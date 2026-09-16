@@ -145,6 +145,13 @@ Next phase:
 - `scripts/fetch_wiki_shard.py` - download one Wikipedia JSONL shard without the full archive (`--list` shows all 544)
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
 
+## Environment (set up 2026-09-17)
+
+- Python 3.12 venv in `.venv` (`python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pip install -e .`). Run tools as `.venv/bin/python -m pytest`, `.venv/bin/ruff check .`, `.venv/bin/wikilense`.
+- torch with CUDA works on the RTX 4060 (`torch.cuda.is_available()` is true); the embedding model downloads to `~/.cache/huggingface`.
+- `docs/DESIGN.md` is the module contract: layout, data formats, parsing and chunking rules, schema, provisional settings and their reasons. Update it when a decision changes.
+- Git: initialised on `main` on 2026-09-17, local identity `ylli <yrada@constructor.university>`. The owner creates the public GitHub repository and pushes. The README is written last (owner's decision, 2026-09-17); until then, `docs/DESIGN.md` holds the reasoning.
+
 ## Working rules
 
 - Development happens on Ubuntu. Keep data and the MariaDB data directory on the Ubuntu (ext4) partition.
@@ -152,7 +159,8 @@ Next phase:
 - MariaDB must be 11.7.1 or newer for `VECTOR` (the brief targets 11.8 LTS).
   - Ubuntu's own `mariadb-server` package is 10.6 on 22.04 and 10.11 on 24.04, neither of which has `VECTOR`; it is 11.8 on 25.10 and 26.04 (packages.ubuntu.com, checked 2026-09-17).
   - Check `SELECT VERSION();` before writing schema code, and state the version in the README.
-  - The install route (Ubuntu apt, MariaDB's own apt repository, or Docker) is the owner's choice; ask.
+  - Install route (owner's decision, 2026-09-17): Docker Compose, `docker compose up -d` from the project root with the official `mariadb:11.8` image (11.8.9 at the time). Passwords live in `.env` (copy `.env.example`). The volume `mariadb-data` is on the ext4 root partition.
+  - Two databases: `wikilense` (the corpus) and `wikilense_test` (the test suite only, created by `sql/docker-init/01-test-database.sh` on first start). Tests must never touch `wikilense`.
 - Keep database credentials in environment variables or an untracked `.env`; never commit them.
 - Compute every statistic from the files and report the actual output. Write "not computed" or "not found" instead of estimating.
 - Do not modify raw data in `data/feverous/`.
