@@ -1,0 +1,23 @@
+# MariaDB 11.8 LTS for WikiLense. Usage: cp .env.example .env, edit the passwords, docker compose up -d
+services:
+  mariadb:
+    image: mariadb:11.8
+    container_name: wikilense-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${WIKILENSE_DB_ROOT_PASSWORD:?set WIKILENSE_DB_ROOT_PASSWORD in .env}
+      MARIADB_DATABASE: ${WIKILENSE_DB_NAME:-wikilense}
+      MARIADB_USER: ${WIKILENSE_DB_USER:-wikilense}
+      MARIADB_PASSWORD: ${WIKILENSE_DB_PASSWORD:?set WIKILENSE_DB_PASSWORD in .env}
+    ports:
+      - "${WIKILENSE_DB_PORT:-3306}:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mariadb-data:
