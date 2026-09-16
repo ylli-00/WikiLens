@@ -13,6 +13,7 @@ services:
       - "${WIKILENSE_DB_PORT:-3306}:3306"
     volumes:
       - mariadb-data:/var/lib/mysql
+      - ./sql/docker-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
