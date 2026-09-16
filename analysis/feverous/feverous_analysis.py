@@ -429,7 +429,7 @@ def derive(a):
         observed = {"claims": a.claims[(split, "ALL")]}
         observed.update({lab: a.claims[(split, lab)] for lab in LABELS})
         observed.update({ch: a.challenge[(split, "ALL", ch, "claims")] for ch in PAPER_CHALLENGES})
-        mod = lambda m: a.set_modality[(split, "ALL", m)]
+        mod = lambda m, split=split: a.set_modality[(split, "ALL", m)]
         list_table = a.set_mixed[(split, "ALL", "list+table")]
         observed[SETS_SENT] = mod("sentence-only")
         observed[SETS_CELLS] = mod("table-only") + mod("list-only") + list_table

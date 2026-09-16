@@ -54,8 +54,9 @@ cell = `{"id", "value", "is_header", "row_span", "column_span"}`); `list_N`
 
 **Element id**: `<page title>_<type>_<numbers>` with type in `sentence`, `cell`, `header_cell`,
 `table_caption`, `item`. Parse with a regex anchored at the end,
-`^(?P<page>.+)_(?P<type>sentence|cell|header_cell|table_caption|item)_(?P<nums>\d+(?:_\d+)*)$`,
-so that a title containing an underscore still parses. `corpus.parse_element_id(el)` returns
+`^(?P<page>.+?)_(?P<type>sentence|cell|header_cell|table_caption|item)_(?P<nums>\d+(?:_\d+)*)$`
+(non-greedy page group: with a greedy one every `header_cell` id parses as page `X_header`, type
+`cell`; measured on all 383,137 train+dev ids), so that a title containing an underscore still parses. `corpus.parse_element_id(el)` returns
 `(page_title_nfc, type, key)` where `key` is the page-object key (`sentence_7`, `item_0_1`,
 `cell_0_1_1` ...). Normalise page titles to Unicode NFC before any comparison.
 
@@ -183,3 +184,105 @@ Deterministic, standard library only, recompute every count from the files.
 - Sweeps: `mhnsw_ef_search`, index `M` (rebuild), chunk `max_words` at equal retrieved text
   (`max_words * k`), embedding prefix on/off.
 - Output: JSON and a Markdown table in `results/`, with the machine, versions and parameters.
+
+## Phase 1 outcomes (measured 2026-09-17, all tests green: 95 passed)
+
+Corrections to the rules above, forced by the data, and the numbers behind the provisional choices.
+
+- **Corpus**: 75 in-shard claims (65 train, 10 dev; 7 SUPPORTS, 58 REFUTES, 10 NEI), 54 evidence
+  pages, 46 filler pages all taken from links (202 candidates), 100 pages, `pages.jsonl` 8.0 MB
+  (large fillers such as Latin, Amsterdam, Lebanon). 65 claims have a sentence-only evidence set;
+  all 75 cite a single page. SHA-256 of both files is in `data/corpus/MANIFEST.md`; the build is
+  byte-identical on re-run (about 5 s).
+- **Parsing** (whole shard, 9,996 pages): 514,984 sentences, 139,131 list items, 654,115 text
+  units; 2,664 units are whitespace-only (empty after cleaning) and are kept as `sentence` rows so
+  evidence ids resolve, but they belong to no chunk. Residual markup after `clean_text` is 86 units
+  (0.013%), all real text (`|` in scores, formulas, IPA). Links: 754,400 (sentences 445,886, cells
+  141,121, items 167,393); links with an empty target (`[[#Section|x]]`, `[[]]`) and bare links
+  truncated by the sentence splitter are skipped; table captions are not read (139 links, no
+  element id). `page_stats["n_sections"]` counts headings, so the `section` table holds
+  `n_sections + 1` rows per page (lead included). Section stack pops every level >= the new one.
+- **Chunking** (max_words 120, overlap 1, whole shard): 165,607 chunks; per page min/median/max
+  1 / 7 / 336; words per chunk min/median/p95/max 1 / 100 / 119 / 543 (mean 87.3); 5.6% of chunks
+  are a single unit; 2 chunks (0.001%) exceed 512 tokens at 1.3 tokens per word (two long list
+  items). Two guards beyond the rule: a chunk that would only repeat units of the previous chunk
+  is not emitted (1,004 on the shard) and a chunk with zero words is not emitted (100).
+- **Database** (MariaDB 11.8.9, PyMySQL 2.2.8): binding a `VECTOR` parameter as plain bytes works
+  only on a connection opened with `binary_prefix=True` (`db.connect` sets it); otherwise MariaDB
+  rejects it (errors 1292 / 4079). `VEC_FromText(%s)` and `UNHEX(%s)` work on any connection. The
+  knn query `ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT n` gives `EXPLAIN` type `index`, key
+  `embedding`; the alias form `ORDER BY distance` is identical. Resolution references
+  (`link.to_page_id`, `claim_evidence.page_id`, `claim_evidence.sentence_id`) use `ON DELETE SET
+  NULL`, ownership references cascade. Explicit indexes on every FK column. `claim.split`,
+  `claim.label`, `claim_evidence.element_type` are ENUMs over the complete value sets found in the
+  files. `section.heading` uses the server default collation (`utf8mb4_uca1400_ai_ci`), so a
+  heading filter with `LIKE` is case- and accent-insensitive on purpose. `mhnsw_ef_search` outside
+  its range is clamped with a warning, not an error. Schema apply 59 ms, reset 87 ms.
+- **Embedding** (bge-small-en-v1.5, revision 5c38ec7c405e, 33.4M parameters, 256 MB on disk):
+  RTX 4060 1,059 passages/s, CPU 78 passages/s for 100-word texts; peak GPU memory 253 MiB; the
+  outputs are bitwise deterministic on both devices; model load 3 to 6 s from a warm cache.
+
+## Ingest (`ingest.py`), contract for phase 2
+
+`run_ingest(settings, corpus_dir=DEFAULT_CORPUS_DIR, reset=True, embedder=None, batch_size=64,
+use_prefix=True, progress=True) -> IngestReport` with counts `n_pages, n_sections, n_sentences,
+n_units_empty, n_chunks, n_links, n_links_resolved, n_links_skipped, n_claims, n_evidence,
+n_evidence_page_resolved, n_evidence_sentence_resolved` and `seconds` per stage (parse, embed,
+load, resolve). Steps, each committed when it completes:
+
+1. `apply_schema(reset)`; refuse to run against the test database.
+2. Parse every page (`parse_page`, `chunk_page`); insert `page`, `section` (lead included),
+   `sentence` (every unit, empty ones too), `link` (`to_title` over 255 characters skipped and
+   counted). Keep chunks in memory with their `embedding_text` (prefix on by default).
+3. Embed all chunk texts in batches (`embed_passages`), then insert `chunk` rows with
+   `vec_param` bytes and `chunk_sentence` rows through `insert_rows`. Assert `embedder.dim ==
+   settings.vector_dim` before embedding.
+4. Resolve `link.to_page_id` with one `UPDATE link JOIN page ON page.title = link.to_title`.
+5. Insert `claim` and `claim_evidence` (`parse_element_id`; `page_id` by title, `sentence_id` by
+   (`page_id`, `element_key`); cells and captions keep `sentence_id` NULL).
+6. Write `ingest_meta`: `embedding_model`, `embedding_dim`, `embedding_prefix`, `chunk_max_words`,
+   `chunk_overlap_units`, `index_m`, `index_distance`, `corpus_dir`, `corpus_pages_sha256`,
+   `corpus_claims_sha256`, `mariadb_version`, `wikilense_version`, `ingested_at` (UTC ISO 8601).
+
+## Search (`search.py`), contract for phase 2
+
+- `Hit(chunk_id, page_id, title, section_path, chunk_ordinal, n_words, distance, text)`.
+- `Filters(min_words=None, max_words=None, heading_like=None, path_like=None, linked_from=None,
+  links_to=None, titles=None)`; every field optional; `heading_like` and `path_like` are SQL LIKE
+  patterns supplied by the caller (parameters, never interpolated).
+- `search(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10, ef_search=None) ->
+  list[Hit]` with strategies: `inline` (predicates and joins in the one statement that carries
+  `ORDER BY VEC_DISTANCE_COSINE(...) LIMIT k`), `overfetch` (an inner index-driven query with
+  `LIMIT k * overfetch`, filtered and re-limited in the outer query), `none` (no filters).
+  `ef_search` sets the session variable for that call and restores it afterwards.
+- `explain_search(conn, ...)` returns the `EXPLAIN` rows for the same statement.
+- `hit_sentences(conn, chunk_ids) -> dict[chunk_id, list[(element_key, text)]]` through
+  `chunk_sentence`, and `page_summary(conn, page_id)`.
+- Every SQL statement is a named module constant (or built from named fragments) so the README
+  can quote them verbatim.
+
+## Evaluation (`evaluate.py`), contract for phase 2
+
+- `load_ground_truth(conn) -> list[ClaimTruth(claim_id, split, label, text, gold_pages: set[int],
+  sentence_only_sets: list[set[int]])]` from `claim` and `claim_evidence` (resolved ids only; a
+  set counts as sentence-only when every element is a `sentence` or `item` with a resolved
+  `sentence_id`).
+- `evaluate(conn, embedder, ks=(1, 3, 5, 10, 20), repeats=5, strategy=..., filters=None,
+  ef_search=None) -> EvalResult` with, per k: article recall (a gold page among the pages of the
+  top-k chunks), evidence recall (every unit of at least one sentence-only set covered by the
+  top-k chunks, over the 65 eligible claims), unit coverage (share of gold units covered), and
+  latency: embedding time and SQL time separately, p50 / p95 / mean over `repeats` warm runs of
+  every claim, plus the parameters, `ingest_meta`, machine and versions.
+- `write_results(result, out_dir="results", name=...)` writes `<name>.json` and `<name>.md` (a
+  table per metric).
+- Sweeps are separate CLI runs (`--ef-search`, `--strategy`, `--k`), not hidden loops.
+
+## CLI and web (`cli.py`, `web.py`), contract for phase 2
+
+`wikilense init-db [--reset]`, `wikilense ingest [--corpus-dir] [--no-reset] [--batch-size]
+[--no-prefix]`, `wikilense query "text" [--k 5] [--min-words N] [--heading PATTERN]
+[--linked-from TITLE] [--strategy inline|overfetch|none] [--ef-search N] [--explain] [--json]`,
+`wikilense eval [--k 1,3,5,10,20] [--repeats 5] [--strategy ...] [--ef-search N] [--out results]
+[--name NAME]`, `wikilense serve [--host 127.0.0.1] [--port 8000]`. The web page is one HTML form
+(query, k, filters) that calls `GET /api/search` and shows hits with title, section path,
+distance, the chunk text and the SQL that ran; no JavaScript framework, no external assets.
