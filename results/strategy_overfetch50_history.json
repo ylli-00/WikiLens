@@ -1,0 +1,2039 @@
+{
+  "parameters": {
+    "ks": [
+      5,
+      10
+    ],
+    "max_k": 10,
+    "repeats": 5,
+    "strategy": "overfetch",
+    "overfetch": 50,
+    "filters": {
+      "min_words": null,
+      "max_words": null,
+      "heading_like": "%History%",
+      "path_like": null,
+      "linked_from": null,
+      "links_to": null,
+      "titles": null
+    },
+    "claim_filters": null,
+    "ef_search": 20,
+    "ef_search_effective": 20,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_device": "cuda",
+    "n_claims": 75,
+    "n_evidence_claims": 66,
+    "n_pages": 100,
+    "n_chunks": 8868,
+    "n_sentences": 33637,
+    "experiment_group": "filters",
+    "eval_seconds": 4.2,
+    "mhnsw_max_cache_size": 536870912,
+    "mhnsw_ef_search_global": 20,
+    "vector_index_name": "embedding",
+    "vector_index_m": 6,
+    "vector_index_distance": "cosine",
+    "chunk_data_length": 23642112,
+    "chunk_index_length": 9273344,
+    "vector_index_tablespace_bytes": 16777216,
+    "chunk_words_mean": 93.0,
+    "chunk_words_median": 103.0,
+    "chunk_words_p95": 119.0,
+    "chunk_words_max": 174,
+    "filter_ground_truth": {
+      "filter": {
+        "heading_like": "%History%"
+      },
+      "n_chunks": 8868,
+      "n_chunks_passing": 268,
+      "n_pages_passing": 66,
+      "claims_gold_page_excluded": 37,
+      "claims_gold_page_excluded_ids": [
+        3482,
+        5753,
+        5848,
+        6419,
+        11910,
+        13207,
+        14253,
+        14727,
+        14909,
+        17676,
+        22563,
+        25324,
+        28863,
+        30562,
+        31383,
+        40707,
+        42937,
+        45793,
+        46127,
+        48999,
+        54047,
+        56899,
+        63422,
+        64595,
+        65842,
+        66646,
+        69572,
+        76756,
+        82504,
+        82761,
+        85631,
+        85881,
+        89819,
+        90340,
+        93212,
+        94092,
+        95085
+      ],
+      "article_recall_ceiling": 38,
+      "n_claims": 75,
+      "evidence_recall_ceiling": 0,
+      "n_evidence_claims": 66
+    },
+    "short_results": {
+      "5": {
+        "queries_short_of_k": 31,
+        "queries_with_no_rows": 4,
+        "rows_min": 0,
+        "rows_mean": 3.79,
+        "short_claim_ids": [
+          2835,
+          5753,
+          5848,
+          6419,
+          11235,
+          11910,
+          13207,
+          13383,
+          14253,
+          14909,
+          19145,
+          40707,
+          40804,
+          42937,
+          43675,
+          48999,
+          50355,
+          54047,
+          62373,
+          65842,
+          66646,
+          69299,
+          74482,
+          76756,
+          79567,
+          82761,
+          85631,
+          90340,
+          93212,
+          93234,
+          95085
+        ]
+      },
+      "10": {
+        "queries_short_of_k": 23,
+        "queries_with_no_rows": 0,
+        "rows_min": 2,
+        "rows_mean": 8.73,
+        "short_claim_ids": [
+          2835,
+          5753,
+          5848,
+          6419,
+          9154,
+          11910,
+          13207,
+          14727,
+          14909,
+          19145,
+          40804,
+          43675,
+          48999,
+          50355,
+          62373,
+          65842,
+          66646,
+          69299,
+          74482,
+          76756,
+          85631,
+          90340,
+          93234
+        ]
+      }
+    }
+  },
+  "ingest_meta": {
+    "chunk_max_words": "120",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
+    "corpus_dir": "/home/ylli/Desktop/Projects/WikiLense/wikilense-linux-20260916T222239Z-1-001/wikilense-linux/data/corpus",
+    "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "index_distance": "cosine",
+    "index_m": "6",
+    "ingested_at": "2026-09-17T12:03:13+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 15.2,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.3",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.0",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  },
+  "n_claims": 75,
+  "n_evidence_claims": 66,
+  "per_k": [
+    {
+      "k": 5,
+      "article_hits": 30,
+      "article_recall": 0.4,
+      "evidence_hits": 0,
+      "evidence_recall": 0.0,
+      "unit_coverage": 0.0,
+      "sql_latency": {
+        "n": 375,
+        "p50_ms": 1.8956800049636513,
+        "p95_ms": 3.5536095012503215,
+        "mean_ms": 2.1347345172349983,
+        "min_ms": 1.3904639999964274,
+        "max_ms": 4.356227000243962
+      }
+    },
+    {
+      "k": 10,
+      "article_hits": 31,
+      "article_recall": 0.41333333333333333,
+      "evidence_hits": 0,
+      "evidence_recall": 0.0,
+      "unit_coverage": 0.0,
+      "sql_latency": {
+        "n": 375,
+        "p50_ms": 2.7905520037165843,
+        "p95_ms": 5.030183796770872,
+        "mean_ms": 3.096845368098002,
+        "min_ms": 2.0046599966008216,
+        "max_ms": 6.403815001249313
+      }
+    }
+  ],
+  "embedding_latency": {
+    "n": 375,
+    "p50_ms": 4.653108000638895,
+    "p95_ms": 4.858087897446239,
+    "mean_ms": 4.711992205353454,
+    "min_ms": 4.470484003832098,
+    "max_ms": 12.680029001785442
+  },
+  "claims": [
+    {
+      "claim_id": 854,
+      "split": "dev",
+      "label": "REFUTES",
+      "text": "Ehrendingen is a municipality in the district of Baden in the canton of Aargau in Switzerland and has an unemployment rate of 2.08%.",
+      "gold_titles": [
+        "Canton of Aargau"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3849,
+        3881,
+        3879,
+        3882,
+        3880,
+        3877,
+        3878,
+        5038,
+        2720,
+        2882
+      ]
+    },
+    {
+      "claim_id": 2835,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Organic solutes (primarily glucose and amino acids)reabsorb 100% of filtrate via secondary active transport, while potassium reabsorb 65% of filtrate by solvent drag and simple diffusion.",
+      "gold_titles": [
+        "Amino acid"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1740,
+        1739,
+        7217,
+        7215,
+        1721,
+        7214,
+        1325
+      ]
+    },
+    {
+      "claim_id": 3482,
+      "split": "dev",
+      "label": "REFUTES",
+      "text": "Jack Brabham, the winner of the 1966 United States Grand Prix at Watkins Glen, beat Jim Clark for first place by 0.11 seconds.",
+      "gold_titles": [
+        "Jack Brabham"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8217,
+        3125,
+        5997,
+        8216,
+        5995,
+        8215,
+        8218,
+        3126,
+        6000,
+        6007
+      ]
+    },
+    {
+      "claim_id": 4212,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "In Chuks Aneke's career from 2011 to 2021, he was part of the Arsenal (football club in America), Zulte Waregem, and Charlton Athletic clubs and got the total of 69 goals.",
+      "gold_titles": [
+        "Arsenal F.C."
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3126,
+        3129,
+        3130,
+        3134,
+        6005,
+        3137,
+        3131,
+        3125,
+        6007,
+        3127
+      ]
+    },
+    {
+      "claim_id": 5121,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Upsilon Pi Epsilon is a member of the ACHS - Association of College Honor Societies and was endorsed by the Association for Computing Machinery (ACM), the asia's largest scientific and educational computing society, founded in 1947.",
+      "gold_titles": [
+        "Association for Computing Machinery"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2535,
+        2243,
+        2572,
+        2569,
+        2571,
+        2723,
+        2568,
+        2770,
+        2771,
+        16
+      ]
+    },
+    {
+      "claim_id": 5753,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Asterales is a species in the tribe Anthemideae, in the kingdom Plantae.",
+      "gold_titles": [
+        "Asterales"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2105,
+        1809,
+        6281,
+        752,
+        2106,
+        1808,
+        6286,
+        2723
+      ]
+    },
+    {
+      "claim_id": 5848,
+      "split": "dev",
+      "label": "SUPPORTS",
+      "text": "Some biennial plants have leaves that develop as basal rosettes.",
+      "gold_titles": [
+        "Biennial plant"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8302,
+        518,
+        6281,
+        8301,
+        6286,
+        8298
+      ]
+    },
+    {
+      "claim_id": 6419,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Kim Philby, part of the Cambridge Five, was an effective American spy while he was serving in the British counterintelligence service.",
+      "gold_titles": [
+        "Kim Philby"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8301,
+        1840,
+        1839,
+        8363,
+        8299,
+        8302
+      ]
+    },
+    {
+      "claim_id": 7831,
+      "split": "dev",
+      "label": "NOT ENOUGH INFO",
+      "text": "Juventus, colloquially known as Juve (pronounced [ˈjuːve), is a professional football club based in Turin, Piedmont, Italy, that competes in the Serie A, the top flight of Italian football, won the most numbers of gold in the Coppa Italia finals.",
+      "gold_titles": [
+        "Juventus F.C."
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7935,
+        5999,
+        2127,
+        6009,
+        2128,
+        86,
+        6010,
+        3137,
+        2126,
+        6005
+      ]
+    },
+    {
+      "claim_id": 7971,
+      "split": "dev",
+      "label": "REFUTES",
+      "text": "Urban decay is a process by which a city falls into a state of disrepair and neglect,  for instance, Kabul, Afghanistan, which, after decades of civil war and occupation, has regions of rubble and desolation, but the indigenous population continues to live in the area.",
+      "gold_titles": [
+        "Kabul"
+      ],
+      "eligible": true,
+      "gold_page_rank": 5,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1809,
+        4502,
+        1811,
+        1810,
+        7678,
+        4500,
+        1812,
+        1808,
+        2241,
+        2242
+      ]
+    },
+    {
+      "claim_id": 9154,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "A total of 22 foreign NBA players came from Asia, coming from seven of the 48 Asian countries.",
+      "gold_titles": [
+        "Asia"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        4502,
+        2247,
+        4501,
+        4499,
+        4503,
+        4498,
+        8220,
+        1809
+      ]
+    },
+    {
+      "claim_id": 11235,
+      "split": "dev",
+      "label": "REFUTES",
+      "text": "London's Underground is one of the few Railway electrification systems that utilizes four rails, which doesn't solve the problem of electrolytic damage in return currents as the system has no way keep stray earth currents at manageable levels.",
+      "gold_titles": [
+        "London Underground"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7510,
+        5756,
+        6280,
+        6224,
+        6283,
+        6284,
+        6285,
+        6509,
+        5757,
+        6510
+      ]
+    },
+    {
+      "claim_id": 11435,
+      "split": "dev",
+      "label": "NOT ENOUGH INFO",
+      "text": "Azerbaijan's primary economic sectors were oil, gas, chemical, light industries, and food processing, which continued to move at a slow pace from 1920 until 1939.",
+      "gold_titles": [
+        "Economy of Azerbaijan"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2246,
+        2245,
+        2227,
+        2241,
+        2236,
+        7214,
+        2243,
+        2244,
+        2240,
+        7217
+      ]
+    },
+    {
+      "claim_id": 11439,
+      "split": "dev",
+      "label": "REFUTES",
+      "text": "Roma, colloquially known as Juve (pronounced [ˈjuːve), is a professional football club based in Turin, Piedmont, Italy, that competes in the Serie A, the top flight of Italian football, won the most numbers of gold in the Coppa Italia finals.",
+      "gold_titles": [
+        "Juventus F.C."
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7935,
+        2128,
+        2126,
+        2127,
+        5999,
+        86,
+        6009,
+        3137,
+        2194,
+        2193
+      ]
+    },
+    {
+      "claim_id": 11910,
+      "split": "train",
+      "label": "SUPPORTS",
+      "text": "Jimmy Carter won the 1980 New Hampshire Primary vote, but lost the Presidential election to Ronald Reagan.",
+      "gold_titles": [
+        "Jimmy Carter"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8215,
+        8301,
+        8216,
+        8218,
+        1839,
+        1840,
+        8217,
+        8299,
+        8302
+      ]
+    },
+    {
+      "claim_id": 13207,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Leigha Hancock appeared in The Hunger Games (2012), which Gary Valenciano directed, and ran 142 minutes.",
+      "gold_titles": [
+        "The Hunger Games (film)"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1423,
+        1419,
+        1418,
+        1424,
+        1422,
+        1420,
+        6285
+      ]
+    },
+    {
+      "claim_id": 13383,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Jackie Tyler is introduced in \"Rose\", she is attacked by shop window dummies and returns twelve months later from London which is the capital of Scotland.",
+      "gold_titles": [
+        "London"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6284,
+        6285,
+        6510,
+        6283,
+        8776,
+        6792,
+        5999,
+        8775,
+        6280,
+        6512
+      ]
+    },
+    {
+      "claim_id": 14253,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Russowia belongs to the Asteraceae family of the Asterales order, an order of monocotyledonous flowering plants.",
+      "gold_titles": [
+        "Asterales"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        752,
+        2105,
+        2237,
+        1812,
+        4499,
+        2236,
+        2245,
+        3036,
+        2239,
+        1809
+      ]
+    },
+    {
+      "claim_id": 14727,
+      "split": "train",
+      "label": "SUPPORTS",
+      "text": "Flowering plants in the daisy family belong to the Kingdon Plantae, Order Asterales and Family Asteraceae.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": false,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6286,
+        2105,
+        6281,
+        2106,
+        6282,
+        752,
+        3043
+      ]
+    },
+    {
+      "claim_id": 14909,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Melanthera is a genus of flowering plants under the Asteraceae, the largest family of the order Asterales.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3035,
+        2105,
+        3041,
+        3033,
+        773,
+        8775,
+        774
+      ]
+    },
+    {
+      "claim_id": 15195,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Kencargo Airlines International has three owners, one of whom is KLM (founded in 1958) with 20% ownership.",
+      "gold_titles": [
+        "KLM"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3128,
+        8300,
+        6006,
+        2770,
+        6005,
+        3123,
+        3122,
+        2771,
+        3121,
+        5993
+      ]
+    },
+    {
+      "claim_id": 15823,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Canadian poet and prose writer Peter Sanger studied at the University of Melbourne, University of Victoria, and Acadia University located in New York City.",
+      "gold_titles": [
+        "Acadia University"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2566,
+        2570,
+        2571,
+        2568,
+        2572,
+        2569,
+        4095,
+        4093,
+        4096,
+        4097
+      ]
+    },
+    {
+      "claim_id": 17676,
+      "split": "dev",
+      "label": "NOT ENOUGH INFO",
+      "text": "A specie of fish native to the United States belongs to the Kingdom Animalia, Phylum Chordata and Class Actinopterygii.",
+      "gold_titles": [
+        "Actinopterygii"
+      ],
+      "eligible": false,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        4096,
+        4093,
+        752,
+        6284,
+        4095,
+        6280,
+        751,
+        4094,
+        1809,
+        7055
+      ]
+    },
+    {
+      "claim_id": 19145,
+      "split": "dev",
+      "label": "REFUTES",
+      "text": "Westshore velodrome a 33m outdoor bicycle racing track located in Colwood city (capital of British Columbia) was designed to be used by the public after the Commonwealth Games.",
+      "gold_titles": [
+        "British Columbia"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        4092,
+        6388,
+        6510,
+        6224,
+        6389
+      ]
+    },
+    {
+      "claim_id": 22563,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Genus Hyoseris is classified under tribe Cichorieae,  a tribe in the plant family Asteraceae that includes 93 genera, in the kingdom Plantae.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        4096,
+        3036,
+        4095,
+        3033,
+        3034,
+        4094,
+        1740,
+        3261,
+        4093,
+        3035
+      ]
+    },
+    {
+      "claim_id": 25324,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Zhang Quanyi became governor of Heyang while Li Hanzhi was preoccupied with his campaign.",
+      "gold_titles": [
+        "Zhang Quanyi"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1839,
+        1838,
+        1840,
+        7423,
+        4502,
+        2236,
+        7214,
+        4501,
+        7215,
+        7678
+      ]
+    },
+    {
+      "claim_id": 26799,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "In the 1870s Monreith Estate covered about 16,000 acres (65 km), and the Monreith House is surrounded by woodlands and looks towards the White Loch of Myrton in the Mochrum area.",
+      "gold_titles": [
+        "Monreith House"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8774,
+        8775,
+        8776,
+        6792,
+        6509,
+        6224,
+        4098,
+        6510,
+        4092,
+        4094
+      ]
+    },
+    {
+      "claim_id": 28863,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The name Alaricus has no connection with the Gothic Language.",
+      "gold_titles": [
+        "Alaric I"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3260,
+        2882,
+        3849,
+        6510,
+        5138,
+        6120,
+        752,
+        6512,
+        751,
+        3261
+      ]
+    },
+    {
+      "claim_id": 30562,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Garra waterloti scientific classification is kingdom animalia, phylum chordata and class actinopterygiin whose members are ray-finned frogs.",
+      "gold_titles": [
+        "Actinopterygii"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6281,
+        6280,
+        6284,
+        2723,
+        6285,
+        3041,
+        1740,
+        3036,
+        6224,
+        4096
+      ]
+    },
+    {
+      "claim_id": 31383,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Despite cold War tensions Louis Pasteur, a Soviet microbiologist and virologist, traveled to the U.S. to study the Salk polio vaccine.",
+      "gold_titles": [
+        "Louis Pasteur"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1840,
+        4096,
+        1839,
+        1740,
+        1739,
+        4502,
+        2245,
+        2628,
+        2246,
+        2243
+      ]
+    },
+    {
+      "claim_id": 32256,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The Apache Directory (an American nonprofit corporation (classified as a 501(c)(3) organization in the United States) to support Apache software projects, including the Apache HTTP Server) is an open source project of the Apache Software Foundation (certified LDAPv3-compatible by The Open Group in 2006) with its Apache Directory Server - an embeddable directory server entirely written in Java, as its flagship product.",
+      "gold_titles": [
+        "The Apache Software Foundation"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2769,
+        2772,
+        2770,
+        2771,
+        1740,
+        516,
+        8302,
+        3033,
+        3882,
+        3034
+      ]
+    },
+    {
+      "claim_id": 32645,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The 72-titled Netherlands football team, AFC Ajax, has played in the Eredivisie league since its inception in 1956.",
+      "gold_titles": [
+        "AFC Ajax"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3121,
+        3124,
+        3125,
+        3123,
+        3133,
+        3129,
+        3135,
+        3126,
+        3134,
+        3136
+      ]
+    },
+    {
+      "claim_id": 34024,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Panda and the Magic Serpent, also known as The Tale of the White Serpent, is the first color anime feature film, which is not hand-drawn, but computer animation originating from Japan.",
+      "gold_titles": [
+        "Anime"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1420,
+        1419,
+        1417,
+        1421,
+        1424,
+        1422,
+        1423,
+        1418,
+        3258,
+        3041
+      ]
+    },
+    {
+      "claim_id": 36003,
+      "split": "train",
+      "label": "SUPPORTS",
+      "text": "The Principality of Andorra is home to folk dances like the contrapàs and marratxa, which survive in Sant Julià de Lòria especially, but also in Andorra la Vella.",
+      "gold_titles": [
+        "Andorra"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        775,
+        774,
+        776,
+        773,
+        2127,
+        5138,
+        2722,
+        4500,
+        6281,
+        3258
+      ]
+    },
+    {
+      "claim_id": 36109,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The May 17 Agreement called for the Lebanese Army (founded neither on August 1, 1945 nor on  August 1, 1983) to take over Israeli positions, but was revoked by the Lebanese parliament under the leadership of newly-elected speaker Hussein el-Husseini.",
+      "gold_titles": [
+        "Lebanese Armed Forces"
+      ],
+      "eligible": false,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8365,
+        8364,
+        8360,
+        8358,
+        8357,
+        8366,
+        8361,
+        8359,
+        8363,
+        8367
+      ]
+    },
+    {
+      "claim_id": 40707,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "Following the American Civil War, the Army and Navy were unsupportive of each other at either the planning or operational level; thus the Joint Board, acting as an \"advisory committee\", was created to plan joint operations and resolve problems of common rivalry between the two services.",
+      "gold_titles": [
+        "American Civil War"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1840,
+        8301,
+        8365,
+        8360,
+        5758,
+        7214,
+        5760,
+        5759,
+        8359,
+        5756
+      ]
+    },
+    {
+      "claim_id": 40804,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Atlanta, the largest city in Georgia, had a population of 5,268,860 in 2010.",
+      "gold_titles": [
+        "Atlanta"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3535,
+        2241,
+        2247,
+        6280
+      ]
+    },
+    {
+      "claim_id": 42937,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Garra tibanica is in the Labeoninae subfamily, within the Cyprinidae family, under the class of Actinopterygii (known as a diverse taxonomic group of fish).",
+      "gold_titles": [
+        "Actinopterygii"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3041,
+        1808,
+        6281,
+        3043,
+        2723,
+        5137,
+        752,
+        4096,
+        3261,
+        3040
+      ]
+    },
+    {
+      "claim_id": 43675,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Annie Duke born September 13, 1965 lives in Los Angeles, California, U.S. (the smallest city in California) and is known as the Duchess of Poker",
+      "gold_titles": [
+        "Los Angeles"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7055,
+        8215,
+        8216,
+        6284,
+        8776,
+        8774
+      ]
+    },
+    {
+      "claim_id": 44563,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Gajapathinagaram is found in Andhra Pradesh in India, which has a population of 5687 from the 2011 census.",
+      "gold_titles": [
+        "Andhra Pradesh"
+      ],
+      "eligible": false,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3039,
+        3042,
+        3043,
+        3033,
+        3038,
+        3041,
+        3031,
+        3037,
+        3036,
+        3040
+      ]
+    },
+    {
+      "claim_id": 45340,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Oklahoma State Highway 54 runs north to south and exists in two parts which lie at approximately the same longitude which is a geographic coordinate that specifies the north-south position of a point on the Earth's surface or the surface of a celestial body.",
+      "gold_titles": [
+        "Longitude"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7901,
+        7897,
+        7902,
+        7900,
+        7892,
+        7906,
+        7898,
+        7903,
+        7908,
+        6224
+      ]
+    },
+    {
+      "claim_id": 45793,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Jack Bravham, n Australian racing driver born in 1946, placed first in the 1960 French Grand Prix.",
+      "gold_titles": [
+        "Jack Brabham"
+      ],
+      "eligible": false,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8216,
+        3124,
+        5996,
+        3127,
+        5995,
+        3128,
+        3126,
+        3123,
+        3129,
+        3125
+      ]
+    },
+    {
+      "claim_id": 46127,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "Australia's truple world champion Jack Brabham was in the first position at the Classification, finishing 80 laps with a time of 1:49:34.6",
+      "gold_titles": [
+        "Jack Brabham"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6010,
+        6003,
+        5995,
+        6000,
+        6007,
+        6795,
+        2723,
+        6008,
+        6388,
+        6005
+      ]
+    },
+    {
+      "claim_id": 48999,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Playwright Jules Verne is the woman behind the characterization of Willy Fog.",
+      "gold_titles": [
+        "Jules Verne"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2104,
+        8302,
+        5038,
+        3952
+      ]
+    },
+    {
+      "claim_id": 50355,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "In 2011 Liz Nistico and Louie Diller of Holychild from Los Angeles, officially the city of angels, spent a summer together writing and making music until Nistico moved to Brooklyn and Diller stayed in DC, and in 2012 In 2012 Diller convinced Nistico to move back to Washington, DC.",
+      "gold_titles": [
+        "Los Angeles"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7055,
+        8215,
+        8219,
+        6284,
+        8217,
+        8218,
+        8220,
+        6280,
+        8216
+      ]
+    },
+    {
+      "claim_id": 54047,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "Including 23,810 species, Lamiales holds erythranthe moschata.",
+      "gold_titles": [
+        "Lamiales"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6280,
+        6281,
+        6284,
+        6286,
+        6283,
+        775,
+        776,
+        2194,
+        6285,
+        774
+      ]
+    },
+    {
+      "claim_id": 56899,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Teratornis is the Animalia kingdom, Aves class (which are rodents), and is in the Teratornithidae family.",
+      "gold_titles": [
+        "Bird"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6283,
+        6286,
+        6284,
+        6285,
+        6282,
+        1808,
+        6281,
+        1809,
+        6280,
+        2723
+      ]
+    },
+    {
+      "claim_id": 61236,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The Central Connecticut Blue Devils women's sports include softball, the oldest organized sport in North America, with its origins in a tribal game played by the indigenous peoples of the Eastern Woodlands and by various other indigenous peoples of North America.",
+      "gold_titles": [
+        "Lacrosse"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6389,
+        6384,
+        6388,
+        6387,
+        6385,
+        6386,
+        4094,
+        4093,
+        4886,
+        2722
+      ]
+    },
+    {
+      "claim_id": 62373,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Thomas Needham Furnival Wilson  was a British Army officer who served in the King's Royal Rifle Corps and the 2nd Battalion, KRRC during the Anglo Irish War.",
+      "gold_titles": [
+        "King's Royal Rifle Corps"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6509,
+        8359,
+        6793,
+        2246,
+        6507,
+        4092,
+        8367,
+        6791,
+        1839
+      ]
+    },
+    {
+      "claim_id": 63422,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Iceland remained under Norwegian kingship until 1380; then Norway became part of the Kalmar Union with Sweden and Greenland.",
+      "gold_titles": [
+        "Kalmar Union"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2245,
+        3849,
+        2239,
+        2236,
+        3035,
+        2244,
+        3036,
+        5138,
+        3259,
+        3128
+      ]
+    },
+    {
+      "claim_id": 64595,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Garra tana is a species of tropical ray-finned fish which are a no longer classified as a clade of the bony fishes.",
+      "gold_titles": [
+        "Actinopterygii"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1419,
+        2722,
+        3040,
+        752,
+        2724,
+        751,
+        2236,
+        3042,
+        1812,
+        4094
+      ]
+    },
+    {
+      "claim_id": 65842,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Qinhuangdao District is located in Wenhua Road Subdistrict disctrict in Hebei province and it has a total area of 121 km.",
+      "gold_titles": [
+        "List of township-level divisions of Hebei"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7055,
+        3039
+      ]
+    },
+    {
+      "claim_id": 66646,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "J.K. Rowling, who is known for his work \"The Nature of Truth\" (a novel that explores righteousness and evil,  Yale and the Holocaust), was born in 1965.",
+      "gold_titles": [
+        "J. K. Rowling"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8775,
+        8776,
+        519,
+        521,
+        6284
+      ]
+    },
+    {
+      "claim_id": 67426,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Darevskia praticola, also known as the meadow lizard, is found in most of the country of Bulgaria (a country in southeastern Europe situated entirely in the Balkan peninsula), including the south-western regions and the Upper Thracian valley.",
+      "gold_titles": [
+        "Bulgaria"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3258,
+        3257,
+        6281,
+        3259,
+        751,
+        774,
+        2241,
+        775,
+        5137,
+        5138
+      ]
+    },
+    {
+      "claim_id": 69200,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Uttar Badepasha ( Sylhet District, Bangladesh (capital New York)) had ten names that held terms between 1971 and present, one of whom was Lutfur Rahman.",
+      "gold_titles": [
+        "Bangladesh"
+      ],
+      "eligible": false,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1513,
+        3042,
+        3037,
+        3039,
+        3038,
+        3036,
+        1808,
+        3041,
+        1839,
+        1809
+      ]
+    },
+    {
+      "claim_id": 69299,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Demographics of the Bronx has five separate races, Asian ( Americans of Asian ancestry) makes up 4.2%.",
+      "gold_titles": [
+        "The Bronx"
+      ],
+      "eligible": false,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2378,
+        4886,
+        1809,
+        1812
+      ]
+    },
+    {
+      "claim_id": 69572,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The Austro-Hungarian Foreign Minister Andrássy could not obtain the right to station garrisons in the Sanjak of Novi Pazar, which was under the administration of the Ottoman Empire and separated Serbia from Montenegro",
+      "gold_titles": [
+        "Gyula Andrássy"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8359,
+        2242,
+        2243,
+        2236,
+        8357,
+        3261,
+        2241,
+        4500,
+        2237,
+        2245
+      ]
+    },
+    {
+      "claim_id": 74482,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Smithfield, Utah is the largest city in the area.",
+      "gold_titles": [
+        "Smithfield, Utah"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3359,
+        751,
+        3043
+      ]
+    },
+    {
+      "claim_id": 76756,
+      "split": "train",
+      "label": "SUPPORTS",
+      "text": "The scientific classification of kingdom plantae, order asterales and family asteraceae which has 32,000 accepted species.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": false,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6280,
+        6281,
+        2105,
+        2723,
+        6286,
+        4096,
+        6120
+      ]
+    },
+    {
+      "claim_id": 76962,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "AFC Ajax, a Netherlands football team with 72 titles, has played in the Eredivisie league since its inception in 1956.",
+      "gold_titles": [
+        "AFC Ajax"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3121,
+        3125,
+        3135,
+        3133,
+        3129,
+        3123,
+        3134,
+        3124,
+        3126,
+        3122
+      ]
+    },
+    {
+      "claim_id": 79299,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Zeta Antliae is in the Antlia Constellation (originally Antlia Pneumatica, established by Nicolas-Louis de Lacaille in the 16th century) with an apparent magnitude of 5.91 and a spectral type of A9 IV.",
+      "gold_titles": [
+        "Antlia"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2105,
+        2104,
+        2106,
+        7900,
+        7895,
+        7894,
+        7899,
+        753,
+        7896,
+        7904
+      ]
+    },
+    {
+      "claim_id": 79567,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Testeagles were formed as a techno rock trio in Adelaide (the capital city of the state of North Australia) in 1994, and were signed by Stuart MacQueen of Adelaide-based independent label, Krell Records.",
+      "gold_titles": [
+        "Adelaide"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6284,
+        2566,
+        2127,
+        2568,
+        6795,
+        6285,
+        5993,
+        2128,
+        6386,
+        4095
+      ]
+    },
+    {
+      "claim_id": 82504,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "The 1979 season of the Cleveland Indians implemented a Farm system for their Minor League Baseball with levels AAA, AA, and A represented by Tacoma Tugs, Chattanooga Lookouts, and Waterloo Indians, respectively.",
+      "gold_titles": [
+        "Kenesaw Mountain Landis"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8215,
+        8218,
+        8217,
+        6385,
+        6386,
+        6384,
+        6387,
+        8216,
+        4094,
+        6388
+      ]
+    },
+    {
+      "claim_id": 82761,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The scientific classification of Prairie coneflowers is kingdom plantae, order asterales and family asteraceae which is a family of non-flowering animals.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6281,
+        6286,
+        4094,
+        6282,
+        2105,
+        4095,
+        4096,
+        1325,
+        752,
+        4093
+      ]
+    },
+    {
+      "claim_id": 83276,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The 2018 Cambodian League teams included Arsenal, a Cambodian professional football club.",
+      "gold_titles": [
+        "Arsenal F.C."
+      ],
+      "eligible": true,
+      "gold_page_rank": 7,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6009,
+        6005,
+        6010,
+        3137,
+        3136,
+        5996,
+        2929,
+        3132,
+        6004,
+        5995
+      ]
+    },
+    {
+      "claim_id": 84120,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Paolo Montero has made 30 appearances in the 1993–94 Serie A League under Atalanta; then made 23 appearances in the 2000–01 Serie A League under Juventus (a professional baseball club based in Turin, Piedmont, Italy).",
+      "gold_titles": [
+        "Juventus F.C."
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        7935,
+        2127,
+        2128,
+        86,
+        8004,
+        6008,
+        5999,
+        6010,
+        3137,
+        6005
+      ]
+    },
+    {
+      "claim_id": 85631,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Plantae kingdom Diplazoptilon are classified in the Asteraceae family, a very large and widespread family of flowering plants, including over 32,000 species, in 1,900 genera, in thirteen subfamilies.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6281,
+        752,
+        2723,
+        1808,
+        4096,
+        2105
+      ]
+    },
+    {
+      "claim_id": 85881,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Moonia belongs to the tribe Coreopsideae under the family Asteraceae which includes over 40,000 currently accepted species, in over 1,900 genera (list) in 13 subfamilies.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        2106,
+        1809,
+        3033,
+        2105,
+        752,
+        3036,
+        1812,
+        4499,
+        4093,
+        4095
+      ]
+    },
+    {
+      "claim_id": 87976,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "During the Waddington By-Election 17 October 2002, Conservatives won more votes than Liberal Democrats which was founded in 1988.",
+      "gold_titles": [
+        "Lincoln, England"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        8297,
+        6793,
+        6000,
+        6001,
+        5993,
+        8299,
+        5995,
+        6792,
+        5998,
+        6002
+      ]
+    },
+    {
+      "claim_id": 89819,
+      "split": "train",
+      "label": "SUPPORTS",
+      "text": "In 1989, Toshiki Kaifu (born January 2, 1931) is an LDP member who became the Prime Minister of Japan.",
+      "gold_titles": [
+        "Toshiki Kaifu"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        1418,
+        1839,
+        1417,
+        1421,
+        1838,
+        2770,
+        1422,
+        2771,
+        8365,
+        1423
+      ]
+    },
+    {
+      "claim_id": 90340,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "There have been 50 film adaptations of the works of Agatha Christie, with the latest being Death on the Nile, and ten video game adaptations.",
+      "gold_titles": [
+        "Agatha Christie"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6280,
+        2781
+      ]
+    },
+    {
+      "claim_id": 93212,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "Lachnorhiza belongs to the Order Asterales, an order consisting of grass, under Kingdom Plantae.",
+      "gold_titles": [
+        "Asterales"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3035,
+        752,
+        3036,
+        2245,
+        6281,
+        2193,
+        2243,
+        4499,
+        1808,
+        1809
+      ]
+    },
+    {
+      "claim_id": 93234,
+      "split": "train",
+      "label": "REFUTES",
+      "text": "The demographics of Metro Atlanta in 2010 included a total of 6 million people, 55.4% white only and 32.4% Black only.",
+      "gold_titles": [
+        "Atlanta"
+      ],
+      "eligible": true,
+      "gold_page_rank": 1,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        3535,
+        4886,
+        2247,
+        3670
+      ]
+    },
+    {
+      "claim_id": 94092,
+      "split": "train",
+      "label": "NOT ENOUGH INFO",
+      "text": "Tournexia is from the Plantae kingdom and a member of the Asteraceae family.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": true,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        752,
+        3034,
+        4094,
+        4096,
+        3040,
+        4499,
+        4095,
+        5138,
+        775,
+        4502
+      ]
+    },
+    {
+      "claim_id": 95085,
+      "split": "train",
+      "label": "SUPPORTS",
+      "text": "The scientific classification of kingdom plantae, order asterales and family asteraceae.",
+      "gold_titles": [
+        "Asteraceae"
+      ],
+      "eligible": false,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
+      "hit_chunk_ids": [
+        6280,
+        1325,
+        6281,
+        4498,
+        5136,
+        4094,
+        6791,
+        2105,
+        96,
+        7425
+      ]
+    }
+  ],
+  "unstable_claims": [],
+  "prefix_mismatches": {
+    "5": 34
+  },
+  "notes": [
+    "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
+    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
+    "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
+  ],
+  "created_at": "2026-09-17T12:03:44+00:00"
+}
