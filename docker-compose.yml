@@ -9,6 +9,9 @@ services:
       MARIADB_DATABASE: ${WIKILENSE_DB_NAME:-wikilense}
       MARIADB_USER: ${WIKILENSE_DB_USER:-wikilense}
       MARIADB_PASSWORD: ${WIKILENSE_DB_PASSWORD:?set WIKILENSE_DB_PASSWORD in .env}
+    # The HNSW index cache defaults to 16 MB, less than the 13.6 MB of vectors plus graph edges of
+    # 8,868 chunks; a thrashing cache made index results change between identical runs.
+    command: --mhnsw-max-cache-size=536870912
     ports:
       - "${WIKILENSE_DB_PORT:-3306}:3306"
     volumes:

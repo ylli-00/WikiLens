@@ -286,3 +286,46 @@ load, resolve). Steps, each committed when it completes:
 [--name NAME]`, `wikilense serve [--host 127.0.0.1] [--port 8000]`. The web page is one HTML form
 (query, k, filters) that calls `GET /api/search` and shows hits with title, section path,
 distance, the chunk text and the SQL that ran; no JavaScript framework, no external assets.
+
+## Phase 2 outcomes (measured 2026-09-18, 199 tests green, commit b517a67)
+
+- **Ingest** of the 100-page corpus: 3,173 sections, 33,637 sentence rows (372 empty), 8,868
+  chunks (per page min/median/max 2 / 85 / 232), 39,155 chunk-sentence rows, 40,542 links of
+  which only 373 resolve inside the corpus (78 distinct target pages), 75 claims, 114 evidence
+  rows (114 with a page, 87 with a sentence: the 27 cell ids stay unresolved). 30 s in total, 26 s
+  of it model load and embedding on the GPU. `chunk` is 23.6 MB of data and 9.3 MB of index.
+- **Evidence-recall denominator is 66, not 65**: claim 65842's set is two sentences and two list
+  items, all resolved; list items count as text units.
+- **Search statements**: the inline statement uses `STRAIGHT_JOIN` with `chunk` first, because
+  with a plain `JOIN` the optimizer started from `page` when table statistics were stale (right
+  after a bulk insert) and lost the vector index. The link filters are joins on a materialised
+  `SELECT DISTINCT to_page_id ...` derived table, because the `IN (subquery)` form became a
+  semi-join that started from `link` and lost the index. `ORDER BY distance, chunk_id` also loses
+  the index, so the chunk-id tie-break is done in Python. A wrong-dimension query vector returns
+  NULL distances, not an error.
+- **How MariaDB 11.8.9 uses the vector index** (the central finding):
+  - A bare `ORDER BY VEC_DISTANCE_COSINE(...) LIMIT k` (strategies `none` and `overfetch`) is the
+    HNSW search proper: 0.5 to 1.2 ms on 8,868 chunks, reads exactly `LIMIT` rows, and its
+    accuracy depends on `mhnsw_ef_search`.
+  - As soon as another table is joined in the same statement (strategy `inline`), `EXPLAIN` still
+    reports `type index, key embedding`, but the index walk continues until `k` rows pass the
+    joins and predicates. Results become near-exact regardless of `ef_search`, and the time grows
+    with the table: 4 ms on the corpus (vs 7.7 ms for an exact full scan), 24 ms on 12,000 random
+    chunks. `overfetch` stays bounded but returns fewer than `k` rows when the filter is selective
+    (`heading LIKE '%History%'` keeps 3% of chunks: 1 row at k=5 with overfetch 10).
+  - Baseline (`none`, ef_search 20, k=1/3/5/10/20): article recall 56/62/64/68/68 of 75, evidence
+    recall 22/31/33/39/48 of 66, SQL p50 0.6 to 0.8 ms, query embedding 4.6 ms on the GPU. An
+    exact ranking of the same vectors finds 66/71/73/74/74 pages, so the gap is HNSW
+    approximation, not the embedding. With `mhnsw_ef_search = 100`: 65/70/72/74/74 pages and
+    31/40/43/49/59 evidence sets at the same latency (p50 0.65 ms at k=1).
+  - Oracle with the gold page as a `titles` filter: the evidence is in the first chunk for 35 of
+    66 claims, within 5 for 50, within 20 for 65; the inline filtered statement costs 4.2 ms p50,
+    15 ms p95, because the walk continues until `k` chunks of the one allowed page have passed.
+  - Index results changed once between two identical runs four minutes apart (each run stable
+    within itself; nothing in `chunk` changed; server not restarted). The suspect is the
+    `mhnsw_max_cache_size` default of 16 MB against 13.6 MB of vectors plus graph edges; the
+    Docker Compose file now starts the server with 512 MB. To be verified in the experiments.
+  - Worst cases at ef_search 20: seven claims whose gold page is not in the top 20, mostly
+    claims about a person or event where the gold page is a city or institution (Kabul, Acadia
+    University, Los Angeles), and a taxonomy cluster (Asteraceae / Asterales) where the corpus
+    holds both pages.
