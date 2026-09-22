@@ -1,25 +1,35 @@
 """Ingest pipeline: corpus files -> page, section, sentence, link, claim tables -> chunks -> embeddings.
 
 ``run_ingest`` is the single entry point (docs/DESIGN.md, "Ingest (ingest.py), contract for
-phase 2"). It runs six steps against ``settings.db_name`` and commits each one when it completes:
+phase 2"). It runs seven steps against ``settings.db_name`` and commits each one when it
+completes:
 
 1. ``db.apply_schema`` (``reset=True`` drops the tables first). The test database
    (``settings.test_db_name``) is refused.
 2. Every page is parsed (``wikitext.parse_page``, ``chunking.chunk_page``) and its ``page``,
-   ``section`` (lead included), ``sentence`` (every text unit, whitespace-only ones too, so that
-   evidence ids resolve) and ``link`` rows are written; a link target longer than
-   ``MAX_TITLE_LENGTH`` characters is skipped and counted. Chunks stay in memory with the text
-   that will be embedded (``chunking.embedding_text`` when ``use_prefix``).
+   ``section`` (lead included), ``sentence`` (every text unit: whitespace-only ones and hatnotes
+   such as "Main article: X" too, so that evidence ids resolve) and ``link`` rows are written; a
+   link target longer than ``MAX_TITLE_LENGTH`` characters is skipped and counted. Chunks stay in
+   memory with the text that will be embedded (``chunking.embedding_text`` when ``use_prefix``).
 3. The embedder's dimension is checked against ``settings.vector_dim`` (which must equal the
    literal in ``sql/schema.sql``), the chunk texts are embedded with ``embed_passages`` and the
    ``chunk`` rows (``db.vec_param`` bytes) and the ``chunk_sentence`` map are written. A chunk is
-   mapped to the units whose text it carries: whitespace-only units belong to no chunk.
+   mapped to the units it carries; whitespace-only units and hatnotes (``TextUnit.chunkable`` is
+   False, see ``wikitext.HATNOTE_RE``) belong to no chunk and are counted as ``n_units_empty``
+   and ``n_units_hatnote``.
 4. ``link.to_page_id`` is resolved with one ``UPDATE link JOIN page``.
-5. ``claim`` and ``claim_evidence`` are written; ``page_id`` is resolved by title and
+5. ``ANALYZE TABLE`` runs for ``chunk``, ``page``, ``section`` and ``link`` (``ANALYZE_TABLES``),
+   so that the optimizer plans the search statements from fresh InnoDB statistics rather than
+   from the stale ones left by the bulk insert (a plain JOIN once started from ``page`` and lost
+   the vector index that way, docs/DESIGN.md). The seconds are reported (stage ``analyze``) and
+   recorded in ``ingest_meta``.
+6. ``claim`` and ``claim_evidence`` are written; ``page_id`` is resolved by title and
    ``sentence_id`` by ``(page_id, element_key)`` for sentences and list items (cells and captions
    keep ``sentence_id`` NULL).
-6. ``ingest_meta`` records the model, chunk and index parameters, the SHA-256 of both corpus
-   files, the server version and the time.
+7. ``ingest_meta`` records the model, chunk and index parameters, the hatnote rule and count,
+   the ANALYZE tables and seconds, the corpus directory (relative to the repository root when
+   inside it, so the value does not leak a home directory), the SHA-256 of both corpus files,
+   the server version and the time.
 
 Every INSERT goes through ``db.insert_rows`` in batches of at most ``INSERT_BATCH_ROWS`` rows.
 Progress bars (tqdm) are shown only with ``progress=True``; each stage logs one summary line
@@ -44,9 +54,9 @@ from tqdm import tqdm
 
 from wikilense import __version__, db
 from wikilense.chunking import chunk_page, embedding_text
-from wikilense.config import Settings
+from wikilense.config import REPO_ROOT, Settings
 from wikilense.corpus import DEFAULT_CORPUS_DIR, iter_claims, iter_pages, parse_element_id
-from wikilense.wikitext import parse_page
+from wikilense.wikitext import HATNOTE_RE, parse_page
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +69,15 @@ MAX_TITLE_LENGTH = 255
 INDEX_DISTANCE = "cosine"
 """The DISTANCE of the VECTOR INDEX in sql/schema.sql, recorded in ``ingest_meta``."""
 
-STAGES: tuple[str, ...] = ("schema", "parse", "embed", "load", "resolve", "total")
+STAGES: tuple[str, ...] = ("schema", "parse", "embed", "load", "resolve", "analyze", "total")
 """Keys of ``IngestReport.seconds``: parse = parse_page + chunk_page; embed = model dimension
 check (loads the model) + embed_passages; load = every INSERT (plus file hashing);
-resolve = the link UPDATE and the evidence id lookups; total = the whole run."""
+resolve = the link UPDATE and the evidence id lookups; analyze = the ANALYZE TABLE statements;
+total = the whole run."""
+
+ANALYZE_TABLES: tuple[str, ...] = ("chunk", "page", "section", "link")
+"""Tables whose InnoDB statistics are refreshed with ``ANALYZE TABLE`` after the chunks are
+loaded: the tables the search statements join and filter on."""
 
 META_KEYS: tuple[str, ...] = (
     "embedding_model",
@@ -72,6 +87,10 @@ META_KEYS: tuple[str, ...] = (
     "chunk_overlap_units",
     "index_m",
     "index_distance",
+    "hatnote_pattern",
+    "n_units_hatnote",
+    "analyze_tables",
+    "analyze_seconds",
     "corpus_dir",
     "corpus_pages_sha256",
     "corpus_claims_sha256",
@@ -87,6 +106,8 @@ RESOLVE_LINKS_SQL = (
 )
 VERSION_SQL = "SELECT VERSION()"
 CLEAR_META_SQL = "DELETE FROM ingest_meta"
+#: One parameterless ``ANALYZE TABLE`` per table of the fixed list above.
+_ANALYZE_SQL: dict[str, str] = {table: f"ANALYZE TABLE `{table}`" for table in ANALYZE_TABLES}
 
 # Explicit primary keys are assigned in Python (parents before children, ids consecutive per
 # table) so that foreign keys are known without reading AUTO_INCREMENT values back. Each run
@@ -140,8 +161,9 @@ class EmbedderLike(Protocol):
 class IngestReport:
     """Counts and per-stage seconds of one ``run_ingest`` call.
 
-    ``n_sentences`` counts every text unit written to ``sentence`` (whitespace-only units
-    included; those are ``n_units_empty``). ``n_links`` counts the link rows written;
+    ``n_sentences`` counts every text unit written to ``sentence``; ``n_units_empty`` of them
+    are whitespace-only and ``n_units_hatnote`` are hatnotes ("Main article: X" and the like,
+    ``wikitext.HATNOTE_RE``); both kinds are in no chunk. ``n_links`` counts the link rows written;
     ``n_links_skipped`` the targets over ``MAX_TITLE_LENGTH`` characters that were not written;
     ``n_links_resolved`` the rows whose target is a corpus page. ``n_evidence`` counts every
     element id of every evidence set; the two ``*_resolved`` counts the rows with a ``page_id``
@@ -152,6 +174,7 @@ class IngestReport:
     n_sections: int = 0
     n_sentences: int = 0
     n_units_empty: int = 0
+    n_units_hatnote: int = 0
     n_chunks: int = 0
     n_links: int = 0
     n_links_resolved: int = 0
@@ -163,7 +186,7 @@ class IngestReport:
     seconds: dict[str, float] = field(default_factory=lambda: dict.fromkeys(STAGES, 0.0))
 
     def counts(self) -> dict[str, int]:
-        """Return the twelve counts as a dict (everything except ``seconds``)."""
+        """Return the thirteen counts as a dict (everything except ``seconds``)."""
         return {
             name: value
             for name, value in self.__dict__.items()
@@ -260,6 +283,20 @@ def corpus_paths(corpus_dir: str | Path) -> tuple[Path, Path]:
     return pages_path, claims_path
 
 
+def corpus_dir_label(corpus_dir: str | Path) -> str:
+    """Return the corpus directory as recorded in ``ingest_meta``.
+
+    The resolved path relative to the repository root (POSIX form, e.g. ``data/corpus``) when
+    it lies inside the checkout, else the absolute resolved path; the relative form keeps home
+    directories out of the database and makes the value comparable between machines.
+    """
+    resolved = Path(corpus_dir).resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
 def _count_lines(path: Path) -> int:
     """Return the number of non-blank lines of a file (the tqdm total)."""
     with open(path, encoding="utf-8") as handle:
@@ -281,7 +318,7 @@ def _server_version(conn: pymysql.Connection) -> str:
 
 
 class _Ingest:
-    """One run of the pipeline; ``run`` executes the six steps in order."""
+    """One run of the pipeline; ``run`` executes the seven steps in order."""
 
     def __init__(
         self,
@@ -314,12 +351,13 @@ class _Ingest:
         self.next_id: dict[str, int] = {}
 
     def run(self) -> IngestReport:
-        """Execute the six steps and return the report."""
+        """Execute the seven steps and return the report."""
         start = time.perf_counter()
         self._apply_schema()
         self._load_pages()
         self._embed_and_load_chunks()
         self._resolve_links()
+        self._analyze_tables()
         self._load_claims()
         self._write_meta()
         self.timer.seconds["total"] = time.perf_counter() - start
@@ -407,14 +445,13 @@ class _Ingest:
                         ),
                     )
                 unit_ids: dict[str, int] = {}
-                empty_keys: set[str] = set()
                 for unit in parsed.units:
                     sentence_id = self.next_id["sentence"]
                     self.next_id["sentence"] += 1
                     unit_ids[unit.element_key] = sentence_id
                     self.sentence_ids[(page_id, unit.element_key)] = sentence_id
-                    if not unit.text:
-                        empty_keys.add(unit.element_key)
+                    report.n_units_empty += int(not unit.text)
+                    report.n_units_hatnote += int(unit.is_hatnote)
                     self.loader.add(
                         "sentence",
                         (
@@ -444,9 +481,8 @@ class _Ingest:
                             ordinal=chunk.ordinal,
                             text=chunk.text,
                             n_words=chunk.n_words,
-                            sentence_ids=[
-                                unit_ids[key] for key in chunk.element_keys if key not in empty_keys
-                            ],
+                            # element_keys hold chunkable units only (chunking.chunk_units)
+                            sentence_ids=[unit_ids[key] for key in chunk.element_keys],
                             embedding_text=(
                                 embedding_text(parsed.title, section.path, chunk.text)
                                 if self.use_prefix
@@ -457,18 +493,18 @@ class _Ingest:
                 report.n_pages += 1
                 report.n_sections += len(parsed.sections)
                 report.n_sentences += len(parsed.units)
-                report.n_units_empty += len(empty_keys)
         with self.timer.stage("load"):
             self.loader.flush()
             self.conn.commit()
         report.n_chunks = len(self.chunks)
         logger.info(
-            "pages: %d pages, %d sections, %d sentences (%d empty), %d links (%d skipped), "
-            "%d chunks; parse %.2f s, load %.2f s",
+            "pages: %d pages, %d sections, %d sentences (%d empty, %d hatnotes), %d links "
+            "(%d skipped), %d chunks; parse %.2f s, load %.2f s",
             report.n_pages,
             report.n_sections,
             report.n_sentences,
             report.n_units_empty,
+            report.n_units_hatnote,
             report.n_links,
             report.n_links_skipped,
             report.n_chunks,
@@ -558,6 +594,28 @@ class _Ingest:
 
     # step 5 ------------------------------------------------------------------------------------
 
+    def _analyze_tables(self) -> None:
+        """Refresh the InnoDB statistics of ``ANALYZE_TABLES`` with one ANALYZE TABLE each.
+
+        Raises ``IngestError`` when the server reports an error for a table (the result rows
+        are ``(table, 'analyze', msg_type, msg_text)``).
+        """
+        with self.timer.stage("analyze"):
+            with self.conn.cursor() as cur:
+                for table in ANALYZE_TABLES:
+                    cur.execute(_ANALYZE_SQL[table])
+                    for _name, _op, msg_type, msg_text in cur.fetchall():
+                        if str(msg_type).lower() == "error":
+                            raise IngestError(f"ANALYZE TABLE {table} failed: {msg_text}")
+            self.conn.commit()  # ANALYZE TABLE commits implicitly; this keeps the step explicit
+        logger.info(
+            "analyze: statistics of %s refreshed in %.3f s",
+            ", ".join(ANALYZE_TABLES),
+            self.timer.seconds["analyze"],
+        )
+
+    # step 6 ------------------------------------------------------------------------------------
+
     def _load_claims(self) -> None:
         """Write claim and claim_evidence rows with page_id and sentence_id resolved."""
         report = self.report
@@ -614,7 +672,7 @@ class _Ingest:
             report.n_evidence_sentence_resolved,
         )
 
-    # step 6 ------------------------------------------------------------------------------------
+    # step 7 ------------------------------------------------------------------------------------
 
     def _write_meta(self) -> None:
         """Replace the ingest_meta rows with this run's parameters and corpus digests."""
@@ -628,7 +686,11 @@ class _Ingest:
                 "chunk_overlap_units": str(settings.chunk_overlap_units),
                 "index_m": str(settings.index_m),
                 "index_distance": INDEX_DISTANCE,
-                "corpus_dir": str(self.pages_path.parent.resolve()),
+                "hatnote_pattern": HATNOTE_RE.pattern,
+                "n_units_hatnote": str(self.report.n_units_hatnote),
+                "analyze_tables": ",".join(ANALYZE_TABLES),
+                "analyze_seconds": f"{self.timer.seconds['analyze']:.3f}",
+                "corpus_dir": corpus_dir_label(self.pages_path.parent),
                 "corpus_pages_sha256": sha256_of_file(self.pages_path),
                 "corpus_claims_sha256": sha256_of_file(self.claims_path),
                 "mariadb_version": _server_version(self.conn),
@@ -665,14 +727,14 @@ def run_ingest(
     rows fails on the unique page title). ``embedder`` defaults to
     ``embedding.Embedder(settings.embedding_model)``; ``batch_size`` is the embedding batch;
     ``use_prefix`` embeds ``"title > section path: text"`` instead of the bare chunk text;
-    ``progress`` shows tqdm bars. Each of the six steps (module doc) is committed when it
+    ``progress`` shows tqdm bars. Each of the seven steps (module doc) is committed when it
     completes.
 
     Raises ``IngestError`` when ``settings.db_name`` is the test database, when
     ``settings.vector_dim`` differs from the literal in ``sql/schema.sql``, when the embedder's
     dimension differs from ``settings.vector_dim`` (before any chunk row is written), on a
-    duplicate page title or a malformed evidence id; ``FileNotFoundError`` when a corpus file is
-    missing; ``ValueError`` for ``batch_size < 1``.
+    duplicate page title, a malformed evidence id or a failed ``ANALYZE TABLE``;
+    ``FileNotFoundError`` when a corpus file is missing; ``ValueError`` for ``batch_size < 1``.
     """
     if settings.db_name == settings.test_db_name:
         raise IngestError(

@@ -1,5 +1,5 @@
 # Lint and run the whole test suite against a real MariaDB 11.8 on every push and pull request.
-# The credentials below exist only inside this throwaway CI container.
+# Dependencies are installed from requirements-cpu.lock, so the lock file is exercised each run.
 name: CI
 
 on:
@@ -12,14 +12,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # Throwaway credentials, defined once here and referenced below; they exist only inside this
+    # job's MariaDB service container. The names are the ones .env.example uses.
+    env:
+      WIKILENSE_DB_HOST: 127.0.0.1
+      WIKILENSE_DB_PORT: "3306"
+      WIKILENSE_DB_NAME: wikilense
+      WIKILENSE_DB_USER: wikilense
+      WIKILENSE_DB_PASSWORD: ci-password
+      WIKILENSE_DB_ROOT_PASSWORD: ci-root-password
+      WIKILENSE_TEST_DB_NAME: wikilense_test
+
     services:
       mariadb:
         image: mariadb:11.8
         env:
-          MARIADB_ROOT_PASSWORD: ci-root-password
-          MARIADB_DATABASE: wikilense
-          MARIADB_USER: wikilense
-          MARIADB_PASSWORD: ci-password
+          MARIADB_ROOT_PASSWORD: ${{ env.WIKILENSE_DB_ROOT_PASSWORD }}
+          MARIADB_DATABASE: ${{ env.WIKILENSE_DB_NAME }}
+          MARIADB_USER: ${{ env.WIKILENSE_DB_USER }}
+          MARIADB_PASSWORD: ${{ env.WIKILENSE_DB_PASSWORD }}
         ports:
           - 3306:3306
         options: >-
@@ -28,14 +39,6 @@ jobs:
           --health-timeout 5s
           --health-retries 30
 
-    env:
-      WIKILENSE_DB_HOST: 127.0.0.1
-      WIKILENSE_DB_PORT: "3306"
-      WIKILENSE_DB_NAME: wikilense
-      WIKILENSE_DB_USER: wikilense
-      WIKILENSE_DB_PASSWORD: ci-password
-      WIKILENSE_TEST_DB_NAME: wikilense_test
-
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +46,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: requirements-cpu.lock
 
       - name: Cache the embedding model
         uses: actions/cache@v4
@@ -51,18 +54,17 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-bge-small-en-v1.5
 
-      - name: Install dependencies (CPU-only torch)
+      - name: Install the pinned CPU-only dependencies and the package
         run: |
           python -m pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements-dev.txt
+          pip install -r requirements-cpu.lock
           pip install -e .
 
       - name: Create the test database
         run: |
-          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -pci-root-password \
-            -e "CREATE DATABASE IF NOT EXISTS wikilense_test; GRANT ALL PRIVILEGES ON wikilense_test.* TO 'wikilense'@'%'; FLUSH PRIVILEGES;"
-          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -pci-root-password -e "SELECT VERSION();"
+          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -p"$WIKILENSE_DB_ROOT_PASSWORD" \
+            -e "CREATE DATABASE IF NOT EXISTS $WIKILENSE_TEST_DB_NAME; GRANT ALL PRIVILEGES ON $WIKILENSE_TEST_DB_NAME.* TO '$WIKILENSE_DB_USER'@'%'; FLUSH PRIVILEGES;"
+          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -p"$WIKILENSE_DB_ROOT_PASSWORD" -e "SELECT VERSION();"
 
       - name: Lint
         run: ruff check .

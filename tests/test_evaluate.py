@@ -12,14 +12,19 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pymysql
 import pytest
 
 from wikilense import db as dbmod
+from wikilense import search as searchmod
+from wikilense.config import Settings
 from wikilense.evaluate import (
+    SERVER_DEFAULT_EF_SEARCH,
     ClaimOutcome,
     ClaimTruth,
     EvalResult,
@@ -35,6 +40,7 @@ from wikilense.evaluate import (
     latency_stats,
     load_ground_truth,
     oracle_title_filters,
+    parse_vector_index,
     results_markdown,
     unit_coverage_at_k,
     worst_claims,
@@ -312,6 +318,9 @@ def test_evaluate_rejects_bad_arguments_before_touching_the_database() -> None:
         evaluate(conn, fake, repeats=0)
     with pytest.raises(ValueError, match="strategy"):
         evaluate(conn, fake, strategy="fast")
+    for bad in (0, -5, "fast", 2.5, True):
+        with pytest.raises(ValueError, match="ef_search"):
+            evaluate(conn, fake, ef_search=bad)
     with pytest.raises(ValueError, match="ignores filters"):
         evaluate(conn, fake, strategy="none", filters=Filters(min_words=1))
     with pytest.raises(ValueError, match="ignores filters"):
@@ -325,12 +334,49 @@ def test_evaluate_rejects_bad_arguments_before_touching_the_database() -> None:
         evaluate(conn, fake, strategy="inline", filters={"min_words": 1})
 
 
+def test_strategy_validation_follows_search_strategies(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every strategy that search.STRATEGIES lists passes validation, read at call time."""
+
+    class NoConnection:
+        def cursor(self):
+            raise AssertionError("validation passed: the database was reached")
+
+    fake = VectorEmbedder({})
+    assert "rrf" in searchmod.STRATEGIES
+    for strategy in searchmod.STRATEGIES:
+        with pytest.raises(AssertionError, match="validation passed"):
+            evaluate(NoConnection(), fake, strategy=strategy, ef_search=SERVER_DEFAULT_EF_SEARCH)
+    monkeypatch.setattr(searchmod, "STRATEGIES", ("inline", "none"))
+    with pytest.raises(ValueError, match="'inline', 'none'"):
+        evaluate(NoConnection(), fake, strategy="rrf", ef_search=SERVER_DEFAULT_EF_SEARCH)
+    with pytest.raises(ValueError, match="use one of 'inline' with them"):
+        evaluate(NoConnection(), fake, strategy="none", filters=Filters(min_words=1))
+
+
+def test_parse_vector_index_reads_m_and_distance() -> None:
+    ddl = (
+        "CREATE TABLE `chunk` (\n  `chunk_id` int(10) unsigned NOT NULL,\n"
+        "  `embedding` vector(384) NOT NULL,\n  PRIMARY KEY (`chunk_id`),\n"
+        "  VECTOR KEY `embedding` (`embedding`) `M`='16' `DISTANCE`='cosine'\n) ENGINE=InnoDB"
+    )
+    assert parse_vector_index(ddl) == {"index_m": 16, "index_distance": "cosine"}
+    assert parse_vector_index("VECTOR KEY `embedding` (`embedding`) `M`=6 `DISTANCE`=euclidean") == {
+        "index_m": 6, "index_distance": "euclidean"
+    }
+    assert parse_vector_index("VECTOR KEY `embedding` (`embedding`)") == {
+        "index_m": None, "index_distance": None
+    }
+    assert parse_vector_index("") == {"index_m": None, "index_distance": None}
+
+
 def _sample_result() -> EvalResult:
     """A small hand-made EvalResult for the output tests."""
     lat = LatencyStats(n=4, p50_ms=1.5, p95_ms=2.85, mean_ms=1.75, min_ms=1.0, max_ms=3.0)
     return EvalResult(
         parameters={"ks": [1, 3], "max_k": 3, "repeats": 2, "strategy": "none",
-                    "filters": None, "ef_search": None, "ef_search_effective": 20},
+                    "filters": None, "ef_search": None, "ef_search_source": "server",
+                    "ef_search_effective": 20, "mhnsw_max_cache_size": 16777216,
+                    "index_m": 16, "index_distance": "cosine"},
         ingest_meta={"chunk_max_words": "120", "embedding_model": "m"},
         machine={"platform": "test", "cpu_count": 2, "gpu": None},
         versions={"python": "3.12", "mariadb": "11.8.9"},
@@ -464,8 +510,16 @@ def test_evaluate_end_to_end_with_known_rankings(
     assert result.parameters["ks"] == [1, 3, 5, 10]
     assert result.parameters["ef_search"] == 40
     assert result.parameters["ef_search_effective"] == 40
+    assert result.parameters["ef_search_source"] == "argument"
     assert result.parameters["strategy"] == "none" and result.parameters["filters"] is None
+    assert result.parameters["overfetch"] is None
     assert result.parameters["n_chunks"] == N_CHUNKS and result.parameters["n_pages"] == 3
+    # the index and server state the run was measured on, read from the server itself
+    assert result.parameters["index_m"] == 16 and result.parameters["index_distance"] == "cosine"
+    with corpus.cursor() as cur:
+        cur.execute("SELECT @@GLOBAL.mhnsw_max_cache_size")
+        cache_size = int(cur.fetchone()[0])
+    assert result.parameters["mhnsw_max_cache_size"] == cache_size > 0
     assert result.n_claims == 6 and result.n_evidence_claims == 3
 
     # the claims were embedded once as a batch (after one warm-up call), then one by one for
@@ -519,6 +573,72 @@ def test_evaluate_end_to_end_with_known_rankings(
     data = json.loads(json_path.read_text(encoding="utf-8"))
     assert data["n_claims"] == 6 and data["per_k"][3]["evidence_recall"] == 1.0
     assert "| 5 | 5 | 6 | 0.833 |" in md_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.db
+def test_ef_search_defaults_to_the_settings_and_can_keep_the_server_value(
+    corpus: pymysql.Connection, embedder: VectorEmbedder, settings: Settings
+) -> None:
+    server_value = dbmod.get_session_var(corpus, "mhnsw_ef_search")
+    chosen = server_value + 13
+    result = evaluate(corpus, embedder, ks=(1,), repeats=1, strategy="none",
+                      settings=replace(settings, ef_search=chosen))
+    assert result.parameters["ef_search"] == chosen
+    assert result.parameters["ef_search_effective"] == chosen
+    assert result.parameters["ef_search_source"] == "settings"
+    assert dbmod.get_session_var(corpus, "mhnsw_ef_search") == server_value  # restored
+    kept = evaluate(corpus, embedder, ks=(1,), repeats=1, strategy="none",
+                    ef_search=SERVER_DEFAULT_EF_SEARCH, settings=replace(settings, ef_search=chosen))
+    assert kept.parameters["ef_search"] is None
+    assert kept.parameters["ef_search_effective"] == server_value
+    assert kept.parameters["ef_search_source"] == "server"
+    # an explicit int wins over the settings
+    explicit = evaluate(corpus, embedder, ks=(1,), repeats=1, strategy="none", ef_search=7,
+                        settings=replace(settings, ef_search=chosen))
+    assert explicit.parameters["ef_search"] == 7 and explicit.parameters["ef_search_effective"] == 7
+    assert explicit.parameters["ef_search_source"] == "argument"
+    # settings=None loads them from the environment / .env: the same source label
+    loaded = evaluate(corpus, embedder, ks=(1,), repeats=1, strategy="none")
+    assert loaded.parameters["ef_search_source"] == "settings"
+    assert loaded.parameters["ef_search"] == loaded.parameters["ef_search_effective"] >= 1
+
+
+@pytest.mark.db
+def test_every_search_call_gets_the_claim_text_as_query_text(
+    corpus: pymysql.Connection, embedder: VectorEmbedder, settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_search = searchmod.search
+    calls: list[dict[str, Any]] = []
+
+    def with_query_text(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
+                        ef_search=None, query_text=None):
+        calls.append({"strategy": strategy, "k": k, "query_text": query_text})
+        return real_search(conn, qvec, k=k, filters=filters, strategy="none")
+
+    monkeypatch.setattr(searchmod, "search", with_query_text)
+    monkeypatch.setattr(searchmod, "STRATEGIES", ("none", "rrf"))
+    result = evaluate(corpus, embedder, ks=(2, 1), repeats=1, strategy="rrf", overfetch=4,
+                      settings=settings)
+    texts = [CLAIM_QUERIES[i][0] for i in range(1, 7)]
+    assert result.parameters["strategy"] == "rrf" and result.parameters["overfetch"] == 4
+    assert len(calls) == 2 * 2 * 6  # (warm-up + 1 timed pass) x 2 ks x 6 claims
+    assert all(call["strategy"] == "rrf" for call in calls)
+    assert [call["query_text"] for call in calls[:4]] == [texts[0], texts[0], texts[1], texts[1]]
+    assert {call["query_text"] for call in calls} == set(texts)
+    assert result.metrics_at(1).article_hits == 4  # the searches still ran (strategy none)
+
+    # a search function without the parameter is called without it
+    calls.clear()
+
+    def without_query_text(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
+                           ef_search=None):
+        calls.append({"k": k})
+        return real_search(conn, qvec, k=k, filters=filters, strategy="none")
+
+    monkeypatch.setattr(searchmod, "search", without_query_text)
+    result = evaluate(corpus, embedder, ks=(1,), repeats=1, strategy="none", settings=settings)
+    assert len(calls) == 12 and result.metrics_at(1).article_hits == 4
 
 
 @pytest.mark.db

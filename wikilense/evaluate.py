@@ -21,6 +21,15 @@ The query-embedding latency (one ``embed_queries([text])`` call per claim and re
 warm-up call) is reported separately; the vectors used for the searches come from one batched
 ``embed_queries`` call, so the SQL timing never includes the model.
 
+Every ``search.search`` call also receives the claim text as ``query_text`` (the ``rrf``
+strategy fuses the vector ranking with a full-text ranking of these words; the other strategies
+ignore it). ``strategy`` accepts whatever ``search.STRATEGIES`` lists. ``mhnsw_ef_search``
+defaults to ``settings.ef_search`` (``WIKILENSE_EF_SEARCH``); ``ef_search=SERVER_DEFAULT_EF_SEARCH``
+leaves the server's value in place. The parameters of a run record the effective session
+``mhnsw_ef_search``, the global ``mhnsw_max_cache_size``, the ``M`` and ``DISTANCE`` of the
+vector index as ``SHOW CREATE TABLE chunk`` reports them, and the chunk count, so that a result
+file says which index it was measured on.
+
 The metrics (:func:`article_recall_at_k`, :func:`evidence_recall_at_k`,
 :func:`unit_coverage_at_k`, :func:`gold_page_rank`, :func:`evidence_rank`,
 :func:`latency_stats`) are pure functions over lists of hit page ids or hit sentence-id sets in
@@ -30,10 +39,12 @@ the order ``search`` returned the chunks: "top-k chunks" means the first ``k`` h
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import os
 import platform
+import re
 import time
 from collections import defaultdict
 from collections.abc import Callable, Collection, Sequence
@@ -47,15 +58,9 @@ import numpy as np
 import pymysql
 
 from wikilense import __version__, db
-from wikilense.config import REPO_ROOT, Settings
-from wikilense.search import (
-    EF_SEARCH_VARIABLE,
-    STRATEGIES,
-    Filters,
-    Hit,
-    ef_search_session,
-    search,
-)
+from wikilense import search as searchmod
+from wikilense.config import REPO_ROOT, Settings, load_settings
+from wikilense.search import EF_SEARCH_VARIABLE, Filters, Hit, ef_search_session
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +70,12 @@ DEFAULT_STRATEGY = "none"
 DEFAULT_OVERFETCH = 10
 DEFAULT_RESULTS_DIR = REPO_ROOT / "results"
 DEFAULT_NAME = "baseline"
+
+SERVER_DEFAULT_EF_SEARCH = "server"
+"""Pass as ``ef_search`` to leave ``mhnsw_ef_search`` at the server's value for the run."""
+
+#: Strategies whose statement uses the ``overfetch`` factor (recorded in the parameters).
+OVERFETCH_STRATEGIES: frozenset[str] = frozenset({"overfetch", "rrf"})
 
 #: Element types that are text units (rows of ``sentence``); the others are table content.
 TEXT_UNIT_TYPES = frozenset({"sentence", "item"})
@@ -98,6 +109,12 @@ CORPUS_COUNTS_SQL = (
     "(SELECT COUNT(*) FROM sentence)"
 )
 VERSION_SQL = "SELECT VERSION()"
+CACHE_SIZE_SQL = "SELECT @@GLOBAL.mhnsw_max_cache_size"
+SHOW_CREATE_CHUNK_SQL = "SHOW CREATE TABLE chunk"
+#: ``M`` and ``DISTANCE`` as SHOW CREATE TABLE prints a vector index on 11.8:
+#: ``VECTOR KEY `embedding` (`embedding`) `M`='16' `DISTANCE`='cosine'``.
+_INDEX_M_RE = re.compile(r"`M`\s*=\s*'?(\d+)'?")
+_INDEX_DISTANCE_RE = re.compile(r"`DISTANCE`\s*=\s*'?([A-Za-z]+)'?")
 
 # ---------------------------------------------------------------------------------------------
 # data classes
@@ -441,6 +458,35 @@ def _server_version(conn: pymysql.Connection) -> str:
         return str(cur.fetchone()[0])
 
 
+def global_cache_size(conn: pymysql.Connection) -> int:
+    """Return the global ``mhnsw_max_cache_size`` in bytes (the HNSW graph cache limit)."""
+    with conn.cursor() as cur:
+        cur.execute(CACHE_SIZE_SQL)
+        return int(cur.fetchone()[0])
+
+
+def parse_vector_index(create_table: str) -> dict[str, Any]:
+    """Return ``{"index_m": int | None, "index_distance": str | None}`` from a CREATE TABLE text.
+
+    The values are the ``M`` and ``DISTANCE`` options of the vector index as ``SHOW CREATE
+    TABLE`` prints them; an option that is not printed (server default) gives None.
+    """
+    m_match = _INDEX_M_RE.search(create_table)
+    distance_match = _INDEX_DISTANCE_RE.search(create_table)
+    return {
+        "index_m": int(m_match.group(1)) if m_match else None,
+        "index_distance": distance_match.group(1).lower() if distance_match else None,
+    }
+
+
+def vector_index_info(conn: pymysql.Connection) -> dict[str, Any]:
+    """Return :func:`parse_vector_index` of ``SHOW CREATE TABLE chunk`` on this connection."""
+    with conn.cursor() as cur:
+        cur.execute(SHOW_CREATE_CHUNK_SQL)
+        row = cur.fetchone()
+    return parse_vector_index(str(row[1]) if row else "")
+
+
 # ---------------------------------------------------------------------------------------------
 # machine and versions
 # ---------------------------------------------------------------------------------------------
@@ -532,10 +578,13 @@ def _check_eval_args(
     filters: Filters | None,
     claim_filters: ClaimFilters | None,
     overfetch: int,
+    ef_search: int | str | None = None,
 ) -> tuple[int, ...]:
     """Validate the arguments of :func:`evaluate` and return ``ks`` sorted, without duplicates.
 
-    Raises ValueError / TypeError with the offending argument in the message.
+    ``strategy`` must be one of ``search.STRATEGIES`` (read at call time); ``ef_search`` must be
+    None, a positive int or :data:`SERVER_DEFAULT_EF_SEARCH`. Raises ValueError / TypeError
+    with the offending argument in the message.
     """
     if isinstance(ks, (str, bytes)) or len(ks) == 0:
         raise ValueError("ks must be a non-empty sequence of positive ints")
@@ -545,8 +594,17 @@ def _check_eval_args(
         raise ValueError(f"repeats must be a positive int, got {repeats!r}")
     if isinstance(overfetch, bool) or not isinstance(overfetch, int) or overfetch < 1:
         raise ValueError(f"overfetch must be a positive int, got {overfetch!r}")
-    if strategy not in STRATEGIES:
-        raise ValueError(f"unknown strategy {strategy!r}; choose one of {STRATEGIES}")
+    strategies = tuple(searchmod.STRATEGIES)
+    if strategy not in strategies:
+        raise ValueError(f"unknown strategy {strategy!r}; choose one of {strategies}")
+    explicit = ef_search is not None and ef_search != SERVER_DEFAULT_EF_SEARCH
+    if explicit and (
+        isinstance(ef_search, bool) or not isinstance(ef_search, int) or ef_search < 1
+    ):
+        raise ValueError(
+            f"ef_search must be a positive int, None (settings.ef_search) or "
+            f"{SERVER_DEFAULT_EF_SEARCH!r}, got {ef_search!r}"
+        )
     if filters is not None and not isinstance(filters, Filters):
         raise TypeError(f"filters must be a Filters or None, got {type(filters).__name__}")
     if claim_filters is not None and not callable(claim_filters):
@@ -556,10 +614,42 @@ def _check_eval_args(
     if strategy == "none" and (
         (filters is not None and not filters.is_empty()) or claim_filters is not None
     ):
-        raise ValueError(
-            "strategy 'none' ignores filters; use strategy 'inline' or 'overfetch' with them"
-        )
+        others = ", ".join(repr(name) for name in strategies if name != "none")
+        raise ValueError(f"strategy 'none' ignores filters; use one of {others} with them")
     return tuple(sorted(set(ks)))
+
+
+def _resolve_ef_search(
+    ef_search: int | str | None, settings: Settings | None
+) -> tuple[int | None, str]:
+    """Return ``(value to set for the run or None, source)`` for the ``ef_search`` argument.
+
+    An int is used as given (source ``"argument"``); None takes ``settings.ef_search``, loading
+    the settings when none were passed (source ``"settings"``); :data:`SERVER_DEFAULT_EF_SEARCH`
+    leaves the session untouched (source ``"server"``). Raises ``config.SettingsError`` when the
+    settings have to be loaded and cannot be.
+    """
+    if ef_search == SERVER_DEFAULT_EF_SEARCH:
+        return None, "server"
+    if ef_search is None:
+        if settings is None:
+            settings = load_settings()
+        return int(settings.ef_search), "settings"
+    return int(ef_search), "argument"
+
+
+def _search_kwargs(query_text: str) -> dict[str, str]:
+    """Return ``{"query_text": query_text}`` when ``search.search`` accepts it, else ``{}``.
+
+    The signature is inspected so that the harness runs with a search function that has no
+    ``query_text`` parameter yet (or a test double without one).
+    """
+    parameters = inspect.signature(searchmod.search).parameters
+    if "query_text" in parameters or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values()
+    ):
+        return {"query_text": query_text}
+    return {}
 
 
 def _embed_claims(
@@ -600,14 +690,17 @@ def _run_searches(
 ) -> tuple[list[list[Hit]], dict[int, list[float]], list[int], dict[int, int]]:
     """Run every (claim, k) search once untimed, then ``repeats`` times timed.
 
-    Returns the ``max(ks)`` hits of every claim (from the first timed pass), the SQL times in
-    ms per ``k``, the ids of the claims whose ``max(ks)`` hits changed between passes, and the
-    number of claims per ``k`` whose ``LIMIT k`` hits are not the first ``k`` of ``max(ks)``.
+    Every call gets the claim text as ``query_text`` when ``search.search`` takes it (see
+    :func:`_search_kwargs`). Returns the ``max(ks)`` hits of every claim (from the first timed
+    pass), the SQL times in ms per ``k``, the ids of the claims whose ``max(ks)`` hits changed
+    between passes, and the number of claims per ``k`` whose ``LIMIT k`` hits are not the first
+    ``k`` of ``max(ks)``.
     """
     max_k = ks[-1]
     per_claim_filters = [
         claim_filters(truth) if claim_filters is not None else filters for truth in truths
     ]
+    per_claim_kwargs = [_search_kwargs(truth.text) for truth in truths]
     hits_max: list[list[Hit]] = [[] for _ in truths]
     sql_ms: dict[int, list[float]] = {k: [] for k in ks}
     unstable: set[int] = set()
@@ -617,13 +710,14 @@ def _run_searches(
             hits_by_k: dict[int, list[Hit]] = {}
             for k in ks:
                 start = time.perf_counter()
-                hits = search(
+                hits = searchmod.search(
                     conn,
                     vectors[index],
                     k=k,
                     filters=per_claim_filters[index],
                     strategy=strategy,
                     overfetch=overfetch,
+                    **per_claim_kwargs[index],
                 )
                 elapsed = (time.perf_counter() - start) * 1000.0
                 if pass_index < 0:
@@ -650,27 +744,37 @@ def evaluate(
     repeats: int = DEFAULT_REPEATS,
     strategy: str = DEFAULT_STRATEGY,
     filters: Filters | None = None,
-    ef_search: int | None = None,
+    ef_search: int | str | None = None,
     overfetch: int = DEFAULT_OVERFETCH,
     claim_filters: ClaimFilters | None = None,
+    settings: Settings | None = None,
 ) -> EvalResult:
     """Run the recall and latency harness over every claim in ``conn``'s database.
 
     ``ks`` are the cut-offs (sorted, duplicates dropped); ``repeats`` the number of timed
-    passes after one warm-up pass; ``strategy``, ``filters`` and ``overfetch`` go to
-    ``search.search`` unchanged (``filters`` apply to every claim; ``claim_filters`` is a
-    function returning the Filters for one claim, e.g. :func:`oracle_title_filters`, and cannot
-    be combined with non-empty ``filters``). ``ef_search`` sets ``mhnsw_ef_search`` for the
-    whole run (restored afterwards; the effective value is recorded in the parameters). The
-    metrics use the first ``k`` hits of the ``LIMIT max(ks)`` query of each claim; the SQL
-    latency at ``k`` is measured on the ``LIMIT k`` query. Returns the :class:`EvalResult`.
+    passes after one warm-up pass; ``strategy`` (one of ``search.STRATEGIES``), ``filters`` and
+    ``overfetch`` go to ``search.search`` unchanged, together with the claim text as
+    ``query_text`` (``filters`` apply to every claim; ``claim_filters`` is a function returning
+    the Filters for one claim, e.g. :func:`oracle_title_filters`, and cannot be combined with
+    non-empty ``filters``). ``ef_search`` sets ``mhnsw_ef_search`` for the whole run (restored
+    afterwards): an int is used as given, None (the default) takes ``settings.ef_search``
+    (``settings`` defaults to ``load_settings()``), and :data:`SERVER_DEFAULT_EF_SEARCH` keeps
+    the server's value; the effective session value, its source, the global
+    ``mhnsw_max_cache_size`` and the vector index's ``M`` and ``DISTANCE`` are recorded in the
+    parameters. The metrics use the first ``k`` hits of the ``LIMIT max(ks)`` query of each
+    claim; the SQL latency at ``k`` is measured on the ``LIMIT k`` query. Returns the
+    :class:`EvalResult`.
 
-    Raises ValueError for invalid ``ks`` / ``repeats`` / ``overfetch`` / ``strategy``, for
-    filters combined with strategy ``none``, when the database holds no claims, or when the
-    embedder's vectors do not have ``db.VECTOR_DIM`` dimensions; TypeError for a ``filters``
-    value that is not a Filters.
+    Raises ValueError for invalid ``ks`` / ``repeats`` / ``overfetch`` / ``strategy`` /
+    ``ef_search``, for filters combined with strategy ``none``, when the database holds no
+    claims, or when the embedder's vectors do not have ``db.VECTOR_DIM`` dimensions; TypeError
+    for a ``filters`` value that is not a Filters; ``config.SettingsError`` when the settings
+    are needed for ``ef_search`` and cannot be loaded.
     """
-    ks_sorted = _check_eval_args(ks, repeats, strategy, filters, claim_filters, overfetch)
+    ks_sorted = _check_eval_args(
+        ks, repeats, strategy, filters, claim_filters, overfetch, ef_search
+    )
+    ef_requested, ef_source = _resolve_ef_search(ef_search, settings)
     truths = load_ground_truth(conn)
     if not truths:
         raise ValueError("the claim table is empty: run the ingest before evaluating")
@@ -678,16 +782,22 @@ def evaluate(
     if counts["n_chunks"] == 0:
         raise ValueError("the chunk table is empty: run the ingest before evaluating")
     meta = read_ingest_meta(conn)
+    index_info = vector_index_info(conn)
+    cache_size = global_cache_size(conn)
     logger.info(
         "evaluate: %d claims (%d with a sentence-only set), %d chunks, ks=%s, repeats=%d, "
-        "strategy=%s, ef_search=%s",
+        "strategy=%s, ef_search=%s (%s), index M=%s DISTANCE=%s, cache %d bytes",
         len(truths),
         sum(1 for t in truths if t.eligible),
         counts["n_chunks"],
         list(ks_sorted),
         repeats,
         strategy,
-        ef_search,
+        ef_requested,
+        ef_source,
+        index_info["index_m"],
+        index_info["index_distance"],
+        cache_size,
     )
 
     texts = [truth.text for truth in truths]
@@ -695,7 +805,7 @@ def evaluate(
     vectors, embed_samples = _embed_claims(embedder, texts, repeats)
     logger.info("embedded %d claims in %.2f s", len(texts), time.perf_counter() - embed_start)
 
-    with ef_search_session(conn, ef_search):
+    with ef_search_session(conn, ef_requested):
         ef_effective = db.get_session_var(conn, EF_SEARCH_VARIABLE)
         sql_start = time.perf_counter()
         hits_max, sql_ms, unstable, prefix_mismatches = _run_searches(
@@ -766,11 +876,14 @@ def evaluate(
         "max_k": ks_sorted[-1],
         "repeats": repeats,
         "strategy": strategy,
-        "overfetch": overfetch if strategy == "overfetch" else None,
+        "overfetch": overfetch if strategy in OVERFETCH_STRATEGIES else None,
         "filters": asdict(filters) if filters is not None and not filters.is_empty() else None,
         "claim_filters": getattr(claim_filters, "__name__", None) if claim_filters else None,
-        "ef_search": ef_search,
+        "ef_search": ef_requested,
+        "ef_search_source": ef_source,
         "ef_search_effective": ef_effective,
+        "mhnsw_max_cache_size": cache_size,
+        **index_info,
         "embedding_model": getattr(embedder, "model_name", None),
         "embedding_device": getattr(embedder, "device", None),
         "n_claims": n_claims,
@@ -1019,7 +1132,7 @@ def run_eval(
     repeats: int = DEFAULT_REPEATS,
     strategy: str = DEFAULT_STRATEGY,
     filters: Filters | None = None,
-    ef_search: int | None = None,
+    ef_search: int | str | None = None,
     overfetch: int = DEFAULT_OVERFETCH,
     claim_filters: ClaimFilters | None = None,
     out_dir: str | Path = DEFAULT_RESULTS_DIR,
@@ -1028,9 +1141,10 @@ def run_eval(
 ) -> tuple[EvalResult, Path, Path]:
     """Evaluate ``settings.db_name`` with ``embedding.Embedder(settings.embedding_model)``.
 
-    Opens the connection, runs :func:`evaluate`, writes the results with :func:`write_results`
-    and returns ``(result, json_path, md_path)``. ``device`` is passed to the Embedder. The
-    connection is closed afterwards; nothing is committed.
+    Opens the connection, runs :func:`evaluate` (with ``settings`` for the ``ef_search``
+    default), writes the results with :func:`write_results` and returns
+    ``(result, json_path, md_path)``. ``device`` is passed to the Embedder. The connection is
+    closed afterwards; nothing is committed.
     """
     from wikilense.embedding import Embedder
 
@@ -1047,6 +1161,7 @@ def run_eval(
             ef_search=ef_search,
             overfetch=overfetch,
             claim_filters=claim_filters,
+            settings=settings,
         )
     finally:
         conn.close()

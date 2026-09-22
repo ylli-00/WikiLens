@@ -9,11 +9,14 @@ services:
       MARIADB_DATABASE: ${WIKILENSE_DB_NAME:-wikilense}
       MARIADB_USER: ${WIKILENSE_DB_USER:-wikilense}
       MARIADB_PASSWORD: ${WIKILENSE_DB_PASSWORD:?set WIKILENSE_DB_PASSWORD in .env}
-    # The HNSW index cache defaults to 16 MB, less than the 13.6 MB of vectors plus graph edges of
-    # 8,868 chunks; a thrashing cache made index results change between identical runs.
+    # The HNSW index cache (mhnsw_max_cache_size) defaults to 16 MB; the graph of the 8,868-chunk
+    # corpus is already 16 MB on disk, so 512 MB is set for capacity. The size does not change the
+    # results: within one server process the hit lists were identical at 512 MB and 16 MB (75 of
+    # 75 claims); a server restart is what changed them (46 of 75 identical), see results/SUMMARY.md.
     command: --mhnsw-max-cache-size=536870912
     ports:
-      - "${WIKILENSE_DB_PORT:-3306}:3306"
+      # Loopback only: the database is reachable from this machine, not from the network.
+      - "127.0.0.1:${WIKILENSE_DB_PORT:-3306}:3306"
     volumes:
       - mariadb-data:/var/lib/mysql
       - ./sql/docker-init:/docker-entrypoint-initdb.d:ro

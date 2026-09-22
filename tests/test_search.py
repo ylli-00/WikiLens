@@ -5,12 +5,15 @@ The fixture: 3 pages ("Alpha" 100 words, "Beta" 5000, "Gamma" 250), 2 sections e
 the distance to the query ``e_0`` is ``1 - cos(0.1 * chunk_id)`` and the exact order is chunk
 1, 2, ..., 12. Chunks 1-4 belong to Alpha, 5-8 to Beta, 9-12 to Gamma. Links: Alpha -> Beta,
 Beta -> Gamma, Gamma -> Alpha, and Alpha -> "Outside" (not a corpus page, to_page_id NULL).
-The pure tests (statement text, argument validation) run without a server.
+Chunk texts are "chunk N"; chunk 2 also holds the word "glacier" twice and chunk 12 once, so a
+full-text search for "glacier" (the ``rrf`` strategy) ranks chunk 2 first, chunk 12 second and
+finds nothing else. The pure tests (statement text, argument validation) run without a server.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Any
 
 import numpy as np
 import pymysql
@@ -35,6 +38,8 @@ DIM = dbmod.VECTOR_DIM
 N_CHUNKS = 12
 ALPHA, BETA, GAMMA = 1, 2, 3
 CHUNKS_OF = {ALPHA: [1, 2, 3, 4], BETA: [5, 6, 7, 8], GAMMA: [9, 10, 11, 12]}
+KEYWORDS = {2: " glacier glacier", 12: " glacier"}  # appended to the chunk text
+NO_MATCH_TEXT = "zzzznomatch"  # a word no chunk contains: rrf then reduces to the vector list
 
 
 def _angled(angle: float, axis: int) -> np.ndarray:
@@ -58,6 +63,11 @@ def _ids(hits: list[Hit]) -> list[int]:
 
 def _pages(hits: list[Hit]) -> set[int]:
     return {h.page_id for h in hits}
+
+
+def _kw(strategy: str) -> dict[str, Any]:
+    """Return the extra search() arguments a strategy needs: rrf requires ``query_text``."""
+    return {"query_text": NO_MATCH_TEXT} if strategy == "rrf" else {}
 
 
 @pytest.fixture
@@ -91,8 +101,9 @@ def corpus(db_conn: pymysql.Connection) -> pymysql.Connection:
     for chunk_id in range(1, N_CHUNKS + 1):
         section_id = (chunk_id - 1) // 2 + 1
         page_id = (section_id - 1) // 2 + 1
+        text = f"chunk {chunk_id}" + KEYWORDS.get(chunk_id, "")
         chunks.append(
-            (chunk_id, page_id, section_id, chunk_id, f"chunk {chunk_id}", 3,
+            (chunk_id, page_id, section_id, chunk_id, text, 3,
              dbmod.vec_param(_angled(0.1 * chunk_id, chunk_id)))
         )
     dbmod.insert_rows(
@@ -212,6 +223,60 @@ def test_search_statement_rejects_bad_arguments() -> None:
         search_statement(QUERY, filters={"min_words": 5})  # type: ignore[arg-type]
 
 
+def test_rrf_statement_shape_and_parameters() -> None:
+    qbytes = dbmod.vec_param(QUERY)
+    sql, params = search_statement(QUERY, k=5, strategy="rrf", overfetch=4, query_text="Aare river")
+    assert sql.startswith(searchmod.RRF_WITH) and searchmod.RRF_WITH.startswith("WITH vec AS (")
+    assert "FROM (" + searchmod.KNN_SQL + ") AS knn" in sql  # the HNSW search, LIMIT N
+    assert "FROM (" + searchmod.FT_SQL + ") AS matched" in sql  # the full-text search, LIMIT N
+    assert "MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE)" in searchmod.FT_SQL
+    assert sql.count("ROW_NUMBER() OVER (ORDER BY") == 2
+    assert f"SUM(CAST(1 AS DOUBLE) / ({searchmod.RRF_K} + ranked.rnk)) AS score" in sql
+    assert "VEC_DISTANCE_COSINE(chunk.embedding, %s) AS distance, chunk.text, fused.score" in sql
+    assert sql.endswith("ORDER BY fused.score DESC, chunk.chunk_id LIMIT %s")
+    assert "WHERE" not in sql.split("FROM fused")[1]
+    assert params == (qbytes, qbytes, 20, "Aare river", "Aare river", 20, qbytes, 5)
+    assert sql.count("%s") == len(params)
+    assert "Aare" not in sql
+
+    filters = Filters(min_words=5, heading_like="%History%", titles=["Ab", "Cd"], links_to="Aare")
+    sql, params = search_statement(
+        QUERY, k=3, filters=filters, strategy="rrf", overfetch=2, query_text="glacier"
+    )
+    outer = sql.split("FROM fused")[1]  # filters are outer-query joins and predicates
+    assert " JOIN (SELECT DISTINCT link.from_page_id" in outer and "STRAIGHT_JOIN" not in sql
+    assert "WHERE page.n_words >= %s AND section.heading LIKE %s AND page.title IN (%s, %s)" in outer
+    assert params == (
+        qbytes, qbytes, 6, "glacier", "glacier", 6, qbytes, "Aare", 5, "%History%", "Ab", "Cd", 3
+    )
+    assert sql.count("%s") == len(params)
+    for value in ("glacier", "Aare", "%History%", "Ab"):
+        assert value not in sql
+    assert search_statement(QUERY, strategy="rrf", query_text="x", filters=Filters(titles=[])) \
+        == ("", ())
+
+
+def test_rrf_requires_query_text_and_the_other_strategies_ignore_it() -> None:
+    with pytest.raises(ValueError, match="query_text"):
+        search_statement(QUERY, strategy="rrf")
+    with pytest.raises(ValueError, match="blank"):
+        search_statement(QUERY, strategy="rrf", query_text="   ")
+    with pytest.raises(TypeError, match="query_text"):
+        search_statement(QUERY, strategy="rrf", query_text=5)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="overfetch"):
+        search_statement(QUERY, strategy="rrf", overfetch=0, query_text="x")
+    for strategy in ("inline", "overfetch", "none"):
+        assert search_statement(QUERY, k=4, strategy=strategy, query_text="ignored") == \
+            search_statement(QUERY, k=4, strategy=strategy)
+
+
+def test_schema_declares_the_fulltext_index_on_chunk_text() -> None:
+    script = dbmod.SCHEMA_PATH.read_text(encoding="utf-8")
+    chunk_ddl = script.split("CREATE TABLE IF NOT EXISTS chunk (")[1].split(") ENGINE=InnoDB")[0]
+    assert "FULLTEXT KEY ft_chunk_text (text)," in chunk_ddl
+    assert "VECTOR INDEX (embedding)" in chunk_ddl
+
+
 # ---------------------------------------------------------------------------------------------
 # database tests
 # ---------------------------------------------------------------------------------------------
@@ -220,16 +285,22 @@ def test_search_statement_rejects_bad_arguments() -> None:
 @pytest.mark.db
 @pytest.mark.parametrize("strategy", STRATEGIES)
 def test_knn_order_without_filters_is_the_expected_order(corpus, strategy: str) -> None:
-    hits = search(corpus, QUERY, k=N_CHUNKS, strategy=strategy)
+    hits = search(corpus, QUERY, k=N_CHUNKS, strategy=strategy, **_kw(strategy))
     assert _ids(hits) == list(range(1, N_CHUNKS + 1))
     np.testing.assert_allclose(
         [h.distance for h in hits], [_expected_distance(i) for i in range(1, N_CHUNKS + 1)],
         atol=1e-6,
     )
-    assert hits[0] == Hit(chunk_id=1, page_id=ALPHA, title="Alpha", section_path="",
-                          chunk_ordinal=1, n_words=3, distance=hits[0].distance, text="chunk 1")
+    assert replace(hits[0], score=None) == Hit(
+        chunk_id=1, page_id=ALPHA, title="Alpha", section_path="", chunk_ordinal=1, n_words=3,
+        distance=hits[0].distance, text="chunk 1",
+    )
+    if strategy == "rrf":  # no full-text match: the score is the vector rank alone
+        np.testing.assert_allclose([h.score for h in hits], [1 / (60 + r) for r in range(1, 13)])
+    else:
+        assert all(h.score is None for h in hits)
     assert hits[6].title == "Beta" and hits[6].section_path == "Geography"
-    assert _ids(search(corpus, QUERY, k=3, strategy=strategy)) == [1, 2, 3]
+    assert _ids(search(corpus, QUERY, k=3, strategy=strategy, **_kw(strategy))) == [1, 2, 3]
 
 
 @pytest.mark.db
@@ -302,10 +373,11 @@ def test_combined_filters_and_strategy_none_ignores_them(corpus) -> None:
 @pytest.mark.db
 def test_empty_filters_equal_no_filter(corpus) -> None:
     for strategy in STRATEGIES:
-        assert search_statement(QUERY, k=5, filters=Filters(), strategy=strategy) == \
-            search_statement(QUERY, k=5, filters=None, strategy=strategy)
-        assert search(corpus, QUERY, k=5, filters=Filters(), strategy=strategy) == \
-            search(corpus, QUERY, k=5, filters=None, strategy=strategy)
+        kw = _kw(strategy)
+        assert search_statement(QUERY, k=5, filters=Filters(), strategy=strategy, **kw) == \
+            search_statement(QUERY, k=5, filters=None, strategy=strategy, **kw)
+        assert search(corpus, QUERY, k=5, filters=Filters(), strategy=strategy, **kw) == \
+            search(corpus, QUERY, k=5, filters=None, strategy=strategy, **kw)
 
 
 @pytest.mark.db
@@ -352,6 +424,98 @@ def test_explain_search_reports_the_vector_index(corpus) -> None:
     assert analyzed[0]["table"] == "chunk" and analyzed[0]["key"] == "embedding", analyzed
     assert "r_rows" in analyzed[0] and float(analyzed[0]["r_rows"]) == 3.0, analyzed[0]
     assert explain_search(corpus, QUERY, filters=Filters(titles=[])) == []
+
+
+@pytest.mark.db
+def test_rrf_fuses_the_vector_and_full_text_ranks(corpus) -> None:
+    """With N = k * overfetch = 6 the vector list is chunks 1-6 and the full-text list for
+    "glacier" is chunk 2 (two occurrences), then chunk 12 (one). Chunk 2 is in both lists and
+    comes first; chunk 1 (vector rank 1 only, 1/61) beats chunk 12 (full-text rank 2 only,
+    1/62); the rest follow the vector ranks. Chunk 12 was never seen by the vector search, and
+    its distance is still the cosine distance."""
+    hits = search(corpus, QUERY, k=6, strategy="rrf", overfetch=1, query_text="glacier")
+    assert _ids(hits) == [2, 1, 12, 3, 4, 5]
+    np.testing.assert_allclose(
+        [h.score for h in hits], [1 / 62 + 1 / 61, 1 / 61, 1 / 62, 1 / 63, 1 / 64, 1 / 65],
+        rtol=1e-9,
+    )
+    np.testing.assert_allclose(
+        [h.distance for h in hits], [_expected_distance(i) for i in _ids(hits)], atol=1e-6
+    )
+    assert hits[2].title == "Gamma" and hits[2].text == "chunk 12 glacier"
+    assert hits[0].text == "chunk 2 glacier glacier"
+    # N = 10: chunk 10 (1/70, vector only) falls behind chunk 12 (1/62) and is cut by LIMIT k
+    hits = search(corpus, QUERY, k=10, strategy="rrf", overfetch=1, query_text="glacier")
+    assert _ids(hits) == [2, 1, 12, 3, 4, 5, 6, 7, 8, 9]
+    # the query text is bound as data and natural-language mode has no operators: "-meltwater"
+    # is just a word that no chunk contains
+    hits = search(corpus, QUERY, k=3, strategy="rrf", overfetch=2,
+                  query_text="+glacier -meltwater")
+    assert _ids(hits) == [2, 1, 12]
+    assert all(h.score is None for h in search(corpus, QUERY, k=3, strategy="inline"))
+
+
+@pytest.mark.db
+def test_rrf_without_a_full_text_match_is_the_vector_list_with_rank_scores(corpus) -> None:
+    hits = search(corpus, QUERY, k=N_CHUNKS, strategy="rrf", query_text=NO_MATCH_TEXT)
+    assert _ids(hits) == list(range(1, N_CHUNKS + 1))
+    np.testing.assert_allclose(
+        [h.score for h in hits], [1 / (60 + r) for r in range(1, N_CHUNKS + 1)], rtol=1e-9
+    )
+    # InnoDB stopwords ("the") and tokens under innodb_ft_min_token_size (3) match nothing
+    assert _ids(search(corpus, QUERY, k=3, strategy="rrf", query_text="the of a")) == [1, 2, 3]
+
+
+@pytest.mark.db
+def test_rrf_filters_apply_to_the_fused_list_only(corpus) -> None:
+    """Filters are outer-query predicates: a chunk outside both top-N lists is never seen.
+    With N = 6 the fused list is chunks 1-6 (Alpha, Beta) plus chunk 12 (Gamma, full text)."""
+    kw = {"strategy": "rrf", "overfetch": 2, "query_text": "glacier"}
+    assert _ids(search(corpus, QUERY, k=3, filters=Filters(titles=["Gamma"]), **kw)) == [12]
+    assert _ids(search(corpus, QUERY, k=3, filters=Filters(links_to="Alpha"), **kw)) == [12]
+    assert _ids(search(corpus, QUERY, k=3, filters=Filters(linked_from="Alpha"), **kw)) == [5, 6]
+    assert _ids(search(corpus, QUERY, k=3, filters=Filters(max_words=200), **kw)) == [2, 1, 3]
+    assert _ids(search(corpus, QUERY, k=3, filters=Filters(heading_like="%history%"), **kw)) \
+        == [12, 3, 4]
+    # Beta's Geography chunks (7, 8) are outside both top-6 lists: nothing, until N reaches them
+    assert search(corpus, QUERY, k=3, filters=Filters(path_like="Geography%"), **kw) == []
+    assert _ids(search(corpus, QUERY, k=3, filters=Filters(path_like="Geography%"), strategy="rrf",
+                       overfetch=3, query_text="glacier")) == [7, 8]
+    assert search(corpus, QUERY, k=3, filters=Filters(min_words=10_000), **kw) == []
+    assert search(corpus, QUERY, k=3, filters=Filters(titles=[]), **kw) == []
+    # with N covering the whole table the filter sees every chunk, like inline
+    assert _ids(search(corpus, QUERY, k=4, filters=Filters(titles=["Gamma"]), strategy="rrf",
+                       overfetch=3, query_text="glacier")) == [12, 9, 10, 11]
+
+
+@pytest.mark.db
+def test_rrf_explain_shows_both_indexes_and_ef_search_is_restored(corpus) -> None:
+    kw = {"strategy": "rrf", "overfetch": 2, "query_text": "glacier"}
+    plan = explain_search(corpus, QUERY, k=3, **kw)
+    assert plan[0]["select_type"] == "PRIMARY", plan
+    chunk_rows = {(row["type"], row["key"]) for row in plan if row["table"] == "chunk"}
+    assert {("index", "embedding"), ("fulltext", "ft_chunk_text")} <= chunk_rows, plan
+    analyzed = explain_search(corpus, QUERY, k=3, analyze=True, **kw)
+    by_key = {row["key"]: row for row in analyzed if row["table"] == "chunk"}
+    assert float(by_key["embedding"]["r_rows"]) == 6.0, analyzed  # the vector top-N, N = 6
+    assert float(by_key["ft_chunk_text"]["r_rows"]) == 2.0, analyzed  # the two matches
+    with pytest.raises(ValueError, match="query_text"):
+        explain_search(corpus, QUERY, k=3, strategy="rrf")
+    assert explain_search(corpus, QUERY, filters=Filters(titles=[]), **kw) == []
+    dbmod.set_session_var(corpus, "mhnsw_ef_search", 33)
+    assert _ids(search(corpus, QUERY, k=2, ef_search=77, **kw)) == [2, 1]
+    assert dbmod.get_session_var(corpus, "mhnsw_ef_search") == 33
+
+
+@pytest.mark.db
+def test_fulltext_index_exists_in_the_database(db_conn) -> None:
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT INDEX_NAME, INDEX_TYPE FROM information_schema.STATISTICS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+            ("chunk", "text"),
+        )
+        assert cur.fetchall() == (("ft_chunk_text", "FULLTEXT"),)
 
 
 @pytest.mark.db
@@ -408,6 +572,7 @@ def test_injection_shaped_inputs_are_data(corpus) -> None:
     assert search(corpus, QUERY, k=N_CHUNKS, filters=Filters(linked_from=hostile[0])) == []
     assert search(corpus, QUERY, k=N_CHUNKS, filters=Filters(path_like=hostile[1]),
                   strategy="overfetch") == []
+    assert _ids(search(corpus, QUERY, k=3, strategy="rrf", query_text=hostile[1])) == [1, 2, 3]
     sql, params = search_statement(QUERY, filters=Filters(titles=hostile, heading_like=hostile[2]))
     assert all(value not in sql for value in hostile) and hostile[0] in params
     with corpus.cursor() as cur:

@@ -18,10 +18,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_FILE = REPO_ROOT / ".env"
 
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # provisional, see docs/DESIGN.md
-DEFAULT_CHUNK_MAX_WORDS = 120  # provisional
+DEFAULT_CHUNK_MAX_WORDS = 240  # chosen with results/SUMMARY.md: equal recall at equal retrieved text, half the vectors
 DEFAULT_CHUNK_OVERLAP_UNITS = 1  # provisional
 DEFAULT_VECTOR_DIM = 384  # the model's dimension; sql/schema.sql writes it literally
-DEFAULT_INDEX_M = 6  # provisional
+DEFAULT_INDEX_M = 16  # chosen with results/SUMMARY.md: exact-ranking recall at the default ef_search
+DEFAULT_EF_SEARCH = 100  # mhnsw_ef_search applied per query by the CLI, web page and harness
 
 
 class SettingsError(ValueError):
@@ -43,6 +44,7 @@ class Settings:
     chunk_overlap_units: int = DEFAULT_CHUNK_OVERLAP_UNITS
     vector_dim: int = DEFAULT_VECTOR_DIM
     index_m: int = DEFAULT_INDEX_M
+    ef_search: int = DEFAULT_EF_SEARCH
 
 
 def _get_str(env: Mapping[str, str], name: str, default: str | None) -> str:
@@ -108,4 +110,5 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         ),
         vector_dim=_get_int(env, "WIKILENSE_VECTOR_DIM", DEFAULT_VECTOR_DIM),
         index_m=_get_int(env, "WIKILENSE_INDEX_M", DEFAULT_INDEX_M),
+        ef_search=_get_int(env, "WIKILENSE_EF_SEARCH", DEFAULT_EF_SEARCH),
     )

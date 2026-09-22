@@ -3,6 +3,21 @@
 A page is the raw FEVEROUS page object (see docs/DESIGN.md, "Data contracts"). The parser walks
 ``order``, keeps a section stack keyed by heading level, and emits one ``TextUnit`` per sentence
 and per list item. Tables and captions are counted in the page statistics only.
+
+Hatnotes. Wikipedia's navigation lines ("Main article: X", "See also: Y", "For other uses, see
+Z", ...) survive the FEVEROUS extraction as ordinary sentences, usually the first one of a
+section. They carry no facts about the page, but a chunk that starts with one embeds much like
+the page it points to, and with 8,868 chunks of the phase-1 corpus 788 (8.9%) started with
+"Main article". ``HATNOTE_RE`` recognises them (``is_hatnote``); the parser marks the unit
+(``TextUnit.is_hatnote``) and counts it in ``page_stats`` (``n_hatnotes``). A hatnote unit
+stays a text unit, so it keeps its ordinal and becomes a ``sentence`` row at ingest (FEVEROUS
+evidence ids still resolve), but ``chunking.chunk_units`` leaves it out of every chunk, exactly
+like a whitespace-only unit. The openers were measured on ``wiki_000.jsonl`` (654,115 text
+units on 9,996 pages): "Main article:" 4,545, "See also:" 1,636, "For other uses," 807,
+"Further information:" 761, "Main articles:" 651, other "For ..., see ..." lines 1,462, "This
+article is about" 530, '"X" redirects here' 484, "Not to be confused with" 261; together
+11,137 units (1.70%), 9,030 of them the first unit of their section (the rest follow another
+hatnote). "For example, ... see" is prose and is excluded (1 unit on the shard).
 """
 
 from __future__ import annotations
@@ -18,6 +33,17 @@ LEAD_LEVEL = 1
 PATH_SEPARATOR = " > "
 """Joins the headings on the section stack into ``Section.path``."""
 
+HATNOTE_RE = re.compile(
+    r"^(?:"
+    r"(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]"
+    r"|For (?!example\b|instance\b)[^.]{0,80}?, see "
+    r"|Not to be confused with "
+    r"|This (?:article|page) is about "
+    r'|"[^"]{1,120}" redirects here'
+    r")"
+)
+"""Matches the cleaned text of a hatnote unit (case-sensitive; counts in the module docstring)."""
+
 
 @dataclass(frozen=True)
 class Section:
@@ -31,13 +57,23 @@ class Section:
 
 @dataclass(frozen=True)
 class TextUnit:
-    """One sentence or list item in page order, with its cleaned and raw text."""
+    """One sentence or list item in page order, with its cleaned and raw text.
+
+    ``is_hatnote`` is True when ``text`` matches ``HATNOTE_RE``. ``chunkable`` says whether the
+    unit may be part of a chunk: it has text and is not a hatnote.
+    """
 
     element_key: str
     ordinal: int
     section_ordinal: int
     text: str
     raw: str
+    is_hatnote: bool = False
+
+    @property
+    def chunkable(self) -> bool:
+        """Return True when the unit has text and is not a hatnote (it may be in a chunk)."""
+        return bool(self.text) and not self.is_hatnote
 
 
 @dataclass
@@ -120,6 +156,11 @@ def clean_text(raw: str) -> str:
     return " ".join(text.split())
 
 
+def is_hatnote(text: str) -> bool:
+    """Return True when the cleaned text of a unit is a hatnote (``HATNOTE_RE`` matches)."""
+    return HATNOTE_RE.match(text) is not None
+
+
 def normalise_title(title: str) -> str:
     """Return a page title in Unicode NFC with underscores as spaces and whitespace collapsed."""
     return " ".join(unicodedata.normalize("NFC", title.replace("_", " ")).split())
@@ -190,6 +231,12 @@ def extract_links(page: dict) -> list[tuple[str, str]]:
     return links
 
 
+def _unit(element_key: str, ordinal: int, section_ordinal: int, raw: str) -> TextUnit:
+    """Return the ``TextUnit`` of one raw sentence or item: cleaned text and the hatnote flag."""
+    text = clean_text(raw)
+    return TextUnit(element_key, ordinal, section_ordinal, text, raw, is_hatnote(text))
+
+
 def _walk(page: dict) -> tuple[list[Section], list[TextUnit], dict[str, int]]:
     """Return sections, text units and element counts from one walk over ``order``."""
     sections = [Section(0, "", LEAD_LEVEL, "")]
@@ -209,14 +256,12 @@ def _walk(page: dict) -> tuple[list[Section], list[TextUnit], dict[str, int]]:
             sections.append(Section(len(sections), heading, level, section_path(stack)))
             counts["n_sections"] += 1
         elif key.startswith("sentence_"):
-            raw = str(element)
-            units.append(TextUnit(key, len(units), sections[-1].ordinal, clean_text(raw), raw))
+            units.append(_unit(key, len(units), sections[-1].ordinal, str(element)))
         elif key.startswith("list_"):
             counts["n_lists"] += 1
             for item in element.get("list", []):
-                raw = str(item["value"])
                 units.append(
-                    TextUnit(item["id"], len(units), sections[-1].ordinal, clean_text(raw), raw)
+                    _unit(item["id"], len(units), sections[-1].ordinal, str(item["value"]))
                 )
         elif key.startswith("table_"):
             counts["n_tables"] += 1
@@ -233,12 +278,14 @@ def _stats(units: list[TextUnit], counts: dict[str, int]) -> dict[str, int]:
         "n_sections": counts["n_sections"],
         "n_tables": counts["n_tables"],
         "n_lists": counts["n_lists"],
+        "n_hatnotes": sum(1 for u in units if u.is_hatnote),
     }
 
 
 def page_stats(page: dict) -> dict[str, int]:
-    """Return ``n_sentences``, ``n_items``, ``n_words``, ``n_chars`` (over cleaned text units),
-    ``n_sections`` (headings, the lead not counted), ``n_tables`` and ``n_lists``."""
+    """Return ``n_sentences``, ``n_items``, ``n_words``, ``n_chars`` (over all cleaned text
+    units, hatnotes included), ``n_sections`` (headings, the lead not counted), ``n_tables``,
+    ``n_lists`` and ``n_hatnotes`` (text units that ``is_hatnote`` recognises)."""
     _, units, counts = _walk(page)
     return _stats(units, counts)
 

@@ -98,7 +98,8 @@ def test_load_settings_from_file_with_defaults(tmp_path: Path, monkeypatch) -> N
     assert s.test_db_name == "mydb_test"
     assert (s.db_host, s.db_port, s.db_user) == ("127.0.0.1", 3306, "wikilense")
     assert s.embedding_model == "BAAI/bge-small-en-v1.5"
-    assert (s.chunk_max_words, s.chunk_overlap_units, s.vector_dim, s.index_m) == (120, 1, 384, 6)
+    assert (s.chunk_max_words, s.chunk_overlap_units, s.vector_dim, s.index_m) == (240, 1, 384, 16)
+    assert s.ef_search == 100
 
 
 def test_environment_overrides_file(tmp_path: Path, monkeypatch) -> None:
@@ -174,7 +175,7 @@ def test_schema_file_matches_the_fixed_table_list() -> None:
     assert all(s.startswith("CREATE TABLE IF NOT EXISTS") for s in statements)
     assert "DELIMITER" not in script
     assert re.search(r"embedding\s+VECTOR\(384\) NOT NULL", script)
-    assert "VECTOR INDEX (embedding) M=6 DISTANCE=cosine" in script
+    assert "VECTOR INDEX (embedding) M=16 DISTANCE=cosine" in script
     for column in ("title", "to_title", "page_title"):
         pattern = rf"^\s+{column}\s+VARCHAR\(\d+\) COLLATE utf8mb4_bin"
         assert re.search(pattern, script, flags=re.MULTILINE), column
@@ -420,10 +421,11 @@ def test_knn_order_and_explain_use_the_vector_index(db_conn) -> None:
 
 @pytest.mark.db
 def test_set_session_var_changes_ef_search_for_this_session_only(db_conn, settings) -> None:
-    before = dbmod.get_session_var(db_conn, "mhnsw_ef_search")
-    assert before == 20  # MariaDB default
-    dbmod.set_session_var(db_conn, "mhnsw_ef_search", 50)
-    assert dbmod.get_session_var(db_conn, "mhnsw_ef_search") == 50
+    before = dbmod.get_session_var(db_conn, "mhnsw_ef_search")  # the server's default, 20 unless
+    assert before >= 1  # the server was started with another value
+    target = before + 30
+    dbmod.set_session_var(db_conn, "mhnsw_ef_search", target)
+    assert dbmod.get_session_var(db_conn, "mhnsw_ef_search") == target
     other = dbmod.connect(settings, database=settings.test_db_name)
     try:
         assert dbmod.get_session_var(other, "mhnsw_ef_search") == before
@@ -435,6 +437,67 @@ def test_set_session_var_changes_ef_search_for_this_session_only(db_conn, settin
         dbmod.set_session_var(db_conn, "mhnsw_ef_search; SET GLOBAL x = 1", 1)
     dbmod.set_session_var(db_conn, "mhnsw_ef_search", 0)  # MariaDB clamps to the minimum, 1
     assert dbmod.get_session_var(db_conn, "mhnsw_ef_search") == 1
+
+
+def _knn(conn: pymysql.Connection, query: np.ndarray, k: int) -> list[tuple[int, float]]:
+    """Return ``(chunk_id, distance)`` of the ``k`` nearest chunks through the vector index."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT chunk_id, VEC_DISTANCE_COSINE(embedding, %s) AS distance "
+            "FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT %s",
+            (dbmod.vec_param(query), dbmod.vec_param(query), k),
+        )
+        return [(int(cid), float(d)) for cid, d in cur.fetchall()]
+
+
+@pytest.mark.db
+def test_vector_index_follows_the_transaction(db_conn, settings) -> None:
+    """The HNSW index lives in InnoDB: uncommitted rows are visible to their own transaction
+    only, a rollback takes them out of the index, and UPDATE / DELETE of a row change the
+    k-nearest result at once."""
+    _insert_page(db_conn, 1, "Transactions")
+    _insert_chunk(db_conn, 1, 1, _angled(0.5, axis=1), ordinal=1)
+    _insert_chunk(db_conn, 2, 1, _angled(0.9, axis=2), ordinal=2)
+    db_conn.commit()
+    query = _angled(0.0, axis=1)  # e_0
+    assert [cid for cid, _ in _knn(db_conn, query, 5)] == [1, 2]
+
+    # 1. an INSERT inside the open transaction: the same connection sees it in the index ...
+    _insert_chunk(db_conn, 3, 1, _angled(0.1, axis=3), ordinal=3)
+    assert [cid for cid, _ in _knn(db_conn, query, 5)] == [3, 1, 2]
+    other = dbmod.connect(settings, database=settings.test_db_name)
+    try:
+        # ... another connection does not, and after the rollback nobody does
+        assert [cid for cid, _ in _knn(other, query, 5)] == [1, 2]
+        db_conn.rollback()
+        assert [cid for cid, _ in _knn(db_conn, query, 5)] == [1, 2]
+        assert _count(db_conn, "SELECT COUNT(*) FROM chunk") == 2
+
+        # 2. an UPDATE of one embedding: the new distance shows and the order changes
+        with db_conn.cursor() as cur:
+            cur.execute(
+                "UPDATE chunk SET embedding = %s WHERE chunk_id = %s",
+                (dbmod.vec_param(_angled(0.05, axis=2)), 2),
+            )
+        rows = _knn(db_conn, query, 5)
+        assert [cid for cid, _ in rows] == [2, 1]
+        np.testing.assert_allclose(
+            [d for _, d in rows], [1 - np.cos(0.05), 1 - np.cos(0.5)], atol=1e-6
+        )
+        assert [cid for cid, _ in _knn(other, query, 5)] == [1, 2]  # not committed yet
+        db_conn.commit()
+        other.commit()  # end the other connection's snapshot so that it sees the commit
+        assert [cid for cid, _ in _knn(other, query, 5)] == [2, 1]
+
+        # 3. a DELETE removes the chunk from the k-nearest result
+        with db_conn.cursor() as cur:
+            cur.execute("DELETE FROM chunk WHERE chunk_id = %s", (1,))
+        assert _knn(db_conn, query, 5) == [(2, pytest.approx(1 - np.cos(0.05), abs=1e-6))]
+        db_conn.commit()
+        other.commit()
+        assert [cid for cid, _ in _knn(other, query, 5)] == [2]
+    finally:
+        other.close()
 
 
 @pytest.mark.db

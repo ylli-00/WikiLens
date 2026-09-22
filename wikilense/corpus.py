@@ -92,11 +92,12 @@ def claim_pages(record: dict) -> set[str]:
     }
 
 
-def _link_targets(page: dict) -> set[str]:
+def link_targets(page: dict) -> set[str]:
     """Return the distinct NFC link targets in a page's sentences, list items and table cells.
 
     Target = the text before ``|``, without a ``#fragment``, ``_`` replaced by a space, NFC.
-    Empty targets (``[[#fragment|shown]]``) are dropped.
+    Empty targets (``[[#fragment|shown]]``) are dropped. This is the corpus-selection view of a
+    whole page (a set of titles); ``wikitext.link_targets`` is the per-text list used at ingest.
     """
     texts: list[str] = []
     for key, value in page.items():
@@ -113,6 +114,10 @@ def _link_targets(page: dict) -> set[str]:
             if target:
                 targets.add(nfc(target))
     return targets
+
+
+_link_targets = link_targets
+"""Former private name of :func:`link_targets`, kept for callers that imported it."""
 
 
 def _n_sentences(page: dict) -> int:
@@ -162,7 +167,7 @@ def _scan_shards(shard_paths: Iterable[str | Path]) -> list[_PageInfo]:
             if title in seen:
                 raise ValueError(f"duplicate page title {title!r} in {path}")
             seen.add(title)
-            infos.append(_PageInfo(title, _n_sentences(page), frozenset(_link_targets(page))))
+            infos.append(_PageInfo(title, _n_sentences(page), frozenset(link_targets(page))))
     return infos
 
 

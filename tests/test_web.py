@@ -5,7 +5,10 @@ The synthetic corpus mirrors tests/test_search.py in miniature: 3 pages ("Alpha"
 whose vectors are ``cos(a) e_0 + sin(a) e_i`` with ``a = 0.1 * chunk_id``, and links
 Alpha -> Beta, Beta -> Gamma. The fake embedder answers every query with ``e_0``, so the exact
 ranking is chunk 1, 2, ..., 12 with distance ``1 - cos(0.1 * chunk_id)``. Chunks 1-4 belong to
-Alpha, 5-8 to Beta, 9-12 to Gamma; the odd section of each page carries a heading.
+Alpha, 5-8 to Beta, 9-12 to Gamma; the odd section of each page carries a heading. Chunk 12's
+text also holds the word "glacier" (the only full-text match for it, for ``rrf``), and Alpha's
+lead has two sentences: chunk 1 covers both, chunk 2 the second one (the overlap), so
+``sentences=1`` has rows to return.
 
 Tests that reach the server are marked ``db``; validation, the page and the unreachable-server
 path run without it.
@@ -13,6 +16,7 @@ path run without it.
 
 from __future__ import annotations
 
+from dataclasses import fields
 from typing import Any, get_args
 
 import numpy as np
@@ -23,14 +27,14 @@ from fastapi.testclient import TestClient
 from wikilense import db as dbmod
 from wikilense import web as webmod
 from wikilense.config import Settings
-from wikilense.search import STRATEGIES
+from wikilense.search import EF_SEARCH_VARIABLE, STRATEGIES, Hit
 
 DIM = dbmod.VECTOR_DIM
 N_CHUNKS = 12
 ALPHA, BETA, GAMMA = 1, 2, 3
-HIT_FIELDS = [
-    "chunk_id", "page_id", "title", "section_path", "chunk_ordinal", "n_words", "distance", "text"
-]  # fmt: skip
+HIT_FIELDS = [f.name for f in fields(Hit)]
+FT_WORD = "glacier"  # in chunk 12's text only
+ALPHA_SENTENCES = [("sentence_0", "Alpha is a page."), ("sentence_1", "It has two sentences.")]
 
 #: Settings for tests that must never reach a server (an invalid host fails at once).
 OFFLINE_SETTINGS = Settings(db_password="not-a-real-password", db_host="db.invalid", db_port=3307)
@@ -97,18 +101,28 @@ def corpus(db_conn: pymysql.Connection) -> pymysql.Connection:
     for chunk_id in range(1, N_CHUNKS + 1):
         section_id = (chunk_id - 1) // 2 + 1
         page_id = (section_id - 1) // 2 + 1
+        text = f"chunk {chunk_id} text" + (f" {FT_WORD}" if chunk_id == N_CHUNKS else "")
         chunks.append(
             (
                 chunk_id,
                 page_id,
                 section_id,
                 chunk_id,
-                f"chunk {chunk_id} text",
+                text,
                 3,
                 dbmod.vec_param(_angled(0.1 * chunk_id, chunk_id)),
             )
         )
     dbmod.insert_rows(db_conn, "chunk", dbmod.SCHEMA_COLUMNS["chunk"], chunks)
+    dbmod.insert_rows(
+        db_conn,
+        "sentence",
+        dbmod.SCHEMA_COLUMNS["sentence"],
+        [(i + 1, ALPHA, 1, key, i, text) for i, (key, text) in enumerate(ALPHA_SENTENCES)],
+    )
+    dbmod.insert_rows(
+        db_conn, "chunk_sentence", dbmod.SCHEMA_COLUMNS["chunk_sentence"], [(1, 1), (1, 2), (2, 2)]
+    )
     dbmod.insert_rows(
         db_conn,
         "link",
@@ -157,16 +171,31 @@ def test_index_page_is_self_contained_html_with_the_form() -> None:
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/html")
     html = resp.text
-    assert html == webmod.INDEX_HTML
+    assert html == webmod.render_index(OFFLINE_SETTINGS)
+    assert "__" not in html  # every template marker was filled in
     assert "<form" in html and "<script>" in html
-    for name in ("q", "k", "min_words", "heading", "linked_from", "strategy", "ef_search"):
+    # every search.Filters field, the strategy, overfetch, ef_search and the sentence switch
+    for name, _field in webmod.API_FILTER_FIELDS:
+        assert f'name="{name}"' in html
+    for name in ("q", "k", "strategy", "overfetch", "ef_search", "sentences"):
         assert f'name="{name}"' in html
     for strategy in STRATEGIES:
         assert f'value="{strategy}"' in html
+    assert f'placeholder="{OFFLINE_SETTINGS.ef_search} (default)' in html
     assert "/api/search" in html
+    assert f'href="{webmod.DOCS_URL}"' in html and f'href="{webmod.OPENAPI_URL}"' in html
     # no external assets, no framework
     assert "<script src" not in html and "<link" not in html and "@import" not in html
     assert "http://" not in html and "https://" not in html
+
+
+def test_docs_and_openapi_schema_are_served() -> None:
+    client = TestClient(webmod.create_app(OFFLINE_SETTINGS, embedder=FakeEmbedder()))
+    assert client.get(webmod.DOCS_URL).status_code == 200
+    schema = client.get(webmod.OPENAPI_URL).json()
+    parameters = {p["name"] for p in schema["paths"]["/api/search"]["get"]["parameters"]}
+    assert parameters == set(webmod.API_PARAMETER_NAMES)
+    assert "/" not in schema["paths"]  # the page is not part of the API
 
 
 def test_api_search_rejects_bad_parameters_with_422_or_400() -> None:
@@ -179,20 +208,58 @@ def test_api_search_rejects_bad_parameters_with_422_or_400() -> None:
         {"q": "x", "k": "three"},
         {"q": "x", "min_words": -1},
         {"q": "x", "min_words": "many"},
+        {"q": "x", "max_words": -1},
         {"q": "x", "strategy": "exact"},
-        {"q": "x", "ef_search": 0},
+        {"q": "x", "overfetch": 0},
+        {"q": "x", "ef_search": -1},
     ):
         resp = client.get("/api/search", params=params)
         assert resp.status_code == 422, params
-        assert isinstance(resp.json()["detail"], list)
+        assert isinstance(resp.json()["detail"], list)  # FastAPI's validation report
+    resp = client.get("/api/search", params={"q": "x", "min_words": 10, "max_words": 5})
+    assert resp.status_code == 422 and "greater than max_words" in resp.json()["detail"]
     resp = client.get("/api/search", params={"q": "   "})
     assert resp.status_code == 400
     assert "blank" in resp.json()["detail"]
+    # a mistyped or unknown parameter is refused instead of being silently ignored
+    resp = client.get("/api/search", params={"q": "x", "heading_like": "%History%"})
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert "heading_like" in detail and "accepted: " + ", ".join(webmod.API_PARAMETER_NAMES) in detail
+    resp = client.get("/api/search", params={"q": "x", "K": 3, "titel": "Aare"})
+    assert resp.status_code == 400 and "K, titel" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"min_words": 100},
+        {"max_words": 100},
+        {"heading": "%History%"},
+        {"path": "Geo%"},
+        {"linked_from": "Aare"},
+        {"links_to": "Bern"},
+        {"titles": ["Aare"]},
+        {"min_words": 100, "heading": "%History%"},
+    ],
+)
+def test_api_search_rejects_a_filter_with_strategy_none_as_422(params: dict[str, Any]) -> None:
+    embedder = FakeEmbedder()
+    client = TestClient(webmod.create_app(OFFLINE_SETTINGS, embedder=embedder))
+    resp = client.get("/api/search", params={"q": "x", "strategy": "none", **params})
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert detail.startswith("strategy 'none' runs without filters")
+    for name in params:
+        assert name in detail  # every offending parameter is named
+    assert "inline" in detail and "overfetch" in detail and "rrf" in detail  # the alternatives
+    assert embedder.queries == [webmod.WARM_UP_TEXT]  # refused before embedding the query
 
 
 def test_api_search_reports_an_unreachable_server_as_503(monkeypatch: pytest.MonkeyPatch) -> None:
     embedder = FakeEmbedder()
     client = TestClient(webmod.create_app(OFFLINE_SETTINGS, embedder=embedder))
+    assert embedder.queries == [webmod.WARM_UP_TEXT]  # the model is loaded when the app is built
 
     def refuse(settings: Settings | None = None, database: str | None = None) -> Any:
         raise pymysql.err.OperationalError(2003, "Can't connect to MySQL server on 'db.invalid'")
@@ -203,7 +270,16 @@ def test_api_search_reports_an_unreachable_server_as_503(monkeypatch: pytest.Mon
     detail = resp.json()["detail"]
     assert "db.invalid:3307" in detail and "Can't connect" in detail
     assert "not-a-real-password" not in resp.text
-    assert embedder.queries == ["x"]  # embedded before connecting, so the model is not blocked
+    assert embedder.queries == [webmod.WARM_UP_TEXT, "x"]  # embedded before connecting
+
+
+def test_create_app_without_warm_up_reports_no_model_load_time() -> None:
+    embedder = FakeEmbedder()
+    app = webmod.create_app(OFFLINE_SETTINGS, embedder=embedder, warm_up=False)
+    assert embedder.queries == [] and app.state.model_load_ms is None
+    warmed = webmod.create_app(OFFLINE_SETTINGS, embedder=embedder)
+    assert embedder.queries == [webmod.WARM_UP_TEXT]
+    assert isinstance(warmed.state.model_load_ms, float) and warmed.state.model_load_ms >= 0
 
 
 # ---------------------------------------------------------------------------------------------
@@ -212,19 +288,20 @@ def test_api_search_reports_an_unreachable_server_as_503(monkeypatch: pytest.Mon
 
 
 @pytest.mark.db
-def test_api_search_returns_hits_sql_explain_and_timing(
-    client: TestClient, fake_embedder: FakeEmbedder
+def test_api_search_returns_hits_sql_explain_ef_search_and_timing(
+    client: TestClient, fake_embedder: FakeEmbedder, settings: Settings, corpus: pymysql.Connection
 ) -> None:
     resp = client.get("/api/search", params={"q": "anything at all", "k": 3})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body) == {"hits", "sql", "explain", "timing_ms"}
+    assert set(body) == {"hits", "sql", "explain", "ef_search", "timing_ms"}
     assert _ids(body) == [1, 2, 3]
     assert [list(hit) for hit in body["hits"]] == [HIT_FIELDS] * 3
     assert [hit["title"] for hit in body["hits"]] == ["Alpha"] * 3
     assert [hit["section_path"] for hit in body["hits"]] == ["", "", "History"]
     assert body["hits"][0]["text"] == "chunk 1 text"
     assert body["hits"][0]["n_words"] == 3 and body["hits"][0]["page_id"] == ALPHA
+    assert all(hit["score"] is None for hit in body["hits"])  # rrf only
     for hit in body["hits"]:
         assert hit["distance"] == pytest.approx(_expected_distance(hit["chunk_id"]), abs=1e-6)
     assert body["sql"].startswith("SELECT ")
@@ -234,9 +311,53 @@ def test_api_search_returns_hits_sql_explain_and_timing(
     assert len(chunk_rows) == 1
     assert chunk_rows[0]["key"] == "embedding" and chunk_rows[0]["type"] == "index"
     assert {row["table"] for row in body["explain"]} == {"chunk", "page", "section"}
-    assert set(body["timing_ms"]) == {"embed", "sql"}
+    # the effective mhnsw_ef_search: the settings' value, or the server's when that is 0
+    expected_ef = settings.ef_search or dbmod.get_session_var(corpus, EF_SEARCH_VARIABLE)
+    assert body["ef_search"] == expected_ef
+    assert set(body["timing_ms"]) == {"model_load", "embed", "sql"}
     assert all(isinstance(v, float) and v >= 0 for v in body["timing_ms"].values())
-    assert fake_embedder.queries == ["anything at all"]
+    assert body["timing_ms"]["model_load"] == client.app.state.model_load_ms
+    assert fake_embedder.queries == [webmod.WARM_UP_TEXT, "anything at all"]
+
+
+@pytest.mark.db
+def test_api_search_sentences_lists_the_chunk_sentence_rows_per_hit(client: TestClient) -> None:
+    body = client.get("/api/search", params={"q": "x", "k": 3, "sentences": 1}).json()
+    assert _ids(body) == [1, 2, 3]
+    assert [list(hit) for hit in body["hits"]] == [[*HIT_FIELDS, "sentences"]] * 3
+    expected = [{"element_key": key, "text": text} for key, text in ALPHA_SENTENCES]
+    assert body["hits"][0]["sentences"] == expected  # chunk 1: both sentences, page order
+    assert body["hits"][1]["sentences"] == expected[1:]  # chunk 2: the overlapping one
+    assert body["hits"][2]["sentences"] == []  # chunk 3: no chunk_sentence rows
+    body = client.get("/api/search", params={"q": "x", "k": 1, "sentences": 0}).json()
+    assert "sentences" not in body["hits"][0]
+    body = client.get("/api/search", params={"q": "x", "k": 1}).json()
+    assert "sentences" not in body["hits"][0]
+
+
+@pytest.mark.db
+def test_api_search_rrf_hits_carry_a_score_and_use_the_full_text_index(
+    client: TestClient,
+) -> None:
+    # vector list (N = 3): chunks 1, 2, 3; full-text list for "glacier": chunk 12 only.
+    # Chunk 1 and 12 tie at 1/61 and the lower chunk_id comes first.
+    body = client.get(
+        "/api/search", params={"q": FT_WORD, "k": 3, "strategy": "rrf", "overfetch": 1}
+    ).json()
+    assert _ids(body) == [1, 12, 2]
+    assert [hit["score"] for hit in body["hits"]] == pytest.approx([1 / 61, 1 / 61, 1 / 62])
+    assert body["hits"][1]["text"] == f"chunk 12 text {FT_WORD}"
+    for hit in body["hits"]:
+        assert hit["distance"] == pytest.approx(_expected_distance(hit["chunk_id"]), abs=1e-6)
+    assert "MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE)" in body["sql"]
+    assert FT_WORD not in body["sql"]  # the query text is a bound parameter
+    assert any(row["type"] == "fulltext" for row in body["explain"])
+    # a filter applies to the fused list: only Gamma's chunk 12 matches it
+    body = client.get(
+        "/api/search",
+        params={"q": FT_WORD, "k": 3, "strategy": "rrf", "overfetch": 1, "titles": ["Gamma"]},
+    ).json()
+    assert _ids(body) == [12]
 
 
 @pytest.mark.db
@@ -260,11 +381,28 @@ def test_api_search_filters_and_strategy_reach_the_sql(client: TestClient) -> No
     assert _ids(body) == [5, 6]  # Alpha links to Beta only
     assert "link.to_page_id" in body["sql"] and "Alpha" not in body["sql"]
 
+    body = client.get("/api/search", params={"q": "x", "k": 3, "max_words": 200}).json()
+    assert _ids(body) == [1, 2, 3] and "page.n_words <= %s" in body["sql"]  # Alpha only
+    body = client.get("/api/search", params={"q": "x", "k": 3, "path": "Geo%"}).json()
+    assert _ids(body) == [7, 8] and "section.path LIKE %s" in body["sql"]  # Beta > Geography
+    body = client.get("/api/search", params={"q": "x", "k": 3, "links_to": "Gamma"}).json()
+    assert _ids(body) == [5, 6, 7] and "link.from_page_id" in body["sql"]  # Beta links to Gamma
     body = client.get(
-        "/api/search", params={"q": "x", "k": 3, "min_words": 1000, "strategy": "none"}
+        "/api/search", params={"q": "x", "k": 3, "titles": ["Gamma", "Alpha", "Nope"]}
     ).json()
-    assert _ids(body) == [1, 2, 3]  # none ignores the filters
+    assert _ids(body) == [1, 2, 3]
+    assert "page.title IN (%s, %s, %s)" in body["sql"] and "Gamma" not in body["sql"]
+    body = client.get("/api/search", params={"q": "x", "k": 3, "titles": ["Gamma", ""]}).json()
+    assert _ids(body) == [9, 10, 11] and "page.title IN (%s)" in body["sql"]  # blank dropped
+
+    body = client.get("/api/search", params={"q": "x", "k": 3, "strategy": "none"}).json()
+    assert _ids(body) == [1, 2, 3]
     assert "WHERE" not in body["sql"]
+    resp = client.get(
+        "/api/search", params={"q": "x", "k": 3, "min_words": 1000, "strategy": "none"}
+    )
+    assert resp.status_code == 422  # none would drop the filter silently: refused
+    assert "min_words" in resp.json()["detail"]
 
     body = client.get(
         "/api/search",
@@ -272,9 +410,21 @@ def test_api_search_filters_and_strategy_reach_the_sql(client: TestClient) -> No
     ).json()
     assert _ids(body) == [5, 6, 7]  # inner limit 30 covers all 12 chunks
     assert ") AS knn" in body["sql"] and "page.n_words >= %s" in body["sql"]
+    assert body["ef_search"] == 50
 
     resp = client.get("/api/search", params={"q": "x", "k": 3, "heading": "", "linked_from": ""})
     assert resp.status_code == 200 and _ids(resp.json()) == [1, 2, 3]  # empty = no filter
+
+
+@pytest.mark.db
+def test_api_search_ef_search_zero_leaves_the_session_value_and_reports_it(
+    client: TestClient, corpus: pymysql.Connection
+) -> None:
+    server_value = dbmod.get_session_var(corpus, EF_SEARCH_VARIABLE)
+    body = client.get("/api/search", params={"q": "x", "k": 1, "ef_search": 0}).json()
+    assert body["ef_search"] == server_value and _ids(body) == [1]
+    body = client.get("/api/search", params={"q": "x", "k": 1, "ef_search": 7}).json()
+    assert body["ef_search"] == 7
 
 
 @pytest.mark.db

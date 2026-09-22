@@ -9,7 +9,7 @@
 -- deleted with it (ON DELETE CASCADE); references that only resolve a title to a corpus page
 -- become NULL again when that page goes (ON DELETE SET NULL).
 --
--- The vector dimension 384 (BAAI/bge-small-en-v1.5) and the index parameter M=6 are provisional
+-- The vector dimension 384 (BAAI/bge-small-en-v1.5) and the index parameter M=16 were chosen with the experiments in results/SUMMARY.md
 -- (docs/DESIGN.md); the ingest checks the model dimension against this literal.
 
 -- page: one row per Wikipedia page in the corpus, with the size statistics that the length
@@ -68,7 +68,12 @@ CREATE TABLE IF NOT EXISTS sentence (
 -- chunk: the retrieval unit. Consecutive text units of one section (at most
 -- WIKILENSE_CHUNK_MAX_WORDS words, never across a section boundary) with the embedding of
 -- "title > section path: text" stored in a VECTOR(384) column. The HNSW vector index
--- (M=6, cosine distance) serves ORDER BY VEC_DISTANCE_COSINE(embedding, ?) LIMIT n.
+-- (M=16, cosine distance) serves ORDER BY VEC_DISTANCE_COSINE(embedding, ?) LIMIT n.
+-- M=16 (server default 6): with M=6 the HNSW search misses gold pages that an exact ranking finds
+-- unless mhnsw_ef_search is raised to 200+; with M=16 it matches the exact ranking at the default
+-- ef_search 20 for the same sub-millisecond latency (build 2.6 s vs 0.7 s on 8,868 chunks).
+-- The FULLTEXT index on text serves MATCH(text) AGAINST (?) for the hybrid ``rrf`` search
+-- strategy (vector top-N and keyword top-N fused by reciprocal rank fusion in one statement).
 CREATE TABLE IF NOT EXISTS chunk (
     chunk_id   INT UNSIGNED NOT NULL AUTO_INCREMENT,
     page_id    INT UNSIGNED NOT NULL,
@@ -80,7 +85,8 @@ CREATE TABLE IF NOT EXISTS chunk (
     PRIMARY KEY (chunk_id),
     UNIQUE KEY uq_chunk_page_ordinal (page_id, ordinal),
     KEY ix_chunk_section (section_id),
-    VECTOR INDEX (embedding) M=6 DISTANCE=cosine,
+    FULLTEXT KEY ft_chunk_text (text),
+    VECTOR INDEX (embedding) M=16 DISTANCE=cosine,
     CONSTRAINT fk_chunk_page FOREIGN KEY (page_id)
         REFERENCES page (page_id) ON DELETE CASCADE,
     CONSTRAINT fk_chunk_section FOREIGN KEY (section_id)

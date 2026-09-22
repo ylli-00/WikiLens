@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from wikilense.wikitext import (
+    HATNOTE_RE,
     ParsedPage,
     Section,
     TextUnit,
     clean_text,
     extract_links,
+    is_hatnote,
     link_source,
     link_targets,
     normalise_title,
@@ -249,7 +251,77 @@ def test_page_stats_counts() -> None:
         "n_sections": 3,
         "n_tables": 1,
         "n_lists": 2,
+        "n_hatnotes": 0,
     }
+
+
+HATNOTES = [
+    "Main article: [[History_of_the_Aare|History of the Aare]]",
+    "Main articles: [[Aare_Gorge|Aare Gorge]] and [[Lake_Thun|Lake Thun]]",
+    "See also: [[List_of_rivers_of_Switzerland|List of rivers of Switzerland]]",
+    "Further information: [[Bernese_Oberland|Bernese Oberland]]",
+    "For other uses, see [[Aare_(disambiguation)|Aare (disambiguation)]].",
+    "For the given name, see [[Aare_(given_name)|Aare (given name)]].",
+    "For a more detailed discussion of the course, see [[Aare_Gorge|Aare Gorge]].",
+    "Not to be confused with [[Aar_(Hesse)|Aar]].",
+    "This article is about the river. For the surname, see [[Aare_(surname)|Aare (surname)]].",
+    "This page is about the river.",
+    '"Aar" redirects here.',
+]
+NOT_HATNOTES = [
+    "For example, see the table below.",
+    "For instance, see the map.",
+    "main article: lower case is prose",
+    "Further information on the treaty is scarce.",
+    "See also the section on hydrology.",
+    "The main article: a summary follows.",
+    "Not to be confused, the mayor withdrew.",
+    "This article is a stub.",
+    'He said "the river" redirects here and there.',
+    "",
+]
+
+
+def test_is_hatnote_matches_the_measured_openers_case_sensitively() -> None:
+    for raw in HATNOTES:
+        assert is_hatnote(clean_text(raw)), raw
+    for text in NOT_HATNOTES:
+        assert not is_hatnote(text), text
+    assert HATNOTE_RE.pattern.startswith("^(?:")
+    assert HATNOTE_RE.flags & 2 == 0  # re.IGNORECASE is not set
+
+
+def test_hatnote_units_are_flagged_counted_and_kept_in_order() -> None:
+    page = {
+        "title": "Aare",
+        "order": ["sentence_0", "section_0", "sentence_1", "sentence_2", "list_0"],
+        "sentence_0": "For other uses, see [[Aare_(disambiguation)|Aare (disambiguation)]].",
+        "section_0": {"value": "Course", "level": 2},
+        "sentence_1": "Main article: [[Course_of_the_Aare|Course of the Aare]]",
+        "sentence_2": "The river passes [[Bern|Bern]].",
+        "list_0": {
+            "type": "unordered_list",
+            "list": [{"id": "item_0_0", "value": "See also: [[Rhine|Rhine]]", "level": 0}],
+        },
+    }
+    parsed = parse_page(page)
+    assert [(u.element_key, u.ordinal, u.is_hatnote) for u in parsed.units] == [
+        ("sentence_0", 0, True),
+        ("sentence_1", 1, True),
+        ("sentence_2", 2, False),
+        ("item_0_0", 3, True),
+    ]
+    assert parsed.units[1].text == "Main article: Course of the Aare"
+    assert [u.chunkable for u in parsed.units] == [False, False, True, False]
+    assert TextUnit("sentence_9", 9, 0, "", "").chunkable is False
+    assert TextUnit("sentence_9", 9, 0, "Text.", "Text.").chunkable is True
+    stats = page_stats(page)
+    assert stats["n_hatnotes"] == 3
+    assert stats["n_sentences"] == 3 and stats["n_items"] == 1
+    assert stats["n_words"] == sum(len(u.text.split()) for u in parsed.units)  # hatnotes count
+    assert parsed.stats == stats
+    # the hatnote's link is still a link of the page
+    assert ("Course of the Aare", "sentence_1") in parsed.links
 
 
 def test_empty_page_and_missing_order_key() -> None:

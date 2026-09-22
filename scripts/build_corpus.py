@@ -32,10 +32,10 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from wikilense.corpus import (
     CorpusSelection,
-    _link_targets,
     claim_pages,
     iter_claims,
     iter_pages,
+    link_targets,
     nfc,
     parse_element_id,
     select_corpus,
@@ -120,7 +120,7 @@ def stats_from_files(out_dir: Path) -> dict:
     for page in pages:
         title = nfc(page["title"])
         if title in cited:
-            for target in _link_targets(page):
+            for target in link_targets(page):
                 if target in title_set and target not in cited:
                     linking.setdefault(target, set()).add(title)
     fillers = [title for title in page_titles if title not in cited]

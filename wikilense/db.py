@@ -3,6 +3,11 @@
 Every statement is parameterised with ``%s``. The only identifiers that are ever interpolated
 are table and column names taken from the fixed allowlist ``SCHEMA_COLUMNS`` below, which
 mirrors ``sql/schema.sql`` (tests/test_db.py checks the two against each other).
+
+The schema is read from ``sql/schema.sql`` in the repository checkout (``REPO_ROOT``, the parent
+of the package directory), not from package data, so the package works only as an editable
+install of the checkout (``pip install -e .``); a wheel would not carry the file, and
+``apply_schema`` refuses with the expected path when the file is missing.
 """
 
 from __future__ import annotations
@@ -167,7 +172,17 @@ def apply_schema(conn: pymysql.Connection, reset: bool = False) -> int:
     With ``reset=True`` the tables are dropped first (``drop_tables``), so the schema is
     recreated from scratch; otherwise ``CREATE TABLE IF NOT EXISTS`` leaves existing tables
     untouched, which makes a second call a no-op. DDL commits implicitly in MariaDB.
+
+    Raises FileNotFoundError, naming the expected path, when ``sql/schema.sql`` is missing
+    (the file lives in the repository checkout, so the package must be an editable install).
+    Nothing is dropped in that case: the check runs before ``drop_tables``.
     """
+    if not SCHEMA_PATH.is_file():
+        raise FileNotFoundError(
+            f"schema file not found: {SCHEMA_PATH} (wikilense reads sql/schema.sql from the "
+            "repository checkout and works only as an editable install: run "
+            "'pip install -e .' from the repository root)"
+        )
     if reset:
         drop_tables(conn)
     statements = split_sql(SCHEMA_PATH.read_text(encoding="utf-8"))

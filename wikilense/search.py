@@ -45,7 +45,7 @@ import pymysql.cursors
 from wikilense import db
 
 #: Filtering strategies accepted by :func:`search` and :func:`explain_search`.
-STRATEGIES: tuple[str, ...] = ("inline", "overfetch", "none")
+STRATEGIES: tuple[str, ...] = ("inline", "overfetch", "none", "rrf")
 
 EF_SEARCH_VARIABLE = "mhnsw_ef_search"
 
@@ -102,6 +102,66 @@ OVERFETCH_FROM = (
 #: Parameters: k.
 OVERFETCH_ORDER_LIMIT = "ORDER BY knn.distance, chunk.chunk_id LIMIT %s"
 OVERFETCH_JOIN_KEYWORD = "JOIN"
+
+# ---------------------------------------------------------------------------------------------
+# SQL: the ``rrf`` statement (vector top-N and full-text top-N fused by reciprocal rank fusion)
+# ---------------------------------------------------------------------------------------------
+
+#: The full-text top-N over the FULLTEXT index ``ft_chunk_text`` on ``chunk.text`` (InnoDB,
+#: natural-language mode: the words of the text, stopwords and tokens shorter than
+#: ``innodb_ft_min_token_size`` = 3 dropped, ranked by InnoDB's relevance; a row that contains
+#: none of the words is not returned). Parameters: query text, query text, limit.
+FT_SQL = (
+    "SELECT chunk_id, MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE) AS relevance "
+    "FROM chunk "
+    "WHERE MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE) "
+    "ORDER BY relevance DESC "
+    "LIMIT %s"
+)
+#: The RRF smoothing constant (Cormack, Clarke and Buettcher, SIGIR 2009), the value the
+#: MariaDB docs use; it is written literally in ``RRF_WITH`` (tests/test_search.py checks the
+#: two agree).
+RRF_K = 60
+#: The two ranked lists as CTEs and their fusion. ``vec`` is :data:`KNN_SQL` (the HNSW search,
+#: LIMIT N = k * overfetch) and ``ft`` is :data:`FT_SQL` (LIMIT N), each ranked by
+#: ``ROW_NUMBER()`` over the LIMITed derived table: a window function written directly on the
+#: index query makes MariaDB compute it over the whole table (measured: r_rows 8,868 instead of
+#: N, 9.6 ms instead of 2.0 ms). ``fused`` sums ``1 / (60 + rank)`` over both lists per chunk;
+#: the division is done in DOUBLE because an integer division would give a DECIMAL with
+#: ``div_precision_increment`` (4) digits, and ranks past 60 would tie.
+#: Parameters: query vector (bytes), query vector, N, query text, query text, N.
+RRF_WITH = (
+    "WITH vec AS ("
+    "SELECT knn.chunk_id, ROW_NUMBER() OVER (ORDER BY knn.distance, knn.chunk_id) AS rnk "
+    "FROM (" + KNN_SQL + ") AS knn), "
+    "ft AS ("
+    "SELECT matched.chunk_id, "
+    "ROW_NUMBER() OVER (ORDER BY matched.relevance DESC, matched.chunk_id) AS rnk "
+    "FROM (" + FT_SQL + ") AS matched), "
+    "fused AS ("
+    "SELECT ranked.chunk_id, SUM(CAST(1 AS DOUBLE) / (60 + ranked.rnk)) AS score "
+    "FROM (SELECT chunk_id, rnk FROM vec UNION ALL SELECT chunk_id, rnk FROM ft) AS ranked "
+    "GROUP BY ranked.chunk_id)"
+)
+#: Parameters: query vector (bytes): the cosine distance is computed here for every fused
+#: chunk, so it is known also for a chunk that only the full-text list found.
+RRF_SELECT = (
+    "SELECT chunk.chunk_id, chunk.page_id, page.title, section.path AS section_path, "
+    "chunk.ordinal AS chunk_ordinal, chunk.n_words, "
+    "VEC_DISTANCE_COSINE(chunk.embedding, %s) AS distance, chunk.text, fused.score"
+)
+#: ``fused`` holds at most 2 N rows, so the joins are primary-key lookups from it; the filter
+#: joins and predicates are added here, in the outer query, like in ``overfetch``.
+RRF_FROM = (
+    "FROM fused "
+    "JOIN chunk ON chunk.chunk_id = fused.chunk_id "
+    "JOIN page ON page.page_id = chunk.page_id "
+    "JOIN section ON section.section_id = chunk.section_id"
+)
+#: Parameters: k. The tie-break can be in the statement here: this ORDER BY does not have to
+#: be the vector-index shape.
+RRF_ORDER_LIMIT = "ORDER BY fused.score DESC, chunk.chunk_id LIMIT %s"
+RRF_JOIN_KEYWORD = "JOIN"
 
 # ---------------------------------------------------------------------------------------------
 # SQL: filter fragments (each added only when its Filters field is set; one parameter each,
@@ -169,7 +229,11 @@ PAGE_SECTIONS_SQL = (
 
 @dataclass(frozen=True)
 class Hit:
-    """One retrieved chunk with its page and section, in the column order of the SELECTs."""
+    """One retrieved chunk with its page and section, in the column order of the SELECTs.
+
+    ``distance`` is always the cosine distance to the query vector. ``score`` is the
+    reciprocal-rank-fusion score of the ``rrf`` strategy and ``None`` for the others.
+    """
 
     chunk_id: int
     page_id: int
@@ -179,6 +243,7 @@ class Hit:
     n_words: int
     distance: float
     text: str
+    score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -315,17 +380,30 @@ def _filter_fragments(
 
 
 def _check_search_args(
-    qvec: np.ndarray, k: int, filters: Filters | None, strategy: str, overfetch: int
+    qvec: np.ndarray,
+    k: int,
+    filters: Filters | None,
+    strategy: str,
+    overfetch: int,
+    query_text: str | None,
 ) -> tuple[bytes, Filters]:
     """Validate the search arguments and return (vector bytes, effective Filters).
 
-    Raises ValueError for an unknown strategy, ``k`` or ``overfetch`` below 1, or a query vector
+    Raises ValueError for an unknown strategy, ``k`` or ``overfetch`` below 1, a query vector
     whose dimension is not ``db.VECTOR_DIM`` (MariaDB would not fail but return NULL distances
-    and an arbitrary order), and TypeError for non-int ``k`` / ``overfetch`` or a filters value
-    that is not a Filters.
+    and an arbitrary order), or a missing or blank ``query_text`` with strategy ``rrf``, and
+    TypeError for non-int ``k`` / ``overfetch``, a filters value that is not a Filters or a
+    ``query_text`` that is not a str.
     """
     if strategy not in STRATEGIES:
         raise ValueError(f"unknown strategy {strategy!r}; choose one of {STRATEGIES}")
+    if strategy == "rrf":
+        if query_text is None:
+            raise ValueError("strategy 'rrf' needs query_text, the words for the full-text search")
+        if not isinstance(query_text, str):
+            raise TypeError(f"query_text must be a str, got {type(query_text).__name__}")
+        if not query_text.strip():
+            raise ValueError("query_text must not be blank with strategy 'rrf'")
     for name, value in (("k", k), ("overfetch", overfetch)):
         if isinstance(value, bool) or not isinstance(value, int):
             raise TypeError(f"{name} must be an int, got {type(value).__name__}")
@@ -350,28 +428,40 @@ def search_statement(
     filters: Filters | None = None,
     strategy: str = "inline",
     overfetch: int = 10,
+    query_text: str | None = None,
 ) -> tuple[str, tuple[Any, ...]]:
     """Return the SQL text and its parameter tuple that :func:`search` runs for these arguments.
 
     The text depends only on the strategy, on which filter fields are set and on the number
-    of titles; every value (the vector bytes, the limits, the filter values) is in the
-    parameter tuple. Raises as :func:`search` does for invalid arguments. For ``titles=[]``
-    (a filter that matches no page) the SQL is empty and the params are ``()``: no statement
-    is run.
+    of titles; every value (the vector bytes, the query text, the limits, the filter values)
+    is in the parameter tuple. Raises as :func:`search` does for invalid arguments. For
+    ``titles=[]`` (a filter that matches no page) the SQL is empty and the params are ``()``:
+    no statement is run. ``query_text`` is used by strategy ``rrf`` only.
     """
-    qbytes, filters = _check_search_args(qvec, k, filters, strategy, overfetch)
+    qbytes, filters = _check_search_args(qvec, k, filters, strategy, overfetch, query_text)
     if strategy == "none":
         filters = Filters()
         overfetch = 1
     elif filters.titles is not None and len(filters.titles) == 0:
         return "", ()
+    if strategy == "rrf":
+        joins, join_params, wheres, where_params = _filter_fragments(filters, RRF_JOIN_KEYWORD)
+        parts = [RRF_WITH, RRF_SELECT, RRF_FROM, *joins]
+        if wheres:
+            parts.append("WHERE " + " AND ".join(wheres))
+        parts.append(RRF_ORDER_LIMIT)
+        n = k * overfetch
+        params: tuple[Any, ...] = (
+            qbytes, qbytes, n, query_text, query_text, n, qbytes, *join_params, *where_params, k
+        )
+        return " ".join(parts), params
     if strategy == "inline":
         joins, join_params, wheres, where_params = _filter_fragments(filters, INLINE_JOIN_KEYWORD)
         parts = [INLINE_SELECT, INLINE_FROM, *joins]
         if wheres:
             parts.append("WHERE " + " AND ".join(wheres))
         parts.append(INLINE_ORDER_LIMIT)
-        params: tuple[Any, ...] = (qbytes, *join_params, *where_params, qbytes, k)
+        params = (qbytes, *join_params, *where_params, qbytes, k)
         return " ".join(parts), params
     joins, join_params, wheres, where_params = _filter_fragments(filters, OVERFETCH_JOIN_KEYWORD)
     parts = [OVERFETCH_SELECT, OVERFETCH_FROM, *joins]
@@ -418,19 +508,22 @@ def search(
     strategy: str = "inline",
     overfetch: int = 10,
     ef_search: int | None = None,
+    query_text: str | None = None,
 ) -> list[Hit]:
-    """Return up to ``k`` hits nearest to ``qvec`` (cosine), ordered by distance, then chunk_id.
+    """Return up to ``k`` hits for ``qvec``, ordered by distance then chunk_id (``rrf``: by
+    score descending, then chunk_id).
 
     ``filters`` restricts the pages and sections (see :class:`Filters`); ``strategy`` is one
     of :data:`STRATEGIES` (module docstring); ``overfetch`` is the factor of the inner limit
-    for the ``overfetch`` strategy and is ignored otherwise. ``ef_search`` sets the session's
-    ``mhnsw_ef_search`` for this call only and restores the previous value afterwards, even
-    when the statement fails. The ``inline`` and ``none`` strategies return exactly ``k`` hits
-    when at least ``k`` chunks match; ``overfetch`` may return fewer. Nothing is committed.
-    Raises ValueError / TypeError for invalid arguments and ``pymysql.err.Error`` from the
-    server.
+    for the ``overfetch`` and ``rrf`` strategies and is ignored otherwise. ``query_text`` is
+    the text for the full-text half of ``rrf`` (required there, ignored otherwise).
+    ``ef_search`` sets the session's ``mhnsw_ef_search`` for this call only and restores the
+    previous value afterwards, even when the statement fails. The ``inline`` and ``none``
+    strategies return exactly ``k`` hits when at least ``k`` chunks match; ``overfetch`` and
+    ``rrf`` may return fewer. Nothing is committed. Raises ValueError / TypeError for invalid
+    arguments and ``pymysql.err.Error`` from the server.
     """
-    sql, params = search_statement(qvec, k, filters, strategy, overfetch)
+    sql, params = search_statement(qvec, k, filters, strategy, overfetch, query_text)
     if not sql:
         return []
     with ef_search_session(conn, ef_search), conn.cursor() as cur:
@@ -446,10 +539,14 @@ def search(
             n_words=int(row[5]),
             distance=float(row[6]),
             text=str(row[7]),
+            score=float(row[8]) if len(row) > 8 else None,
         )
         for row in rows
     ]
-    hits.sort(key=lambda h: (h.distance, h.chunk_id))
+    if strategy == "rrf":
+        hits.sort(key=lambda h: (-(h.score or 0.0), h.chunk_id))
+    else:
+        hits.sort(key=lambda h: (h.distance, h.chunk_id))
     return hits
 
 
@@ -461,15 +558,18 @@ def explain_search(
     strategy: str = "inline",
     overfetch: int = 10,
     analyze: bool = False,
+    query_text: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return the ``EXPLAIN`` rows (dicts) of the statement :func:`search` would run.
 
     With ``analyze=True`` the statement is executed under ``ANALYZE`` instead, which adds the
     measured ``r_rows`` (rows actually read per table) and ``r_filtered`` columns. The vector
     index is in use when a row for table ``chunk`` has ``key`` ``embedding`` and ``type``
-    ``index``. Returns ``[]`` for ``titles=[]`` (no statement runs).
+    ``index``; for ``rrf`` a second ``chunk`` row has ``type`` ``fulltext`` and ``key``
+    ``ft_chunk_text``. ``query_text`` is required for ``rrf`` as in :func:`search`. Returns
+    ``[]`` for ``titles=[]`` (no statement runs).
     """
-    sql, params = search_statement(qvec, k, filters, strategy, overfetch)
+    sql, params = search_statement(qvec, k, filters, strategy, overfetch, query_text)
     if not sql:
         return []
     if not analyze:

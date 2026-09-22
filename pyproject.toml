@@ -33,6 +33,12 @@ markers = [
   "db: needs a running MariaDB (skipped when WIKILENSE_DB_* is not reachable)",
   "slow: downloads or runs the embedding model",
 ]
+# Two deprecation notices raised inside third-party packages at import time, not by our code:
+# starlette's TestClient (used by tests/test_web.py) about httpx, and starlette about an anyio alias.
+filterwarnings = [
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
+  "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100

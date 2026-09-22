@@ -24,16 +24,18 @@ import pytest
 
 from wikilense import db as dbmod
 from wikilense.chunking import chunk_page, embedding_text
-from wikilense.config import Settings
+from wikilense.config import REPO_ROOT, Settings
 from wikilense.ingest import (
+    ANALYZE_TABLES,
     INSERT_BATCH_ROWS,
     META_KEYS,
     STAGES,
     IngestError,
     IngestReport,
+    corpus_dir_label,
     run_ingest,
 )
-from wikilense.wikitext import parse_page
+from wikilense.wikitext import HATNOTE_RE, parse_page
 
 DIM = dbmod.VECTOR_DIM
 CHUNK_MAX_WORDS = 12  # small, so that the synthetic pages give several overlapping chunks
@@ -58,6 +60,7 @@ PAGES: list[dict] = [
             "sentence_0",
             "sentence_1",
             "section_0",
+            "sentence_6",
             "sentence_2",
             "sentence_3",
             "list_0",
@@ -72,6 +75,8 @@ PAGES: list[dict] = [
         ),
         "sentence_1": "It has about fifty thousand inhabitants.",
         "section_0": {"value": "History", "level": 2},
+        # a hatnote: a sentence row (evidence ids resolve), in no chunk
+        "sentence_6": "Main article: [[History of Alpha City|History of Alpha City]]",
         "sentence_2": "The city was founded in 1200.",
         "sentence_3": "It grew quickly in the 1800s.",
         "list_0": {
@@ -141,6 +146,7 @@ CLAIMS: list[dict] = [
                     "Missing Page_sentence_0",
                     "Alpha City_table_caption_0",
                     "Alpha City_sentence_5",
+                    "Alpha City_sentence_6",
                 ],
                 "context": {},
             }
@@ -152,26 +158,29 @@ CLAIMS: list[dict] = [
 ]
 
 # Counted by hand from PAGES and CLAIMS (chunks with CHUNK_MAX_WORDS=12, overlap 1: Alpha City
-# 6, Beta River 2, Gamma Mountain 2; links: Alpha City 5 written + 1 skipped, Beta River 3).
+# 6, Beta River 2, Gamma Mountain 2, the hatnote and the whitespace-only unit in none; links:
+# Alpha City 6 written + 1 skipped, Beta River 3).
 EXPECTED_COUNTS: dict[str, int] = {
     "n_pages": 3,
     "n_sections": 8,  # 3 + 2 + 3, lead sections included
-    "n_sentences": 15,  # 8 + 3 + 4 text units, the whitespace-only one included
+    "n_sentences": 16,  # 9 + 3 + 4 text units, the whitespace-only one and the hatnote included
     "n_units_empty": 1,
+    "n_units_hatnote": 1,
     "n_chunks": 10,
-    "n_links": 8,
-    "n_links_resolved": 6,  # Delta Town and Omega Sea are not corpus pages
+    "n_links": 9,
+    "n_links_resolved": 6,  # Delta Town, Omega Sea and History of Alpha City are not corpus pages
     "n_links_skipped": 1,
     "n_claims": 2,
-    "n_evidence": 9,
-    "n_evidence_page_resolved": 8,  # all but Missing Page
-    "n_evidence_sentence_resolved": 5,  # sentence_1, item_0_1, sentence_2, item_0_0, sentence_5
+    "n_evidence": 10,
+    "n_evidence_page_resolved": 9,  # all but Missing Page
+    "n_evidence_sentence_resolved": 6,  # sentence_1, item_0_1, sentence_2, item_0_0, 5 and 6
 }
 
 EXPECTED_LINKS: list[tuple[str, str, str, bool]] = [
     ("Alpha City", "Beta River", "sentence_0", True),
     ("Alpha City", "Gamma Mountain", "sentence_0", True),
     ("Alpha City", "Delta Town", "sentence_0", False),
+    ("Alpha City", "History of Alpha City", "sentence_6", False),
     ("Alpha City", "Beta River", "item_0_1", True),
     ("Alpha City", "Beta River", "cell_0_1_0", True),
     ("Beta River", "Alpha City", "sentence_0", True),
@@ -190,6 +199,7 @@ EXPECTED_EVIDENCE: list[tuple[int, int, int, str, str | None, str | None]] = [
     (102, 0, 2, "sentence", None, None),
     (102, 0, 3, "table_caption", "Alpha City", None),
     (102, 0, 4, "sentence", "Alpha City", "sentence_5"),
+    (102, 0, 5, "sentence", "Alpha City", "sentence_6"),  # the hatnote resolves
 ]
 
 
@@ -304,7 +314,17 @@ def test_report_counts_and_stages() -> None:
     report = IngestReport()
     assert set(report.counts()) == set(EXPECTED_COUNTS)
     assert set(report.seconds) == set(STAGES)
-    assert {"parse", "embed", "load", "resolve"} <= set(STAGES)
+    assert {"parse", "embed", "load", "resolve", "analyze"} <= set(STAGES)
+    assert ANALYZE_TABLES == ("chunk", "page", "section", "link")
+
+
+def test_corpus_dir_label_is_relative_inside_the_repository(tmp_path: Path) -> None:
+    assert corpus_dir_label(REPO_ROOT / "data" / "corpus") == "data/corpus"
+    assert corpus_dir_label(REPO_ROOT / "data" / ".." / "data" / "corpus") == "data/corpus"
+    assert corpus_dir_label(str(REPO_ROOT)) == "."
+    outside = tmp_path / "corpus"
+    assert corpus_dir_label(outside) == str(outside.resolve())
+    assert not corpus_dir_label(REPO_ROOT / "data" / "corpus").startswith("/")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -321,6 +341,7 @@ def test_run_ingest_on_the_synthetic_corpus(ingest_settings: Settings, corpus_di
     assert set(report.seconds) == set(STAGES)
     assert all(value >= 0.0 for value in report.seconds.values())
     assert report.seconds["total"] >= report.seconds["parse"]
+    assert report.seconds["analyze"] > 0.0
     assert embedder.calls == [(EXPECTED_COUNTS["n_chunks"], 64)]
 
     with closing(dbmod.connect(ingest_settings)) as conn:
@@ -328,7 +349,8 @@ def test_run_ingest_on_the_synthetic_corpus(ingest_settings: Settings, corpus_di
         _check_chunk_map(conn, embedder)
         _check_links(conn)
         _check_evidence(conn)
-        _check_meta(conn, corpus_dir)
+        _check_meta(conn, corpus_dir, report)
+        _check_statistics(conn)
         first_counts = _table_counts(conn)
 
     # A second run with reset=True rebuilds everything and gives the same counts.
@@ -354,20 +376,26 @@ def _check_tables(conn: pymysql.Connection) -> None:
     assert _rows(
         conn, "SELECT n_sentences, n_items, n_sections, n_tables, n_lists FROM page WHERE title = %s",
         ("Alpha City",),
-    ) == [(6, 2, 2, 1, 1)]
+    ) == [(7, 2, 2, 1, 1)]
     assert _rows(
         conn,
         "SELECT s.ordinal, s.heading, s.level, s.path FROM section s JOIN page p USING (page_id) "
         "WHERE p.title = %s ORDER BY s.ordinal",
         ("Gamma Mountain",),
     ) == [(0, "", 1, ""), (1, "Geology", 2, "Geology"), (2, "Rock types", 3, "Geology > Rock types")]
-    # the whitespace-only unit is a sentence row with empty text, and the only one in no chunk
+    # the hatnote and the whitespace-only unit are sentence rows (the hatnote with its cleaned
+    # text and its page-order ordinal), and the only two units in no chunk
     unmapped = _rows(
         conn,
-        "SELECT p.title, s.element_key, s.text FROM sentence s JOIN page p USING (page_id) "
-        "LEFT JOIN chunk_sentence cs USING (sentence_id) WHERE cs.chunk_id IS NULL",
+        "SELECT p.title, s.element_key, s.ordinal, s.text FROM sentence s "
+        "JOIN page p USING (page_id) LEFT JOIN chunk_sentence cs USING (sentence_id) "
+        "WHERE cs.chunk_id IS NULL ORDER BY s.ordinal",
     )
-    assert unmapped == [("Alpha City", "sentence_5", "")]
+    assert unmapped == [
+        ("Alpha City", "sentence_6", 2, "Main article: History of Alpha City"),
+        ("Alpha City", "sentence_5", 8, ""),
+    ]
+    assert _scalar(conn, "SELECT COUNT(*) FROM chunk WHERE text LIKE %s", ("Main article%",)) == 0
 
 
 def _check_chunk_map(conn: pymysql.Connection, embedder: FakeEmbedder) -> None:
@@ -395,8 +423,8 @@ def _check_chunk_map(conn: pymysql.Connection, embedder: FakeEmbedder) -> None:
                     (chunk_id,),
                 )
             ]
-            non_empty = {u.element_key for u in parsed.units if u.text}
-            assert keys == [k for k in chunk.element_keys if k in non_empty]
+            assert keys == chunk.element_keys
+            assert all(u.chunkable for u in parsed.units if u.element_key in keys)
             # the stored vector is the fake embedding of "title > path: text" (prefix on)
             section_path = parsed.sections[chunk.section_ordinal].path
             text = embedding_text(parsed.title, section_path, chunk.text)
@@ -445,7 +473,7 @@ def _check_evidence(conn: pymysql.Connection) -> None:
     ) == [("Missing Page_sentence_0", "Missing Page")]
 
 
-def _check_meta(conn: pymysql.Connection, corpus_dir: Path) -> None:
+def _check_meta(conn: pymysql.Connection, corpus_dir: Path, report: IngestReport) -> None:
     """ingest_meta holds every key with the values of this run."""
     meta = dict(_rows(conn, "SELECT `key`, `value` FROM ingest_meta"))
     assert set(meta) == set(META_KEYS)
@@ -455,6 +483,12 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path) -> None:
     assert meta["chunk_max_words"] == str(CHUNK_MAX_WORDS)
     assert meta["chunk_overlap_units"] == str(CHUNK_OVERLAP_UNITS)
     assert meta["index_distance"] == "cosine"
+    assert meta["hatnote_pattern"] == HATNOTE_RE.pattern
+    assert meta["n_units_hatnote"] == "1"
+    assert meta["analyze_tables"] == "chunk,page,section,link"
+    assert float(meta["analyze_seconds"]) == pytest.approx(report.seconds["analyze"], abs=0.001)
+    assert float(meta["analyze_seconds"]) > 0.0
+    # the temporary corpus lies outside the repository, so the path stays absolute
     assert meta["corpus_dir"] == str(corpus_dir.resolve())
     for name in ("pages", "claims"):
         digest = hashlib.sha256((corpus_dir / f"{name}.jsonl").read_bytes()).hexdigest()
@@ -463,6 +497,23 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path) -> None:
     assert meta["index_m"].isdigit()
     assert datetime.fromisoformat(meta["ingested_at"]).utcoffset() is not None
     assert meta["wikilense_version"]
+
+
+def _check_statistics(conn: pymysql.Connection) -> None:
+    """ANALYZE TABLE ran: the primary-key cardinality of every analysed table is its row count.
+
+    InnoDB's persistent statistics are exact for tables this small (every leaf page is sampled),
+    and they are only refreshed by ANALYZE TABLE or by the background recalculation, which is
+    not guaranteed to have run right after the bulk insert.
+    """
+    for table in ANALYZE_TABLES:
+        cardinality = _scalar(
+            conn,
+            "SELECT CARDINALITY FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() "
+            "AND TABLE_NAME = %s AND INDEX_NAME = 'PRIMARY' AND SEQ_IN_INDEX = 1",
+            (table,),
+        )
+        assert cardinality == _table_counts(conn)[table], table
 
 
 @pytest.mark.db
