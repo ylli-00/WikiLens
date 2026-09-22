@@ -1,7 +1,7 @@
 """Sentence-window chunker: consecutive text units of one section become one ``Chunk``.
 
 ``chunk_units`` is pure and deterministic. Word count is ``len(text.split())``. The rules are in
-docs/DESIGN.md, "Chunking rules"; ``max_words`` and ``overlap_units`` are provisional.
+docs/DESIGN.md, "Chunking rules"; ``max_words`` and ``overlap_units`` were chosen with results/SUMMARY.md.
 
 Only *chunkable* units take part (``TextUnit.chunkable``): a unit with no text after cleaning,
 or a hatnote ("Main article: X", "See also: Y", ...; ``wikitext.HATNOTE_RE``), is in no chunk:
@@ -104,7 +104,7 @@ def chunk_units(
 
 
 def embedding_text(title: str, section_path: str, text: str) -> str:
-    """Return the text that is embedded: title and section path as a prefix (provisional)."""
+    """Return the text that is embedded: title and section path as a prefix (kept after measuring)."""
     if section_path:
         return f"{title} > {section_path}: {text}"
     return f"{title}: {text}"

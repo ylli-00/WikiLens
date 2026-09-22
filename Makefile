@@ -16,6 +16,11 @@
 PYTHON  ?= python3
 VENV    ?= .venv
 COMPOSE ?= docker compose
+# `make setup CPU=1` installs the pinned CPU-only build (no CUDA wheels, about 2 GB smaller).
+REQS    ?= requirements-dev.txt
+ifeq ($(CPU),1)
+REQS    := requirements-cpu.lock
+endif
 
 .PHONY: setup test lint eval serve experiments down
 
@@ -23,7 +28,7 @@ COMPOSE ?= docker compose
 
 setup: .env $(VENV)
 	$(COMPOSE) up -d --wait
-	$(VENV)/bin/pip install -r requirements-dev.txt -e .
+	$(VENV)/bin/pip install -r $(REQS) -e .
 	$(VENV)/bin/wikilense ingest
 
 # First run only: copy the example file, then stop so the placeholder passwords are replaced

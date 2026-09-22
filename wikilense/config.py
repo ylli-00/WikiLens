@@ -17,9 +17,9 @@ from dotenv import dotenv_values
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_FILE = REPO_ROOT / ".env"
 
-DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # provisional, see docs/DESIGN.md
+DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # chosen in phase 1, see docs/DESIGN.md
 DEFAULT_CHUNK_MAX_WORDS = 240  # chosen with results/SUMMARY.md: equal recall at equal retrieved text, half the vectors
-DEFAULT_CHUNK_OVERLAP_UNITS = 1  # provisional
+DEFAULT_CHUNK_OVERLAP_UNITS = 1  # one unit of overlap, kept through the experiments
 DEFAULT_VECTOR_DIM = 384  # the model's dimension; sql/schema.sql writes it literally
 DEFAULT_INDEX_M = 16  # chosen with results/SUMMARY.md: exact-ranking recall at the default ef_search
 DEFAULT_EF_SEARCH = 100  # mhnsw_ef_search applied per query by the CLI, web page and harness

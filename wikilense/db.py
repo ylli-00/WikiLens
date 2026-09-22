@@ -243,7 +243,7 @@ def insert_rows(
 def vec_param(v: np.ndarray) -> bytes:
     """Return the bytes to bind for a ``VECTOR`` parameter: float32, little-endian, C order.
 
-    Verified on MariaDB 11.8.9 with PyMySQL 2.2.8 (tests/test_db.py): with the
+    Verified on MariaDB 11.8.9 with PyMySQL 1.2.0 and 1.2.3 (tests/test_db.py): with the
     ``binary_prefix=True`` that ``connect()`` sets, these bytes bound as a plain ``%s`` work
     both in ``INSERT ... VALUES (%s)`` and in ``VEC_DISTANCE_COSINE(embedding, %s)``, and the
     vector index is used. On a connection without ``binary_prefix`` and a PyMySQL older than 1.2.3 the same bytes

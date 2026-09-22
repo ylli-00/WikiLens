@@ -1,5 +1,5 @@
 # WikiLense pinned dependencies, GPU build (what the results in results/ were produced with).
-# Made on 2026-09-17 with: .venv/bin/pip freeze --exclude-editable  (Python 3.12.3, Linux x86_64,
+# Made on 2026-09-22 with: .venv/bin/pip freeze --exclude-editable  (Python 3.12.3, Linux x86_64,
 # after `pip install -r requirements-dev.txt`), so torch is the PyPI wheel with CUDA 13 libraries.
 # Use: python3 -m venv .venv && .venv/bin/pip install -r requirements.lock -e .
 # For a machine without an NVIDIA GPU, or for CI, use requirements-cpu.lock instead (about 2 GB

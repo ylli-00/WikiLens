@@ -1,6 +1,6 @@
 """Embedding of chunk and query texts, and the vector <-> bytes / text helpers for MariaDB.
 
-The model is provisional (see docs/DESIGN.md, "Embedding"): ``BAAI/bge-small-en-v1.5``, 384
+The model (chosen in phase 1, see docs/DESIGN.md, "Embedding") is ``BAAI/bge-small-en-v1.5``, 384
 dimensions. Embeddings are L2-normalised so that the cosine distance MariaDB computes with
 ``VEC_DISTANCE_COSINE`` equals ``1 - dot``.
 

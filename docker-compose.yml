@@ -9,10 +9,11 @@ services:
       MARIADB_DATABASE: ${WIKILENSE_DB_NAME:-wikilense}
       MARIADB_USER: ${WIKILENSE_DB_USER:-wikilense}
       MARIADB_PASSWORD: ${WIKILENSE_DB_PASSWORD:?set WIKILENSE_DB_PASSWORD in .env}
-    # The HNSW index cache (mhnsw_max_cache_size) defaults to 16 MB; the graph of the 8,868-chunk
-    # corpus is already 16 MB on disk, so 512 MB is set for capacity. The size does not change the
-    # results: within one server process the hit lists were identical at 512 MB and 16 MB (75 of
-    # 75 claims); a server restart is what changed them (46 of 75 identical), see results/SUMMARY.md.
+    # The HNSW index cache (mhnsw_max_cache_size) defaults to 16 MB; the M=6 graph of the 120-word
+    # ingest (8,658 chunks) is already 16 MB on disk and the final 240-word graph 13 MB, so 512 MB is
+    # set for capacity. The size does not change the results: within one server process the hit
+    # lists were identical at 512 MB and 16 MB (75 of 75 claims); a server restart is what changed
+    # them (3 of 75 on the M=6 index, 1 of 75 on M=16), see results/SUMMARY.md sections 1 and 7.
     command: --mhnsw-max-cache-size=536870912
     ports:
       # Loopback only: the database is reachable from this machine, not from the network.

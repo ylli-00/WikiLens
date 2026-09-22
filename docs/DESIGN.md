@@ -97,7 +97,7 @@ limitation).
 - The text that is embedded is `f"{title} > {section_path}: {text}"` when the section path is
   non-empty, else `f"{title}: {text}"`. The stored `chunk.text` stays the plain text. Ingest adds
   the prefix; it was tested against no prefix and kept (exact rankings: article recall@10 74/75
-  both ways, evidence recall@20 63/66 with the prefix against 59/66 without; see Phase 3).
+  both ways, evidence recall@20 63/66 with the prefix against 61/66 without; see results/SUMMARY.md section 5).
 
 ## Embedding (`embedding.py`)
 
@@ -152,8 +152,8 @@ distance in an expression, or a bare `WHERE VEC_DISTANCE(...) < t`, defeats it. 
 variable `mhnsw_ef_search` (default 20, session scope) sets the minimum number of candidates the
 index looks at; the application passes `Settings.ef_search` (100) per query, see Phase 3.
 `mhnsw_max_cache_size` (16 MB default, global) bounds the index cache; `docker-compose.yml` starts
-the server with 512 MB because the graph of the 8,868-chunk corpus is already 16 MB on disk (the
-size does not change the results, see the stability bullet under Phase 2).
+the server with 512 MB because the M=6 graph of the 120-word ingest (8,658 chunks) is already 16 MB
+on disk (the size does not change the results, see results/SUMMARY.md section 1).
 
 ## Corpus selection (`corpus.py`, `scripts/build_corpus.py`)
 
@@ -220,7 +220,7 @@ Corrections to the rules above, forced by the data, and the numbers behind the p
   are a single unit; 2 chunks (0.001%) exceed 512 tokens at 1.3 tokens per word (two long list
   items). Two guards beyond the rule: a chunk that would only repeat units of the previous chunk
   is not emitted (1,004 on the shard) and a chunk with zero words is not emitted (100).
-- **Database** (MariaDB 11.8.9, PyMySQL 2.2.8): binding a `VECTOR` parameter as plain bytes works
+- **Database** (MariaDB 11.8.9, PyMySQL 1.2.0; 1.2.3 since 2026-09-22): binding a `VECTOR` parameter as plain bytes works
   only on a connection opened with `binary_prefix=True` (`db.connect` sets it) with PyMySQL 1.2.0 to
   1.2.2; PyMySQL 1.2.3 and later escape bytes as `_binary X'...'` by themselves (found on 2026-09-22
   when CI, which installs the newest driver, failed the test that documented the rule); otherwise MariaDB
@@ -233,7 +233,7 @@ Corrections to the rules above, forced by the data, and the numbers behind the p
   files. `section.heading` uses the server default collation (`utf8mb4_uca1400_ai_ci`), so a
   heading filter with `LIKE` is case- and accent-insensitive on purpose. `mhnsw_ef_search` outside
   its range is clamped with a warning, not an error. Schema apply 59 ms, reset 87 ms.
-- **Embedding** (bge-small-en-v1.5, revision 5c38ec7c405e, 33.4M parameters, 256 MB on disk):
+- **Embedding** (bge-small-en-v1.5, revision 5c38ec7c405e, 33.4M parameters, 134 MB on disk):
   RTX 4060 1,059 passages/s, CPU 78 passages/s for 100-word texts; peak GPU memory 253 MiB; the
   outputs are bitwise deterministic on both devices; model load 3 to 6 s from a warm cache.
 
