@@ -221,7 +221,9 @@ Corrections to the rules above, forced by the data, and the numbers behind the p
   items). Two guards beyond the rule: a chunk that would only repeat units of the previous chunk
   is not emitted (1,004 on the shard) and a chunk with zero words is not emitted (100).
 - **Database** (MariaDB 11.8.9, PyMySQL 2.2.8): binding a `VECTOR` parameter as plain bytes works
-  only on a connection opened with `binary_prefix=True` (`db.connect` sets it); otherwise MariaDB
+  only on a connection opened with `binary_prefix=True` (`db.connect` sets it) with PyMySQL 1.2.0 to
+  1.2.2; PyMySQL 1.2.3 and later escape bytes as `_binary X'...'` by themselves (found on 2026-09-22
+  when CI, which installs the newest driver, failed the test that documented the rule); otherwise MariaDB
   rejects it (errors 1292 / 4079). `VEC_FromText(%s)` and `UNHEX(%s)` work on any connection. The
   knn query `ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT n` gives `EXPLAIN` type `index`, key
   `embedding`; the alias form `ORDER BY distance` is identical. Resolution references

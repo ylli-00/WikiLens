@@ -2,6 +2,11 @@ A project for area 4, "Vector search and RAG, natively" for the [MariaDB student
 
 # WikiLense
 
+> **Status (2026-09-22): working pipeline, draft benchmark.** Everything below runs and every
+> number is measured, but the claim set (75 claims that happen to fall inside one Wikipedia shard)
+> is a development set, not the benchmark. The next phase picks the claims to evaluate on, scales
+> the corpus, and reruns the experiments; the README will be rewritten with those results.
+
 Semantic search over Wikipedia inside MariaDB. Wikipedia pages are cut into chunks, each chunk is
 embedded with a small open model and stored in a `VECTOR(384)` column with a cosine `VECTOR INDEX`,
 and a query is one SQL statement: `ORDER BY VEC_DISTANCE_COSINE(...)` combined with ordinary
@@ -61,11 +66,13 @@ make setup
    on first use. The run takes 21 s on an RTX 4060 laptop GPU, of which 16 s is embedding; on a
    CPU the embedding runs at about 78 passages per second, so expect about a minute.
 
-The ingest ends with a report you can compare against this one:
+The ingest ends with the seconds per stage and a report you can compare against this one (the
+1,316 hatnote units kept out of chunks are recorded in `ingest_meta`):
 
 ```
-pages 100, sections 3173, sentences 33637 (372 empty, 1316 hatnotes), chunks 4598,
-links 40542 (373 resolved inside the corpus), claims 75, evidence 114 (114 pages, 87 sentences resolved)
+  pages 100, sections 3173, sentences 33637 (empty 372), chunks 4598
+  links 40542 (resolved 373, skipped 0)
+  claims 75, evidence ids 114 (page resolved 114, sentence resolved 87)
 ```
 
 Then `make test` (255 tests, 20 s), `make eval` (the headline table below, about 15 s),
@@ -185,7 +192,7 @@ Nine InnoDB tables, all in [sql/schema.sql](sql/schema.sql), which the code exec
 | `section` | the heading tree: ordinal, heading, level, path such as `History > Roman history` | the lead is section 0; `heading` keeps the server's accent- and case-insensitive collation on purpose, so `LIKE '%history%'` matches `History` |
 | `sentence` | one row per text unit (a sentence or a list item), with its FEVEROUS element key | this is the unit of gold evidence; every unit is stored, even empty ones and hatnotes, so evidence ids always resolve |
 | `chunk` | the retrieval unit: text, word count, `embedding VECTOR(384) NOT NULL`, the `VECTOR INDEX` and a `FULLTEXT` index | see the DDL below |
-| `chunk_sentence` | which sentences each chunk covers (39,155 rows for the 120-word chunking, fewer now) | the join that turns "chunk in the top k" into "gold sentence in the top k" |
+| `chunk_sentence` | which sentences each chunk covers (33,783 rows) | the join that turns "chunk in the top k" into "gold sentence in the top k" |
 | `link` | every `[[link]]` in a page, with the target resolved to a `page_id` when it is in the corpus | "pages linked from X" and "pages linking to X" become joins |
 | `claim` | the FEVEROUS claim, label, split, challenge | the queries of the evaluation |
 | `claim_evidence` | every evidence element id, with `page_id` and `sentence_id` resolved when possible | the ground truth of the evaluation, joined by id rather than by text |
@@ -224,8 +231,7 @@ dimension is literal in the DDL and checked against the model at ingest.
 
 Every statement is a named constant in [wikilense/search.py](wikilense/search.py), assembled from
 fixed fragments; values are always bound as parameters, and a vector parameter is bound as the
-raw float32 bytes (`db.vec_param`), which MariaDB accepts on a PyMySQL connection opened with
-`binary_prefix=True`.
+raw float32 bytes (`db.vec_param`), sent as a `_binary X'...'` literal (see "Binding" below).
 
 The bare index query (strategy `none`, the fastest form):
 
@@ -319,8 +325,10 @@ index-use facts on synthetic data.
   the 16 MB default is already the size of the graph of a 9,000-chunk table, so the Docker
   configuration starts the server with 512 MB. The graph lives in a hidden InnoDB table
   (`chunk#i#NN`), not in `SHOW TABLE STATUS`'s `Index_length`.
-- **Binding.** Raw float32 bytes bind on a `binary_prefix=True` connection (`INSERT` and inside
-  `VEC_DISTANCE_COSINE`); on a default PyMySQL connection they fail with "Incorrect vector value";
+- **Binding.** Raw float32 bytes bind as `_binary X'...'` (`INSERT` and inside
+  `VEC_DISTANCE_COSINE`): PyMySQL 1.2.3 and later escape bytes that way by themselves, older
+  drivers only on a connection opened with `binary_prefix=True`, which `db.connect` sets for both;
+  without it, PyMySQL 1.2.0 sends bytes as a string and MariaDB answers "Incorrect vector value";
   `VEC_FromText(?)` with a JSON list and `UNHEX(?)` work everywhere. A query vector of the wrong
   dimension returns `NULL` distances, silently.
 - **Transactions.** A chunk inserted inside a transaction is visible to the index in the same
@@ -380,8 +388,9 @@ Query embedding: 4.7 ms p50 on the GPU.
 | `final_oracle_titles` | inline, gold page as `titles` filter | 75/75 | 66/66 | 2.65 / 9.87 ms; evidence in the first chunk for 42/66, within 5 for 59/66 |
 | `final_ef_100_after_restart` | index, ef_search 100, after `docker compose restart` | 74/75 | 65/66 | hit lists identical to before for 74/75 |
 
-**Reading the numbers.** The one claim whose gold page never appears is missed by the embedding
-itself (the exact ranking misses it too); it is named in `results/final_ef_100.md`. The hybrid
+**Reading the numbers.** The one claim whose gold page never appears (claim 87976, a NOT ENOUGH
+INFO claim about a by-election whose gold page is "Lincoln, England") is missed by the embedding
+itself: the exact ranking misses it too (`results/final_ef_100.md`, worst-cases table). The hybrid
 does not beat the vector ranking on these claims and costs ten times more. The oracle row is the
 bound on what better chunk ranking could give: with the page known, 42 of 66 gold sets are already
 in the first chunk. Compared with the server defaults on the same corpus, `M=6` and `ef_search=20`

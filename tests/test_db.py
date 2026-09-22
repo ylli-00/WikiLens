@@ -351,9 +351,26 @@ def test_vector_round_trip_bytes_unhex_and_vec_fromtext(db_conn) -> None:
         assert all(abs(d) < 1e-6 for _, d in cur.fetchall())
 
 
+def _driver_prefixes_bytes() -> bool:
+    """Return True when the installed PyMySQL escapes bytes as a ``_binary`` literal by itself.
+
+    PyMySQL 1.2.3 does (``_binary X'...'``); 1.2.0 to 1.2.2 send bytes as a utf8mb4 string unless
+    the connection is opened with ``binary_prefix=True``, which ``db.connect`` sets.
+    """
+    try:
+        return pymysql.converters.escape_bytes(b"\x00\x80").startswith("_binary")
+    except UnicodeEncodeError:  # 1.2.0 to 1.2.2 cannot even escape non-UTF-8 bytes
+        return False
+
+
 @pytest.mark.db
-def test_bytes_parameter_needs_binary_prefix(settings) -> None:
-    """Documents the binding rule: without binary_prefix the bytes arrive as a varchar."""
+def test_bytes_parameter_binding_depends_on_the_driver(settings) -> None:
+    """Documents the binding rule for a connection opened WITHOUT binary_prefix.
+
+    With PyMySQL 1.2.3 and later the bytes arrive as ``_binary X'...'`` and work; with older
+    drivers they arrive as a varchar and MariaDB rejects them. ``db.connect`` sets
+    ``binary_prefix=True`` so the code works with either (test_vector_round_trip_bytes).
+    """
     conn = pymysql.connect(
         host=settings.db_host,
         port=settings.db_port,
@@ -367,17 +384,27 @@ def test_bytes_parameter_needs_binary_prefix(settings) -> None:
         dbmod.apply_schema(conn, reset=True)
         _insert_page(conn, 1, "No prefix")
         conn.commit()
-        with pytest.raises(pymysql.err.OperationalError, match="Incorrect vector value"):
+        if _driver_prefixes_bytes():
             _insert_chunk(conn, 1, 1, _unit(3))
-        conn.rollback()
-        with (
-            pytest.raises(pymysql.err.OperationalError, match="Illegal parameter data type"),
-            conn.cursor() as cur,
-        ):
-            cur.execute(
-                "SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk",
-                (dbmod.vec_param(_unit(3)),),
-            )
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk",
+                    (dbmod.vec_param(_unit(3)),),
+                )
+                assert abs(cur.fetchone()[0]) < 1e-6
+            conn.rollback()
+        else:
+            with pytest.raises(pymysql.err.OperationalError, match="Incorrect vector value"):
+                _insert_chunk(conn, 1, 1, _unit(3))
+            conn.rollback()
+            with (
+                pytest.raises(pymysql.err.OperationalError, match="Illegal parameter data type"),
+                conn.cursor() as cur,
+            ):
+                cur.execute(
+                    "SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk",
+                    (dbmod.vec_param(_unit(3)),),
+                )
         with conn.cursor() as cur:  # the text form works on any connection
             cur.execute(
                 "INSERT INTO chunk (chunk_id, page_id, section_id, ordinal, text, n_words, "

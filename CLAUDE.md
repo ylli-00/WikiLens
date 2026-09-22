@@ -16,6 +16,7 @@ recall/latency harness, the experiment protocol (`scripts/run_experiments.py`, `
 with the title prefix, index M=16, `mhnsw_ef_search` 100 per query, strategy `inline` for filtered
 queries. The corpus is the 100 pages / 75 claims described below; the decisions of 2026-09-16/17 stand.
 
+- **Owner's decision (2026-09-22):** the results in `results/` and the README are drafts. The claim set of the current corpus is a development set; the benchmark claims are picked in the next phase, and the README is rewritten with those results.
 - **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus (the
   inline filtered statement's cost grows with the table and is the number to watch), then run and
   document the experiments; the LLM fact-checker extension. This includes measuring the share of gold

@@ -84,9 +84,9 @@ def connect(settings: Settings | None = None, database: str | None = None) -> py
 
     ``settings`` defaults to ``load_settings()``; ``database`` overrides ``settings.db_name``
     (the test suite passes ``settings.test_db_name``). The connection is opened with
-    ``binary_prefix=True`` so that a ``bytes`` parameter is sent as a ``_binary'...'`` literal,
-    which is what a ``VECTOR`` column and ``VEC_DISTANCE_COSINE`` accept; without the prefix
-    PyMySQL sends bytes as a utf8mb4 string and MariaDB rejects them ("Incorrect vector value").
+    ``binary_prefix=True`` so that a ``bytes`` parameter is sent as a ``_binary'...'`` literal on
+    every PyMySQL version: 1.2.3 and later do this by themselves, 1.2.0 to 1.2.2 would otherwise
+    send bytes as a utf8mb4 string that MariaDB rejects ("Incorrect vector value").
     """
     if settings is None:
         settings = load_settings()
@@ -246,8 +246,8 @@ def vec_param(v: np.ndarray) -> bytes:
     Verified on MariaDB 11.8.9 with PyMySQL 2.2.8 (tests/test_db.py): with the
     ``binary_prefix=True`` that ``connect()`` sets, these bytes bound as a plain ``%s`` work
     both in ``INSERT ... VALUES (%s)`` and in ``VEC_DISTANCE_COSINE(embedding, %s)``, and the
-    vector index is used. On a connection without ``binary_prefix`` the same bytes arrive as a
-    utf8mb4 string and fail ("Incorrect vector value", "Illegal parameter data type varchar");
+    vector index is used. On a connection without ``binary_prefix`` and a PyMySQL older than 1.2.3 the same bytes
+    arrive as a utf8mb4 string and fail ("Incorrect vector value", "Illegal parameter data type");
     the forms that work on any connection are ``UNHEX(%s)`` with ``vec_param(v).hex()`` and
     ``VEC_FromText(%s)`` with a JSON list of numbers.
 
