@@ -1,0 +1,158 @@
+{
+  "created_at": "2026-09-22T01:43:02+00:00",
+  "configuration": {
+    "chunk_max_words": 240,
+    "chunk_overlap_units": 1,
+    "index_m": 16,
+    "use_prefix": true,
+    "label": "240 words, overlap 1, M=16, prefix on"
+  },
+  "ingest_run": {
+    "label": "restore_defaults",
+    "kind": "ingest",
+    "configuration": {
+      "chunk_max_words": 240,
+      "chunk_overlap_units": 1,
+      "index_m": 16,
+      "use_prefix": true,
+      "label": "240 words, overlap 1, M=16, prefix on"
+    },
+    "ingested_at": "2026-09-22T01:43:02+00:00",
+    "counts": {
+      "n_pages": 100,
+      "n_sections": 3173,
+      "n_sentences": 33637,
+      "n_units_empty": 372,
+      "n_units_hatnote": 1316,
+      "n_chunks": 4598,
+      "n_links": 40542,
+      "n_links_resolved": 373,
+      "n_links_skipped": 0,
+      "n_claims": 75,
+      "n_evidence": 114,
+      "n_evidence_page_resolved": 114,
+      "n_evidence_sentence_resolved": 87
+    },
+    "seconds": {
+      "schema": 0.09,
+      "parse": 0.84,
+      "embed": 16.44,
+      "load": 3.57,
+      "resolve": 0.01,
+      "analyze": 0.01,
+      "total": 21.0
+    },
+    "n_units_hatnote": 1316,
+    "chunk_words_mean": 156.6,
+    "chunk_words_median": 183.5,
+    "chunk_words_p95": 238.0,
+    "chunk_words_max": 240,
+    "vector_index_name": "embedding",
+    "vector_index_m": 16,
+    "vector_index_distance": "cosine",
+    "chunk_data_length": 14172160,
+    "chunk_index_length": 344064,
+    "vector_index_tablespace_bytes": 13631488,
+    "index_rebuild": null
+  },
+  "ingest_meta": {
+    "analyze_seconds": "0.008",
+    "analyze_tables": "chunk,page,section,link",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
+    "corpus_dir": "data/corpus",
+    "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-09-22T01:43:02+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "1316",
+    "wikilense_version": "0.1.0"
+  },
+  "vector_index": {
+    "name": "embedding",
+    "m": 16,
+    "distance": "cosine"
+  },
+  "mhnsw_max_cache_size": 536870912,
+  "checks": [
+    {
+      "item": "ingest_meta.chunk_max_words",
+      "expected": "240",
+      "found": "240",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.chunk_overlap_units",
+      "expected": "1",
+      "found": "1",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.embedding_prefix",
+      "expected": "true",
+      "found": "true",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.index_m",
+      "expected": "16",
+      "found": "16",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.index_distance",
+      "expected": "cosine",
+      "found": "cosine",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.hatnote_pattern",
+      "expected": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+      "found": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.embedding_model",
+      "expected": "BAAI/bge-small-en-v1.5",
+      "found": "BAAI/bge-small-en-v1.5",
+      "ok": true
+    },
+    {
+      "item": "ingest_meta.embedding_dim",
+      "expected": "384",
+      "found": "384",
+      "ok": true
+    },
+    {
+      "item": "vector index M (SHOW CREATE TABLE chunk)",
+      "expected": 16,
+      "found": 16,
+      "ok": true
+    },
+    {
+      "item": "vector index DISTANCE",
+      "expected": "cosine",
+      "found": "cosine",
+      "ok": true
+    },
+    {
+      "item": "@@GLOBAL.mhnsw_max_cache_size",
+      "expected": 536870912,
+      "found": 536870912,
+      "ok": true
+    },
+    {
+      "item": "ingest_meta equals final_ef_100's (ingested_at, analyze_seconds excepted)",
+      "expected": "identical",
+      "found": "identical",
+      "ok": true
+    }
+  ],
+  "all_ok": true
+}

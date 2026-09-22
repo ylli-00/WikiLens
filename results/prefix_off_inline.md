@@ -1,6 +1,6 @@
-# WikiLense evaluation: noprefix_ef_100
+# WikiLense evaluation: prefix_off_inline
 
-Generated 2026-09-17T12:02:46+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-09-22T01:40:10+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -9,51 +9,60 @@ Generated 2026-09-17T12:02:46+00:00. 75 claims; 66 with a sentence-only evidence
 | ks | [1, 3, 5, 10, 20] |
 | max_k | 20 |
 | repeats | 5 |
-| strategy | none |
+| strategy | inline |
 | overfetch | - |
 | filters | - |
 | claim_filters | - |
 | ef_search | 100 |
+| ef_search_source | argument |
 | ef_search_effective | 100 |
+| mhnsw_max_cache_size | 536870912 |
+| index_m | 16 |
+| index_distance | cosine |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_device | cuda |
 | n_claims | 75 |
 | n_evidence_claims | 66 |
 | n_pages | 100 |
-| n_chunks | 8868 |
+| n_chunks | 8658 |
 | n_sentences | 33637 |
 | experiment_group | prefix |
-| eval_seconds | 3.9 |
-| mhnsw_max_cache_size | 536870912 |
+| configuration | {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": false, "label": "120 words, overlap 1, M=16, prefix off"} |
+| eval_seconds | 11.7 |
+| n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
-| vector_index_m | 6 |
+| vector_index_m | 16 |
 | vector_index_distance | cosine |
-| chunk_data_length | 16384 |
-| chunk_index_length | 49152 |
-| vector_index_tablespace_bytes | 16777216 |
-| chunk_words_mean | 93.0 |
-| chunk_words_median | 103.0 |
+| chunk_data_length | 22593536 |
+| chunk_index_length | 10485760 |
+| vector_index_tablespace_bytes | 17825792 |
+| chunk_words_mean | 93.8 |
+| chunk_words_median | 104.0 |
 | chunk_words_p95 | 119.0 |
 | chunk_words_max | 174 |
-| ingest_report | {"label": "noprefix", "chunk_max_words": 120, "chunk_overlap_units": 1, "use_prefix": false, "ingested_at": "2026-09-17T12:02:42+00:00", "counts": {"n_pages": 100, "n_sections": 3173, "n_sentences": 33637, "n_units_empty": 372, "n_chunks": 8868, "n_links": 40542, "n_links_resolved": 373, "n_links_skipped": 0, "n_claims": 75, "n_evidence": 114, "n_evidence_page_resolved": 114, "n_evidence_sentence_resolved": 87}, "seconds": {"schema": 0.08, "parse": 0.87, "embed": 17.79, "load": 3.17, "resolve": 0.0, "total": 21.97}, "chunk_words_mean": 93.0, "chunk_words_median": 103.0, "chunk_words_p95": 119.0, "chunk_words_max": 174, "vector_index_m": 6, "chunk_data_length": 16384, "chunk_index_length": 49152, "vector_index_tablespace_bytes": 16777216} |
+| ingest_run | {"label": "prefix_off", "kind": "ingest", "configuration": {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": false, "label": "120 words, overlap 1, M=16, prefix off"}, "ingested_at": "2026-09-22T01:39:53+00:00", "counts": {"n_pages": 100, "n_sections": 3173, "n_sentences": 33637, "n_units_empty": 372, "n_units_hatnote": 1316, "n_chunks": 8658, "n_links": 40542, "n_links_resolved": 373, "n_links_skipped": 0, "n_claims": 75, "n_evidence": 114, "n_evidence_page_resolved": 114, "n_evidence_sentence_resolved": 87}, "seconds": {"schema": 0.1, "parse": 0.86, "embed": 17.19, "load": 5.82, "resolve": 0.0, "analyze": 0.01, "total": 24.03}, "n_units_hatnote": 1316, "chunk_words_mean": 93.8, "chunk_words_median": 104.0, "chunk_words_p95": 119.0, "chunk_words_max": 174, "vector_index_name": "embedding", "vector_index_m": 16, "vector_index_distance": "cosine", "chunk_data_length": 22593536, "chunk_index_length": 524288, "vector_index_tablespace_bytes": 17825792, "index_rebuild": null} |
 
 ## Ingest parameters (ingest_meta)
 
 | Key | Value |
 |---|---|
+| analyze_seconds | 0.008 |
+| analyze_tables | chunk,page,section,link |
 | chunk_max_words | 120 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
-| corpus_dir | /home/ylli/Desktop/Projects/WikiLense/wikilense-linux-20260916T222239Z-1-001/wikilense-linux/data/corpus |
+| corpus_dir | data/corpus |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | false |
+| hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
-| index_m | 6 |
-| ingested_at | 2026-09-17T12:02:42+00:00 |
+| index_m | 16 |
+| ingested_at | 2026-09-22T01:39:53+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
+| n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
 
 ## Machine and versions
@@ -82,7 +91,7 @@ A claim counts when a gold page is among the pages of its first k chunks.
 | k | claims recalled | of | article recall |
 |---|---|---|---|
 | 1 | 65 | 75 | 0.867 |
-| 3 | 72 | 75 | 0.960 |
+| 3 | 73 | 75 | 0.973 |
 | 5 | 74 | 75 | 0.987 |
 | 10 | 74 | 75 | 0.987 |
 | 20 | 74 | 75 | 0.987 |
@@ -93,11 +102,11 @@ A claim counts when every unit of one of its sentence-only evidence sets is insi
 
 | k | claims recalled | of | evidence recall |
 |---|---|---|---|
-| 1 | 35 | 66 | 0.530 |
-| 3 | 42 | 66 | 0.636 |
-| 5 | 47 | 66 | 0.712 |
-| 10 | 54 | 66 | 0.818 |
-| 20 | 58 | 66 | 0.879 |
+| 1 | 36 | 66 | 0.545 |
+| 3 | 46 | 66 | 0.697 |
+| 5 | 48 | 66 | 0.727 |
+| 10 | 56 | 66 | 0.848 |
+| 20 | 61 | 66 | 0.924 |
 
 ## Unit coverage@k
 
@@ -105,11 +114,11 @@ Mean, over the same claims, of the best share of a set's gold units inside the f
 
 | k | of | unit coverage |
 |---|---|---|
-| 1 | 66 | 0.543 |
-| 3 | 66 | 0.660 |
-| 5 | 66 | 0.744 |
-| 10 | 66 | 0.848 |
-| 20 | 66 | 0.902 |
+| 1 | 66 | 0.558 |
+| 3 | 66 | 0.721 |
+| 5 | 66 | 0.759 |
+| 10 | 66 | 0.875 |
+| 20 | 66 | 0.939 |
 
 ## SQL latency per k (ms)
 
@@ -117,11 +126,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.74 | 1.63 | 0.83 | 0.53 | 3.09 |
-| 3 | 375 | 0.71 | 1.58 | 0.81 | 0.50 | 3.76 |
-| 5 | 375 | 0.72 | 1.58 | 0.81 | 0.49 | 2.72 |
-| 10 | 375 | 0.79 | 1.67 | 0.87 | 0.55 | 2.64 |
-| 20 | 375 | 0.92 | 2.01 | 1.02 | 0.67 | 2.96 |
+| 1 | 375 | 4.24 | 4.64 | 4.31 | 4.02 | 8.53 |
+| 3 | 375 | 4.22 | 4.67 | 4.31 | 4.03 | 7.79 |
+| 5 | 375 | 4.24 | 4.65 | 4.30 | 4.06 | 6.10 |
+| 10 | 375 | 4.31 | 4.68 | 4.38 | 4.14 | 7.27 |
+| 20 | 375 | 4.46 | 4.92 | 4.54 | 4.22 | 8.87 |
 
 ## Query embedding latency (ms)
 
@@ -129,7 +138,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.62 | 4.77 | 4.64 | 4.48 | 5.44 |
+| 375 | 4.64 | 4.81 | 4.67 | 4.53 | 5.74 |
 
 ## Claims with the worst rank of their gold page
 
@@ -138,13 +147,13 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 | claim | label | gold page | gold page rank | evidence rank | claim text |
 |---|---|---|---|---|---|
 | 87976 | NOT ENOUGH INFO | Lincoln, England | not in top k | not in top k | During the Waddington By-Election 17 October 2002, Conservatives won more votes |
-| 13383 | REFUTES | London | 4 | 12 | Jackie Tyler is introduced in "Rose", she is attacked by shop window dummies and |
 | 95085 | SUPPORTS | Asteraceae | 4 | n/a | The scientific classification of kingdom plantae, order asterales and family ast |
-| 9154 | REFUTES | Asia | 2 | 4 | A total of 22 foreign NBA players came from Asia, coming from seven of the 48 As |
+| 9154 | REFUTES | Asia | 3 | 9 | A total of 22 foreign NBA players came from Asia, coming from seven of the 48 As |
+| 13383 | REFUTES | London | 3 | 3 | Jackie Tyler is introduced in "Rose", she is attacked by shop window dummies and |
+| 40707 | NOT ENOUGH INFO | American Civil War | 3 | 9 | Following the American Civil War, the Army and Navy were unsupportive of each ot |
 | 11235 | REFUTES | London Underground | 2 | 14 | London's Underground is one of the few Railway electrification systems that util |
 | 14253 | REFUTES | Asterales | 2 | 5 | Russowia belongs to the Asteraceae family of the Asterales order, an order of mo |
-| 22563 | REFUTES | Asteraceae | 2 | 11 | Genus Hyoseris is classified under tribe Cichorieae,  a tribe in the plant famil |
-| 40707 | NOT ENOUGH INFO | American Civil War | 2 | 9 | Following the American Civil War, the Army and Navy were unsupportive of each ot |
+| 22563 | REFUTES | Asteraceae | 2 | 12 | Genus Hyoseris is classified under tribe Cichorieae,  a tribe in the plant famil |
 | 76756 | SUPPORTS | Asteraceae | 2 | n/a | The scientific classification of kingdom plantae, order asterales and family ast |
 | 85631 | REFUTES | Asteraceae | 2 | 2 | Plantae kingdom Diplazoptilon are classified in the Asteraceae family, a very la |
 

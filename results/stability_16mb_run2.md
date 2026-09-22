@@ -1,6 +1,6 @@
 # WikiLense evaluation: stability_16mb_run2
 
-Generated 2026-09-17T11:59:58+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-09-22T01:35:18+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -14,45 +14,55 @@ Generated 2026-09-17T11:59:58+00:00. 75 claims; 66 with a sentence-only evidence
 | filters | - |
 | claim_filters | - |
 | ef_search | 20 |
+| ef_search_source | argument |
 | ef_search_effective | 20 |
+| mhnsw_max_cache_size | 16777216 |
+| index_m | 6 |
+| index_distance | cosine |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_device | cuda |
 | n_claims | 75 |
 | n_evidence_claims | 66 |
 | n_pages | 100 |
-| n_chunks | 8868 |
+| n_chunks | 8658 |
 | n_sentences | 33637 |
 | experiment_group | stability |
-| eval_seconds | 4.5 |
-| mhnsw_max_cache_size | 16777216 |
+| configuration | {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 6, "use_prefix": true, "label": "120 words, overlap 1, M=6, prefix on"} |
+| eval_seconds | 3.2 |
+| n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
 | vector_index_m | 6 |
 | vector_index_distance | cosine |
-| chunk_data_length | 23642112 |
-| chunk_index_length | 9273344 |
+| chunk_data_length | 22593536 |
+| chunk_index_length | 524288 |
 | vector_index_tablespace_bytes | 16777216 |
-| chunk_words_mean | 93.0 |
-| chunk_words_median | 103.0 |
+| chunk_words_mean | 93.8 |
+| chunk_words_median | 104.0 |
 | chunk_words_p95 | 119.0 |
 | chunk_words_max | 174 |
+| ingest_run | stability_old |
 
 ## Ingest parameters (ingest_meta)
 
 | Key | Value |
 |---|---|
+| analyze_seconds | 0.008 |
+| analyze_tables | chunk,page,section,link |
 | chunk_max_words | 120 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
-| corpus_dir | /home/ylli/Desktop/Projects/WikiLense/wikilense-linux-20260916T222239Z-1-001/wikilense-linux/data/corpus |
+| corpus_dir | data/corpus |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | true |
+| hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 6 |
-| ingested_at | 2026-09-16T23:30:33+00:00 |
+| ingested_at | 2026-09-22T01:34:49+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
+| n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
 
 ## Machine and versions
@@ -80,11 +90,11 @@ A claim counts when a gold page is among the pages of its first k chunks.
 
 | k | claims recalled | of | article recall |
 |---|---|---|---|
-| 1 | 49 | 75 | 0.653 |
-| 3 | 55 | 75 | 0.733 |
-| 5 | 58 | 75 | 0.773 |
-| 10 | 61 | 75 | 0.813 |
-| 20 | 61 | 75 | 0.813 |
+| 1 | 62 | 75 | 0.827 |
+| 3 | 67 | 75 | 0.893 |
+| 5 | 68 | 75 | 0.907 |
+| 10 | 68 | 75 | 0.907 |
+| 20 | 68 | 75 | 0.907 |
 
 ## Evidence recall@k
 
@@ -92,11 +102,11 @@ A claim counts when every unit of one of its sentence-only evidence sets is insi
 
 | k | claims recalled | of | evidence recall |
 |---|---|---|---|
-| 1 | 20 | 66 | 0.303 |
-| 3 | 27 | 66 | 0.409 |
-| 5 | 30 | 66 | 0.455 |
-| 10 | 35 | 66 | 0.530 |
-| 20 | 42 | 66 | 0.636 |
+| 1 | 35 | 66 | 0.530 |
+| 3 | 43 | 66 | 0.652 |
+| 5 | 46 | 66 | 0.697 |
+| 10 | 53 | 66 | 0.803 |
+| 20 | 58 | 66 | 0.879 |
 
 ## Unit coverage@k
 
@@ -104,11 +114,11 @@ Mean, over the same claims, of the best share of a set's gold units inside the f
 
 | k | of | unit coverage |
 |---|---|---|
-| 1 | 66 | 0.316 |
-| 3 | 66 | 0.427 |
-| 5 | 66 | 0.473 |
-| 10 | 66 | 0.553 |
-| 20 | 66 | 0.644 |
+| 1 | 66 | 0.543 |
+| 3 | 66 | 0.669 |
+| 5 | 66 | 0.716 |
+| 10 | 66 | 0.811 |
+| 20 | 66 | 0.879 |
 
 ## SQL latency per k (ms)
 
@@ -116,11 +126,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.90 | 1.75 | 0.98 | 0.47 | 2.69 |
-| 3 | 375 | 0.88 | 1.78 | 0.99 | 0.43 | 2.89 |
-| 5 | 375 | 0.90 | 1.88 | 1.00 | 0.45 | 3.23 |
-| 10 | 375 | 0.98 | 1.98 | 1.08 | 0.51 | 3.23 |
-| 20 | 375 | 1.10 | 2.24 | 1.25 | 0.62 | 3.44 |
+| 1 | 375 | 0.53 | 0.97 | 0.57 | 0.43 | 1.34 |
+| 3 | 375 | 0.49 | 0.85 | 0.53 | 0.41 | 1.39 |
+| 5 | 375 | 0.49 | 0.91 | 0.54 | 0.43 | 1.39 |
+| 10 | 375 | 0.55 | 0.96 | 0.59 | 0.47 | 1.58 |
+| 20 | 375 | 0.69 | 1.23 | 0.75 | 0.59 | 1.79 |
 
 ## Query embedding latency (ms)
 
@@ -128,7 +138,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.68 | 5.64 | 4.88 | 4.48 | 15.02 |
+| 375 | 4.67 | 4.78 | 4.69 | 4.56 | 6.29 |
 
 ## Claims with the worst rank of their gold page
 
@@ -136,18 +146,16 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 
 | claim | label | gold page | gold page rank | evidence rank | claim text |
 |---|---|---|---|---|---|
-| 5848 | SUPPORTS | Biennial plant | not in top k | not in top k | Some biennial plants have leaves that develop as basal rosettes. |
-| 7971 | REFUTES | Kabul | not in top k | not in top k | Urban decay is a process by which a city falls into a state of disrepair and neg |
 | 9154 | REFUTES | Asia | not in top k | not in top k | A total of 22 foreign NBA players came from Asia, coming from seven of the 48 As |
+| 11910 | SUPPORTS | Jimmy Carter | not in top k | not in top k | Jimmy Carter won the 1980 New Hampshire Primary vote, but lost the Presidential |
 | 13383 | REFUTES | London | not in top k | not in top k | Jackie Tyler is introduced in "Rose", she is attacked by shop window dummies and |
-| 15823 | REFUTES | Acadia University | not in top k | not in top k | Canadian poet and prose writer Peter Sanger studied at the University of Melbour |
-| 31383 | REFUTES | Louis Pasteur | not in top k | not in top k | Despite cold War tensions Louis Pasteur, a Soviet microbiologist and virologist, |
-| 34024 | REFUTES | Anime | not in top k | not in top k | Panda and the Magic Serpent, also known as The Tale of the White Serpent, is the |
-| 43675 | REFUTES | Los Angeles | not in top k | not in top k | Annie Duke born September 13, 1965 lives in Los Angeles, California, U.S. (the s |
-| 45793 | REFUTES | Jack Brabham | not in top k | n/a | Jack Bravham, n Australian racing driver born in 1946, placed first in the 1960 |
-| 54047 | NOT ENOUGH INFO | Lamiales | not in top k | not in top k | Including 23,810 species, Lamiales holds erythranthe moschata. |
-
-Claims whose LIMIT k hits were not the first k of LIMIT max_k, per k: {"10": 1}.
+| 32256 | REFUTES | The Apache Software Foundation | not in top k | not in top k | The Apache Directory (an American nonprofit corporation (classified as a 501(c)( |
+| 69200 | REFUTES | Bangladesh | not in top k | n/a | Uttar Badepasha ( Sylhet District, Bangladesh (capital New York)) had ten names |
+| 79299 | REFUTES | Antlia | not in top k | not in top k | Zeta Antliae is in the Antlia Constellation (originally Antlia Pneumatica, estab |
+| 87976 | NOT ENOUGH INFO | Lincoln, England | not in top k | not in top k | During the Waddington By-Election 17 October 2002, Conservatives won more votes |
+| 76756 | SUPPORTS | Asteraceae | 4 | n/a | The scientific classification of kingdom plantae, order asterales and family ast |
+| 22563 | REFUTES | Asteraceae | 3 | 16 | Genus Hyoseris is classified under tribe Cichorieae,  a tribe in the plant famil |
+| 85631 | REFUTES | Asteraceae | 3 | 3 | Plantae kingdom Diplazoptilon are classified in the Asteraceae family, a very la |
 
 ## Notes
 

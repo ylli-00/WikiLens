@@ -2,38 +2,75 @@
 """Run the WikiLense experiment protocol on the main database and write the files in results/.
 
 Every evaluation goes through ``wikilense.evaluate.evaluate`` and ``write_results`` (one JSON and
-one Markdown file per run, named as in the protocol); every re-ingest through
-``wikilense.ingest.run_ingest`` with ``dataclasses.replace(settings, ...)``. The evaluations run
-one after the other, never two at once, so the latency samples never overlap. Each result file
-records, besides the harness's own ``ingest_meta``, the effective ``mhnsw_ef_search``, the global
-``mhnsw_max_cache_size``, the vector index's M and DISTANCE as ``SHOW CREATE TABLE chunk`` reports
-them, and the sizes of the chunk table and of the hidden InnoDB tablespace that holds the HNSW
-graph (``parameters`` in the JSON, the "Parameters" table in the Markdown).
+one Markdown file per run, named as in the protocol); every ingest through
+``wikilense.ingest.run_ingest`` with ``dataclasses.replace(settings, chunk_max_words=...,
+chunk_overlap_units=..., index_m=...)`` and an explicit ``use_prefix``. Nothing is inherited from
+the environment or from an earlier run: every group names its configuration (chunk size,
+overlap, index M, prefix) as a :class:`Configuration` and either ingests it or verifies, from
+``ingest_meta`` and ``SHOW CREATE TABLE chunk``, that the database holds exactly it; every
+evaluation passes ``mhnsw_ef_search``, the strategy, the ks and the overfetch factor explicitly,
+and :func:`run_eval` refuses to run when the database does not hold the configuration it was
+given. The evaluations run one after the other, never two at once, so the latency samples never
+overlap.
 
-Groups (the full protocol runs them in this order; each can be rerun on its own):
+``sql/schema.sql`` builds the vector index with M=16 (``DEFAULT_INDEX_M``), so a configuration
+with another M rebuilds the index right after the ingest: ``ALTER TABLE chunk DROP INDEX <name>``
+then ``ALTER TABLE chunk ADD VECTOR INDEX <name> (embedding) M=<m> DISTANCE=cosine``, where
+``<name>`` is the index name that ``SHOW CREATE TABLE chunk`` reports (checked against
+``IDENTIFIER_RE``) and ``<m>`` one of ``INDEX_M_VALUES``, followed by ``ANALYZE TABLE chunk`` as
+after an ingest. The ANALYZE is not cosmetic: measured on 2026-09-22 (MariaDB 11.8.9), a rebuilt
+index that had not been analysed made every vector query after the next server restart re-read
+the whole hidden index table (``Handler_read_rnd_next`` about the number of chunks per query,
+p50 2.84 ms instead of 0.88 ms on 4,598 chunks, 4.1 ms instead of 0.56 ms on 8,658), and
+``ANALYZE TABLE chunk`` restored the normal cost; an index built by ``CREATE TABLE`` at ingest,
+which is analysed, did not show this. All three statements are timed, the size of the hidden
+InnoDB tablespace that holds the HNSW graph is recorded, and ``ingest_meta.index_m`` is updated
+so that it keeps describing the index that is in place.
 
-  stability   three baseline runs with the 512 MB HNSW cache, one after a container restart,
-              three with a 16 MB cache (SET GLOBAL, restored afterwards); per-claim hit
-              comparison -> stability_*.json/.md and stability_comparison.json/.md
-  ef_search   mhnsw_ef_search 20/50/100/200/400 with strategy none (ef_<n>), 20/100 with the
-              inline statement and no filters (inline_ef_<n>)
-  index_m     rebuild the vector index with M=16, M=32 and back to M=6 (timed ALTER TABLE, index
-              sizes) -> m16_ef_20/100, m32_ef_20/100, m6_rebuilt_ef_20, index_m_rebuild.json/.md
-  chunk_size  re-ingest with chunk_max_words 60 and 240 (overlap 1, prefix on), evaluate at
-              ef_search 100 with ks that give the same amount of retrieved text
-              -> chunk60_ef_100, chunk240_ef_100 (the 120-word case is ef_100)
-  prefix      re-ingest 120 words without the "title > section: " prefix -> noprefix_ef_100/20
-  filters     min_words=1000 and heading LIKE '%History%' with the inline, overfetch 10 and
-              overfetch 50 strategies at ef_search 20, k 5 and 10 -> strategy_*
-  restore     re-ingest the defaults (120 words, overlap 1, prefix on; the schema's M=6), run the
-              baseline once more -> final_state_ef_20, and check ingest_meta against baseline.json
+Every result file records, besides the harness's own fields (the effective ``mhnsw_ef_search``,
+the global ``mhnsw_max_cache_size``, the index M and DISTANCE from ``SHOW CREATE TABLE chunk``
+and the chunk count), the configuration of the group, the hatnote count of the ingest
+(``ingest_meta.n_units_hatnote``), the sizes of the chunk table and of the graph tablespace and
+the chunk word statistics (``parameters`` in the JSON, the "Parameters" table in the Markdown).
+
+Configurations: ``OLD`` = 120-word chunks, overlap 1, M=6, prefix on (phases 1 and 2);
+``FINAL`` = 240 words, overlap 1, M=16, prefix on (the defaults of ``wikilense.config`` and
+``sql/schema.sql``). ks 1, 3, 5, 10, 20 (plus the equal-text ks of the chunk-size group) and
+5 repeats.
+
+Groups (``all`` runs them in this order; each can be rerun on its own):
+
+  stability   fresh ingest of OLD; three runs at ef 20 with the 512 MB HNSW cache, a container
+              restart and a fourth run, then SET GLOBAL mhnsw_max_cache_size = 16 MB and three
+              more runs (512 MB restored); per-claim hit-list comparison
+              -> stability_512mb_run1..3, stability_512mb_after_restart, stability_16mb_run1..3,
+              stability_comparison.json/.md
+  ef_search   OLD: mhnsw_ef_search 20 / 50 / 100 / 200 / 400 with strategy none (ef_<n>), the
+              inline statement without filters, which is the exact ranking, at ef 20 and 100
+              (inline_ef_<n>), and the rrf hybrid at ef 100 (rrf_120_m6)
+  index_m     OLD vectors: the index rebuilt with M=6, 16 and 32 (timed, tablespace sizes), each
+              evaluated at ef 20 and 100 -> m<M>_ef_<n>, index_m_rebuild.json/.md; M=6 is
+              rebuilt once more at the end so that OLD stays in place
+  chunk_size  fresh ingests with 60, 120 and 240 words (overlap 1, M=16, prefix on), evaluated
+              at ef 100 with the ks that give the same amount of retrieved text
+              -> chunk60_ef_100, chunk120_ef_100, chunk240_ef_100
+  prefix      fresh ingests of 120 words (M=16) with and without the "title > section path: "
+              prefix, each with an approximate run at ef 100 and the exact inline ranking
+              -> prefix_on_ef_100, prefix_on_inline, prefix_off_ef_100, prefix_off_inline
+  filters     FINAL: min_words 1000 and heading LIKE '%History%' with the inline, overfetch 10
+              and overfetch 50 strategies at ef 100 -> strategy_<strategy>_<filter>
+  final       fresh ingest of FINAL; final_ef_100 (the headline run: strategy none, ef 100),
+              final_ef_20, final_inline (exact), final_rrf (rrf, ef 100, overfetch 10, the claim
+              text as query_text), final_oracle_titles (inline with the claim's gold pages as the
+              titles filter), then a container restart and final_ef_100_after_restart /
+              final_ef_20_after_restart with the before/after hit-list comparison
+              -> final_restart_comparison.json/.md
+  restore     fresh ingest of FINAL (what ``wikilense ingest`` produces), the cache checked at
+              512 MB and ingest_meta verified -> restore_state.json/.md
   summary     results/SUMMARY.md from the JSON files (no database access)
   all         every group above, in that order
 
-Groups that need the default ingest (stability, ef_search, index_m, filters) check ``ingest_meta``
-first and re-ingest the defaults when a previous group left another chunking in the database;
-``index_m`` also rebuilds M=6 first when another M is in place. Every re-ingest is appended to
-results/ingest_runs.json.
+Every ingest and every index rebuild is appended to results/ingest_runs.json/.md.
 
 Root-level SQL (``SET GLOBAL mhnsw_max_cache_size``, the hidden tablespace size) and the
 container restart go through ``docker exec`` / ``docker compose`` on the container named in
@@ -56,7 +93,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -73,6 +110,7 @@ from wikilense.cli import make_embedder
 from wikilense.config import (
     DEFAULT_CHUNK_MAX_WORDS,
     DEFAULT_CHUNK_OVERLAP_UNITS,
+    DEFAULT_EF_SEARCH,
     DEFAULT_ENV_FILE,
     DEFAULT_INDEX_M,
     Settings,
@@ -81,14 +119,17 @@ from wikilense.config import (
 from wikilense.embedding import Embedder
 from wikilense.evaluate import (
     DEFAULT_RESULTS_DIR,
+    ClaimFilters,
     EvalResult,
     evaluate,
     load_ground_truth,
+    oracle_title_filters,
     read_ingest_meta,
     write_results,
 )
-from wikilense.ingest import run_ingest
+from wikilense.ingest import INDEX_DISTANCE, run_ingest
 from wikilense.search import Filters, search
+from wikilense.wikitext import HATNOTE_RE
 
 log = logging.getLogger("experiments")
 
@@ -104,31 +145,111 @@ SET_CACHE_SQL: dict[int, str] = {
 }
 
 DEFAULT_KS: tuple[int, ...] = (1, 3, 5, 10, 20)
-CHUNK60_KS: tuple[int, ...] = (2, 6, 10, 20, 40)
-CHUNK240_KS: tuple[int, ...] = (1, 2, 3, 5, 10)
-FILTER_KS: tuple[int, ...] = (5, 10)
+DEFAULT_REPEATS = 5
+#: ks of the chunk-size group: the standard ks plus the ones that give the same retrieved text
+#: (60 x 20 = 120 x 10 = 240 x 5 = 1,200 words, 60 x 40 = 120 x 20 = 240 x 10 = 2,400 words ...).
+CHUNK60_KS: tuple[int, ...] = (1, 2, 3, 5, 6, 10, 20, 40)
+CHUNK120_KS: tuple[int, ...] = DEFAULT_KS
+CHUNK240_KS: tuple[int, ...] = (1, 2, 3, 5, 10, 20)
 EF_SWEEP: tuple[int, ...] = (20, 50, 100, 200, 400)
-INDEX_M_SWEEP: tuple[int, ...] = (16, 32)
+EF_LOW = 20
+EF_CHOSEN = DEFAULT_EF_SEARCH  # 100: Settings.ef_search, the application default
+INDEX_M_VALUES: tuple[int, ...] = (6, 16, 32)
+INDEX_M_EFS: tuple[int, ...] = (EF_LOW, EF_CHOSEN)
+OVERFETCH_DEFAULT = 10  # the overfetch factor of the rrf runs and of overfetch10
 MIN_WORDS_FILTER = 1000
 HEADING_FILTER = "%History%"
-FILTER_EF_SEARCH = 20
 
-INDEX_NAME = "embedding"
-DROP_VECTOR_INDEX_SQL = "ALTER TABLE chunk DROP INDEX `embedding`"
-#: ADD VECTOR INDEX statements as fixed literals, one per M value of the sweep.
-ADD_VECTOR_INDEX_SQL: dict[int, str] = {
-    6: "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=6 DISTANCE=cosine",
-    16: "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=16 DISTANCE=cosine",
-    32: "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=32 DISTANCE=cosine",
-}
+
+@dataclass(frozen=True)
+class Configuration:
+    """One ingest configuration: what ``run_ingest`` and the index rebuild are pinned to."""
+
+    chunk_max_words: int
+    chunk_overlap_units: int
+    index_m: int
+    use_prefix: bool
+
+    @property
+    def label(self) -> str:
+        """Return a short human-readable description, e.g. ``120 words, overlap 1, M=6, prefix on``."""
+        return (
+            f"{self.chunk_max_words} words, overlap {self.chunk_overlap_units}, "
+            f"M={self.index_m}, prefix {'on' if self.use_prefix else 'off'}"
+        )
+
+    def settings(self, base: Settings) -> Settings:
+        """Return ``base`` with the chunking and index parameters of this configuration."""
+        return replace(
+            base,
+            chunk_max_words=self.chunk_max_words,
+            chunk_overlap_units=self.chunk_overlap_units,
+            index_m=self.index_m,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**asdict(self), "label": self.label}
+
+    def ingest_meta_expected(self) -> dict[str, str]:
+        """Return the ``ingest_meta`` values an ingest of this configuration writes."""
+        return {
+            "chunk_max_words": str(self.chunk_max_words),
+            "chunk_overlap_units": str(self.chunk_overlap_units),
+            "embedding_prefix": "true" if self.use_prefix else "false",
+            "index_m": str(self.index_m),
+            "index_distance": INDEX_DISTANCE,
+            "hatnote_pattern": HATNOTE_RE.pattern,
+        }
+
+    def differences(self, meta: dict[str, str], index: dict[str, Any]) -> dict[str, Any]:
+        """Return what differs between this configuration and the database state, or ``{}``.
+
+        ``meta`` is ``ingest_meta`` and ``index`` the :func:`index_definition`. The hatnote
+        pattern is compared too, so an ingest made by an older version of the code (no
+        ``hatnote_pattern`` key, or another rule) does not count as this configuration.
+        """
+        diffs: dict[str, Any] = {}
+        for key, expected in self.ingest_meta_expected().items():
+            if meta.get(key) != expected:
+                diffs[f"ingest_meta.{key}"] = {"expected": expected, "found": meta.get(key)}
+        if index.get("m") != self.index_m:
+            diffs["vector_index_m"] = {"expected": self.index_m, "found": index.get("m")}
+        if index.get("distance") != INDEX_DISTANCE:
+            diffs["vector_index_distance"] = {
+                "expected": INDEX_DISTANCE, "found": index.get("distance")
+            }
+        return diffs
+
+
+#: The phase-1/2 configuration, on which the stability, ef_search and index_m groups run.
+OLD = Configuration(chunk_max_words=120, chunk_overlap_units=1, index_m=6, use_prefix=True)
+#: The chosen defaults (wikilense.config, sql/schema.sql): the filters, final and restore groups.
+FINAL = Configuration(
+    chunk_max_words=DEFAULT_CHUNK_MAX_WORDS,
+    chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
+    index_m=DEFAULT_INDEX_M,
+    use_prefix=True,
+)
+CHUNK_SIZE_CASES: tuple[tuple[int, tuple[int, ...], str], ...] = (
+    (60, CHUNK60_KS, "chunk60_ef_100"),
+    (120, CHUNK120_KS, "chunk120_ef_100"),
+    (240, CHUNK240_KS, "chunk240_ef_100"),
+)
+PREFIX_CASES: tuple[tuple[str, bool], ...] = (("on", True), ("off", False))
+
+#: Identifiers read from the server (the vector index name, the database name) must match this
+#: before they are written into an ALTER TABLE or a LIKE pattern.
+IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 SHOW_CREATE_CHUNK_SQL = "SHOW CREATE TABLE chunk"
 GLOBALS_SQL = "SELECT @@GLOBAL.mhnsw_max_cache_size, @@GLOBAL.mhnsw_ef_search"
+UPTIME_SQL = "SHOW GLOBAL STATUS LIKE 'Uptime'"
 CHUNK_SIZES_SQL = (
     "SELECT data_length, index_length FROM information_schema.tables "
     "WHERE table_schema = DATABASE() AND table_name = 'chunk'"
 )
 CHUNK_WORDS_SQL = "SELECT n_words FROM chunk"
+CHUNK_COUNT_SQL = "SELECT COUNT(*) FROM chunk"
 CHUNKS_MIN_WORDS_SQL = (
     "SELECT COUNT(*) FROM chunk JOIN page ON page.page_id = chunk.page_id WHERE page.n_words >= %s"
 )
@@ -142,9 +263,15 @@ SENTENCES_HEADING_SQL = (
     "SELECT s.sentence_id FROM sentence AS s JOIN section ON section.section_id = s.section_id "
     "WHERE section.heading LIKE %s"
 )
-#: Hidden InnoDB tablespaces of the vector index (root: needs the PROCESS privilege).
+#: Keeps ingest_meta.index_m equal to the index that is in place after a rebuild.
+UPDATE_META_INDEX_M_SQL = "UPDATE ingest_meta SET `value` = %s WHERE `key` = 'index_m'"
+#: Run after every index rebuild (see the module docstring); the ingest runs it too.
+ANALYZE_CHUNK_SQL = "ANALYZE TABLE chunk"
+#: Hidden InnoDB tablespaces of the vector index (root: needs the PROCESS privilege). The
+#: database name is checked against IDENTIFIER_RE before it is written into the pattern.
 HIDDEN_TABLESPACE_SQL = (
-    "SELECT name, file_size FROM information_schema.innodb_sys_tablespaces WHERE name LIKE '{db}/chunk#i#%'"
+    "SELECT name, file_size FROM information_schema.innodb_sys_tablespaces "
+    "WHERE name LIKE '{db}/chunk#i#%'"
 )
 
 INDEX_DEFINITION_RE = re.compile(r"VECTOR KEY `(?P<name>[^`]+)` \(`embedding`\)(?P<options>[^\n]*)")
@@ -154,7 +281,17 @@ INDEX_DISTANCE_RE = re.compile(r"`DISTANCE`='(\w+)'")
 STABILITY_512_RUNS = ("stability_512mb_run1", "stability_512mb_run2", "stability_512mb_run3")
 STABILITY_16_RUNS = ("stability_16mb_run1", "stability_16mb_run2", "stability_16mb_run3")
 AFTER_RESTART = "stability_512mb_after_restart"
-COMMITTED_BASELINE = "baseline"
+EXACT_OLD = "inline_ef_20"
+RRF_OLD = "rrf_120_m6"
+FINAL_HEADLINE = "final_ef_100"
+FINAL_EF_20 = "final_ef_20"
+FINAL_EXACT = "final_inline"
+FINAL_RRF = "final_rrf"
+FINAL_ORACLE = "final_oracle_titles"
+FINAL_AFTER = {FINAL_HEADLINE: "final_ef_100_after_restart", FINAL_EF_20: "final_ef_20_after_restart"}
+FINAL_RUNS = (FINAL_HEADLINE, FINAL_EF_20, FINAL_EXACT, FINAL_RRF, FINAL_ORACLE, *FINAL_AFTER.values())
+INGEST_RUNS = "ingest_runs"
+RESTORE_STATE = "restore_state"
 
 
 class ExperimentError(RuntimeError):
@@ -192,7 +329,7 @@ class Server:
             )
         except FileNotFoundError as exc:
             raise ExperimentError(
-                "docker is not on PATH; the stability group and the tablespace sizes need it"
+                "docker is not on PATH; the restarts, SET GLOBAL and the tablespace sizes need it"
             ) from exc
         if proc.returncode != 0:
             raise ExperimentError(
@@ -225,6 +362,8 @@ class Server:
 
     def vector_index_tablespace_bytes(self) -> int | None:
         """Return the file size of the hidden InnoDB tablespace(s) of the vector index, or None."""
+        if not IDENTIFIER_RE.match(self.settings.db_name):
+            raise ExperimentError(f"database name {self.settings.db_name!r} is not a plain identifier")
         try:
             rows = self.root_sql(HIDDEN_TABLESPACE_SQL.format(db=self.settings.db_name))
         except ExperimentError as exc:
@@ -232,8 +371,13 @@ class Server:
             return None
         return sum(int(row[1]) for row in rows) if rows else None
 
-    def restart(self, timeout_s: float = 300.0) -> float:
-        """``docker compose restart``, wait until healthy and connectable; returns the seconds."""
+    def restart(self, timeout_s: float = 300.0) -> dict[str, Any]:
+        """``docker compose restart``, wait until healthy and connectable; returns timings.
+
+        The dict has ``container_restart_seconds`` (from the command to the first successful
+        connection) and ``server_uptime_seconds_after_restart`` (the server's ``Uptime`` status
+        right after, which shows that a new server process answered).
+        """
         start = time.perf_counter()
         log.info("restarting the container ...")
         self._docker(["compose", "restart"])
@@ -252,7 +396,8 @@ class Server:
                 conn = db.connect(self.settings)
                 try:
                     with conn.cursor() as cur:
-                        cur.execute("SELECT 1")
+                        cur.execute(UPTIME_SQL)
+                        uptime = int(cur.fetchone()[1])
                 finally:
                     conn.close()
                 break
@@ -261,8 +406,11 @@ class Server:
                     raise ExperimentError(f"server not connectable after restart: {exc}") from exc
                 time.sleep(1.0)
         seconds = time.perf_counter() - start
-        log.info("container healthy and connectable after %.1f s", seconds)
-        return seconds
+        log.info("container healthy and connectable after %.1f s (server uptime %d s)", seconds, uptime)
+        return {
+            "container_restart_seconds": round(seconds, 1),
+            "server_uptime_seconds_after_restart": uptime,
+        }
 
 
 # ---------------------------------------------------------------------------------------------
@@ -271,20 +419,27 @@ class Server:
 
 
 def index_definition(conn: pymysql.Connection) -> dict[str, Any]:
-    """Return ``{name, m, distance}`` of the vector index from SHOW CREATE TABLE chunk."""
+    """Return ``{name, m, distance}`` of the vector index from SHOW CREATE TABLE chunk.
+
+    Raises ExperimentError when the index name is not a plain identifier (it is written into
+    the ALTER TABLE statements of :func:`rebuild_index`).
+    """
     with conn.cursor() as cur:
         cur.execute(SHOW_CREATE_CHUNK_SQL)
         ddl = str(cur.fetchone()[1])
     match = INDEX_DEFINITION_RE.search(ddl)
     if match is None:
         return {"name": None, "m": None, "distance": None}
+    name = match.group("name")
+    if not IDENTIFIER_RE.match(name):
+        raise ExperimentError(f"vector index name {name!r} is not a plain identifier")
     options = match.group("options")
     m_match = INDEX_M_RE.search(options)
     d_match = INDEX_DISTANCE_RE.search(options)
     return {
-        "name": match.group("name"),
+        "name": name,
         "m": int(m_match.group(1)) if m_match else None,
-        "distance": d_match.group(1) if d_match else None,
+        "distance": d_match.group(1).lower() if d_match else None,
     }
 
 
@@ -314,14 +469,20 @@ def server_snapshot(conn: pymysql.Connection, server: Server) -> dict[str, Any]:
     }
 
 
+def hatnote_count(meta: dict[str, str]) -> int | None:
+    """Return ``ingest_meta.n_units_hatnote`` as an int, or None when the ingest did not record it."""
+    value = meta.get("n_units_hatnote")
+    return int(value) if value is not None and value.isdigit() else None
+
+
 # ---------------------------------------------------------------------------------------------
-# context, evaluation and ingest wrappers
+# context, evaluation, ingest and rebuild wrappers
 # ---------------------------------------------------------------------------------------------
 
 
 @dataclass
 class Context:
-    """Settings, the docker helper, the output directory and the lazily loaded GPU embedder."""
+    """Settings, the docker helper, the output directory and the lazily loaded embedder."""
 
     settings: Settings
     server: Server
@@ -337,6 +498,14 @@ class Context:
 
     def connect(self) -> pymysql.Connection:
         return db.connect(self.settings)
+
+    def database_state(self) -> tuple[dict[str, str], dict[str, Any]]:
+        """Return ``(ingest_meta, index_definition)`` from a fresh connection."""
+        conn = self.connect()
+        try:
+            return read_ingest_meta(conn), index_definition(conn)
+        finally:
+            conn.close()
 
 
 def utc_now() -> str:
@@ -368,24 +537,54 @@ def md_table(headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> str:
     return "\n".join(lines)
 
 
+def describe_state(meta: dict[str, str], index: dict[str, Any]) -> str:
+    """Return a one-line description of the ingest and index the database holds."""
+    return (
+        f"chunk_max_words={meta.get('chunk_max_words')}, overlap={meta.get('chunk_overlap_units')}, "
+        f"prefix={meta.get('embedding_prefix')}, ingest_meta.index_m={meta.get('index_m')}, "
+        f"index {index.get('name')} M={index.get('m')} DISTANCE={index.get('distance')}, "
+        f"ingested_at={meta.get('ingested_at')}"
+    )
+
+
+def check_configuration(ctx: Context, config: Configuration, what: str) -> dict[str, str]:
+    """Raise ExperimentError unless the database holds ``config``; returns ``ingest_meta``."""
+    meta, index = ctx.database_state()
+    diffs = config.differences(meta, index)
+    if diffs:
+        raise ExperimentError(
+            f"{what}: the database holds {describe_state(meta, index)}, not "
+            f"'{config.label}': {diffs}"
+        )
+    return meta
+
+
 def run_eval(
     ctx: Context,
     name: str,
     *,
     group: str,
-    ks: Sequence[int] = DEFAULT_KS,
-    ef_search: int | None = None,
-    strategy: str = "none",
+    config: Configuration,
+    ks: Sequence[int],
+    ef_search: int,
+    strategy: str,
     filters: Filters | None = None,
-    overfetch: int = 10,
+    claim_filters: ClaimFilters | None = None,
+    overfetch: int = OVERFETCH_DEFAULT,
     extra: dict[str, Any] | None = None,
 ) -> EvalResult:
-    """Run one evaluation on a fresh connection, add the server state, write <name>.json/.md."""
+    """Run one evaluation on a fresh connection, add the server state, write <name>.json/.md.
+
+    The database must hold ``config`` (checked first, ExperimentError otherwise); ``ef_search``
+    and ``strategy`` are always given explicitly. ``extra`` is merged into the parameters.
+    """
     log.info(
-        "eval %s: strategy=%s ef_search=%s ks=%s overfetch=%s filters=%s",
-        name, strategy, ef_search, list(ks), overfetch if strategy == "overfetch" else "-",
-        filters,
+        "eval %s: %s; strategy=%s ef_search=%d ks=%s overfetch=%s filters=%s claim_filters=%s",
+        name, config.label, strategy, ef_search, list(ks),
+        overfetch if strategy in ("overfetch", "rrf") else "-", filters,
+        getattr(claim_filters, "__name__", None),
     )
+    check_configuration(ctx, config, name)
     conn = ctx.connect()
     try:
         started = time.perf_counter()
@@ -398,9 +597,13 @@ def run_eval(
             filters=filters,
             ef_search=ef_search,
             overfetch=overfetch,
+            claim_filters=claim_filters,
+            settings=ctx.settings,
         )
         result.parameters["experiment_group"] = group
+        result.parameters["configuration"] = config.to_dict()
         result.parameters["eval_seconds"] = round(time.perf_counter() - started, 1)
+        result.parameters["n_units_hatnote"] = hatnote_count(result.ingest_meta)
         result.parameters.update(server_snapshot(conn, ctx.server))
     finally:
         conn.close()
@@ -416,107 +619,188 @@ def run_eval(
     return result
 
 
-INGEST_RUNS = "ingest_runs"
-
-
-def reingest(
-    ctx: Context,
-    *,
-    label: str,
-    chunk_max_words: int,
-    chunk_overlap_units: int = DEFAULT_CHUNK_OVERLAP_UNITS,
-    use_prefix: bool = True,
-) -> dict[str, Any]:
-    """Re-ingest the corpus with the given chunking and prefix; appends to ingest_runs.json."""
-    settings = replace(
-        ctx.settings, chunk_max_words=chunk_max_words, chunk_overlap_units=chunk_overlap_units
-    )
-    log.info(
-        "re-ingest %s: chunk_max_words=%d overlap=%d prefix=%s",
-        label, chunk_max_words, chunk_overlap_units, use_prefix,
-    )
-    report = run_ingest(settings, embedder=ctx.embedder, use_prefix=use_prefix, progress=False)
-    conn = ctx.connect()
-    try:
-        snapshot = server_snapshot(conn, ctx.server)
-        meta = read_ingest_meta(conn)
-    finally:
-        conn.close()
-    info: dict[str, Any] = {
-        "label": label,
-        "chunk_max_words": chunk_max_words,
-        "chunk_overlap_units": chunk_overlap_units,
-        "use_prefix": use_prefix,
-        "ingested_at": meta.get("ingested_at"),
-        "counts": report.counts(),
-        "seconds": {stage: round(value, 2) for stage, value in report.seconds.items()},
-        "chunk_words_mean": snapshot["chunk_words_mean"],
-        "chunk_words_median": snapshot["chunk_words_median"],
-        "chunk_words_p95": snapshot["chunk_words_p95"],
-        "chunk_words_max": snapshot["chunk_words_max"],
-        "vector_index_m": snapshot["vector_index_m"],
-        "chunk_data_length": snapshot["chunk_data_length"],
-        "chunk_index_length": snapshot["chunk_index_length"],
-        "vector_index_tablespace_bytes": snapshot["vector_index_tablespace_bytes"],
-    }
-    log.info(
-        "  %d chunks (mean %.1f words) in %.1f s (embed %.1f s)",
-        report.n_chunks, snapshot["chunk_words_mean"] or 0.0, report.seconds["total"],
-        report.seconds["embed"],
-    )
+def append_ingest_run(ctx: Context, info: dict[str, Any]) -> None:
+    """Append one ingest or rebuild record to ingest_runs.json and rewrite ingest_runs.md."""
     runs = load_json(ctx.out_dir / f"{INGEST_RUNS}.json") or []
     runs.append(info)
     write_json(ctx.out_dir / f"{INGEST_RUNS}.json", runs)
     (ctx.out_dir / f"{INGEST_RUNS}.md").write_text(ingest_runs_markdown(runs), encoding="utf-8")
+
+
+def rebuild_index(ctx: Context, m: int, *, label: str, record: bool = True) -> dict[str, Any]:
+    """DROP and re-ADD the vector index with M=``m``, then ANALYZE TABLE chunk (each timed).
+
+    The index name comes from ``SHOW CREATE TABLE chunk`` (a plain identifier, see
+    :func:`index_definition`), ``m`` must be one of ``INDEX_M_VALUES`` and the distance is
+    ``ingest.INDEX_DISTANCE``; the ANALYZE is explained in the module docstring.
+    ``ingest_meta.index_m`` is set to ``m`` afterwards. Returns the timings and sizes. With
+    ``record`` the rebuild gets its own row in ingest_runs.json (an ingest that rebuilds right
+    away carries the rebuild inside its own row instead).
+    """
+    if m not in INDEX_M_VALUES:
+        raise ValueError(f"M={m} is not one of {INDEX_M_VALUES}")
+    conn = ctx.connect()
+    try:
+        before = index_definition(conn)
+        name = before["name"]
+        if name is None:
+            raise ExperimentError("chunk has no vector index to rebuild (SHOW CREATE TABLE chunk)")
+        drop_sql = f"ALTER TABLE chunk DROP INDEX `{name}`"
+        add_sql = (
+            f"ALTER TABLE chunk ADD VECTOR INDEX `{name}` (embedding) "
+            f"M={int(m)} DISTANCE={INDEX_DISTANCE}"
+        )
+        log.info("rebuilding the vector index `%s`: M=%s -> M=%d (%s)", name, before["m"], m, label)
+        with conn.cursor() as cur:
+            start = time.perf_counter()
+            cur.execute(drop_sql)
+            drop_seconds = time.perf_counter() - start
+            start = time.perf_counter()
+            cur.execute(add_sql)
+            add_seconds = time.perf_counter() - start
+            start = time.perf_counter()
+            cur.execute(ANALYZE_CHUNK_SQL)
+            for _table, _op, msg_type, msg_text in cur.fetchall():
+                if str(msg_type).lower() == "error":
+                    raise ExperimentError(f"ANALYZE TABLE chunk failed: {msg_text}")
+            analyze_seconds = time.perf_counter() - start
+            cur.execute(UPDATE_META_INDEX_M_SQL, (str(m),))
+        conn.commit()
+        after = index_definition(conn)
+        if after["name"] != name or after["m"] != m or after["distance"] != INDEX_DISTANCE:
+            raise ExperimentError(f"index rebuild with M={m} left {after}")
+        snapshot = server_snapshot(conn, ctx.server)
+        with conn.cursor() as cur:
+            cur.execute(CHUNK_COUNT_SQL)
+            n_chunks = int(cur.fetchone()[0])
+    finally:
+        conn.close()
+    info = {
+        "label": label,
+        "kind": "rebuild",
+        "m": m,
+        "m_before": before["m"],
+        "index_name": name,
+        "drop_sql": drop_sql,
+        "add_sql": add_sql,
+        "drop_seconds": round(drop_seconds, 2),
+        "add_seconds": round(add_seconds, 2),
+        "analyze_seconds": round(analyze_seconds, 3),
+        "vector_index_m_after": snapshot["vector_index_m"],
+        "vector_index_distance_after": snapshot["vector_index_distance"],
+        "n_chunks": n_chunks,
+        "chunk_index_length": snapshot["chunk_index_length"],
+        "chunk_data_length": snapshot["chunk_data_length"],
+        "vector_index_tablespace_bytes": snapshot["vector_index_tablespace_bytes"],
+        "rebuilt_at": utc_now(),
+    }
+    log.info(
+        "  drop %.2f s, add %.2f s, analyze %.3f s; index_length %s, vector tablespace %s bytes",
+        drop_seconds, add_seconds, analyze_seconds, info["chunk_index_length"],
+        info["vector_index_tablespace_bytes"],
+    )
+    if record:
+        append_ingest_run(ctx, info)
     return info
 
 
-def ingest_runs_markdown(runs: list[dict[str, Any]]) -> str:
-    rows = [
-        (
-            r["label"], r["chunk_max_words"], r["chunk_overlap_units"], r["use_prefix"],
-            r["counts"]["n_chunks"], r["chunk_words_mean"], r["chunk_words_median"],
-            r["seconds"]["total"], r["seconds"]["embed"], r["seconds"]["load"],
-            r["vector_index_tablespace_bytes"], r["ingested_at"],
+def ingest_configuration(ctx: Context, config: Configuration, *, label: str) -> dict[str, Any]:
+    """Fresh ingest of ``config`` (reset), rebuilding the index when its M is not the schema's.
+
+    Returns the record appended to ingest_runs.json (counts, seconds, sizes, the rebuild).
+    """
+    settings = config.settings(ctx.settings)
+    log.info("ingest %s: %s", label, config.label)
+    report = run_ingest(settings, embedder=ctx.embedder, use_prefix=config.use_prefix, progress=False)
+    conn = ctx.connect()
+    try:
+        definition = index_definition(conn)
+    finally:
+        conn.close()
+    rebuild = None
+    if definition["m"] != config.index_m:
+        rebuild = rebuild_index(
+            ctx, config.index_m, label=f"{label}_rebuild_m{config.index_m}", record=False
         )
-        for r in runs
-    ]
+    meta = check_configuration(ctx, config, f"ingest {label}")
+    conn = ctx.connect()
+    try:
+        snapshot = server_snapshot(conn, ctx.server)
+    finally:
+        conn.close()
+    info: dict[str, Any] = {
+        "label": label,
+        "kind": "ingest",
+        "configuration": config.to_dict(),
+        "ingested_at": meta.get("ingested_at"),
+        "counts": report.counts(),
+        "seconds": {stage: round(value, 2) for stage, value in report.seconds.items()},
+        "n_units_hatnote": hatnote_count(meta),
+        "chunk_words_mean": snapshot["chunk_words_mean"],
+        "chunk_words_median": snapshot["chunk_words_median"],
+        "chunk_words_p95": snapshot["chunk_words_p95"],
+        "chunk_words_max": snapshot["chunk_words_max"],
+        "vector_index_name": snapshot["vector_index_name"],
+        "vector_index_m": snapshot["vector_index_m"],
+        "vector_index_distance": snapshot["vector_index_distance"],
+        "chunk_data_length": snapshot["chunk_data_length"],
+        "chunk_index_length": snapshot["chunk_index_length"],
+        "vector_index_tablespace_bytes": snapshot["vector_index_tablespace_bytes"],
+        "index_rebuild": rebuild,
+    }
+    log.info(
+        "  %d chunks (mean %.1f words, %d hatnote units excluded) in %.1f s (embed %.1f s)",
+        report.n_chunks, snapshot["chunk_words_mean"] or 0.0, report.n_units_hatnote,
+        report.seconds["total"], report.seconds["embed"],
+    )
+    append_ingest_run(ctx, info)
+    return info
+
+
+def ensure_configuration(ctx: Context, config: Configuration, *, label: str) -> dict[str, Any] | None:
+    """Ingest ``config`` unless the database already holds exactly it; returns the ingest record."""
+    meta, index = ctx.database_state()
+    diffs = config.differences(meta, index)
+    if not diffs:
+        log.info("database holds '%s' (%s); no ingest", config.label, describe_state(meta, index))
+        return None
+    log.info(
+        "database holds %s, not '%s' (%s); ingesting", describe_state(meta, index), config.label,
+        diffs,
+    )
+    return ingest_configuration(ctx, config, label=label)
+
+
+def ingest_runs_markdown(runs: list[dict[str, Any]]) -> str:
+    rows = []
+    for r in runs:
+        if r.get("kind") == "rebuild":
+            rows.append((
+                r["label"], "rebuild", f"M {r['m_before']} -> {r['m']}", r["n_chunks"], "-", "-",
+                f"drop {r['drop_seconds']} + add {r['add_seconds']} + analyze {r.get('analyze_seconds')}",
+                "-", r["vector_index_tablespace_bytes"], r["rebuilt_at"],
+            ))
+            continue
+        rebuild = r.get("index_rebuild") or {}
+        total = str(r["seconds"]["total"])
+        if rebuild:
+            total += f" + rebuild M={rebuild['m']} {rebuild['add_seconds']}"
+        rows.append((
+            r["label"], "ingest", r["configuration"]["label"], r["counts"]["n_chunks"],
+            r["n_units_hatnote"], r["chunk_words_mean"], total, r["seconds"]["embed"],
+            r["vector_index_tablespace_bytes"], r["ingested_at"],
+        ))
     return (
-        "# Re-ingests run by scripts/run_experiments.py\n\n"
-        "One row per `run_ingest` call, in order. Seconds are the stages of `IngestReport`.\n\n"
+        "# Ingests and index rebuilds run by scripts/run_experiments.py\n\n"
+        "One row per `run_ingest` call or `ALTER TABLE` rebuild, in order. Seconds are the "
+        "stages of `IngestReport` (an ingest whose configuration needs another M than the "
+        "schema's is followed by a rebuild, listed on its own row too).\n\n"
         + md_table(
-            ("label", "max_words", "overlap", "prefix", "chunks", "words mean", "words median",
-             "total s", "embed s", "load s", "vector index bytes", "ingested_at"),
+            ("label", "kind", "configuration", "chunks", "hatnote units", "words mean",
+             "total s", "embed s", "vector index bytes", "at"),
             rows,
         )
         + "\n"
-    )
-
-
-def is_default_ingest(meta: dict[str, str]) -> bool:
-    return (
-        meta.get("chunk_max_words") == str(DEFAULT_CHUNK_MAX_WORDS)
-        and meta.get("chunk_overlap_units") == str(DEFAULT_CHUNK_OVERLAP_UNITS)
-        and meta.get("embedding_prefix") == "true"
-    )
-
-
-def ensure_default_ingest(ctx: Context, label: str) -> dict[str, Any] | None:
-    """Re-ingest the defaults when ingest_meta shows another chunking; returns the ingest info."""
-    conn = ctx.connect()
-    try:
-        meta = read_ingest_meta(conn)
-    finally:
-        conn.close()
-    if is_default_ingest(meta):
-        return None
-    log.info("database holds a non-default ingest (%s); re-ingesting the defaults first", meta)
-    return reingest(
-        ctx,
-        label=label,
-        chunk_max_words=DEFAULT_CHUNK_MAX_WORDS,
-        chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
-        use_prefix=True,
     )
 
 
@@ -604,9 +888,11 @@ def comparison_rows(comparison: dict[str, Any]) -> list[list[Any]]:
     return rows
 
 
-# ---------------------------------------------------------------------------------------------
-# group 1: stability
-# ---------------------------------------------------------------------------------------------
+def lost_gold_pages(out_dir: Path, reference: str, other: str) -> list[int]:
+    """Return the claims with a gold page in the top hits of ``reference`` but not of ``other``."""
+    ref = claim_ranks(out_dir / f"{reference}.json")
+    oth = claim_ranks(out_dir / f"{other}.json")
+    return sorted(cid for cid, rank in ref.items() if rank is not None and oth.get(cid) is None)
 
 
 def run_summary_fields(out_dir: Path, name: str) -> dict[str, Any]:
@@ -621,70 +907,31 @@ def run_summary_fields(out_dir: Path, name: str) -> dict[str, Any]:
         "mhnsw_max_cache_size": data["parameters"].get("mhnsw_max_cache_size"),
         "ef_search_effective": data["parameters"].get("ef_search_effective"),
         "vector_index_m": data["parameters"].get("vector_index_m"),
+        "n_chunks": data["parameters"].get("n_chunks"),
         "unstable_claims": data["unstable_claims"],
         "article_hits": {str(m["k"]): m["article_hits"] for m in data["per_k"]},
         "evidence_hits": {str(m["k"]): m["evidence_hits"] for m in data["per_k"]},
+        "sql_p50_ms": {str(m["k"]): round(m["sql_latency"]["p50_ms"], 3) for m in data["per_k"]},
     }
 
 
-def group_stability(ctx: Context) -> None:
-    ensure_default_ingest(ctx, "stability_defaults")
-    cache_before = ensure_cache_size(ctx, CACHE_512MB)
-    log.info("mhnsw_max_cache_size in force: %d", cache_before)
-    for name in STABILITY_512_RUNS:
-        run_eval(ctx, name, group="stability", ef_search=20)
-    restart_seconds = ctx.server.restart()
-    run_eval(
-        ctx, AFTER_RESTART, group="stability", ef_search=20,
-        extra={"container_restart_seconds": round(restart_seconds, 1)},
-    )
-    ctx.server.set_cache_size(CACHE_16MB)
-    try:
-        for name in STABILITY_16_RUNS:
-            run_eval(ctx, name, group="stability", ef_search=20)
-    finally:
-        ctx.server.set_cache_size(CACHE_512MB)
-    write_stability_comparison(ctx.out_dir)
-
-
-def write_stability_comparison(out_dir: Path) -> None:
-    """Write stability_comparison.json/.md from the stability result files (and baseline.json)."""
-    all_runs = [COMMITTED_BASELINE, *STABILITY_512_RUNS, AFTER_RESTART, *STABILITY_16_RUNS]
-    comparisons = {
-        "within_512mb": compare_hits(out_dir, STABILITY_512_RUNS[0], STABILITY_512_RUNS[1:]),
-        "committed_baseline_vs_512mb": compare_hits(
-            out_dir, COMMITTED_BASELINE, [*STABILITY_512_RUNS]
-        ),
-        "after_restart_vs_512mb": compare_hits(out_dir, STABILITY_512_RUNS[0], [AFTER_RESTART]),
-        "after_restart_vs_16mb": compare_hits(out_dir, AFTER_RESTART, [STABILITY_16_RUNS[0]]),
-        "within_16mb": compare_hits(out_dir, STABILITY_16_RUNS[0], STABILITY_16_RUNS[1:]),
-        "512mb_vs_16mb": compare_hits(out_dir, STABILITY_512_RUNS[0], [*STABILITY_16_RUNS]),
-        "committed_baseline_vs_16mb": compare_hits(
-            out_dir, COMMITTED_BASELINE, [*STABILITY_16_RUNS]
-        ),
-    }
-    data = {
-        "created_at": utc_now(),
-        "runs": [run_summary_fields(out_dir, name) for name in all_runs],
-        "comparisons": comparisons,
-    }
-    write_json(out_dir / "stability_comparison.json", data)
+def comparison_markdown(title: str, intro: str, data: dict[str, Any]) -> str:
+    """Return the Markdown of a runs table plus one table per comparison."""
     parts = [
-        "# Stability of the HNSW results (per-claim hit chunk ids, LIMIT 20)",
+        f"# {title}",
         "",
-        (f"Generated {data['created_at']}. A claim counts as identical when its 20 hit chunk ids "
-        "are the same, in the same order; `identical_set` ignores the order."),
+        f"Generated {data['created_at']}. {intro}",
         "",
         "## Runs",
         "",
         md_table(
-            ("run", "created_at", "index ingested_at", "cache bytes", "ef_search", "M",
+            ("run", "created_at", "index ingested_at", "cache bytes", "ef_search", "M", "chunks",
              "unstable claims", "article hits @1/5/10/20", "evidence hits @5/10/20"),
             [
                 (
                     r["name"], r.get("created_at"), r.get("ingested_at"),
                     r.get("mhnsw_max_cache_size"), r.get("ef_search_effective"),
-                    r.get("vector_index_m"),
+                    r.get("vector_index_m"), r.get("n_chunks"),
                     len(r.get("unstable_claims", [])) if r.get("found") else "-",
                     "/".join(str(r["article_hits"].get(k, "-")) for k in ("1", "5", "10", "20"))
                     if r.get("found") else "not found",
@@ -698,7 +945,7 @@ def write_stability_comparison(out_dir: Path) -> None:
         "## Comparisons",
         "",
     ]
-    for key, comparison in comparisons.items():
+    for key, comparison in data["comparisons"].items():
         parts.append(f"### {key}")
         parts.append("")
         parts.append(md_table(
@@ -706,124 +953,132 @@ def write_stability_comparison(out_dir: Path) -> None:
             comparison_rows(comparison),
         ))
         parts.append("")
-    (out_dir / "stability_comparison.md").write_text("\n".join(parts), encoding="utf-8")
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------------------------
+# group 1: stability (OLD: 120 words, M=6)
+# ---------------------------------------------------------------------------------------------
+
+
+def group_stability(ctx: Context) -> None:
+    info = ingest_configuration(ctx, OLD, label="stability_old")
+    cache = ensure_cache_size(ctx, CACHE_512MB)
+    log.info("mhnsw_max_cache_size in force: %d", cache)
+    common = {"group": "stability", "config": OLD, "ks": DEFAULT_KS, "strategy": "none"}
+    for name in STABILITY_512_RUNS:
+        run_eval(ctx, name, ef_search=EF_LOW, extra={"ingest_run": info["label"]}, **common)
+    restart = ctx.server.restart()
+    run_eval(ctx, AFTER_RESTART, ef_search=EF_LOW, extra={"ingest_run": info["label"], **restart},
+             **common)
+    ctx.server.set_cache_size(CACHE_16MB)
+    try:
+        for name in STABILITY_16_RUNS:
+            run_eval(ctx, name, ef_search=EF_LOW, extra={"ingest_run": info["label"]}, **common)
+    finally:
+        ctx.server.set_cache_size(CACHE_512MB)
+    write_stability_comparison(ctx.out_dir)
+
+
+def write_stability_comparison(out_dir: Path) -> None:
+    """Write stability_comparison.json/.md from the seven stability result files."""
+    all_runs = [*STABILITY_512_RUNS, AFTER_RESTART, *STABILITY_16_RUNS]
+    comparisons = {
+        "within_512mb": compare_hits(out_dir, STABILITY_512_RUNS[0], STABILITY_512_RUNS[1:]),
+        "after_restart_vs_512mb": compare_hits(out_dir, STABILITY_512_RUNS[0], [AFTER_RESTART]),
+        "after_restart_vs_16mb": compare_hits(out_dir, AFTER_RESTART, [STABILITY_16_RUNS[0]]),
+        "within_16mb": compare_hits(out_dir, STABILITY_16_RUNS[0], STABILITY_16_RUNS[1:]),
+        "512mb_vs_16mb": compare_hits(out_dir, STABILITY_512_RUNS[0], [*STABILITY_16_RUNS]),
+    }
+    data = {
+        "created_at": utc_now(),
+        "configuration": OLD.to_dict(),
+        "runs": [run_summary_fields(out_dir, name) for name in all_runs],
+        "comparisons": comparisons,
+        "gold_page_lost_after_restart": lost_gold_pages(out_dir, STABILITY_512_RUNS[0], AFTER_RESTART),
+        "gold_page_gained_after_restart": lost_gold_pages(out_dir, AFTER_RESTART, STABILITY_512_RUNS[0]),
+    }
+    write_json(out_dir / "stability_comparison.json", data)
+    (out_dir / "stability_comparison.md").write_text(
+        comparison_markdown(
+            "Stability of the HNSW results (per-claim hit chunk ids, LIMIT 20)",
+            (f"Configuration: {OLD.label}; strategy none, ef 20. A claim counts as identical when "
+             "its 20 hit chunk ids are the same, in the same order; `identical (set)` ignores "
+             "the order. The container was restarted between `stability_512mb_run3` and "
+             "`stability_512mb_after_restart`; `SET GLOBAL mhnsw_max_cache_size = 16777216` was "
+             "issued before `stability_16mb_run1` and 536870912 restored afterwards."),
+            data,
+        ),
+        encoding="utf-8",
+    )
     log.info("wrote stability_comparison.json/.md")
 
 
 # ---------------------------------------------------------------------------------------------
-# group 2: ef_search sweep
+# group 2: ef_search sweep (OLD)
 # ---------------------------------------------------------------------------------------------
-
-
-def ensure_index_m(ctx: Context, m: int) -> dict[str, Any] | None:
-    conn = ctx.connect()
-    try:
-        definition = index_definition(conn)
-    finally:
-        conn.close()
-    if definition["m"] == m and definition["name"] == INDEX_NAME:
-        return None
-    log.info("vector index is %s; rebuilding with M=%d first", definition, m)
-    return rebuild_index(ctx, m)
 
 
 def group_ef_search(ctx: Context) -> None:
-    ensure_default_ingest(ctx, "ef_search_defaults")
-    ensure_index_m(ctx, DEFAULT_INDEX_M)
+    ensure_configuration(ctx, OLD, label="ef_search_old")
+    common = {"group": "ef_search", "config": OLD, "ks": DEFAULT_KS}
     for ef in EF_SWEEP:
-        run_eval(ctx, f"ef_{ef}", group="ef_search", ef_search=ef)
-    for ef in (20, 100):
-        run_eval(ctx, f"inline_ef_{ef}", group="ef_search", ef_search=ef, strategy="inline")
+        run_eval(ctx, f"ef_{ef}", ef_search=ef, strategy="none", **common)
+    for ef in (EF_LOW, EF_CHOSEN):
+        run_eval(ctx, f"inline_ef_{ef}", ef_search=ef, strategy="inline", **common)
+    run_eval(ctx, RRF_OLD, ef_search=EF_CHOSEN, strategy="rrf", overfetch=OVERFETCH_DEFAULT, **common)
 
 
 # ---------------------------------------------------------------------------------------------
-# group 3: index M sweep
+# group 3: index M sweep (OLD vectors, the index rebuilt with M=6, 16, 32)
 # ---------------------------------------------------------------------------------------------
-
-
-def rebuild_index(ctx: Context, m: int) -> dict[str, Any]:
-    """DROP and re-ADD the vector index with the given M (timed); returns the timings and sizes."""
-    add_sql = ADD_VECTOR_INDEX_SQL.get(m)
-    if add_sql is None:
-        raise ValueError(f"M={m} is not one of {sorted(ADD_VECTOR_INDEX_SQL)}")
-    conn = ctx.connect()
-    try:
-        before = index_definition(conn)
-        if before["name"] != INDEX_NAME:
-            raise ExperimentError(
-                f"expected the vector index to be named {INDEX_NAME!r}, SHOW CREATE TABLE says "
-                f"{before}"
-            )
-        log.info("rebuilding the vector index: M=%s -> M=%d", before["m"], m)
-        with conn.cursor() as cur:
-            start = time.perf_counter()
-            cur.execute(DROP_VECTOR_INDEX_SQL)
-            drop_seconds = time.perf_counter() - start
-            start = time.perf_counter()
-            cur.execute(add_sql)
-            add_seconds = time.perf_counter() - start
-        conn.commit()
-        snapshot = server_snapshot(conn, ctx.server)
-    finally:
-        conn.close()
-    info = {
-        "m": m,
-        "m_before": before["m"],
-        "index_name": INDEX_NAME,
-        "drop_seconds": round(drop_seconds, 2),
-        "add_seconds": round(add_seconds, 2),
-        "vector_index_m_after": snapshot["vector_index_m"],
-        "vector_index_distance_after": snapshot["vector_index_distance"],
-        "chunk_index_length": snapshot["chunk_index_length"],
-        "chunk_data_length": snapshot["chunk_data_length"],
-        "vector_index_tablespace_bytes": snapshot["vector_index_tablespace_bytes"],
-        "rebuilt_at": utc_now(),
-    }
-    log.info(
-        "  drop %.2f s, add %.2f s; index_length %s, vector tablespace %s bytes",
-        drop_seconds, add_seconds, info["chunk_index_length"], info["vector_index_tablespace_bytes"],
-    )
-    return info
 
 
 def group_index_m(ctx: Context) -> None:
-    ensure_default_ingest(ctx, "index_m_defaults")
-    ensure_index_m(ctx, DEFAULT_INDEX_M)
+    ensure_configuration(ctx, OLD, label="index_m_old")
     rebuilds: list[dict[str, Any]] = []
-    for m in INDEX_M_SWEEP:
-        info = rebuild_index(ctx, m)
+    for m in INDEX_M_VALUES:
+        info = rebuild_index(ctx, m, label=f"index_m_sweep_m{m}")
         rebuilds.append(info)
-        for ef in (20, 100):
+        config = replace(OLD, index_m=m)
+        for ef in INDEX_M_EFS:
             run_eval(
-                ctx, f"m{m}_ef_{ef}", group="index_m", ef_search=ef,
-                extra={"index_rebuild": info},
+                ctx, f"m{m}_ef_{ef}", group="index_m", config=config, ks=DEFAULT_KS,
+                ef_search=ef, strategy="none", extra={"index_rebuild": info},
             )
-    info = rebuild_index(ctx, DEFAULT_INDEX_M)
-    rebuilds.append(info)
-    run_eval(
-        ctx, "m6_rebuilt_ef_20", group="index_m", ef_search=20, extra={"index_rebuild": info}
-    )
+    rebuilds.append(rebuild_index(ctx, OLD.index_m, label="index_m_restore_m6"))
+    check_configuration(ctx, OLD, "index_m: after the sweep")
     comparisons: dict[str, Any] = {}
-    for reference in (STABILITY_512_RUNS[0], "ef_20"):
+    for reference in (f"ef_{EF_LOW}", STABILITY_512_RUNS[0], AFTER_RESTART):
         if (ctx.out_dir / f"{reference}.json").is_file():
-            comparisons[f"m6_rebuilt_vs_{reference}"] = compare_hits(
-                ctx.out_dir, reference, ["m6_rebuilt_ef_20"]
+            comparisons[f"m6_ef_20_vs_{reference}"] = compare_hits(
+                ctx.out_dir, reference, [f"m6_ef_{EF_LOW}"]
             )
-    data = {"created_at": utc_now(), "rebuilds": rebuilds, "comparisons": comparisons}
+    if (ctx.out_dir / f"{EXACT_OLD}.json").is_file():
+        comparisons["exact_vs_rebuilt"] = compare_hits(
+            ctx.out_dir, EXACT_OLD, [f"m{m}_ef_{ef}" for m in INDEX_M_VALUES for ef in INDEX_M_EFS]
+        )
+    data = {
+        "created_at": utc_now(),
+        "configuration": OLD.to_dict(),
+        "rebuilds": rebuilds,
+        "comparisons": comparisons,
+    }
     write_json(ctx.out_dir / "index_m_rebuild.json", data)
     parts = [
-        "# Vector index rebuilds (ALTER TABLE chunk DROP INDEX / ADD VECTOR INDEX)",
+        "# Vector index rebuilds (ALTER TABLE chunk DROP INDEX / ADD VECTOR INDEX ... M=n DISTANCE=cosine)",
         "",
-        (f"Generated {data['created_at']}. `index_length` is information_schema.tables for `chunk` "
-        "(all secondary indexes); `vector tablespace` is the file size of the hidden InnoDB table "
-        "`chunk#i#NN` that holds the HNSW graph."),
+        (f"Generated {data['created_at']}. Vectors of the ingest '{OLD.label}'. `index_length` is "
+        "information_schema.tables for `chunk` (all secondary indexes); `vector tablespace` is "
+        "the file size of the hidden InnoDB table `chunk#i#NN` that holds the HNSW graph."),
         "",
         md_table(
-            ("M before", "M", "drop s", "add s", "index_length", "vector tablespace bytes",
-             "rebuilt_at"),
+            ("label", "M before", "M", "drop s", "add s", "analyze s", "index_length",
+             "vector tablespace bytes", "rebuilt_at"),
             [
-                (r["m_before"], r["m"], r["drop_seconds"], r["add_seconds"],
-                 r["chunk_index_length"], r["vector_index_tablespace_bytes"], r["rebuilt_at"])
+                (r["label"], r["m_before"], r["m"], r["drop_seconds"], r["add_seconds"],
+                 r.get("analyze_seconds"), r["chunk_index_length"],
+                 r["vector_index_tablespace_bytes"], r["rebuilt_at"])
                 for r in rebuilds
             ],
         ),
@@ -842,36 +1097,37 @@ def group_index_m(ctx: Context) -> None:
 
 
 # ---------------------------------------------------------------------------------------------
-# group 4: chunk size, group 5: prefix
+# group 4: chunk size (M=16, ef 100), group 5: prefix (120 words, M=16, ef 100)
 # ---------------------------------------------------------------------------------------------
 
 
 def group_chunk_size(ctx: Context) -> None:
-    info = reingest(ctx, label="chunk60", chunk_max_words=60)
-    run_eval(
-        ctx, "chunk60_ef_100", group="chunk_size", ks=CHUNK60_KS, ef_search=100,
-        extra={"ingest_report": info},
-    )
-    info = reingest(ctx, label="chunk240", chunk_max_words=240)
-    run_eval(
-        ctx, "chunk240_ef_100", group="chunk_size", ks=CHUNK240_KS, ef_search=100,
-        extra={"ingest_report": info},
-    )
-
-
-def group_prefix(ctx: Context) -> None:
-    info = reingest(
-        ctx, label="noprefix", chunk_max_words=DEFAULT_CHUNK_MAX_WORDS, use_prefix=False
-    )
-    for ef in (100, 20):
+    for words, ks, name in CHUNK_SIZE_CASES:
+        config = Configuration(
+            chunk_max_words=words, chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
+            index_m=DEFAULT_INDEX_M, use_prefix=True,
+        )
+        info = ingest_configuration(ctx, config, label=f"chunk{words}")
         run_eval(
-            ctx, f"noprefix_ef_{ef}", group="prefix", ef_search=ef,
-            extra={"ingest_report": info},
+            ctx, name, group="chunk_size", config=config, ks=ks, ef_search=EF_CHOSEN,
+            strategy="none", extra={"ingest_run": info},
         )
 
 
+def group_prefix(ctx: Context) -> None:
+    for label, use_prefix in PREFIX_CASES:
+        config = Configuration(
+            chunk_max_words=120, chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
+            index_m=DEFAULT_INDEX_M, use_prefix=use_prefix,
+        )
+        info = ingest_configuration(ctx, config, label=f"prefix_{label}")
+        common = {"group": "prefix", "config": config, "ks": DEFAULT_KS, "extra": {"ingest_run": info}}
+        run_eval(ctx, f"prefix_{label}_ef_{EF_CHOSEN}", ef_search=EF_CHOSEN, strategy="none", **common)
+        run_eval(ctx, f"prefix_{label}_inline", ef_search=EF_CHOSEN, strategy="inline", **common)
+
+
 # ---------------------------------------------------------------------------------------------
-# group 6: filter strategies
+# group 6: filter strategies (FINAL)
 # ---------------------------------------------------------------------------------------------
 
 
@@ -879,7 +1135,7 @@ def filter_ground_truth(conn: pymysql.Connection) -> dict[str, Any]:
     """Return, per filter, how many chunks pass it and how many claims' gold evidence it excludes."""
     truths = load_ground_truth(conn)
     with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM chunk")
+        cur.execute(CHUNK_COUNT_SQL)
         n_chunks = int(cur.fetchone()[0])
         cur.execute(CHUNKS_MIN_WORDS_SQL, (MIN_WORDS_FILTER,))
         chunks_min_words = int(cur.fetchone()[0])
@@ -940,7 +1196,7 @@ def count_short_results(
         for k in ks:
             counts = [
                 len(search(conn, vectors[i], k=k, filters=filters, strategy=strategy,
-                           overfetch=overfetch, ef_search=ef_search))
+                           overfetch=overfetch, ef_search=ef_search, query_text=truths[i].text))
                 for i in range(len(truths))
             ]
             short = [t.claim_id for t, n in zip(truths, counts) if n < k]
@@ -961,15 +1217,14 @@ FILTER_CASES: tuple[tuple[str, Filters], ...] = (
     ("history", Filters(heading_like=HEADING_FILTER)),
 )
 STRATEGY_CASES: tuple[tuple[str, str, int], ...] = (
-    ("inline", "inline", 10),
+    ("inline", "inline", OVERFETCH_DEFAULT),
     ("overfetch10", "overfetch", 10),
     ("overfetch50", "overfetch", 50),
 )
 
 
 def group_filters(ctx: Context) -> None:
-    ensure_default_ingest(ctx, "filters_defaults")
-    ensure_index_m(ctx, DEFAULT_INDEX_M)
+    ensure_configuration(ctx, FINAL, label="filters_final")
     conn = ctx.connect()
     try:
         truth = filter_ground_truth(conn)
@@ -978,55 +1233,155 @@ def group_filters(ctx: Context) -> None:
     for filter_name, filters in FILTER_CASES:
         for strategy_name, strategy, overfetch in STRATEGY_CASES:
             name = f"strategy_{strategy_name}_{filter_name}"
-            short = count_short_results(
-                ctx, FILTER_KS, filters, strategy, overfetch, FILTER_EF_SEARCH
-            )
+            short = count_short_results(ctx, DEFAULT_KS, filters, strategy, overfetch, EF_CHOSEN)
             run_eval(
-                ctx, name, group="filters", ks=FILTER_KS, ef_search=FILTER_EF_SEARCH,
+                ctx, name, group="filters", config=FINAL, ks=DEFAULT_KS, ef_search=EF_CHOSEN,
                 strategy=strategy, filters=filters, overfetch=overfetch,
-                extra={
-                    "filter_ground_truth": truth[filter_name],
-                    "short_results": short,
-                },
+                extra={"filter_ground_truth": truth[filter_name], "short_results": short},
             )
 
 
 # ---------------------------------------------------------------------------------------------
-# group 7: restore the default state
+# group 7: the final configuration
+# ---------------------------------------------------------------------------------------------
+
+
+def group_final(ctx: Context) -> None:
+    info = ingest_configuration(ctx, FINAL, label="final")
+    cache = ensure_cache_size(ctx, CACHE_512MB)
+    log.info("mhnsw_max_cache_size in force: %d", cache)
+    common = {"group": "final", "config": FINAL, "ks": DEFAULT_KS, "extra": {"ingest_run": info}}
+    run_eval(ctx, FINAL_HEADLINE, ef_search=EF_CHOSEN, strategy="none", **common)
+    run_eval(ctx, FINAL_EF_20, ef_search=EF_LOW, strategy="none", **common)
+    run_eval(ctx, FINAL_EXACT, ef_search=EF_CHOSEN, strategy="inline", **common)
+    run_eval(ctx, FINAL_RRF, ef_search=EF_CHOSEN, strategy="rrf", overfetch=OVERFETCH_DEFAULT, **common)
+    run_eval(
+        ctx, FINAL_ORACLE, ef_search=EF_CHOSEN, strategy="inline", claim_filters=oracle_title_filters,
+        **common,
+    )
+    restart = ctx.server.restart()
+    after_common = {**common, "extra": {"ingest_run": info, **restart}}
+    run_eval(ctx, FINAL_AFTER[FINAL_HEADLINE], ef_search=EF_CHOSEN, strategy="none", **after_common)
+    run_eval(ctx, FINAL_AFTER[FINAL_EF_20], ef_search=EF_LOW, strategy="none", **after_common)
+    write_final_restart_comparison(ctx.out_dir)
+
+
+def write_final_restart_comparison(out_dir: Path) -> None:
+    """Write final_restart_comparison.json/.md: hit lists before and after the restart (M=16)."""
+    comparisons: dict[str, Any] = {}
+    per_k: dict[str, Any] = {}
+    for before, after in FINAL_AFTER.items():
+        comparisons[f"{before}_vs_{after}"] = compare_hits(out_dir, before, [after])
+        fields = {name: run_summary_fields(out_dir, name) for name in (before, after)}
+        per_k[before] = {
+            "before": before,
+            "after": after,
+            "article_hits_before": fields[before]["article_hits"],
+            "article_hits_after": fields[after]["article_hits"],
+            "evidence_hits_before": fields[before]["evidence_hits"],
+            "evidence_hits_after": fields[after]["evidence_hits"],
+            "gold_page_lost_after_restart": lost_gold_pages(out_dir, before, after),
+            "gold_page_gained_after_restart": lost_gold_pages(out_dir, after, before),
+        }
+    comparisons["exact_vs_approximate"] = compare_hits(
+        out_dir, FINAL_EXACT, [FINAL_HEADLINE, FINAL_AFTER[FINAL_HEADLINE], FINAL_EF_20,
+                               FINAL_AFTER[FINAL_EF_20]]
+    )
+    data = {
+        "created_at": utc_now(),
+        "configuration": FINAL.to_dict(),
+        "runs": [run_summary_fields(out_dir, name) for name in FINAL_RUNS],
+        "comparisons": comparisons,
+        "per_k": per_k,
+    }
+    write_json(out_dir / "final_restart_comparison.json", data)
+    (out_dir / "final_restart_comparison.md").write_text(
+        comparison_markdown(
+            "Final configuration: hit lists before and after a container restart (M=16)",
+            (f"Configuration: {FINAL.label}. `final_ef_100` / `final_ef_20` ran before "
+             "`docker compose restart`, `*_after_restart` after it, on the same on-disk index; "
+             "`exact_vs_approximate` compares each with the exact ranking `final_inline`. A claim "
+             "counts as identical when its 20 hit chunk ids are the same, in the same order."),
+            data,
+        ),
+        encoding="utf-8",
+    )
+    log.info("wrote final_restart_comparison.json/.md")
+
+
+# ---------------------------------------------------------------------------------------------
+# group 8: restore the default state
 # ---------------------------------------------------------------------------------------------
 
 
 def group_restore(ctx: Context) -> None:
-    info = reingest(
-        ctx, label="restore_defaults", chunk_max_words=DEFAULT_CHUNK_MAX_WORDS,
-        chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS, use_prefix=True,
-    )
+    info = ingest_configuration(ctx, FINAL, label="restore_defaults")
     cache = ensure_cache_size(ctx, CACHE_512MB)
-    baseline = load_json(ctx.out_dir / f"{COMMITTED_BASELINE}.json")
-    conn = ctx.connect()
-    try:
-        meta = read_ingest_meta(conn)
-    finally:
-        conn.close()
-    differences: dict[str, Any] = {}
-    if baseline is not None:
-        for key, value in baseline["ingest_meta"].items():
-            if key != "ingested_at" and meta.get(key) != value:
-                differences[key] = {"baseline": value, "now": meta.get(key)}
-    run_eval(
-        ctx, "final_state_ef_20", group="restore", ef_search=20,
-        extra={
-            "ingest_report": info,
-            "mhnsw_max_cache_size_after_restore": cache,
-            "ingest_meta_matches_baseline": baseline is not None and not differences,
-            "ingest_meta_differences": differences,
-        },
-    )
-    log.info("ingest_meta vs baseline.json (ingested_at excepted): %s", differences or "identical")
+    meta, index = ctx.database_state()
+    expected = {
+        **FINAL.ingest_meta_expected(),
+        "embedding_model": ctx.settings.embedding_model,
+        "embedding_dim": str(ctx.settings.vector_dim),
+    }
+    checks = [
+        {"item": f"ingest_meta.{key}", "expected": value, "found": meta.get(key),
+         "ok": meta.get(key) == value}
+        for key, value in expected.items()
+    ]
+    checks += [
+        {"item": "vector index M (SHOW CREATE TABLE chunk)", "expected": FINAL.index_m,
+         "found": index.get("m"), "ok": index.get("m") == FINAL.index_m},
+        {"item": "vector index DISTANCE", "expected": INDEX_DISTANCE, "found": index.get("distance"),
+         "ok": index.get("distance") == INDEX_DISTANCE},
+        {"item": "@@GLOBAL.mhnsw_max_cache_size", "expected": CACHE_512MB, "found": cache,
+         "ok": cache == CACHE_512MB},
+    ]
+    final_meta = (load_json(ctx.out_dir / f"{FINAL_HEADLINE}.json") or {}).get("ingest_meta")
+    if final_meta is not None:
+        volatile = {"ingested_at", "analyze_seconds"}
+        differences = {
+            key: {"final": value, "now": meta.get(key)}
+            for key, value in final_meta.items()
+            if key not in volatile and meta.get(key) != value
+        }
+        checks.append({
+            "item": f"ingest_meta equals {FINAL_HEADLINE}'s (ingested_at, analyze_seconds excepted)",
+            "expected": "identical", "found": differences or "identical", "ok": not differences,
+        })
+    data = {
+        "created_at": utc_now(),
+        "configuration": FINAL.to_dict(),
+        "ingest_run": info,
+        "ingest_meta": meta,
+        "vector_index": index,
+        "mhnsw_max_cache_size": cache,
+        "checks": checks,
+        "all_ok": all(c["ok"] for c in checks),
+    }
+    write_json(ctx.out_dir / f"{RESTORE_STATE}.json", data)
+    parts = [
+        "# Restored default state",
+        "",
+        (f"Generated {data['created_at']}. A fresh `run_ingest` with the defaults "
+         f"('{FINAL.label}', what `wikilense ingest` produces), then `ingest_meta`, the index and "
+         "the HNSW cache size checked."),
+        "",
+        md_table(("check", "expected", "found", "ok"),
+                 [(c["item"], c["expected"], c["found"], "yes" if c["ok"] else "NO") for c in checks]),
+        "",
+        (f"Ingest: {info['counts']['n_chunks']} chunks, {info['n_units_hatnote']} hatnote units "
+         f"excluded, {info['seconds']['total']} s (embed {info['seconds']['embed']} s); vector "
+         f"index tablespace {info['vector_index_tablespace_bytes']} bytes."),
+        "",
+    ]
+    (ctx.out_dir / f"{RESTORE_STATE}.md").write_text("\n".join(parts), encoding="utf-8")
+    log.info("restore checks: %s", "all ok" if data["all_ok"] else [c for c in checks if not c["ok"]])
+    if not data["all_ok"]:
+        raise ExperimentError(f"the restored state is not the default: {[c for c in checks if not c['ok']]}")
 
 
 # ---------------------------------------------------------------------------------------------
-# group 8: SUMMARY.md
+# group 9: SUMMARY.md
 # ---------------------------------------------------------------------------------------------
 
 
@@ -1073,15 +1428,12 @@ class Results:
         m = self.per_k(name).get(k)
         return f"{m['sql_latency']['p95_ms']:.2f}" if m else "not found"
 
-    def p50_n(self, name: str, k: int) -> float | None:
-        m = self.per_k(name).get(k)
-        return float(m["sql_latency"]["p50_ms"]) if m else None
+    def lat(self, name: str, k: int) -> str:
+        return f"{self.p50(name, k)} / {self.p95(name, k)}"
 
-    def param(self, name: str, key: str, default: Any = "not found") -> Any:
+    def emb_p50(self, name: str) -> str:
         data = self.get(name)
-        if data is None:
-            return default
-        return data["parameters"].get(key, default)
+        return f"{data['embedding_latency']['p50_ms']:.2f}" if data else "not found"
 
     def art_n(self, name: str, k: int) -> int | None:
         m = self.per_k(name).get(k)
@@ -1091,6 +1443,16 @@ class Results:
         m = self.per_k(name).get(k)
         return int(m["evidence_hits"]) if m else None
 
+    def param(self, name: str, key: str, default: Any = "not found") -> Any:
+        data = self.get(name)
+        if data is None:
+            return default
+        return data["parameters"].get(key, default)
+
+    def unstable(self, name: str) -> Any:
+        data = self.get(name)
+        return len(data["unstable_claims"]) if data else "not found"
+
     def identical(self, reference: str, other: str) -> str:
         """Return "n/75": claims whose max-k hit lists are identical between the two runs."""
         if not self.has(reference, other):
@@ -1098,18 +1460,27 @@ class Results:
         comparison = compare_hits(self.out_dir, reference, [other])
         return f"{comparison['runs'][other]['identical_sequence']}/{comparison['n_claims']}"
 
+    def identical_n(self, reference: str, other: str) -> int | None:
+        if not self.has(reference, other):
+            return None
+        return int(compare_hits(self.out_dir, reference, [other])["runs"][other]["identical_sequence"])
+
     def lost_gold(self, reference: str, other: str) -> list[int]:
-        """Return the claims with a gold page in the top hits of ``reference`` but not of ``other``."""
         if not self.has(reference, other):
             return []
-        ref = claim_ranks(self.out_dir / f"{reference}.json")
-        oth = claim_ranks(self.out_dir / f"{other}.json")
-        return sorted(cid for cid, rank in ref.items() if rank is not None and oth.get(cid) is None)
+        return lost_gold_pages(self.out_dir, reference, other)
 
     def ingest_run(self, label: str) -> dict[str, Any] | None:
         runs = self.get(INGEST_RUNS) or []
         for run in reversed(runs):
-            if run.get("label") == label:
+            if run.get("label") == label and run.get("kind") == "ingest":
+                return run
+        return None
+
+    def rebuild(self, label: str) -> dict[str, Any] | None:
+        runs = self.get(INGEST_RUNS) or []
+        for run in reversed(runs):
+            if run.get("label") == label and run.get("kind") == "rebuild":
                 return run
         return None
 
@@ -1120,26 +1491,41 @@ def fmt_bytes_mb(value: Any) -> str:
     return f"{value / 1048576:.1f} MB"
 
 
-def fmt_bytes(value: Any) -> str:
-    if not isinstance(value, (int, float)):
-        return "not found"
-    return f"{int(value):,} B"
+def fmt_seconds(value: Any) -> str:
+    return f"{value:.2f} s" if isinstance(value, (int, float)) else "not found"
+
+
+def cmp_word(a: int | None, b: int | None) -> str:
+    """Return "equal to", "above" or "below" for ``a`` against ``b`` ("not found" without values)."""
+    if a is None or b is None:
+        return "not found against"
+    if a == b:
+        return "equal to"
+    return "above" if a > b else "below"
 
 
 def summary_markdown(out_dir: Path) -> str:
     r = Results(out_dir)
-    header = r.get("final_state_ef_20") or r.get("ef_20") or r.get("baseline")
+    header = r.get(FINAL_HEADLINE) or r.get("ef_100") or r.get(STABILITY_512_RUNS[0])
+    n_claims = header["n_claims"] if header else "?"
+    n_evidence = header["n_evidence_claims"] if header else "?"
     intro = (
         f"Generated {utc_now()} by `scripts/run_experiments.py summary`. Every number below is read "
         "from the JSON files in `results/` written by the same script (`write_results` of the "
-        "evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims "
-        "over a 100-page corpus (8,868 chunks of at most 120 words unless stated); article recall "
-        "counts the claims with a gold page among the top-k chunks (of 75), evidence recall the "
-        "claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a "
-        "sentence-only evidence set). Latencies are the SQL time of one `search()` call in "
-        "milliseconds, p50 / p95 over 5 repeats x 75 claims, warm, query embedding excluded "
-        "(about 4.6 ms on the GPU, see the per-run files). Unless stated, the vector index is "
-        "the schema's HNSW index with M=6 and cosine distance, and `ef` is `mhnsw_ef_search`."
+        "evaluation harness); the per-run Markdown files hold the full tables. "
+        f"{n_claims} FEVEROUS claims over the 100-page corpus; article recall counts the claims "
+        f"with a gold page among the pages of the top-k chunks (of {n_claims}), evidence recall "
+        "the claims whose gold sentences are all inside the top-k chunks (of the "
+        f"{n_evidence} claims with a sentence-only evidence set), unit coverage the mean share "
+        "of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one "
+        "`search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query "
+        "embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session "
+        "by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine "
+        "distance, its M as stated per section. Two ingest configurations are used: OLD = "
+        f"{OLD.label} (phases 1 and 2) and FINAL = {FINAL.label} (the chosen defaults); hatnote "
+        "units (\"Main article: ...\") are in no chunk in either. \"Identical to exact\" counts "
+        "the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the "
+        "inline statement without filters, which does not depend on the HNSW graph)."
     )
     parts: list[str] = ["# WikiLense experiments: summary", "", intro, ""]
     if header is not None:
@@ -1155,143 +1541,123 @@ def summary_markdown(out_dir: Path) -> str:
     parts += summary_chunk_size(r)
     parts += summary_prefix(r)
     parts += summary_filters(r)
+    parts += summary_final(r)
     parts += summary_restore(r)
-    parts += summary_recommendations(r)
+    parts += summary_defaults(r)
     return "\n".join(parts) + "\n"
 
 
-def _cache_cell(r: Results, name: str) -> str:
-    value = r.param(name, "mhnsw_max_cache_size", None)
-    if isinstance(value, int):
-        return fmt_bytes_mb(value)
-    if r.get(name) is not None:
-        return "not recorded (16 MB server default at the time)"
-    return "not found"
-
-
 def summary_stability(r: Results) -> list[str]:
-    runs = [COMMITTED_BASELINE, *STABILITY_512_RUNS, AFTER_RESTART, *STABILITY_16_RUNS]
+    runs = [*STABILITY_512_RUNS, AFTER_RESTART, *STABILITY_16_RUNS]
     rows = []
     for name in runs:
-        data = r.get(name)
-        if data is None:
-            rows.append([name] + ["not found"] * 8)
-            continue
         rows.append([
-            name, _cache_cell(r, name), data["ingest_meta"].get("ingested_at"), r.art(name, 1),
-            r.art(name, 10), r.ev(name, 10), r.ev(name, 20), r.p50(name, 10),
-            len(data["unstable_claims"]),
+            name, fmt_bytes_mb(r.param(name, "mhnsw_max_cache_size", None)),
+            r.param(name, "ef_search_effective"), r.art(name, 1), r.art(name, 10), r.art(name, 20),
+            r.ev(name, 10), r.ev(name, 20), r.lat(name, 10), r.unstable(name),
+            r.identical(STABILITY_512_RUNS[0], name), r.identical(AFTER_RESTART, name),
         ])
     parts = [
-        "## 1. Stability: the same configuration repeated (strategy none, ef 20, no filters)",
+        f"## 1. Stability: the same run repeated (OLD: {OLD.label}; strategy none, ef 20)",
         "",
-        ("`baseline` is the committed run of 2026-09-16 (16 MB cache, minutes after the ingest). "
-        "The other runs use the same on-disk index; the container was restarted between "
-        "`stability_512mb_run3` and `stability_512mb_after_restart`, and "
-        "`SET GLOBAL mhnsw_max_cache_size = 16777216` was issued before `stability_16mb_run1` "
-        "(restored to 536870912 afterwards). \"claims unstable within run\" counts the claims "
-        "whose LIMIT-20 hits changed between the five repeats of one run."),
+        ("One fresh ingest, then seven identical evaluations on the same on-disk index: three "
+        "with the 512 MB HNSW cache, one after `docker compose restart`, three after "
+        "`SET GLOBAL mhnsw_max_cache_size = 16777216` (536870912 restored afterwards). "
+        "\"unstable\" counts the claims whose LIMIT-20 hits changed between the five repeats of "
+        "one run; the last two columns count the claims whose 20 hit chunk ids equal, in order, "
+        "those of `stability_512mb_run1` and of `stability_512mb_after_restart` "
+        "(`stability_comparison.md` lists the claims)."),
         "",
         md_table(
-            ("run", "cache", "index built", "article@1", "article@10", "evidence@10",
-             "evidence@20", "SQL p50@10 ms", "claims unstable within run"),
+            ("run", "cache", "ef", "article@1", "article@10", "article@20", "evidence@10",
+             "evidence@20", "SQL p50 / p95 @10 ms", "unstable", "identical to 512mb_run1",
+             "identical to after_restart"),
             rows,
         ),
         "",
     ]
     comp = r.get("stability_comparison")
-    if comp is None:
-        parts += ["`stability_comparison.json` not found.", ""]
+    if comp is None or not r.has(*runs):
+        parts += ["Not every stability file exists yet; the reading is written once they do.", ""]
         return parts
     c = comp["comparisons"]
-    rows = []
-    for key in ("within_512mb", "after_restart_vs_512mb", "after_restart_vs_16mb", "within_16mb",
-                "512mb_vs_16mb", "committed_baseline_vs_512mb", "committed_baseline_vs_16mb"):
-        if key in c:
-            rows.extend([[key, *row] for row in comparison_rows(c[key])])
-    parts += [
-        ("Per-claim comparison of the 20 hit chunk ids (order-sensitive; `identical (set)` ignores "
-        "the order):"),
-        "",
-        md_table(("comparison", "reference", "run", "identical (sequence)", "identical (set)", "of",
-                  "claims that differ"), rows),
-        "",
-    ]
     n = c["within_512mb"]["n_claims"]
     within512 = c["within_512mb"]["identical_in_all"]
     within16 = c["within_16mb"]["identical_in_all"]
+    set_global = c["after_restart_vs_16mb"]["runs"][STABILITY_16_RUNS[0]]["identical_sequence"]
     restart = c["after_restart_vs_512mb"]["runs"][AFTER_RESTART]["identical_sequence"]
-    set_global = r.identical(AFTER_RESTART, STABILITY_16_RUNS[0])
-    vs_base512 = c["committed_baseline_vs_512mb"]["identical_in_all"]
-    vs_base16 = c["committed_baseline_vs_16mb"]["identical_in_all"]
-    lost = r.lost_gold(STABILITY_512_RUNS[0], AFTER_RESTART)
-    gained = r.lost_gold(AFTER_RESTART, STABILITY_512_RUNS[0])
+    lost = comp["gold_page_lost_after_restart"]
+    gained = comp["gold_page_gained_after_restart"]
+    deterministic = within512 == n and within16 == n
+    restart_phrase = (
+        "The container restart changed nothing either" if restart == n
+        else "The container restart is what changed the results"
+    )
     reading = (
-        f"Reading: within one server process the index search is deterministic. The three 512 MB "
-        f"runs return the same 20 chunks in the same order for {within512} of {n} claims, the "
-        f"three 16 MB runs for {within16} of {n}, and lowering the cache from 512 MB to 16 MB "
-        f"with SET GLOBAL changed nothing ({set_global} identical between the run just before "
-        f"and just after it). The container restart is what changed the results: the run after "
-        f"it matches the runs before it for only {restart} of {n} claims, {len(lost)} claims lost "
-        f"their gold page from the top 20 ({', '.join(map(str, lost)) or 'none'}) and "
-        f"{len(gained)} gained one, and article recall@10 went from "
-        f"{r.art(STABILITY_512_RUNS[0], 10)} to {r.art(AFTER_RESTART, 10)}. The committed "
-        f"baseline is a third state of the same on-disk index: identical hit lists for "
-        f"{vs_base512} of {n} claims with the pre-restart runs and {vs_base16} with the "
-        f"post-restart runs. So the phase-2 suspicion, a thrashing 16 MB cache, is not supported "
-        f"by these runs; what differs is the in-memory graph the server has after (re)loading "
-        f"the index, and at ef 20 the effect on recall is large. Section 2 shows that a higher "
-        f"ef_search narrows it."
+        f"Reading: within one server process the search over this M=6 graph is "
+        f"{'deterministic' if deterministic else 'not fully deterministic'}: the three 512 MB runs "
+        f"return the same 20 chunks in the same order for {within512} of {n} claims, the three "
+        f"16 MB runs for {within16} of {n}, and lowering the cache from 512 MB to 16 MB with SET "
+        f"GLOBAL left {set_global} of {n} hit lists unchanged. {restart_phrase}: the run after it "
+        f"matches the run before it for {restart} of {n} "
+        f"claims, {len(lost)} claims lost their gold page from the top 20"
+        f"{' (' + ', '.join(map(str, lost)) + ')' if lost else ''} and {len(gained)} gained one, "
+        f"and article recall@10 went from {r.art(STABILITY_512_RUNS[0], 10)} to "
+        f"{r.art(AFTER_RESTART, 10)} (evidence recall@20 {r.ev(STABILITY_512_RUNS[0], 20)} to "
+        f"{r.ev(AFTER_RESTART, 20)}). SQL p50@10 was {r.p50(STABILITY_512_RUNS[0], 10)} ms before "
+        f"and {r.p50(AFTER_RESTART, 10)} ms after the restart, {r.p50(STABILITY_16_RUNS[0], 10)} ms "
+        f"with the 16 MB cache."
     )
     parts += [reading, ""]
     return parts
 
 
 def summary_ef_search(r: Results) -> list[str]:
-    names = [f"ef_{ef}" for ef in EF_SWEEP] + ["inline_ef_20", "inline_ef_100"]
-    ks = DEFAULT_KS
+    names = [(f"ef_{ef}", "none", ef) for ef in EF_SWEEP]
+    names += [(f"inline_ef_{ef}", "inline (exact)", ef) for ef in (EF_LOW, EF_CHOSEN)]
+    names += [(RRF_OLD, f"rrf (overfetch {OVERFETCH_DEFAULT})", EF_CHOSEN)]
+    rows = [
+        [n, s, r.param(n, "ef_search_effective"), r.art(n, 1), r.art(n, 5), r.art(n, 10),
+         r.art(n, 20), r.ev(n, 5), r.ev(n, 10), r.ev(n, 20), r.cov(n, 10), r.lat(n, 10),
+         r.identical(EXACT_OLD, n) if n != RRF_OLD else "- (other order by construction)"]
+        for n, s, _ in names
+    ]
     parts = [
-        ("## 2. mhnsw_ef_search sweep (strategy none; `inline_*` = the joined statement without "
-        "filters, all on the post-restart index state)"),
+        f"## 2. mhnsw_ef_search sweep (OLD: {OLD.label}; the index state after the restart of section 1)",
         "",
-        "Article recall (of 75):",
-        "",
-        md_table(("run", *[f"@{k}" for k in ks]), [[n, *[r.art(n, k) for k in ks]] for n in names]),
-        "",
-        "Evidence recall (of 66):",
-        "",
-        md_table(("run", *[f"@{k}" for k in ks]), [[n, *[r.ev(n, k) for k in ks]] for n in names]),
-        "",
-        "SQL latency p50 / p95 in ms:",
+        ("`ef_<n>` is strategy none (the bare `ORDER BY VEC_DISTANCE_COSINE ... LIMIT k`, the HNSW "
+        "search proper); `inline_ef_<n>` the joined statement without filters, which ranks "
+        "exactly over the index and so does not depend on `ef`; `rrf_120_m6` the hybrid "
+        f"(vector top-{10 * OVERFETCH_DEFAULT} at ef 100 fused with the full-text top-"
+        f"{10 * OVERFETCH_DEFAULT} of the claim words by reciprocal rank fusion). The reference "
+        f"of the last column is `{EXACT_OLD}`."),
         "",
         md_table(
-            ("run", *[f"@{k}" for k in ks]),
-            [[n, *[f"{r.p50(n, k)} / {r.p95(n, k)}" for k in ks]] for n in names],
+            ("run", "strategy", "ef", "article@1", "article@5", "article@10", "article@20",
+             "evidence@5", "evidence@10", "evidence@20", "coverage@10", "SQL p50 / p95 @10 ms",
+             "identical to exact"),
+            rows,
         ),
         "",
     ]
-    if not r.has(*names):
+    if not r.has(*[n for n, _, _ in names]):
+        parts += ["Not every file of this group exists yet; the reading is written once they do.", ""]
         return parts
     a = {ef: r.art(f"ef_{ef}", 10) for ef in EF_SWEEP}
     e = {ef: r.ev(f"ef_{ef}", 20) for ef in EF_SWEEP}
     p = {ef: r.p50(f"ef_{ef}", 10) for ef in EF_SWEEP}
+    ident = {ef: r.identical(EXACT_OLD, f"ef_{ef}") for ef in EF_SWEEP}
     reading = (
-        f"Reading: raising ef_search from 20 to 100 lifts article recall@10 from {a[20]} to "
-        f"{a[100]} and evidence recall@20 from {e[20]} to {e[100]} for p50@10 {p[20]} vs "
-        f"{p[100]} ms; ef 200 reaches {a[200]} / {e[200]} and ef 400 {a[400]} / {e[400]} at "
-        f"{p[200]} / {p[400]} ms. The inline statement walks the index until k joined rows have "
-        f"passed and so returns the exact top-k: {r.art('inline_ef_20', 10)} / "
-        f"{r.ev('inline_ef_20', 20)} at both ef values (hit lists identical for "
-        f"{r.identical('inline_ef_20', 'inline_ef_100')} claims) for p50@10 "
-        f"{r.p50('inline_ef_20', 10)} ms. ef 400 matches the exact counts at every k; its hit "
-        f"lists are identical to the exact ones for {r.identical('inline_ef_20', 'ef_400')} "
-        f"claims (ef 200: {r.identical('inline_ef_20', 'ef_200')}, ef 100: "
-        f"{r.identical('inline_ef_20', 'ef_100')}, ef 20: {r.identical('inline_ef_20', 'ef_20')}). "
-        f"Across the two index states of section 1 the LIMIT-20 hit lists at ef 100 "
-        f"(`ef_search_100`, committed, vs `ef_100`) agree for "
-        f"{r.identical('ef_search_100', 'ef_100')} claims, against "
-        f"{r.identical('baseline', 'ef_20')} at ef 20: a higher ef_search also makes the "
-        f"results less dependent on the index state."
+        f"Reading: raising ef from 20 to 400 moves article recall@10 from {a[20]} to {a[400]} and "
+        f"evidence recall@20 from {e[20]} to {e[400]} for SQL p50@10 {p[20]} against {p[400]} ms; "
+        f"ef 100 gives {a[100]} / {e[100]} at {p[100]} ms. The exact ranking (inline) gives "
+        f"{r.art(EXACT_OLD, 10)} / {r.ev(EXACT_OLD, 20)} at p50@10 {r.p50(EXACT_OLD, 10)} ms, with "
+        f"hit lists identical at ef 20 and ef 100 for {r.identical(EXACT_OLD, f'inline_ef_{EF_CHOSEN}')} "
+        f"claims; the approximate hit lists are identical to it for "
+        f"{' / '.join(ident[ef] for ef in EF_SWEEP)} claims at ef {' / '.join(map(str, EF_SWEEP))}. "
+        f"The rrf hybrid at ef 100 gives article recall@10 {r.art(RRF_OLD, 10)} and evidence "
+        f"recall@20 {r.ev(RRF_OLD, 20)} against {a[100]} / {e[100]} for the vector ranking alone "
+        f"at the same ef, at p50@10 {r.p50(RRF_OLD, 10)} ms against {p[100]} ms."
     )
     parts += [reading, ""]
     return parts
@@ -1299,135 +1665,105 @@ def summary_ef_search(r: Results) -> list[str]:
 
 def summary_index_m(r: Results) -> list[str]:
     rebuild = r.get("index_m_rebuild")
-    parts = [
-        ("## 3. Index M sweep (ALTER TABLE chunk DROP INDEX / ADD VECTOR INDEX ... M=n "
-        "DISTANCE=cosine; ef 20 and 100)"),
-        "",
-    ]
-    if rebuild is not None:
-        parts += [
-            ("`chunk index_length` is `information_schema.tables` for `chunk` (its B-tree "
-            "secondary indexes only, recomputed by the ALTER); `vector tablespace` is the file "
-            "size of the hidden InnoDB table `chunk#i#NN` that holds the HNSW graph "
-            "(`information_schema.innodb_sys_tablespaces`)."),
-            "",
-            md_table(
-                ("M before", "M", "DROP INDEX s", "ADD VECTOR INDEX s", "chunk index_length",
-                 "vector tablespace"),
-                [
-                    (b["m_before"], b["m"], b["drop_seconds"], b["add_seconds"],
-                     fmt_bytes(b["chunk_index_length"]),
-                     fmt_bytes_mb(b["vector_index_tablespace_bytes"]))
-                    for b in rebuild["rebuilds"]
-                ],
-            ),
-            "",
-        ]
-    names = ["ef_20", "ef_100", "m16_ef_20", "m16_ef_100", "m32_ef_20", "m32_ef_100",
-             "m6_rebuilt_ef_20", "inline_ef_20"]
     rows = []
-    for n in names:
-        rows.append([
-            n, r.param(n, "vector_index_m"), r.param(n, "ef_search_effective"),
-            fmt_bytes_mb(r.param(n, "vector_index_tablespace_bytes", None)),
-            r.art(n, 1), r.art(n, 5), r.art(n, 10), r.ev(n, 5), r.ev(n, 10), r.ev(n, 20),
-            f"{r.p50(n, 10)} / {r.p95(n, 10)}", r.identical("inline_ef_20", n),
-        ])
-    parts += [
-        ("`ef_20` / `ef_100` are the M=6 index built at ingest (section 2); `inline_ef_20` is the "
-        "exact ranking for reference; the last column counts the claims whose 20 hits are "
-        "identical to that exact ranking."),
+    for m in INDEX_M_VALUES:
+        rb = r.rebuild(f"index_m_sweep_m{m}") or {}
+        for ef in INDEX_M_EFS:
+            n = f"m{m}_ef_{ef}"
+            rows.append([
+                n, r.param(n, "vector_index_m"), r.param(n, "ef_search_effective"),
+                fmt_seconds(rb.get("drop_seconds")), fmt_seconds(rb.get("add_seconds")),
+                fmt_bytes_mb(r.param(n, "vector_index_tablespace_bytes", None)),
+                r.art(n, 1), r.art(n, 10), r.art(n, 20), r.ev(n, 10), r.ev(n, 20), r.lat(n, 10),
+                r.identical(EXACT_OLD, n),
+            ])
+    rows.append([
+        EXACT_OLD, r.param(EXACT_OLD, "vector_index_m"), "-", "-", "-",
+        fmt_bytes_mb(r.param(EXACT_OLD, "vector_index_tablespace_bytes", None)),
+        r.art(EXACT_OLD, 1), r.art(EXACT_OLD, 10), r.art(EXACT_OLD, 20), r.ev(EXACT_OLD, 10),
+        r.ev(EXACT_OLD, 20), r.lat(EXACT_OLD, 10), r.identical(EXACT_OLD, EXACT_OLD),
+    ])
+    parts = [
+        f"## 3. Index M sweep (OLD vectors: {OLD.label.replace('M=6, ', '')}; strategy none)",
+        "",
+        ("The vector index rebuilt with `ALTER TABLE chunk DROP INDEX` + `ADD VECTOR INDEX ... "
+        "M=n DISTANCE=cosine` for M 6, 16 and 32 (the drop and add timed separately), each "
+        "evaluated at ef 20 and 100. `graph tablespace` is the file size of the hidden InnoDB "
+        "table `chunk#i#NN` that holds the HNSW graph; the exact ranking `inline_ef_20` is the "
+        "last row for reference."),
         "",
         md_table(
-            ("run", "M", "ef", "vector tablespace", "article@1", "article@5", "article@10",
-             "evidence@5", "evidence@10", "evidence@20", "SQL p50 / p95 @10 ms",
+            ("run", "M", "ef", "DROP INDEX", "ADD VECTOR INDEX", "graph tablespace", "article@1",
+             "article@10", "article@20", "evidence@10", "evidence@20", "SQL p50 / p95 @10 ms",
              "identical to exact"),
             rows,
         ),
         "",
     ]
-    if rebuild is not None:
-        for comp in rebuild.get("comparisons", {}).values():
-            run = comp["runs"]["m6_rebuilt_ef_20"]
-            parts += [
-                (f"`m6_rebuilt_ef_20` vs `{comp['reference']}`: identical hit lists for "
-                f"{run['identical_sequence']} of {comp['n_claims']} claims (same set: "
-                f"{run['identical_set']})."),
-                "",
-            ]
-    if not r.has(*names) or rebuild is None:
+    names = [f"m{m}_ef_{ef}" for m in INDEX_M_VALUES for ef in INDEX_M_EFS]
+    if rebuild is None or not r.has(*names, EXACT_OLD):
+        parts += ["Not every file of this group exists yet; the reading is written once they do.", ""]
         return parts
-    add = {b["m"]: b["add_seconds"] for b in rebuild["rebuilds"]}
-    size = {b["m"]: fmt_bytes_mb(b["vector_index_tablespace_bytes"]) for b in rebuild["rebuilds"]}
+    add = {m: (r.rebuild(f"index_m_sweep_m{m}") or {}).get("add_seconds") for m in INDEX_M_VALUES}
+    drop = {m: (r.rebuild(f"index_m_sweep_m{m}") or {}).get("drop_seconds") for m in INDEX_M_VALUES}
+    size = {m: fmt_bytes_mb(r.param(f"m{m}_ef_20", "vector_index_tablespace_bytes", None))
+            for m in INDEX_M_VALUES}
+    ms = " / ".join(str(m) for m in INDEX_M_VALUES)
+
+    def per_m(fn: Any, ef: int) -> str:
+        return " / ".join(str(fn(f"m{m}_ef_{ef}")) for m in INDEX_M_VALUES)
+
+    same_vectors = r.identical(f"ef_{EF_LOW}", f"m6_ef_{EF_LOW}")
     reading = (
-        f"Reading: at ef 20 the M=16 and M=32 graphs already return the exact counts of the "
-        f"inline statement (article@10 {r.art('m16_ef_20', 10)} and {r.art('m32_ef_20', 10)}, "
-        f"evidence@20 {r.ev('m16_ef_20', 20)} and {r.ev('m32_ef_20', 20)}), where the M=6 graph "
-        f"gives {r.art('ef_20', 10)} / {r.ev('ef_20', 20)} at ef 20 and {r.art('ef_100', 10)} / "
-        f"{r.ev('ef_100', 20)} at ef 100. Hit lists identical to the exact ranking: M=16 "
-        f"{r.identical('inline_ef_20', 'm16_ef_20')} at ef 20 and "
-        f"{r.identical('inline_ef_20', 'm16_ef_100')} at ef 100, M=32 "
-        f"{r.identical('inline_ef_20', 'm32_ef_20')} and "
-        f"{r.identical('inline_ef_20', 'm32_ef_100')}. p50@10 at ef 20 is {r.p50('ef_20', 10)} "
-        f"(M=6) / {r.p50('m16_ef_20', 10)} (M=16) / {r.p50('m32_ef_20', 10)} (M=32) ms; ADD "
-        f"VECTOR INDEX took {add.get(6)} / {add.get(16)} / {add.get(32)} s and the graph "
-        f"tablespace is {size.get(6)} / {size.get(16)} / {size.get(32)}. The M=6 index rebuilt "
-        f"by ALTER TABLE does not reproduce `stability_512mb_run1`: "
-        f"{r.identical(STABILITY_512_RUNS[0], 'm6_rebuilt_ef_20')} identical hit lists, article "
-        f"recall@10 {r.art('m6_rebuilt_ef_20', 10)} against {r.art(STABILITY_512_RUNS[0], 10)}; "
-        f"every build of an M=6 graph is a different approximation of the same vectors "
-        f"(`final_state_ef_20` in section 7 is a third one, identical to the rebuilt one for "
-        f"{r.identical('final_state_ef_20', 'm6_rebuilt_ef_20')} claims)."
+        f"Reading: ADD VECTOR INDEX took {' / '.join(str(add[m]) for m in INDEX_M_VALUES)} s for "
+        f"M {ms} (DROP INDEX {' / '.join(str(drop[m]) for m in INDEX_M_VALUES)} s) and the graph "
+        f"tablespace is {' / '.join(size[m] for m in INDEX_M_VALUES)}. At ef 20 article recall@10 "
+        f"is {per_m(lambda n: r.art(n, 10), 20)} and evidence recall@20 "
+        f"{per_m(lambda n: r.ev(n, 20), 20)} against {r.art(EXACT_OLD, 10)} / {r.ev(EXACT_OLD, 20)} "
+        f"for the exact ranking; at ef 100 {per_m(lambda n: r.art(n, 10), 100)} and "
+        f"{per_m(lambda n: r.ev(n, 20), 100)}. Hit lists identical to the exact ranking: "
+        f"{per_m(lambda n: r.identical(EXACT_OLD, n), 20)} at ef 20 and "
+        f"{per_m(lambda n: r.identical(EXACT_OLD, n), 100)} at ef 100, for SQL p50@10 "
+        f"{per_m(lambda n: r.p50(n, 10), 20)} ms at ef 20 and {per_m(lambda n: r.p50(n, 10), 100)} "
+        f"ms at ef 100. The M=6 graph built here and the M=6 graph of section 2 (the same "
+        f"vectors, `ef_20`) give identical hit lists for {same_vectors} claims: every build of "
+        f"an M=6 graph is another approximation."
     )
     parts += [reading, ""]
     return parts
 
 
+CHUNK_ALIGNMENT: tuple[tuple[int, tuple[tuple[str, int] | None, ...]], ...] = (
+    (2400, (("chunk60_ef_100", 40), ("chunk120_ef_100", 20), ("chunk240_ef_100", 10))),
+    (1200, (("chunk60_ef_100", 20), ("chunk120_ef_100", 10), ("chunk240_ef_100", 5))),
+    (720, (None, None, ("chunk240_ef_100", 3))),
+    (600, (("chunk60_ef_100", 10), ("chunk120_ef_100", 5), None)),
+    (480, (None, None, ("chunk240_ef_100", 2))),
+    (360, (("chunk60_ef_100", 6), ("chunk120_ef_100", 3), None)),
+    (240, (None, None, ("chunk240_ef_100", 1))),
+    (120, (("chunk60_ef_100", 2), ("chunk120_ef_100", 1), None)),
+)
+
+
 def summary_chunk_size(r: Results) -> list[str]:
-    parts = [
-        "## 4. Chunk size at equal retrieved text (strategy none, ef 100, overlap 1, prefix on)",
-        "",
-        ("ef 100 for all three chunkings so that the comparison measures the chunking rather than "
-        "the HNSW approximation at the default ef 20. Each chunking has its own ingest and its "
-        "own freshly built M=6 index; the 120-word case is `ef_100` of section 2 (the committed "
-        "ingest), its ingest time is that of the identical re-ingest `restore_defaults` in "
-        "`ingest_runs.json`."),
-        "",
-    ]
-    ingest_rows = []
-    cases = (("chunk60_ef_100", 60, "chunk60"), ("ef_100", 120, "restore_defaults"),
-             ("chunk240_ef_100", 240, "chunk240"))
-    for name, words, label in cases:
-        data = r.get(name)
-        run = r.ingest_run(label)
-        if data is None:
-            ingest_rows.append([words, "not found", "", "", "", "", "", "", ""])
-            continue
-        p = data["parameters"]
-        ingest_rows.append([
-            words, p["n_chunks"], p.get("chunk_words_mean"), p.get("chunk_words_median"),
-            p.get("chunk_words_p95"), p.get("chunk_words_max"),
-            run["seconds"]["total"] if run else "not found",
-            run["seconds"]["embed"] if run else "not found",
-            fmt_bytes_mb(p.get("vector_index_tablespace_bytes")),
-        ])
-    parts += [
-        md_table(("chunk_max_words", "chunks", "words mean", "median", "p95", "max",
-                  "ingest total s", "embed s", "vector tablespace"), ingest_rows),
-        "",
-    ]
-    align = [
-        (1200, ("chunk60_ef_100", 20), ("ef_100", 10), ("chunk240_ef_100", 5)),
-        (720, None, None, ("chunk240_ef_100", 3)),
-        (600, ("chunk60_ef_100", 10), ("ef_100", 5), None),
-        (480, None, None, ("chunk240_ef_100", 2)),
-        (360, ("chunk60_ef_100", 6), ("ef_100", 3), None),
-        (240, None, None, ("chunk240_ef_100", 1)),
-        (120, ("chunk60_ef_100", 2), ("ef_100", 1), None),
-    ]
-    rows = []
-    for words, *cells in align:
-        row: list[Any] = [words]
+    cases = [(name, words, f"chunk{words}") for words, _, name in CHUNK_SIZE_CASES]
+    rows: list[list[Any]] = []
+
+    def per_case(fn: Any) -> list[Any]:
+        return [fn(name, label) for name, _, label in cases]
+
+    rows.append(["chunks", *per_case(lambda n, lb: r.param(n, "n_chunks"))])
+    rows.append(["hatnote units excluded", *per_case(lambda n, lb: r.param(n, "n_units_hatnote"))])
+    rows.append(["words mean / median / p95 / max", *per_case(
+        lambda n, lb: f"{r.param(n, 'chunk_words_mean')} / {r.param(n, 'chunk_words_median')} / "
+                      f"{r.param(n, 'chunk_words_p95')} / {r.param(n, 'chunk_words_max')}")])
+    rows.append(["ingest total s (embed s)", *per_case(
+        lambda n, lb: (f"{r.ingest_run(lb)['seconds']['total']} ({r.ingest_run(lb)['seconds']['embed']})"
+                       if r.ingest_run(lb) else "not found"))])
+    rows.append(["graph tablespace", *per_case(
+        lambda n, lb: fmt_bytes_mb(r.param(n, "vector_index_tablespace_bytes", None)))])
+    for words, cells in CHUNK_ALIGNMENT:
+        row: list[Any] = [f"{words:,} nominal words"]
         for cell in cells:
             if cell is None:
                 row.append("-")
@@ -1440,94 +1776,100 @@ def summary_chunk_size(r: Results) -> list[str]:
                 f"{r.p50(name, k)} ms"
             )
         rows.append(row)
-    parts += [
-        ("Aligned by nominal retrieved words (chunk_max_words x k); the words in brackets are "
-        "k x the mean chunk length actually stored. Each cell: article recall / evidence recall / "
-        "unit coverage / SQL p50."),
+    parts = [
+        "## 4. Chunk size at equal retrieved text (60 / 120 / 240 words, overlap 1, M=16, prefix on; strategy none, ef 100)",
         "",
-        md_table(("nominal words", "60-word chunks", "120-word chunks", "240-word chunks"), rows),
+        ("One fresh ingest per chunk size, each with its own M=16 graph built by the schema. The "
+        "lower rows align the ks by nominal retrieved words (chunk_max_words x k); the words in "
+        "brackets are k x the mean chunk length actually stored. Each cell: article recall / "
+        "evidence recall / unit coverage / SQL p50."),
+        "",
+        md_table(("", "60-word chunks", "120-word chunks", "240-word chunks"), rows),
         "",
     ]
-    if not r.has("chunk60_ef_100", "ef_100", "chunk240_ef_100"):
+    names = [name for name, _, _ in cases]
+    if not r.has(*names):
+        parts += ["Not every file of this group exists yet; the reading is written once they do.", ""]
         return parts
+    ks1200 = (20, 10, 5)
+    art1200 = [r.art_n(n, k) for n, k in zip(names, ks1200)]
+    ev1200 = [r.ev_n(n, k) for n, k in zip(names, ks1200)]
+    spread_art = max(art1200) - min(art1200) if None not in art1200 else "?"
+    spread_ev = max(ev1200) - min(ev1200) if None not in ev1200 else "?"
     reading = (
-        f"Reading: at 1,200 nominal words the three chunkings give article recall "
-        f"{r.art('chunk60_ef_100', 20)} / {r.art('ef_100', 10)} / {r.art('chunk240_ef_100', 5)} "
-        f"and evidence recall {r.ev('chunk60_ef_100', 20)} / {r.ev('ef_100', 10)} / "
-        f"{r.ev('chunk240_ef_100', 5)} (unit coverage {r.cov('chunk60_ef_100', 20)} / "
-        f"{r.cov('ef_100', 10)} / {r.cov('chunk240_ef_100', 5)}) for 60 / 120 / 240 words; at "
-        f"about 600 words, 60x10 gives {r.art('chunk60_ef_100', 10)} / "
-        f"{r.ev('chunk60_ef_100', 10)}, 120x5 {r.art('ef_100', 5)} / {r.ev('ef_100', 5)}, 240x2 "
-        f"(480 words) {r.art('chunk240_ef_100', 2)} / {r.ev('chunk240_ef_100', 2)} and 240x3 "
-        f"(720 words) {r.art('chunk240_ef_100', 3)} / {r.ev('chunk240_ef_100', 3)}. The 240-word "
-        f"chunks are never below the others at equal nominal text although they actually "
-        f"retrieve fewer words (mean chunk {r.param('chunk240_ef_100', 'chunk_words_mean')} "
-        f"words, because sections are short), and the differences of two to three claims are "
-        f"the size of the index-state noise at ef 100 (section 2: `ef_search_100` vs `ef_100` "
-        f"differ by one claim in article recall@10 and three in evidence recall@20). So the chunk "
-        f"size does not move recall at equal retrieved text on this corpus; it moves the cost: "
-        f"{r.param('chunk60_ef_100', 'n_chunks')} / {r.param('ef_100', 'n_chunks')} / "
-        f"{r.param('chunk240_ef_100', 'n_chunks')} vectors, a graph of "
-        f"{fmt_bytes_mb(r.param('chunk60_ef_100', 'vector_index_tablespace_bytes', None))} / "
-        f"{fmt_bytes_mb(r.param('ef_100', 'vector_index_tablespace_bytes', None))} / "
-        f"{fmt_bytes_mb(r.param('chunk240_ef_100', 'vector_index_tablespace_bytes', None))}, "
-        f"and p50 {r.p50('chunk60_ef_100', 20)} / {r.p50('ef_100', 10)} / "
-        f"{r.p50('chunk240_ef_100', 5)} ms for the 1,200-word row."
+        f"Reading: at 1,200 nominal words (k = 20 / 10 / 5) the 60 / 120 / 240-word chunkings give "
+        f"article recall {' / '.join(r.art(n, k) for n, k in zip(names, ks1200))}, evidence recall "
+        f"{' / '.join(r.ev(n, k) for n, k in zip(names, ks1200))} and unit coverage "
+        f"{' / '.join(r.cov(n, k) for n, k in zip(names, ks1200))}, so the chunkings differ by at "
+        f"most {spread_art} claims in article recall and {spread_ev} in evidence recall there; at "
+        f"2,400 words (k = 40 / 20 / 10) {' / '.join(r.art(n, k) for n, k in zip(names, (40, 20, 10)))} "
+        f"and {' / '.join(r.ev(n, k) for n, k in zip(names, (40, 20, 10)))}; at 600 words 60x10 gives "
+        f"{r.art(names[0], 10)} / {r.ev(names[0], 10)} and 120x5 {r.art(names[1], 5)} / "
+        f"{r.ev(names[1], 5)}, with 240x2 (480 words) at {r.art(names[2], 2)} / {r.ev(names[2], 2)} "
+        f"and 240x3 (720 words) at {r.art(names[2], 3)} / {r.ev(names[2], 3)}. The cost side: "
+        f"{' / '.join(str(r.param(n, 'n_chunks')) for n in names)} chunks, a graph of "
+        f"{' / '.join(fmt_bytes_mb(r.param(n, 'vector_index_tablespace_bytes', None)) for n in names)}, "
+        f"ingest {' / '.join(str((r.ingest_run(lb) or {}).get('seconds', {}).get('total', '?')) for _, _, lb in cases)} s, "
+        f"and SQL p50 {' / '.join(r.p50(n, k) for n, k in zip(names, ks1200))} ms for the 1,200-word "
+        f"row. The 240-word chunks retrieve fewer actual words at equal nominal text (mean chunk "
+        f"{r.param(names[2], 'chunk_words_mean')} words against {r.param(names[1], 'chunk_words_mean')} "
+        f"and {r.param(names[0], 'chunk_words_mean')}) because a chunk never crosses a section "
+        f"boundary and many sections are short."
     )
     parts += [reading, ""]
     return parts
 
 
 def summary_prefix(r: Results) -> list[str]:
-    ks = DEFAULT_KS
-    names = [("ef_20", "on", 20), ("noprefix_ef_20", "off", 20), ("ef_100", "on", 100),
-             ("noprefix_ef_100", "off", 100), ("inline_ef_20", "on (exact ranking)", 20)]
+    names = [
+        ("prefix_on_ef_100", "on", "none", 100, "prefix_on_inline"),
+        ("prefix_on_inline", "on", "inline (exact)", 100, "prefix_on_inline"),
+        ("prefix_off_ef_100", "off", "none", 100, "prefix_off_inline"),
+        ("prefix_off_inline", "off", "inline (exact)", 100, "prefix_off_inline"),
+    ]
+    rows = [
+        [n, p, s, r.param(n, "ef_search_effective"), r.art(n, 1), r.art(n, 5), r.art(n, 10),
+         r.art(n, 20), r.ev(n, 5), r.ev(n, 10), r.ev(n, 20), r.cov(n, 10), r.lat(n, 10),
+         r.identical(exact, n)]
+        for n, p, s, _, exact in names
+    ]
     parts = [
-        ("## 5. Embedding prefix \"title > section path: \" on / off (120-word chunks, strategy "
-        "none)"),
+        "## 5. Embedding prefix \"title > section path: \" on / off (120 words, overlap 1, M=16; ef 100)",
         "",
-        ("The no-prefix runs use their own re-ingest and freshly built M=6 index; `inline_ef_20` "
-        "is the exact ranking of the prefixed vectors, for reference."),
+        ("One fresh ingest with the prefix and one without, each evaluated approximately "
+        "(strategy none, ef 100) and exactly (inline, no filters). The last column compares "
+        "each run with the exact ranking of its own vectors."),
         "",
         md_table(
-            ("run", "prefix", "ef", *[f"article@{k}" for k in ks], *[f"evidence@{k}" for k in ks],
-             "coverage@10"),
-            [[n, p, ef, *[r.art(n, k) for k in ks], *[r.ev(n, k) for k in ks], r.cov(n, 10)]
-             for n, p, ef in names],
+            ("run", "prefix", "strategy", "ef", "article@1", "article@5", "article@10",
+             "article@20", "evidence@5", "evidence@10", "evidence@20", "coverage@10",
+             "SQL p50 / p95 @10 ms", "identical to own exact"),
+            rows,
         ),
         "",
     ]
-    if not r.has(*[n for n, _, _ in names]):
+    if not r.has(*[n for n, *_ in names]):
+        parts += ["Not every file of this group exists yet; the reading is written once they do.", ""]
         return parts
+    on, off = "prefix_on_inline", "prefix_off_inline"
     reading = (
-        f"Reading: without the prefix the counts are equal or higher at every k. At ef 100, "
-        f"article recall@1 is {r.art('noprefix_ef_100', 1)} against {r.art('ef_100', 1)} with "
-        f"the prefix, @10 {r.art('noprefix_ef_100', 10)} against {r.art('ef_100', 10)}, "
-        f"evidence recall@10 {r.ev('noprefix_ef_100', 10)} against {r.ev('ef_100', 10)}, @20 "
-        f"{r.ev('noprefix_ef_100', 20)} against {r.ev('ef_100', 20)}, unit coverage@10 "
-        f"{r.cov('noprefix_ef_100', 10)} against {r.cov('ef_100', 10)}; at ef 20 the gap is "
-        f"wider ({r.art('noprefix_ef_20', 10)} vs {r.art('ef_20', 10)} article@10) but that "
-        f"comparison is confounded by the index state of section 1. Against the exact ranking "
-        f"of the prefixed vectors (`inline_ef_20`: article@10 {r.art('inline_ef_20', 10)}, "
-        f"evidence@10 {r.ev('inline_ef_20', 10)}, @20 {r.ev('inline_ef_20', 20)}) the "
-        f"approximate no-prefix ranking at ef 100 stands at {r.art('noprefix_ef_100', 10)}, "
-        f"{r.ev('noprefix_ef_100', 10)} and {r.ev('noprefix_ef_100', 20)}. The title-and-section "
-        f"prefix therefore buys nothing on these claims, which name their subject in the claim "
-        f"text itself."
+        f"Reading: the exact rankings give, with the prefix, article recall@1 / @10 {r.art(on, 1)} / "
+        f"{r.art(on, 10)} and evidence recall@10 / @20 {r.ev(on, 10)} / {r.ev(on, 20)} (unit "
+        f"coverage@10 {r.cov(on, 10)}); without it {r.art(off, 1)} / {r.art(off, 10)} and "
+        f"{r.ev(off, 10)} / {r.ev(off, 20)} ({r.cov(off, 10)}). So the exact evidence recall@20 with "
+        f"the prefix is {cmp_word(r.ev_n(on, 20), r.ev_n(off, 20))} the one without, by "
+        f"{abs((r.ev_n(on, 20) or 0) - (r.ev_n(off, 20) or 0))} claims, and article recall@10 is "
+        f"{cmp_word(r.art_n(on, 10), r.art_n(off, 10))} it. The approximate runs (M=16, ef 100) "
+        f"give {r.art('prefix_on_ef_100', 10)} / {r.ev('prefix_on_ef_100', 20)} with and "
+        f"{r.art('prefix_off_ef_100', 10)} / {r.ev('prefix_off_ef_100', 20)} without the prefix, "
+        f"with hit lists identical to their exact ranking for "
+        f"{r.identical(on, 'prefix_on_ef_100')} and {r.identical(off, 'prefix_off_ef_100')} claims."
     )
     parts += [reading, ""]
     return parts
 
 
 def summary_filters(r: Results) -> list[str]:
-    parts = [
-        "## 6. Filter strategies (ef 20, k 5 and 10, 120-word chunks, prefix on)",
-        "",
-        ("`queries < k rows` counts, over the 75 claims, the queries that returned fewer than k "
-        "rows (a separate untimed pass of `search()` per claim and k); `no rows` those that "
-        "returned nothing."),
-        "",
-    ]
     rows = []
     truth_by_filter: dict[str, Any] = {}
     for filter_name, _ in FILTER_CASES:
@@ -1535,42 +1877,44 @@ def summary_filters(r: Results) -> list[str]:
             n = f"strategy_{strategy_name}_{filter_name}"
             data = r.get(n)
             if data is None:
-                rows.append([n] + ["not found"] * 10)
+                rows.append([n, filter_name, strategy_name] + ["not found"] * 12)
                 continue
-            truth_by_filter[filter_name] = data["parameters"].get("filter_ground_truth")
+            truth = data["parameters"].get("filter_ground_truth") or {}
+            truth_by_filter[filter_name] = truth
             short = data["parameters"].get("short_results", {})
             rows.append([
-                n, f"{r.p50(n, 5)} / {r.p95(n, 5)}", f"{r.p50(n, 10)} / {r.p95(n, 10)}",
-                short.get("5", {}).get("queries_short_of_k", "-"),
+                n, filter_name, strategy_name,
+                f"{truth.get('n_chunks_passing', '?')} of {truth.get('n_chunks', '?')}",
+                f"{truth.get('article_recall_ceiling', '?')}/{truth.get('n_claims', '?')}",
+                f"{truth.get('evidence_recall_ceiling', '?')}/{truth.get('n_evidence_claims', '?')}",
+                r.art(n, 5), r.art(n, 10), r.art(n, 20), r.ev(n, 10), r.ev(n, 20),
                 short.get("10", {}).get("queries_short_of_k", "-"),
                 short.get("10", {}).get("queries_with_no_rows", "-"),
                 short.get("10", {}).get("rows_mean", "-"),
-                r.art(n, 5), r.art(n, 10), r.ev(n, 5), r.ev(n, 10),
+                r.lat(n, 10),
             ])
-    parts += [
+    parts = [
+        f"## 6. Filter strategies (FINAL: {FINAL.label}; ef 100)",
+        "",
+        ("`min_words >= 1000` (page length) and `heading LIKE '%History%'` (section heading), each "
+        "with the inline statement (predicates joined into the index-driven statement), "
+        "overfetch 10 and overfetch 50 (inner `LIMIT k x factor` by the index, filtered outside). "
+        "`ceiling` is the best value a strategy can reach because the filter itself excludes the "
+        "gold pages or gold sentences of some claims; `queries < 10 rows` / `no rows` count, over "
+        "the claims, the k=10 queries that returned fewer than 10 rows or none (a separate "
+        "untimed pass of `search()`)."),
+        "",
         md_table(
-            ("run", "SQL p50 / p95 @5 ms", "SQL p50 / p95 @10 ms", "queries < 5 rows",
-             "queries < 10 rows", "no rows @10", "rows mean @10", "article@5", "article@10",
-             "evidence@5", "evidence@10"),
+            ("run", "filter", "strategy", "chunks passing", "article ceiling", "evidence ceiling",
+             "article@5", "article@10", "article@20", "evidence@10", "evidence@20",
+             "queries < 10 rows", "no rows @10", "rows mean @10", "SQL p50 / p95 @10 ms"),
             rows,
         ),
         "",
     ]
-    for filter_name, truth in truth_by_filter.items():
-        if not truth:
-            continue
-        parts.append(
-            f"Filter `{filter_name}` ({truth['filter']}): {truth['n_chunks_passing']} of "
-            f"{truth['n_chunks']} chunks pass, on {truth['n_pages_passing']} of 100 pages. The "
-            f"filter itself excludes every gold page of {truth['claims_gold_page_excluded']} of "
-            f"{truth['n_claims']} claims, so article recall can reach at most "
-            f"{truth['article_recall_ceiling']}/{truth['n_claims']}; evidence recall at most "
-            f"{truth['evidence_recall_ceiling']}/{truth['n_evidence_claims']} (a claim's gold "
-            f"sentences must all lie in chunks that pass the filter)."
-        )
-        parts.append("")
     names = [f"strategy_{s}_{f}" for f, _ in FILTER_CASES for s, _, _ in STRATEGY_CASES]
     if not r.has(*names) or len(truth_by_filter) < 2:
+        parts += ["Not every file of this group exists yet; the reading is written once they do.", ""]
         return parts
     t_min = truth_by_filter["minwords1000"]
     t_his = truth_by_filter["history"]
@@ -1578,166 +1922,290 @@ def summary_filters(r: Results) -> list[str]:
     def short(name: str, k: int, key: str = "queries_short_of_k") -> Any:
         return r.get(name)["parameters"]["short_results"][str(k)][key]
 
+    def trio(fn: Any, filter_name: str) -> str:
+        return " / ".join(str(fn(f"strategy_{s}_{filter_name}")) for s, _, _ in STRATEGY_CASES)
+
     reading = (
-        f"Reading: with the non-selective filter (min_words 1000, {t_min['n_chunks_passing']} "
-        f"of {t_min['n_chunks']} chunks pass) every strategy returns k rows for every query and "
-        f"the same article recall ({r.art('strategy_inline_minwords1000', 10)} at k=10, of a "
-        f"ceiling of {t_min['article_recall_ceiling']}); evidence recall@10 is "
-        f"{r.ev('strategy_inline_minwords1000', 10)} inline against "
-        f"{r.ev('strategy_overfetch10_minwords1000', 10)} / "
-        f"{r.ev('strategy_overfetch50_minwords1000', 10)} for overfetch 10 / 50, whose inner "
-        f"index query is approximate at ef 20 while the inline walk is exact. Inline costs "
-        f"{r.p50('strategy_inline_minwords1000', 10)} ms p50 at k=10 against "
-        f"{r.p50('strategy_overfetch10_minwords1000', 10)} ms (overfetch 10) and "
-        f"{r.p50('strategy_overfetch50_minwords1000', 10)} ms (overfetch 50). With the selective "
-        f"filter (heading LIKE '%History%', {t_his['n_chunks_passing']} chunks pass) overfetch "
-        f"10 returns fewer than 10 rows for {short('strategy_overfetch10_history', 10)} of 75 "
-        f"queries ({short('strategy_overfetch10_history', 10, 'queries_with_no_rows')} with no "
-        f"row at all) and overfetch 50 for {short('strategy_overfetch50_history', 10)}, while "
-        f"inline always fills k at {r.p50('strategy_inline_history', 10)} ms p50 / "
-        f"{r.p95('strategy_inline_history', 10)} ms p95 (overfetch 10: "
-        f"{r.p50('strategy_overfetch10_history', 10)} ms, overfetch 50: "
-        f"{r.p50('strategy_overfetch50_history', 10)} ms). Article recall@10 under the History "
-        f"filter is {r.art('strategy_inline_history', 10)} inline, "
-        f"{r.art('strategy_overfetch10_history', 10)} overfetch 10 and "
-        f"{r.art('strategy_overfetch50_history', 10)} overfetch 50, of a ceiling of "
-        f"{t_his['article_recall_ceiling']}; evidence recall is 0 for all because no claim's "
-        f"gold sentences lie in a History section."
+        f"Reading: under min_words >= 1000 ({t_min['n_chunks_passing']} of {t_min['n_chunks']} "
+        f"chunks pass; ceilings {t_min['article_recall_ceiling']}/{t_min['n_claims']} and "
+        f"{t_min['evidence_recall_ceiling']}/{t_min['n_evidence_claims']}) inline / overfetch 10 / "
+        f"overfetch 50 give article recall@10 {trio(lambda n: r.art(n, 10), 'minwords1000')} and "
+        f"evidence recall@20 {trio(lambda n: r.ev(n, 20), 'minwords1000')} at SQL p50@10 "
+        f"{trio(lambda n: r.p50(n, 10), 'minwords1000')} ms, with "
+        f"{trio(lambda n: short(n, 10), 'minwords1000')} queries short of 10 rows. Under heading "
+        f"LIKE '%History%' ({t_his['n_chunks_passing']} chunks pass; ceilings "
+        f"{t_his['article_recall_ceiling']}/{t_his['n_claims']} and "
+        f"{t_his['evidence_recall_ceiling']}/{t_his['n_evidence_claims']}) they give "
+        f"{trio(lambda n: r.art(n, 10), 'history')} and {trio(lambda n: r.ev(n, 20), 'history')} at "
+        f"{trio(lambda n: r.p50(n, 10), 'history')} ms, and overfetch 10 returned fewer than 10 rows "
+        f"for {short('strategy_overfetch10_history', 10)} of {t_his['n_claims']} queries "
+        f"({short('strategy_overfetch10_history', 10, 'queries_with_no_rows')} with no row), "
+        f"overfetch 50 for {short('strategy_overfetch50_history', 10)}, inline for "
+        f"{short('strategy_inline_history', 10)}. The inline statement's cost is the exact ranking "
+        f"over the index plus the walk until k rows pass the predicates (p95@10 "
+        f"{r.p95('strategy_inline_history', 10)} ms under the History filter against "
+        f"{r.p95('strategy_inline_minwords1000', 10)} ms under min_words), so it grows with the "
+        f"table and with the selectivity of the filter."
+    )
+    parts += [reading, ""]
+    return parts
+
+
+def summary_final(r: Results) -> list[str]:
+    h = FINAL_HEADLINE
+    parts = [
+        f"## 7. Final configuration ({FINAL.label}; the fresh ingest of the defaults)",
+        "",
+        (f"Headline run `{h}`: strategy none (the bare index query joined back to `page` and "
+        f"`section`), ef 100, {r.param(h, 'n_chunks')} chunks ({r.param(h, 'n_units_hatnote')} "
+        "hatnote units excluded), M=16, 512 MB cache. Query embedding p50 is the time of one "
+        "`embed_queries([claim])` call on the GPU and does not depend on k."),
+        "",
+        md_table(
+            ("k", "article recall", "evidence recall", "unit coverage", "SQL p50 ms", "SQL p95 ms",
+             "query embedding p50 ms"),
+            [[k, f"{r.art(h, k)} ({(r.art_n(h, k) or 0) / (r.get(h) or {}).get('n_claims', 1):.3f})"
+              if r.get(h) else "not found",
+              f"{r.ev(h, k)} ({(r.ev_n(h, k) or 0) / (r.get(h) or {}).get('n_evidence_claims', 1):.3f})"
+              if r.get(h) else "not found",
+              r.cov(h, k), r.p50(h, k), r.p95(h, k), r.emb_p50(h)]
+             for k in DEFAULT_KS],
+        ),
+        "",
+        ("The other runs of the group on the same ingest (`final_inline` is the exact ranking and "
+        "the reference of the last column; `final_oracle_titles` restricts the inline statement "
+        "to the claim's gold page with the `titles` filter, so its evidence recall says at which "
+        "rank the gold sentences surface once the page is known; the `*_after_restart` runs "
+        "repeat the two approximate runs after `docker compose restart`):"),
+        "",
+    ]
+    runs = [
+        (h, "none, ef 100", True), (FINAL_EF_20, "none, ef 20", True),
+        (FINAL_EXACT, "inline (exact), ef 100", True),
+        (FINAL_RRF, f"rrf (overfetch {OVERFETCH_DEFAULT}), ef 100", False),
+        (FINAL_ORACLE, "inline + gold page as titles filter, ef 100", False),
+        (FINAL_AFTER[h], "none, ef 100, after restart", True),
+        (FINAL_AFTER[FINAL_EF_20], "none, ef 20, after restart", True),
+    ]
+    parts += [
+        md_table(
+            ("run", "strategy", "article@1", "article@5", "article@10", "article@20", "evidence@1",
+             "evidence@5", "evidence@10", "evidence@20", "coverage@10", "SQL p50 / p95 @10 ms",
+             "identical to exact"),
+            [[n, s, r.art(n, 1), r.art(n, 5), r.art(n, 10), r.art(n, 20), r.ev(n, 1), r.ev(n, 5),
+              r.ev(n, 10), r.ev(n, 20), r.cov(n, 10), r.lat(n, 10),
+              r.identical(FINAL_EXACT, n) if comparable else "- (other order by construction)"]
+             for n, s, comparable in runs],
+        ),
+        "",
+    ]
+    comp = r.get("final_restart_comparison")
+    if comp is not None:
+        rows = []
+        for key in (f"{h}_vs_{FINAL_AFTER[h]}", f"{FINAL_EF_20}_vs_{FINAL_AFTER[FINAL_EF_20]}"):
+            c = comp["comparisons"].get(key)
+            if c is None:
+                continue
+            before = c["reference"]
+            per_k = comp["per_k"].get(before, {})
+            for name, run in c["runs"].items():
+                rows.append([
+                    before, name, f"{run['identical_sequence']}/{c['n_claims']}",
+                    f"{run['identical_set']}/{c['n_claims']}",
+                    f"{r.art(before, 10)} -> {r.art(name, 10)}",
+                    f"{r.ev(before, 20)} -> {r.ev(name, 20)}",
+                    len(per_k.get("gold_page_lost_after_restart", [])),
+                    len(per_k.get("gold_page_gained_after_restart", [])),
+                    ", ".join(map(str, run["differing_claims"])) or "none",
+                ])
+        parts += [
+            "Restart comparison (`final_restart_comparison.md`), 20 hit chunk ids per claim:",
+            "",
+            md_table(
+                ("before", "after", "identical (sequence)", "identical (set)", "article@10",
+                 "evidence@20", "gold page lost", "gold page gained", "claims that differ"),
+                rows,
+            ),
+            "",
+        ]
+    if not r.has(*FINAL_RUNS, "final_restart_comparison"):
+        parts += ["Not every file of this group exists yet; the reading is written once they do.", ""]
+        return parts
+    c100 = comp["comparisons"][f"{h}_vs_{FINAL_AFTER[h]}"]["runs"][FINAL_AFTER[h]]["identical_sequence"]
+    c20 = comp["comparisons"][f"{FINAL_EF_20}_vs_{FINAL_AFTER[FINAL_EF_20]}"]["runs"][
+        FINAL_AFTER[FINAL_EF_20]]["identical_sequence"]
+    n = comp["comparisons"][f"{h}_vs_{FINAL_AFTER[h]}"]["n_claims"]
+    reading = (
+        f"Reading: the headline run reaches article recall {r.art(h, 1)} / {r.art(h, 5)} / "
+        f"{r.art(h, 10)} / {r.art(h, 20)} at k 1 / 5 / 10 / 20 and evidence recall {r.ev(h, 1)} / "
+        f"{r.ev(h, 5)} / {r.ev(h, 10)} / {r.ev(h, 20)}, at SQL p50 / p95 {r.lat(h, 10)} ms for k=10 "
+        f"and query embedding p50 {r.emb_p50(h)} ms; its article recall@10 is "
+        f"{cmp_word(r.art_n(h, 10), r.art_n(FINAL_EXACT, 10))} the exact ranking's "
+        f"({r.art(FINAL_EXACT, 10)}) and its evidence recall@20 "
+        f"{cmp_word(r.ev_n(h, 20), r.ev_n(FINAL_EXACT, 20))} it ({r.ev(FINAL_EXACT, 20)}), with hit "
+        f"lists identical to the exact ones for {r.identical(FINAL_EXACT, h)} claims "
+        f"({r.identical(FINAL_EXACT, FINAL_EF_20)} at ef 20) where the exact statement costs "
+        f"{r.p50(FINAL_EXACT, 10)} ms p50. The rrf hybrid gives article recall@10 "
+        f"{r.art(FINAL_RRF, 10)} and evidence recall@20 {r.ev(FINAL_RRF, 20)} at {r.p50(FINAL_RRF, 10)} "
+        f"ms p50, {cmp_word(r.art_n(FINAL_RRF, 10), r.art_n(h, 10))} the vector ranking alone in "
+        f"article recall@10 and {cmp_word(r.ev_n(FINAL_RRF, 20), r.ev_n(h, 20))} it in evidence "
+        f"recall@20; with the gold page known (oracle) the gold sentences are inside the first chunk "
+        f"for {r.ev(FINAL_ORACLE, 1)} claims, within 5 for {r.ev(FINAL_ORACLE, 5)} and within 20 for "
+        f"{r.ev(FINAL_ORACLE, 20)}, at {r.lat(FINAL_ORACLE, 10)} ms. After the container restart the "
+        f"hit lists at ef 100 are identical to the pre-restart ones for {c100} of {n} claims "
+        f"(article recall@10 {r.art(h, 10)} -> {r.art(FINAL_AFTER[h], 10)}, evidence recall@20 "
+        f"{r.ev(h, 20)} -> {r.ev(FINAL_AFTER[h], 20)}) and at ef 20 for {c20} of {n} "
+        f"({r.art(FINAL_EF_20, 10)} -> {r.art(FINAL_AFTER[FINAL_EF_20], 10)}, {r.ev(FINAL_EF_20, 20)} "
+        f"-> {r.ev(FINAL_AFTER[FINAL_EF_20], 20)}), against {r.identical(STABILITY_512_RUNS[0], AFTER_RESTART)} "
+        f"identical hit lists across the restart of the M=6 index in section 1."
     )
     parts += [reading, ""]
     return parts
 
 
 def summary_restore(r: Results) -> list[str]:
-    ks = DEFAULT_KS
-    parts = ["## 7. Restored default state (120 words, overlap 1, prefix on, M=6, ef 20)", ""]
-    names = ["baseline", "stability_512mb_run1", "ef_20", "m6_rebuilt_ef_20", "final_state_ef_20"]
+    state = r.get(RESTORE_STATE)
+    parts = [f"## 8. Restored default state ({FINAL.label}; a fresh `run_ingest` with the defaults)", ""]
+    if state is None:
+        parts += ["`restore_state.json` not found.", ""]
+        return parts
     parts += [
-        md_table(
-            ("run", "index built", "cache", *[f"article@{k}" for k in ks],
-             *[f"evidence@{k}" for k in ks], "SQL p50@10 ms"),
-            [
-                [n, (r.get(n) or {}).get("ingest_meta", {}).get("ingested_at", "not found"),
-                 _cache_cell(r, n), *[r.art(n, k) for k in ks], *[r.ev(n, k) for k in ks],
-                 r.p50(n, 10)]
-                for n in names
-            ],
-        ),
+        md_table(("check", "expected", "found", "ok"),
+                 [(c["item"], c["expected"], c["found"], "yes" if c["ok"] else "NO")
+                  for c in state["checks"]]),
         "",
     ]
-    final = r.get("final_state_ef_20")
-    if final is None:
-        return parts
-    p = final["parameters"]
-    report = p.get("ingest_report") or {}
-    differences = p.get("ingest_meta_differences")
+    info = state["ingest_run"]
     reading = (
-        f"Reading: the final re-ingest ({report.get('counts', {}).get('n_chunks', '?')} chunks, "
-        f"{report.get('seconds', {}).get('total', '?')} s) left `ingest_meta` "
-        f"{'identical to' if p.get('ingest_meta_matches_baseline') else 'different from'} the "
-        f"committed baseline's parameters (ingested_at excepted"
-        + (f"; differences: {differences}" if differences else "")
-        + f"), the vector index at M={p.get('vector_index_m')} and mhnsw_max_cache_size at "
-        f"{p.get('mhnsw_max_cache_size')} bytes. The freshly built index gives article recall@10 "
-        f"{r.art('final_state_ef_20', 10)} and evidence recall@20 {r.ev('final_state_ef_20', 20)} "
-        f"at ef 20, against {r.art('baseline', 10)} / {r.ev('baseline', 20)} for the committed "
-        f"baseline's index and {r.art('ef_20', 10)} / {r.ev('ef_20', 20)} for the same index "
-        f"after the restart; its hit lists are identical to the committed baseline's for "
-        f"{r.identical('final_state_ef_20', 'baseline')} claims. Same parameters, another HNSW "
-        f"graph (section 3): at ef 20 and M=6 the numbers a reader reproduces will differ from "
-        f"these by a few claims."
+        f"Reading: the last ingest ({info['counts']['n_chunks']} chunks, {info['n_units_hatnote']} "
+        f"hatnote units excluded, {info['seconds']['total']} s of which {info['seconds']['embed']} s "
+        f"embedding) {'passed every check' if state['all_ok'] else 'FAILED a check'}: `ingest_meta` "
+        f"holds the defaults, the vector index is M={state['vector_index'].get('m')} "
+        f"DISTANCE={state['vector_index'].get('distance')} and mhnsw_max_cache_size is "
+        f"{state['mhnsw_max_cache_size']} bytes. This is the state `wikilense ingest` produces, so "
+        f"`wikilense eval` on it reproduces section 7 up to the HNSW build (a fresh graph)."
     )
     parts += [reading, ""]
     return parts
 
 
-def summary_recommendations(r: Results) -> list[str]:
-    parts = ["## Recommended defaults", ""]
-    need = ("ef_20", "ef_100", "ef_200", "ef_400", "inline_ef_20", "m16_ef_20", "m16_ef_100",
-            "m32_ef_20", "m32_ef_100", "chunk60_ef_100", "chunk240_ef_100", "noprefix_ef_100",
-            "strategy_inline_history", "strategy_overfetch10_history",
-            "strategy_overfetch50_history", "strategy_inline_minwords1000",
-            "strategy_overfetch10_minwords1000", "stability_comparison", "index_m_rebuild")
+def summary_defaults(r: Results) -> list[str]:
+    parts = ["## Chosen defaults and evidence", ""]
+    need = (*[f"m{m}_ef_{ef}" for m in INDEX_M_VALUES for ef in INDEX_M_EFS], EXACT_OLD,
+            "ef_20", "ef_100", "ef_400", "chunk60_ef_100", "chunk120_ef_100", "chunk240_ef_100",
+            "prefix_on_inline", "prefix_off_inline", "strategy_inline_history",
+            "strategy_overfetch10_history", "strategy_overfetch50_history",
+            "strategy_inline_minwords1000", "strategy_overfetch10_minwords1000",
+            "stability_comparison", "final_restart_comparison", *FINAL_RUNS)
     missing = [n for n in need if r.get(n) is None]
     if missing:
         parts += [
-            (f"Not all groups have run yet (missing: {', '.join(missing)}); the recommendations "
-            "are written once every result file exists."),
+            (f"Not all groups have run yet (missing: {', '.join(missing)}); this section is written "
+             "once every result file exists."),
             "",
         ]
         return parts
     comp = r.get("stability_comparison")["comparisons"]
-    rebuild = {b["m"]: b for b in r.get("index_m_rebuild")["rebuilds"]}
+    fcomp = r.get("final_restart_comparison")["comparisons"]
+    h = FINAL_HEADLINE
+    add = {m: (r.rebuild(f"index_m_sweep_m{m}") or {}).get("add_seconds") for m in INDEX_M_VALUES}
+    size = {m: fmt_bytes_mb(r.param(f"m{m}_ef_20", "vector_index_tablespace_bytes", None))
+            for m in INDEX_M_VALUES}
+    names = ["chunk60_ef_100", "chunk120_ef_100", "chunk240_ef_100"]
+    c100 = fcomp[f"{h}_vs_{FINAL_AFTER[h]}"]["runs"][FINAL_AFTER[h]]["identical_sequence"]
+    c20 = fcomp[f"{FINAL_EF_20}_vs_{FINAL_AFTER[FINAL_EF_20]}"]["runs"][FINAL_AFTER[FINAL_EF_20]][
+        "identical_sequence"]
+    short10 = r.get("strategy_overfetch10_history")["parameters"]["short_results"]["10"]["queries_short_of_k"]
+    short50 = r.get("strategy_overfetch50_history")["parameters"]["short_results"]["10"]["queries_short_of_k"]
+    reach_exact = ", ".join(
+        str(m) for m in INDEX_M_VALUES
+        if r.art_n(f"m{m}_ef_20", 10) == r.art_n(EXACT_OLD, 10)
+        and r.ev_n(f"m{m}_ef_20", 20) == r.ev_n(EXACT_OLD, 20)
+    )
     parts += [
-        ("The current defaults are the provisional ones of docs/DESIGN.md (M=6, ef_search 20, "
-        "120-word chunks, prefix on, strategy inline, 512 MB cache). What the numbers say:"),
+        ("The defaults in the code are `sql/schema.sql` M=16, `Settings.ef_search` 100, "
+        "`chunk_max_words` 240 with `chunk_overlap_units` 1, the embedding prefix on, "
+        "`search()` strategy `inline` for filtered queries and `mhnsw_max_cache_size` 512 MB in "
+        "docker-compose.yml. The evidence, section by section:"),
         "",
-        (f"- **Index M = 16** (sql/schema.sql, currently M=6). At ef 20 the M=16 graph returns the "
-        f"exact ranking's counts, article recall@10 {r.art('m16_ef_20', 10)} and evidence "
-        f"recall@20 {r.ev('m16_ef_20', 20)}, at p50@10 {r.p50('m16_ef_20', 10)} ms, where M=6 "
-        f"gives {r.art('ef_20', 10)} / {r.ev('ef_20', 20)} at {r.p50('ef_20', 10)} ms and needs "
-        f"ef 200 to 400 ({r.art('ef_200', 10)} / {r.ev('ef_200', 20)} at {r.p50('ef_200', 10)} "
-        f"ms, {r.art('ef_400', 10)} / {r.ev('ef_400', 20)} at {r.p50('ef_400', 10)} ms) to get "
-        f"there. M=32 adds nothing ({r.art('m32_ef_20', 10)} / {r.ev('m32_ef_20', 20)} at "
-        f"{r.p50('m32_ef_20', 10)} ms) and costs {rebuild[32]['add_seconds']} s to build against "
-        f"{rebuild[16]['add_seconds']} s for M=16 and {rebuild[6]['add_seconds']} s for M=6; the "
-        f"graph tablespace is {fmt_bytes_mb(rebuild[6]['vector_index_tablespace_bytes'])} / "
-        f"{fmt_bytes_mb(rebuild[16]['vector_index_tablespace_bytes'])} / "
-        f"{fmt_bytes_mb(rebuild[32]['vector_index_tablespace_bytes'])} for M 6 / 16 / 32 "
-        f"(section 3)."),
-        (f"- **mhnsw_ef_search = 100** per query (`search(ef_search=100)`), with M=16. At M=16 "
-        f"ef 100 keeps the exact counts ({r.art('m16_ef_100', 10)} / {r.ev('m16_ef_100', 20)}) "
-        f"and brings the hit lists closer to the exact ranking "
-        f"({r.identical('inline_ef_20', 'm16_ef_100')} identical claims against "
-        f"{r.identical('inline_ef_20', 'm16_ef_20')} at ef 20) for {r.p50('m16_ef_100', 10)} "
-        f"instead of {r.p50('m16_ef_20', 10)} ms p50@10; on the M=6 index ef 100 is also where "
-        f"recall stops depending strongly on the index state (section 1 and 2: "
-        f"{r.identical('ef_search_100', 'ef_100')} identical hit lists between two states at "
-        f"ef 100 against {r.identical('baseline', 'ef_20')} at ef 20). If M stays 6, use ef 200 "
-        f"({r.art('ef_200', 10)} / {r.ev('ef_200', 20)}, {r.p50('ef_200', 10)} ms)."),
-        (f"- **chunk_max_words = 240, overlap 1** (currently 120). At equal retrieved text the "
-        f"240-word chunks are never below the others (1,200 nominal words: article "
-        f"{r.art('chunk60_ef_100', 20)} / {r.art('ef_100', 10)} / {r.art('chunk240_ef_100', 5)}, "
-        f"evidence {r.ev('chunk60_ef_100', 20)} / {r.ev('ef_100', 10)} / "
-        f"{r.ev('chunk240_ef_100', 5)} for 60 / 120 / 240; 480 to 600 words: "
-        f"{r.ev('chunk60_ef_100', 10)} / {r.ev('ef_100', 5)} / {r.ev('chunk240_ef_100', 2)}), "
-        f"the differences are within the index-state noise, and 240 halves the vectors "
-        f"({r.param('chunk240_ef_100', 'n_chunks')} against {r.param('ef_100', 'n_chunks')}), "
-        f"the graph ({fmt_bytes_mb(r.param('chunk240_ef_100', 'vector_index_tablespace_bytes', None))} "
-        f"against {fmt_bytes_mb(r.param('ef_100', 'vector_index_tablespace_bytes', None))}) and "
-        f"the rows per query (section 4). 120 remains defensible when a shorter passage is "
-        f"wanted for display: the recall difference is not measurable on this corpus."),
-        (f"- **Prefix off** (currently on). The prefix gives no measurable gain: at ef 100 the "
-        f"no-prefix vectors reach article recall@1 {r.art('noprefix_ef_100', 1)}, @10 "
-        f"{r.art('noprefix_ef_100', 10)}, evidence recall@10 {r.ev('noprefix_ef_100', 10)}, @20 "
-        f"{r.ev('noprefix_ef_100', 20)} against {r.art('ef_100', 1)}, {r.art('ef_100', 10)}, "
-        f"{r.ev('ef_100', 10)}, {r.ev('ef_100', 20)} with the prefix, and they match the exact "
-        f"ranking of the prefixed vectors ({r.art('inline_ef_20', 10)}, "
-        f"{r.ev('inline_ef_20', 10)}, {r.ev('inline_ef_20', 20)}) although they are themselves "
-        f"approximate (section 5). One re-ingest each; confirm with an inline (exact) run on a "
-        f"no-prefix index before the README states it."),
-        (f"- **Filtered queries: strategy inline** (the current default of `search()`). It always "
-        f"fills k: under the selective History filter overfetch 10 returned fewer than 10 rows "
-        f"for {r.get('strategy_overfetch10_history')['parameters']['short_results']['10']['queries_short_of_k']} "
-        f"of 75 queries and overfetch 50 for "
-        f"{r.get('strategy_overfetch50_history')['parameters']['short_results']['10']['queries_short_of_k']}, "
-        f"inline for 0, at p50@10 {r.p50('strategy_inline_history', 10)} ms (p95 "
+        (f"- **Index M = 16.** On the same vectors (section 3) the M=6 / 16 / 32 graphs give "
+        f"article recall@10 {r.art('m6_ef_20', 10)} / {r.art('m16_ef_20', 10)} / "
+        f"{r.art('m32_ef_20', 10)} and evidence recall@20 {r.ev('m6_ef_20', 20)} / "
+        f"{r.ev('m16_ef_20', 20)} / {r.ev('m32_ef_20', 20)} at ef 20, against "
+        f"{r.art(EXACT_OLD, 10)} / {r.ev(EXACT_OLD, 20)} for the exact ranking; at ef 100, the "
+        f"default it is paired with, {r.art('m6_ef_100', 10)} / {r.art('m16_ef_100', 10)} / "
+        f"{r.art('m32_ef_100', 10)} and {r.ev('m6_ef_100', 20)} / {r.ev('m16_ef_100', 20)} / "
+        f"{r.ev('m32_ef_100', 20)}, with "
+        f"{r.identical(EXACT_OLD, 'm6_ef_100')} / {r.identical(EXACT_OLD, 'm16_ef_100')} / "
+        f"{r.identical(EXACT_OLD, 'm32_ef_100')} hit lists identical to the exact ranking; the builds "
+        f"took {add[6]} / {add[16]} / {add[32]} s and the graphs are {size[6]} / {size[16]} / "
+        f"{size[32]}. The M values whose article recall@10 and evidence recall@20 at ef 20 equal "
+        f"the exact ranking's: {reach_exact or 'none'}; M=32 builds in {add[32]} s against "
+        f"{add[16]} s for M=16 and moves article recall@10 by "
+        f"{abs((r.art_n('m32_ef_100', 10) or 0) - (r.art_n('m16_ef_100', 10) or 0))} claims and "
+        f"evidence recall@20 by "
+        f"{abs((r.ev_n('m32_ef_100', 20) or 0) - (r.ev_n('m16_ef_100', 20) or 0))} at ef 100."),
+        (f"- **mhnsw_ef_search = 100 per query.** On the M=6 graph (section 2) ef 20 / 100 / 400 "
+        f"give article recall@10 {r.art('ef_20', 10)} / {r.art('ef_100', 10)} / {r.art('ef_400', 10)} "
+        f"and evidence recall@20 {r.ev('ef_20', 20)} / {r.ev('ef_100', 20)} / {r.ev('ef_400', 20)} "
+        f"for p50@10 {r.p50('ef_20', 10)} / {r.p50('ef_100', 10)} / {r.p50('ef_400', 10)} ms. On "
+        f"the M=16 graph ef 100 makes {r.identical(EXACT_OLD, 'm16_ef_100')} hit lists identical "
+        f"to the exact ranking against {r.identical(EXACT_OLD, 'm16_ef_20')} at ef 20 (section 3), "
+        f"and on the final ingest (section 7) {r.identical(FINAL_EXACT, h)} against "
+        f"{r.identical(FINAL_EXACT, FINAL_EF_20)}, for p50@10 {r.p50(h, 10)} against "
+        f"{r.p50(FINAL_EF_20, 10)} ms; across the restart {c100} hit lists stayed identical at "
+        f"ef 100 against {c20} at ef 20."),
+        (f"- **chunk_max_words = 240, overlap 1.** At 1,200 nominal words (section 4) the 60 / 120 "
+        f"/ 240-word chunkings give article recall {r.art(names[0], 20)} / {r.art(names[1], 10)} / "
+        f"{r.art(names[2], 5)} and evidence recall {r.ev(names[0], 20)} / {r.ev(names[1], 10)} / "
+        f"{r.ev(names[2], 5)}, at 2,400 words {r.art(names[0], 40)} / {r.art(names[1], 20)} / "
+        f"{r.art(names[2], 10)} and {r.ev(names[0], 40)} / {r.ev(names[1], 20)} / "
+        f"{r.ev(names[2], 10)}; 240 words store {r.param(names[2], 'n_chunks')} vectors against "
+        f"{r.param(names[1], 'n_chunks')} and {r.param(names[0], 'n_chunks')}, a graph of "
+        f"{fmt_bytes_mb(r.param(names[2], 'vector_index_tablespace_bytes', None))} against "
+        f"{fmt_bytes_mb(r.param(names[1], 'vector_index_tablespace_bytes', None))} and "
+        f"{fmt_bytes_mb(r.param(names[0], 'vector_index_tablespace_bytes', None))}, and SQL p50 "
+        f"{r.p50(names[2], 5)} against {r.p50(names[1], 10)} and {r.p50(names[0], 20)} ms for the "
+        f"1,200-word row."),
+        (f"- **Embedding prefix on.** The exact rankings (section 5) give evidence recall@20 "
+        f"{r.ev('prefix_on_inline', 20)} with the prefix and {r.ev('prefix_off_inline', 20)} "
+        f"without, article recall@10 {r.art('prefix_on_inline', 10)} against "
+        f"{r.art('prefix_off_inline', 10)}, unit coverage@10 {r.cov('prefix_on_inline', 10)} "
+        f"against {r.cov('prefix_off_inline', 10)}: with the prefix, evidence recall@20 is "
+        f"{cmp_word(r.ev_n('prefix_on_inline', 20), r.ev_n('prefix_off_inline', 20))} the value "
+        f"without it."),
+        (f"- **Filtered queries: strategy inline; overfetch when latency matters more than a full "
+        f"result.** Under the selective History filter (section 6) overfetch 10 returned fewer "
+        f"than 10 rows for {short10} of 75 queries and overfetch 50 for {short50}, inline for "
+        f"{r.get('strategy_inline_history')['parameters']['short_results']['10']['queries_short_of_k']}, "
+        f"at p50@10 {r.p50('strategy_inline_history', 10)} ms (p95 "
         f"{r.p95('strategy_inline_history', 10)} ms) against "
         f"{r.p50('strategy_overfetch10_history', 10)} / {r.p50('strategy_overfetch50_history', 10)} "
-        f"ms. For a non-selective filter overfetch 10 gives the same article recall for "
-        f"{r.p50('strategy_overfetch10_minwords1000', 10)} ms instead of "
-        f"{r.p50('strategy_inline_minwords1000', 10)} ms, so it is the option when latency "
-        f"matters more than a full result (section 6). The inline walk grows with the table "
-        f"(docs/DESIGN.md: 24 ms on 12,000 random chunks), which is the number to watch when "
-        f"the corpus is scaled."),
-        (f"- **mhnsw_max_cache_size = 512 MB** (docker-compose.yml, kept). The cache size did not "
-        f"change a single hit list ({comp['after_restart_vs_16mb']['runs'][STABILITY_16_RUNS[0]]['identical_sequence']} of {comp['after_restart_vs_16mb']['n_claims']} hit lists identical "
-        f"between 512 MB and 16 MB within one server process); the container restart did "
-        f"({comp['after_restart_vs_512mb']['runs'][AFTER_RESTART]['identical_sequence']} of 75 "
-        f"identical, section 1). 512 MB is kept for capacity: the 8,868-chunk graph is already "
-        f"{fmt_bytes_mb(r.param('ef_100', 'vector_index_tablespace_bytes', None))} on disk, the "
-        f"16 MB default would not hold a larger corpus. The restart effect is an open point for "
-        f"the README: results at ef 20 / M=6 are reproducible only within one server process."),
+        f"ms; under the non-selective min_words filter the three give article recall@10 "
+        f"{r.art('strategy_inline_minwords1000', 10)} / "
+        f"{r.art('strategy_overfetch10_minwords1000', 10)} / "
+        f"{r.art('strategy_overfetch50_minwords1000', 10)} at "
+        f"{r.p50('strategy_inline_minwords1000', 10)} / "
+        f"{r.p50('strategy_overfetch10_minwords1000', 10)} / "
+        f"{r.p50('strategy_overfetch50_minwords1000', 10)} ms."),
+        (f"- **rrf hybrid: available, not the default.** On the final ingest (section 7) rrf gives "
+        f"article recall@10 {r.art(FINAL_RRF, 10)} and evidence recall@20 {r.ev(FINAL_RRF, 20)} "
+        f"against {r.art(h, 10)} / {r.ev(h, 20)} for the vector ranking alone, at p50@10 "
+        f"{r.p50(FINAL_RRF, 10)} against {r.p50(h, 10)} ms; on the OLD ingest (section 2) "
+        f"{r.art(RRF_OLD, 10)} / {r.ev(RRF_OLD, 20)} against {r.art('ef_100', 10)} / "
+        f"{r.ev('ef_100', 20)} at {r.p50(RRF_OLD, 10)} against {r.p50('ef_100', 10)} ms."),
+        (f"- **mhnsw_max_cache_size = 512 MB, for capacity.** Within one server process the cache "
+        f"size changed nothing (section 1: "
+        f"{comp['after_restart_vs_16mb']['runs'][STABILITY_16_RUNS[0]]['identical_sequence']} of "
+        f"{comp['after_restart_vs_16mb']['n_claims']} hit lists identical between 512 MB and 16 MB), "
+        f"while the container restart changed "
+        f"{comp['after_restart_vs_512mb']['n_claims'] - comp['after_restart_vs_512mb']['runs'][AFTER_RESTART]['identical_sequence']} "
+        f"of {comp['after_restart_vs_512mb']['n_claims']} hit lists on the M=6 graph and "
+        f"{fcomp[f'{h}_vs_{FINAL_AFTER[h]}']['n_claims'] - c100} of "
+        f"{fcomp[f'{h}_vs_{FINAL_AFTER[h]}']['n_claims']} on the M=16 graph at ef 100. The graph of "
+        f"the final ingest is {fmt_bytes_mb(r.param(h, 'vector_index_tablespace_bytes', None))} on "
+        f"disk and the 120-word ingest's {fmt_bytes_mb(r.param('ef_100', 'vector_index_tablespace_bytes', None))}, "
+        f"already the size of the 16 MB server default."),
         "",
     ]
     return parts
@@ -1761,6 +2229,7 @@ GROUPS = {
     "chunk_size": group_chunk_size,
     "prefix": group_prefix,
     "filters": group_filters,
+    "final": group_final,
     "restore": group_restore,
     "summary": group_summary,
 }
@@ -1776,8 +2245,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("groups", nargs="+", choices=[*PROTOCOL_ORDER, "all"], metavar="GROUP")
     parser.add_argument("--out", type=Path, default=DEFAULT_RESULTS_DIR,
                         help="results directory (default results/)")
-    parser.add_argument("--repeats", type=int, default=5,
-                        help="timed passes per claim after one warm-up (default 5)")
+    parser.add_argument("--repeats", type=int, default=DEFAULT_REPEATS,
+                        help=f"timed passes per claim after one warm-up (default {DEFAULT_REPEATS})")
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(name)s: %(message)s", stream=sys.stderr

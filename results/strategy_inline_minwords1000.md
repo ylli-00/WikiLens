@@ -1,60 +1,69 @@
 # WikiLense evaluation: strategy_inline_minwords1000
 
-Generated 2026-09-17T12:03:20+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-09-22T01:40:40+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
 | Parameter | Value |
 |---|---|
-| ks | [5, 10] |
-| max_k | 10 |
+| ks | [1, 3, 5, 10, 20] |
+| max_k | 20 |
 | repeats | 5 |
 | strategy | inline |
 | overfetch | - |
 | filters | {"min_words": 1000, "max_words": null, "heading_like": null, "path_like": null, "linked_from": null, "links_to": null, "titles": null} |
 | claim_filters | - |
-| ef_search | 20 |
-| ef_search_effective | 20 |
+| ef_search | 100 |
+| ef_search_source | argument |
+| ef_search_effective | 100 |
+| mhnsw_max_cache_size | 536870912 |
+| index_m | 16 |
+| index_distance | cosine |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_device | cuda |
 | n_claims | 75 |
 | n_evidence_claims | 66 |
 | n_pages | 100 |
-| n_chunks | 8868 |
+| n_chunks | 4598 |
 | n_sentences | 33637 |
 | experiment_group | filters |
-| eval_seconds | 6.0 |
-| mhnsw_max_cache_size | 536870912 |
+| configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
+| eval_seconds | 8.0 |
+| n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
-| vector_index_m | 6 |
+| vector_index_m | 16 |
 | vector_index_distance | cosine |
-| chunk_data_length | 49152 |
-| chunk_index_length | 49152 |
-| vector_index_tablespace_bytes | 16777216 |
-| chunk_words_mean | 93.0 |
-| chunk_words_median | 103.0 |
-| chunk_words_p95 | 119.0 |
-| chunk_words_max | 174 |
-| filter_ground_truth | {"filter": {"min_words": 1000}, "n_chunks": 8868, "n_chunks_passing": 8787, "n_pages_passing": 89, "claims_gold_page_excluded": 10, "claims_gold_page_excluded_ids": [5753, 5848, 14253, 26799, 32256, 54047, 63422, 74482, 89819, 93212], "article_recall_ceiling": 65, "n_claims": 75, "evidence_recall_ceiling": 56, "n_evidence_claims": 66} |
-| short_results | {"5": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 5, "rows_mean": 5.0, "short_claim_ids": []}, "10": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 10, "rows_mean": 10.0, "short_claim_ids": []}} |
+| chunk_data_length | 14172160 |
+| chunk_index_length | 344064 |
+| vector_index_tablespace_bytes | 13631488 |
+| chunk_words_mean | 156.6 |
+| chunk_words_median | 183.5 |
+| chunk_words_p95 | 238.0 |
+| chunk_words_max | 240 |
+| filter_ground_truth | {"filter": {"min_words": 1000}, "n_chunks": 4598, "n_chunks_passing": 4544, "n_pages_passing": 89, "claims_gold_page_excluded": 10, "claims_gold_page_excluded_ids": [5753, 5848, 14253, 26799, 32256, 54047, 63422, 74482, 89819, 93212], "article_recall_ceiling": 65, "n_claims": 75, "evidence_recall_ceiling": 56, "n_evidence_claims": 66} |
+| short_results | {"1": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 1, "rows_mean": 1.0, "short_claim_ids": []}, "3": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 3, "rows_mean": 3.0, "short_claim_ids": []}, "5": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 5, "rows_mean": 5.0, "short_claim_ids": []}, "10": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 10, "rows_mean": 10.0, "short_claim_ids": []}, "20": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 20, "rows_mean": 20.0, "short_claim_ids": []}} |
 
 ## Ingest parameters (ingest_meta)
 
 | Key | Value |
 |---|---|
-| chunk_max_words | 120 |
+| analyze_seconds | 0.009 |
+| analyze_tables | chunk,page,section,link |
+| chunk_max_words | 240 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
-| corpus_dir | /home/ylli/Desktop/Projects/WikiLense/wikilense-linux-20260916T222239Z-1-001/wikilense-linux/data/corpus |
+| corpus_dir | data/corpus |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | true |
+| hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
-| index_m | 6 |
-| ingested_at | 2026-09-17T12:03:13+00:00 |
+| index_m | 16 |
+| ingested_at | 2026-09-22T01:40:31+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
+| n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
 
 ## Machine and versions
@@ -82,8 +91,11 @@ A claim counts when a gold page is among the pages of its first k chunks.
 
 | k | claims recalled | of | article recall |
 |---|---|---|---|
-| 5 | 63 | 75 | 0.840 |
+| 1 | 59 | 75 | 0.787 |
+| 3 | 64 | 75 | 0.853 |
+| 5 | 64 | 75 | 0.853 |
 | 10 | 64 | 75 | 0.853 |
+| 20 | 64 | 75 | 0.853 |
 
 ## Evidence recall@k
 
@@ -91,8 +103,11 @@ A claim counts when every unit of one of its sentence-only evidence sets is insi
 
 | k | claims recalled | of | evidence recall |
 |---|---|---|---|
-| 5 | 37 | 66 | 0.561 |
-| 10 | 45 | 66 | 0.682 |
+| 1 | 33 | 66 | 0.500 |
+| 3 | 43 | 66 | 0.652 |
+| 5 | 46 | 66 | 0.697 |
+| 10 | 50 | 66 | 0.758 |
+| 20 | 55 | 66 | 0.833 |
 
 ## Unit coverage@k
 
@@ -100,8 +115,11 @@ Mean, over the same claims, of the best share of a set's gold units inside the f
 
 | k | of | unit coverage |
 |---|---|---|
-| 5 | 66 | 0.587 |
-| 10 | 66 | 0.705 |
+| 1 | 66 | 0.500 |
+| 3 | 66 | 0.672 |
+| 5 | 66 | 0.716 |
+| 10 | 66 | 0.765 |
+| 20 | 66 | 0.833 |
 
 ## SQL latency per k (ms)
 
@@ -109,8 +127,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 5 | 375 | 4.37 | 5.50 | 4.56 | 3.96 | 9.00 |
-| 10 | 375 | 4.44 | 5.96 | 4.64 | 3.88 | 9.35 |
+| 1 | 375 | 2.59 | 2.81 | 2.61 | 2.23 | 4.81 |
+| 3 | 375 | 2.60 | 2.84 | 2.63 | 2.23 | 4.30 |
+| 5 | 375 | 2.63 | 2.87 | 2.65 | 2.27 | 6.12 |
+| 10 | 375 | 2.70 | 2.90 | 2.72 | 2.34 | 5.77 |
+| 20 | 375 | 2.80 | 3.02 | 2.81 | 2.46 | 4.92 |
 
 ## Query embedding latency (ms)
 
@@ -118,11 +139,11 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.67 | 4.86 | 4.69 | 4.51 | 5.72 |
+| 375 | 4.65 | 4.74 | 4.67 | 4.51 | 5.67 |
 
 ## Claims with the worst rank of their gold page
 
-Rank within the first 10 chunks; "not in top k" means no chunk of a gold page was retrieved.
+Rank within the first 20 chunks; "not in top k" means no chunk of a gold page was retrieved.
 
 | claim | label | gold page | gold page rank | evidence rank | claim text |
 |---|---|---|---|---|---|
