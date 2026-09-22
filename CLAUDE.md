@@ -6,21 +6,25 @@ WikiLense is a project for the MariaDB student database projects 2026-09 (https:
 
 Goal: retrieval over Wikipedia inside MariaDB. Chunk articles, embed the chunks, store them in a `VECTOR` column with a `VECTOR INDEX`, query with `VEC_DISTANCE_COSINE`, and combine the semantic search with ordinary SQL filters and joins in the same statement. The FEVEROUS fact-verification benchmark is the ground truth: its claims are the queries, and its gold evidence measures recall and latency. A later extension tests whether an LLM fact-checker does better with the retrieved passages.
 
-## Current phase: get the whole pipeline working on about 100 pages
+## Current phase: the pipeline works end to end on the 100-page corpus (2026-09-22)
 
-Decided by the owner on 2026-09-16. First write as much of the project code as possible, end to end, on a small corpus. Benchmark depth comes later.
+Everything the brief asks for is built, measured and pushed (github.com/ylli-00/WikiLens):
+corpus selection, parsing, chunking, MariaDB schema with `VECTOR` and a cosine `VECTOR INDEX`,
+ingest, hybrid queries (predicates, joins, an RRF full-text hybrid), CLI and web page, the
+recall/latency harness, the experiment protocol (`scripts/run_experiments.py`, `results/SUMMARY.md`),
+255 tests, CI, README. Chosen defaults with evidence: 240-word chunks, overlap 1, bge-small-en-v1.5
+with the title prefix, index M=16, `mhnsw_ef_search` 100 per query, strategy `inline` for filtered
+queries. The corpus is the 100 pages / 75 claims described below; the decisions of 2026-09-16/17 stand.
 
-- **Do now:** ingest pages → chunk (with the chunk-to-sentence table) → embed → MariaDB schema with `VECTOR` and `VECTOR INDEX` → queries that combine `VEC_DISTANCE_COSINE` with SQL filters and joins → query interface → recall and latency harness → README setup and ingest steps.
-- **Corpus:** about 100 Wikipedia pages, taken from the shard already in `data/feverous/wiki_pages/wiki_000.jsonl` (9,996 pages).
-  - 75 FEVEROUS claims (10 dev, 65 train) have every page cited in their evidence sets inside this shard. Together they need 54 distinct pages (about 4.0 MB of JSONL).
-  - Rule used: for each claim, take the page (`el.split("_")[0]`, NFC-normalised) of every `content` id in all its evidence sets; all of those pages must be shard titles.
-  - Those 54 pages plus about 46 other pages from the shard (any; don't optimise the choice) give about 100 pages, with real claims available to test the recall code.
-  - The 75 claims are mostly REFUTES (58; 7 SUPPORTS, 10 NEI), all cite a single page, and 65 have a sentence-only evidence set. That is fine for testing code, not for experiments.
-  - These counts came from one-off checks on 2026-09-16/17; recompute them when building the corpus.
-- **Settings (owner's decision, 2026-09-17):** Claude may pick provisional values for the embedding model, chunk size and overlap, vector index parameters and table handling, so coding does not stall. Mark them as provisional in code and README; the final choices are made with the experiments.
-- **SQL filters (owner's decision, 2026-09-17):** use only what the pages contain: article length, sections, and links between pages. Categories and edit dates are decided in the next phase.
-- **Not now:** choosing the claims for the experiments, scaling the corpus, the full 53.5 GB database, deeper benchmark analysis. Don't spend effort optimising these yet.
-- **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus, then run and document the experiments. This includes measuring the share of gold evidence outside the lead section: the shards' `order` field is enough, and an annotation-context proxy is in `analysis/feverous/FEVEROUS_ANALYSIS.md` Appendix A.4.
+- **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus (the
+  inline filtered statement's cost grows with the table and is the number to watch), then run and
+  document the experiments; the LLM fact-checker extension. This includes measuring the share of gold
+  evidence outside the lead section: the shards' `order` field is enough, and an annotation-context
+  proxy is in `analysis/feverous/FEVEROUS_ANALYSIS.md` Appendix A.4.
+- **Corpus rule kept from phase 1:** 75 FEVEROUS claims (10 dev, 65 train) whose evidence pages are all
+  in `wiki_000.jsonl`, their 54 pages plus 46 link-ranked filler pages; `scripts/build_corpus.py`
+  rebuilds it byte for byte (`data/corpus/MANIFEST.md`).
+- **Not indexed:** tables and captions (27 of 114 evidence ids are cells); a documented limitation.
 
 ## The MariaDB brief
 

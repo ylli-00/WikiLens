@@ -427,3 +427,16 @@ ingest`; until then the main database holds the phase-2 ingest.
   where the counts equal the exact ranking's (article recall@10 74/75, evidence recall@20 63/66),
   which is what makes them reproducible; `wikilense eval` after `wikilense ingest` with the
   defaults is the check.
+
+## Phase 5 (2026-09-22): the protocol rerun on the final code
+
+After the review fixes (hatnote units out of chunks, `ANALYZE TABLE` after ingest, the `rrf`
+strategy, the chosen defaults) the whole protocol was rerun with `scripts/run_experiments.py all`
+on 2026-09-22; every file in `results/` comes from that run, and `results/SUMMARY.md` is the
+reference for every number in the README. Section 7 there is the final configuration (240-word
+chunks, overlap 1, M=16, prefix on, 4,598 chunks, 1,316 hatnote units excluded): article
+recall@1/5/10/20 63/74/74/74 of 75, evidence recall@1/5/10/20 39/55/60/65 of 66, SQL p50/p95 at
+k=10 0.90/1.41 ms, query embedding 4.7 ms; hit lists identical to the exact ranking for 74/75
+claims, and identical across a server restart for 74/75. The M=6 numbers of the phase-3 section
+above were measured on the pre-hatnote ingest and are superseded by sections 1 to 3 of the
+summary, which repeat them on the current code.
