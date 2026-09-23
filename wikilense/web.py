@@ -610,7 +610,8 @@ def api_search(
                     "'wikilense ingest'",
                 ) from exc
             raise
-        except pymysql.err.InternalError as exc:
+        except pymysql.err.OperationalError as exc:
+            # PyMySQL has no mapping for 1191 and raises OperationalError for it (errno >= 1000)
             if exc.args and exc.args[0] == ER_FT_MATCHING_KEY_NOT_FOUND:
                 raise HTTPException(
                     status_code=503,

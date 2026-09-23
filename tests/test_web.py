@@ -276,6 +276,51 @@ def test_api_search_reports_an_unreachable_server_as_503(monkeypatch: pytest.Mon
     assert embedder.queries == [webmod.WARM_UP_TEXT, "x"]  # embedded before connecting
 
 
+class ClosingConnection:
+    """Stands in for a PyMySQL connection that the search never really uses."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        # MariaDB 1191 has no entry in PyMySQL's error map, so it arrives as OperationalError
+        (pymysql.err.OperationalError(1191, "Can't find FULLTEXT index matching the column list"),
+         "no FULLTEXT index"),
+        (pymysql.err.ProgrammingError(1146, "Table 'wikilense.chunk' doesn't exist"),
+         "has no schema"),
+    ],
+)
+def test_api_search_reports_a_missing_index_or_schema_as_503(
+    monkeypatch: pytest.MonkeyPatch, error: Exception, expected: str
+) -> None:
+    conn = ClosingConnection()
+    monkeypatch.setattr(webmod.db, "connect", lambda settings=None, database=None: conn)
+
+    def failing_search(*args: Any, **kwargs: Any) -> list[Hit]:
+        raise error
+
+    monkeypatch.setattr(webmod.search, "search", failing_search)
+    client = TestClient(webmod.create_app(OFFLINE_SETTINGS, embedder=FakeEmbedder()))
+    resp = client.get("/api/search", params={"q": "x", "strategy": "rrf"})
+    assert resp.status_code == 503, resp.text
+    assert expected in resp.json()["detail"]
+    assert conn.closed
+
+
+def test_the_page_script_never_writes_html_from_data() -> None:
+    """Hits, sentences, SQL and errors reach the page through textContent only, so a title or a
+    chunk text containing markup is shown as text; innerHTML would make it markup."""
+    for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
+        assert sink not in webmod.INDEX_HTML
+    assert "textContent" in webmod.INDEX_HTML
+
+
 def test_create_app_without_warm_up_reports_no_model_load_time() -> None:
     embedder = FakeEmbedder()
     app = webmod.create_app(OFFLINE_SETTINGS, embedder=embedder, warm_up=False)
