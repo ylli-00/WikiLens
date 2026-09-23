@@ -10,9 +10,10 @@ without a cached copy; sentence-transformers raises ``OSError``) is reported as 
 every command that needs it.
 
 Exit codes: 0 success; 1 an expected failure (settings missing, server unreachable, database
-empty or without schema, ingest refused, model not loadable), reported as one line on stderr
-without a traceback; 2 bad arguments (including a filter given with ``--strategy none``, which
-would silently drop it); 130 interrupted. ``query`` writes its result to stdout (text, or JSON
+empty or without schema, ingest refused, model not loadable or of another dimension than
+``chunk.embedding``, results not writable), reported as one line on stderr without a traceback;
+2 bad arguments (including a filter given with ``--strategy none``, which would silently drop
+it, and an ``eval --out`` that cannot be a results directory); 130 interrupted. ``query`` writes its result to stdout (text, or JSON
 with ``--json``) and one timing line to stderr, so ``--json`` output can be piped. The timing
 line separates the model load (one warm-up call that loads the model, seconds from a cold
 process) from the query embedding and the SQL round trip, names the model that ran (the
@@ -32,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import textwrap
 import time
@@ -57,8 +59,9 @@ EXIT_INTERRUPTED = 130
 
 EXIT_CODES_HELP = (
     "exit codes: 0 success; 1 an expected failure (settings missing, server unreachable, "
-    "database empty or without schema, ingest refused, embedding model not loadable), reported "
-    "as one line on stderr; 2 bad arguments; 130 interrupted."
+    "database empty or without schema, ingest refused, embedding model not loadable or of the "
+    "wrong dimension, results not writable), reported as one line on stderr; 2 bad arguments; "
+    "130 interrupted."
 )
 
 DEFAULT_K = 5
@@ -493,13 +496,42 @@ def _load_model(embedder: Embedder) -> float:
 
 
 def _embed_query(embedder: Embedder, text: str) -> tuple[np.ndarray, float]:
-    """Return ``(query vector, milliseconds)``; a model that cannot load becomes a ``CliError``."""
+    """Return ``(query vector, milliseconds)``.
+
+    A model that cannot load, or whose vectors do not have the ``chunk.embedding`` dimension (a
+    ``WIKILENSE_EMBEDDING_MODEL`` other than the one the corpus was ingested with), becomes a
+    ``CliError`` with exit 1: it is the setup that is wrong, not the arguments.
+    """
     start = time.perf_counter()
     try:
         vector = embedder.embed_queries([text])[0]
     except OSError as exc:
         raise _model_error(embedder.model_name, exc) from exc
-    return vector, (time.perf_counter() - start) * 1000.0
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    if vector.shape != (db.VECTOR_DIM,):
+        raise CliError(
+            f"embedding model {embedder.model_name!r} gives vectors of {vector.shape[-1]} "
+            f"dimensions, but chunk.embedding is VECTOR({db.VECTOR_DIM}): set "
+            "WIKILENSE_EMBEDDING_MODEL to the model the corpus was ingested with"
+        )
+    return vector, elapsed_ms
+
+
+def _prepare_out_dir(out: Path) -> None:
+    """Create ``--out`` (with parents) and check it is a writable directory, before the minutes of
+    evaluation it would otherwise follow; ``CliError`` exit 2 naming the option otherwise."""
+    try:
+        out.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise CliError(
+            f"--out {out}: cannot use it as the results directory: {exc.strerror or exc}",
+            exit_code=EXIT_USAGE,
+        ) from exc
+    if not os.access(out, os.W_OK | os.X_OK):
+        raise CliError(
+            f"--out {out}: cannot use it as the results directory: not writable",
+            exit_code=EXIT_USAGE,
+        )
 
 
 def _eval_ef_search(value: int | None) -> int | str | None:
@@ -803,8 +835,8 @@ def cmd_query(args: argparse.Namespace) -> int:
         embedder = make_embedder(settings)
         load_ms = _load_model(embedder)
         qvec, embed_ms = _embed_query(embedder, args.text)
+        start = time.perf_counter()
         try:
-            start = time.perf_counter()
             hits = search.search(
                 conn,
                 qvec,
@@ -815,34 +847,21 @@ def cmd_query(args: argparse.Namespace) -> int:
                 ef_search=ef_search,
                 query_text=args.text,
             )
-            sql_ms = (time.perf_counter() - start) * 1000.0
-            ef_effective = (
-                db.get_session_var(conn, search.EF_SEARCH_VARIABLE)
-                if ef_search is None
-                else ef_search
-            )
-            if args.sentences:
-                sentences = search.hit_sentences(conn, [hit.chunk_id for hit in hits])
-            if args.explain:
-                sql, params = search.search_statement(
-                    qvec,
-                    args.k,
-                    filters,
-                    args.strategy,
-                    args.overfetch,
-                    query_text=args.text,
-                )
-                explain_rows = search.explain_search(
-                    conn,
-                    qvec,
-                    args.k,
-                    filters,
-                    args.strategy,
-                    args.overfetch,
-                    query_text=args.text,
-                )
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError) as exc:  # search() refused an argument
             raise CliError(str(exc), exit_code=EXIT_USAGE) from exc
+        sql_ms = (time.perf_counter() - start) * 1000.0
+        ef_effective = (
+            db.get_session_var(conn, search.EF_SEARCH_VARIABLE) if ef_search is None else ef_search
+        )
+        if args.sentences:
+            sentences = search.hit_sentences(conn, [hit.chunk_id for hit in hits])
+        if args.explain:
+            sql, params = search.search_statement(
+                qvec, args.k, filters, args.strategy, args.overfetch, query_text=args.text
+            )
+            explain_rows = search.explain_search(
+                conn, qvec, args.k, filters, args.strategy, args.overfetch, query_text=args.text
+            )
     finally:
         conn.close()
     if args.json:
@@ -869,12 +888,13 @@ def cmd_query(args: argparse.Namespace) -> int:
 def cmd_eval(args: argparse.Namespace) -> int:
     """Run ``evaluate.evaluate`` over the corpus claims, write and summarise the results; returns 0.
 
-    The database is checked before the model is loaded; ``evaluate``'s own argument errors (for
-    example a database without claims) and a model that cannot be loaded are reported as one
-    line. ``ef_search`` defaults to ``settings.ef_search``; ``--ef-search 0`` leaves the
+    ``--out`` is created and checked first, then the database, before the model is loaded;
+    ``evaluate``'s own argument errors (for example a database without claims), a model that
+    cannot be loaded and a failed write of the results are reported as one line. ``ef_search`` defaults to ``settings.ef_search``; ``--ef-search 0`` leaves the
     server's session value.
     """
     settings = load_settings()
+    _prepare_out_dir(args.out)
     conn = _connect(settings)
     try:
         _require_chunks(conn, settings)
@@ -897,7 +917,10 @@ def cmd_eval(args: argparse.Namespace) -> int:
             raise _model_error(settings.embedding_model, exc) from exc
     finally:
         conn.close()
-    json_path, md_path = evaluate.write_results(result, out_dir=args.out, name=args.name)
+    try:
+        json_path, md_path = evaluate.write_results(result, out_dir=args.out, name=args.name)
+    except OSError as exc:
+        raise CliError(f"cannot write the results to {args.out}: {exc.strerror or exc}") from exc
     print(format_eval_summary(result))
     print(f"results written: {json_path}, {md_path}")
     return EXIT_OK

@@ -313,6 +313,27 @@ def test_api_search_reports_a_missing_index_or_schema_as_503(
     assert conn.closed
 
 
+def test_a_query_model_of_the_wrong_dimension_is_503_not_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class WideEmbedder(FakeEmbedder):
+        def embed_queries(self, texts, batch_size=64, show_progress=False):
+            self.queries.extend(texts)
+            return np.ones((len(texts), 768), dtype=np.float32)
+
+    monkeypatch.setattr(webmod.db, "connect", NoDatabase())
+    client = TestClient(webmod.create_app(OFFLINE_SETTINGS, embedder=WideEmbedder()))
+    resp = client.get("/api/search", params={"q": "x"})
+    assert resp.status_code == 503
+    detail = resp.json()["detail"]
+    assert "768 dimensions" in detail and "WIKILENSE_EMBEDDING_MODEL" in detail
+
+
+class NoDatabase:
+    def __call__(self, *args: object, **kwargs: object) -> None:
+        raise AssertionError("the database must not be reached")
+
+
 def test_the_page_script_never_writes_html_from_data() -> None:
     """Hits, sentences, SQL and errors reach the page through textContent only, so a title or a
     chunk text containing markup is shown as text; innerHTML would make it markup."""

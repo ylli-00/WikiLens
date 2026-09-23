@@ -655,6 +655,22 @@ def test_query_reports_other_database_errors_on_one_line(
     assert err == "wikilense: database error: You have an error in your SQL syntax (error 1064)\n"
 
 
+def test_query_with_a_model_of_the_wrong_dimension_is_a_setup_error_not_a_usage_error(
+    capsys: pytest.CaptureFixture[str],
+    fake_db: FakeDatabase,
+    fake_embedder: FakeEmbedder,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        fake_embedder, "embed_queries", lambda texts, **kw: np.ones((len(texts), 768), np.float32)
+    )
+    assert cli.main(["query", "x"]) == 1
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1
+    assert "768 dimensions" in err and f"VECTOR({DIM})" in err
+    assert "WIKILENSE_EMBEDDING_MODEL" in err
+
+
 def test_query_reports_a_model_that_cannot_load_on_one_line(
     capsys: pytest.CaptureFixture[str],
     fake_db: FakeDatabase,
@@ -1012,6 +1028,41 @@ def test_eval_ef_search_reaches_evaluate_with_the_documented_meaning(
     assert resolved(["eval", "--ef-search", "30"]) == (30, "argument")
     monkeypatch.setattr(cli, "load_settings", lambda: replace(SETTINGS, ef_search=0))
     assert resolved(["eval"]) == (None, "server")
+
+
+def test_eval_refuses_an_unusable_out_directory_before_evaluating(
+    capsys: pytest.CaptureFixture[str],
+    fake_db: FakeDatabase,
+    fake_embedder: FakeEmbedder,
+    fake_evaluate: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    not_a_dir = tmp_path / "results.txt"
+    not_a_dir.write_text("a file, not a directory", encoding="utf-8")
+    assert cli.main(["eval", "--out", str(not_a_dir)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith(f"wikilense: --out {not_a_dir}: cannot use it as the results directory")
+    assert err.count("\n") == 1
+    assert "evaluate" not in fake_evaluate and fake_db.connections == []
+    assert cli.main(["eval", "--out", str(tmp_path / "new" / "dir")]) == 0  # created up front
+    assert (tmp_path / "new" / "dir").is_dir()
+
+
+def test_eval_reports_a_failed_write_on_one_line(
+    capsys: pytest.CaptureFixture[str],
+    fake_db: FakeDatabase,
+    fake_embedder: FakeEmbedder,
+    fake_evaluate: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def disk_full(result: EvalResult, out_dir: Path, name: str) -> tuple[Path, Path]:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(cli.evaluate, "write_results", disk_full)
+    assert cli.main(["eval", "--out", str(tmp_path)]) == 1
+    err = capsys.readouterr().err
+    assert err == f"wikilense: cannot write the results to {tmp_path}: No space left on device\n"
 
 
 def test_eval_reports_evaluate_argument_errors_on_one_line(

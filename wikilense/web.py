@@ -34,8 +34,9 @@ HTML, CSS and the few lines of script that call the API live in :data:`INDEX_HTM
 Errors: invalid parameters are 422 (FastAPI validation, an inconsistent filter pair, a filter
 given with strategy ``none``, or an argument ``search`` refuses) or 400 (a blank query, an
 unknown parameter); a server that cannot be reached, a database without schema, without
-chunks or without the FULLTEXT index that ``rrf`` needs, or a model that cannot be loaded are
-503 with a one-sentence ``detail``.
+chunks or without the FULLTEXT index that ``rrf`` needs, a model that cannot be loaded, or one
+whose vectors do not have the ``chunk.embedding`` dimension are 503 with a one-sentence
+``detail``.
 """
 
 from __future__ import annotations
@@ -536,6 +537,13 @@ def api_search(
             status_code=503, detail=f"cannot load the embedding model: {exc}"
         ) from exc
     embed_ms = (time.perf_counter() - start) * 1000.0
+    if qvec.shape != (db.VECTOR_DIM,):  # a server misconfiguration, not a bad request
+        raise HTTPException(
+            status_code=503,
+            detail=f"the embedding model gives vectors of {qvec.shape[-1]} dimensions, but "
+            f"chunk.embedding is VECTOR({db.VECTOR_DIM}): set WIKILENSE_EMBEDDING_MODEL to the "
+            "model the corpus was ingested with",
+        )
 
     conn = _open_connection(settings, database)
     try:
