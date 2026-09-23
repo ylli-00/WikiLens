@@ -19,6 +19,7 @@ output file is left alone unless --force is given.
 """
 
 import argparse
+import http.client
 import os
 import struct
 import sys
@@ -120,11 +121,15 @@ def main():
         name_len, extra_len = struct.unpack("<HH", local[26:30])
         start = offset + 30 + name_len + extra_len
         raw = fetch_range(args.url, start, start + compressed - 1)
-    except (urllib.error.URLError, RuntimeError, OSError) as e:
+    except (urllib.error.URLError, http.client.HTTPException, RuntimeError, OSError) as e:
+        # HTTPException covers a connection dropped mid-body (IncompleteRead), not an OSError
         sys.exit(f"download failed: {e}")
 
     if method == 8:
-        data = zlib.decompress(raw, -15)
+        try:
+            data = zlib.decompress(raw, -15)
+        except zlib.error as e:
+            sys.exit(f"download is corrupt ({e}), nothing written")
     elif method == 0:
         data = raw
     else:

@@ -61,10 +61,15 @@ jobs:
           pip install -e .
 
       - name: Create the test database
+        # The root password reaches the client as MYSQL_PWD: `docker exec -e MYSQL_PWD` names the
+        # variable and docker copies its value from this step's environment, so the password is
+        # on no command line (the same route scripts/run_experiments.py takes).
+        env:
+          MYSQL_PWD: ${{ env.WIKILENSE_DB_ROOT_PASSWORD }}
         run: |
-          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -p"$WIKILENSE_DB_ROOT_PASSWORD" \
+          docker exec -e MYSQL_PWD ${{ job.services.mariadb.id }} mariadb -uroot \
             -e "CREATE DATABASE IF NOT EXISTS $WIKILENSE_TEST_DB_NAME; GRANT ALL PRIVILEGES ON $WIKILENSE_TEST_DB_NAME.* TO '$WIKILENSE_DB_USER'@'%'; FLUSH PRIVILEGES;"
-          docker exec ${{ job.services.mariadb.id }} mariadb -uroot -p"$WIKILENSE_DB_ROOT_PASSWORD" -e "SELECT VERSION();"
+          docker exec -e MYSQL_PWD ${{ job.services.mariadb.id }} mariadb -uroot -e "SELECT VERSION();"
 
       - name: Lint
         run: ruff check .

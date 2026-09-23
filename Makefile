@@ -22,11 +22,11 @@ ifeq ($(CPU),1)
 REQS    := requirements-cpu.lock
 endif
 
-.PHONY: setup test lint eval serve experiments down
+.PHONY: setup check-env test lint eval serve experiments down
 
 # --- setup -----------------------------------------------------------------------------------
 
-setup: .env $(VENV)
+setup: .env check-env $(VENV)/bin/pip
 	$(COMPOSE) up -d --wait
 	$(VENV)/bin/pip install -r $(REQS) -e .
 	$(VENV)/bin/wikilense ingest
@@ -38,8 +38,18 @@ setup: .env $(VENV)
 	@echo "Created .env from .env.example: set WIKILENSE_DB_PASSWORD and WIKILENSE_DB_ROOT_PASSWORD in .env, then run 'make setup' again."
 	@exit 1
 
-$(VENV):
-	$(PYTHON) -m venv $(VENV)
+# Refuse to start MariaDB while .env still holds the placeholder passwords of .env.example:
+# the first start initialises the data volume with whatever the file says.
+check-env: .env
+	@if grep -Eq '^WIKILENSE_DB_(ROOT_)?PASSWORD=change-me' .env; then \
+		echo "WIKILENSE_DB_PASSWORD or WIKILENSE_DB_ROOT_PASSWORD in .env is still the placeholder of .env.example: set both, then run 'make setup' again."; \
+		exit 1; \
+	fi
+
+# The target is pip, not the directory: a venv that failed half-way (no ensurepip on a stock
+# Ubuntu without python3-venv) leaves the directory behind, and --clear starts it over.
+$(VENV)/bin/pip:
+	$(PYTHON) -m venv --clear $(VENV)
 
 # --- development -----------------------------------------------------------------------------
 
