@@ -182,3 +182,11 @@ def test_embedding_text_with_and_without_path() -> None:
         "Aare > Course > Upper course: Glaciers feed it."
     )
     assert embedding_text("Aare", "", "The Aare is a river.") == "Aare: The Aare is a river."
+
+
+def test_the_chunk_defaults_are_the_settings_defaults() -> None:
+    """chunk_units' defaults are config's (one definition), so a direct call chunks like ingest."""
+    from wikilense import chunking, config
+
+    assert chunking.DEFAULT_MAX_WORDS == config.DEFAULT_CHUNK_MAX_WORDS
+    assert chunking.DEFAULT_OVERLAP_UNITS == config.DEFAULT_CHUNK_OVERLAP_UNITS

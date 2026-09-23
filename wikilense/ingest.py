@@ -30,7 +30,7 @@ each one when it completes:
 6. ``claim`` and ``claim_evidence`` are written; ``page_id`` is resolved by title and
    ``sentence_id`` by ``(page_id, element_key)`` for sentences and list items (cells and captions
    keep ``sentence_id`` NULL).
-7. ``ingest_meta`` records the model, the chunk parameters, the index ``M`` and ``DISTANCE`` as
+7. ``ingest_meta`` records the model and its revision, the chunk parameters, the index ``M`` and ``DISTANCE`` as
    ``SHOW CREATE TABLE chunk`` reports them (``db.vector_index_info``), the hatnote rule and count,
    the ANALYZE tables and seconds, the corpus directory (relative to the repository root when
    inside it, so the value does not leak a home directory), the SHA-256 of both corpus files,
@@ -87,6 +87,7 @@ loaded: the tables the search statements join and filter on."""
 
 META_KEYS: tuple[str, ...] = (
     "embedding_model",
+    "embedding_revision",
     "embedding_dim",
     "embedding_prefix",
     "chunk_max_words",
@@ -716,6 +717,8 @@ class _Ingest:
             index = db.vector_index_info(self.conn)
             values = {
                 "embedding_model": self.model_name,
+                # "main" means the Hub branch at load time, i.e. not pinned (embedding.Embedder)
+                "embedding_revision": str(getattr(self.embedder, "revision", None) or "main"),
                 "embedding_dim": str(settings.vector_dim),
                 "embedding_prefix": "true" if self.use_prefix else "false",
                 "chunk_max_words": str(settings.chunk_max_words),

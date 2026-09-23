@@ -1,7 +1,8 @@
 """Sentence-window chunker: consecutive text units of one section become one ``Chunk``.
 
 ``chunk_units`` is pure and deterministic. Word count is ``len(text.split())``. The rules are in
-docs/DESIGN.md, "Chunking rules"; ``max_words`` and ``overlap_units`` were chosen with results/SUMMARY.md.
+docs/DESIGN.md, "Chunking rules"; ``max_words`` was chosen with results/SUMMARY.md, and the overlap
+of one unit was kept from phase 1 without a sweep.
 
 Only *chunkable* units take part (``TextUnit.chunkable``): a unit with no text after cleaning,
 or a hatnote ("Main article: X", "See also: Y", ...; ``wikitext.HATNOTE_RE``), is in no chunk:
@@ -16,14 +17,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from wikilense.config import DEFAULT_CHUNK_MAX_WORDS, DEFAULT_CHUNK_OVERLAP_UNITS
 from wikilense.wikitext import ParsedPage, TextUnit
 
-DEFAULT_MAX_WORDS = 240  # same value as config.DEFAULT_CHUNK_MAX_WORDS; see results/SUMMARY.md
-"""The word budget of one chunk, chosen with results/SUMMARY.md (equal recall at equal retrieved
-text as 60 or 120 words, with half the vectors of 120)."""
+DEFAULT_MAX_WORDS = DEFAULT_CHUNK_MAX_WORDS
+"""The word budget of one chunk (240, ``config.DEFAULT_CHUNK_MAX_WORDS``), chosen with
+results/SUMMARY.md: equal recall at equal retrieved text as 60 or 120 words, with half the
+vectors of 120."""
 
-DEFAULT_OVERLAP_UNITS = 1
-"""How many units the next chunk repeats from the end of the previous one (one sentence of overlap)."""
+DEFAULT_OVERLAP_UNITS = DEFAULT_CHUNK_OVERLAP_UNITS
+"""How many units the next chunk repeats from the end of the previous one (1,
+``config.DEFAULT_CHUNK_OVERLAP_UNITS``: one sentence of overlap; kept, not swept)."""
 
 
 @dataclass

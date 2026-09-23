@@ -7,6 +7,7 @@ import struct
 import numpy as np
 import pytest
 
+from wikilense import embedding as embedding_module
 from wikilense.embedding import (
     BGE_QUERY_INSTRUCTION,
     Embedder,
@@ -124,6 +125,36 @@ def test_embedder_is_lazy_and_reports_device() -> None:
     assert embedder.device == ("cuda" if torch.cuda.is_available() else "cpu")
     assert not embedder.is_loaded  # resolving the device must not load the model
     assert Embedder(device="cpu").device == "cpu"
+
+
+def test_the_default_model_is_pinned_to_the_measured_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default model loads the Hub snapshot that results/ were measured with, whatever the
+    Hub's main branch points at later; another model loads its main branch unless told."""
+    from wikilense import config
+
+    assert embedding_module.DEFAULT_MODEL_NAME == config.DEFAULT_EMBEDDING_MODEL
+    assert Embedder().revision == config.DEFAULT_EMBEDDING_REVISION
+    assert len(config.DEFAULT_EMBEDDING_REVISION) == 40  # a full commit hash, not a branch
+    assert Embedder("sentence-transformers/all-MiniLM-L6-v2").revision is None
+    assert Embedder("sentence-transformers/all-MiniLM-L6-v2", revision="abc").revision == "abc"
+
+    loaded: list[dict] = []
+
+    class RecordingModel:
+        def __init__(self, name: str, **kwargs: object) -> None:
+            loaded.append({"name": name, **kwargs})
+
+        def eval(self) -> None:
+            pass
+
+    import sentence_transformers
+
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", RecordingModel)
+    assert isinstance(Embedder(device="cpu").model, RecordingModel)
+    assert loaded == [{"name": config.DEFAULT_EMBEDDING_MODEL, "device": "cpu",
+                       "revision": config.DEFAULT_EMBEDDING_REVISION}]
 
 
 def test_query_instruction_only_for_bge() -> None:

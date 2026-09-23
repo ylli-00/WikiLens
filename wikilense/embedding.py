@@ -18,10 +18,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from wikilense.config import DEFAULT_EMBEDDING_MODEL, DEFAULT_EMBEDDING_REVISION
+
 if TYPE_CHECKING:  # pragma: no cover - import only for type checkers
     from sentence_transformers import SentenceTransformer
 
-DEFAULT_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+DEFAULT_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
 
 #: Query instruction of the BGE v1.5 English models. It is prepended to queries only; passages
 #: are embedded as-is (the BGE model card: "no instruction needed for passages").
@@ -38,10 +40,21 @@ class Embedder:
             in :meth:`embed_queries` only when the name starts with ``"BAAI/bge"``.
         device: ``"cuda"``, ``"cpu"``, ``"cuda:1"`` ...; ``None`` picks ``"cuda"`` when a GPU
             is available, else ``"cpu"``.
+        revision: Hugging Face commit, branch or tag to load. ``None`` pins the default model
+            to ``config.DEFAULT_EMBEDDING_REVISION`` (the snapshot results/ were measured with)
+            and loads any other model at the Hub's default branch.
     """
 
-    def __init__(self, model_name: str = DEFAULT_MODEL_NAME, device: str | None = None) -> None:
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL_NAME,
+        device: str | None = None,
+        revision: str | None = None,
+    ) -> None:
         self.model_name = model_name
+        if revision is None and model_name == DEFAULT_MODEL_NAME:
+            revision = DEFAULT_EMBEDDING_REVISION
+        self.revision = revision
         self._device = device
         self._model: SentenceTransformer | None = None
         self._lock = threading.Lock()
@@ -91,7 +104,7 @@ class Embedder:
         """Load the model onto :attr:`device` and return it (downloads to ~/.cache if needed)."""
         from sentence_transformers import SentenceTransformer
 
-        model = SentenceTransformer(self.model_name, device=self.device)
+        model = SentenceTransformer(self.model_name, device=self.device, revision=self.revision)
         # Prompts are handled explicitly in embed_queries; never let a prompt shipped with the
         # model configuration be added implicitly.
         model.default_prompt_name = None

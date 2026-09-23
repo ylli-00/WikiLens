@@ -22,7 +22,7 @@ import pytest
 
 from wikilense import db as dbmod
 from wikilense.config import Settings, SettingsError, load_settings
-from wikilense.embedding import DEFAULT_MODEL_NAME
+from wikilense.embedding import DEFAULT_MODEL_NAME, Embedder
 
 CONNECT_TIMEOUT_S = 1.0
 HF_HUB_HOST = ("huggingface.co", 443)
@@ -55,11 +55,12 @@ def _db_state() -> tuple[Settings | None, str | None]:
     return settings, None
 
 
-def model_is_cached(model_name: str) -> bool:
+def model_is_cached(model_name: str, revision: str | None = None) -> bool:
     """Return True when ``model_name`` is a local directory or a complete Hugging Face cache entry.
 
     Complete means ``config.json`` and a weights file (``MODEL_WEIGHT_FILES``) are in the cached
-    snapshot; ``huggingface_hub.try_to_load_from_cache`` honours ``HF_HOME`` / ``HF_HUB_CACHE``.
+    snapshot of ``revision`` (None: the main branch); ``huggingface_hub.try_to_load_from_cache``
+    honours ``HF_HOME`` / ``HF_HUB_CACHE``.
     """
     if Path(model_name).is_dir():
         return True
@@ -67,7 +68,7 @@ def model_is_cached(model_name: str) -> bool:
         from huggingface_hub import try_to_load_from_cache
     except ImportError:
         return False
-    config = try_to_load_from_cache(model_name, "config.json")
+    config = try_to_load_from_cache(model_name, "config.json", revision=revision)
     if not isinstance(config, str):
         return False
     snapshot = Path(config).parent
@@ -89,14 +90,17 @@ def hub_is_reachable() -> bool:
 def _slow_state() -> str | None:
     """Return None when ``slow`` tests can run, else the skip reason (checked once per session).
 
-    The models needed are the package default and, when settings load, the configured one.
+    The models needed are the package default and, when settings load, the configured one, each
+    at the revision ``Embedder`` loads (the default model is pinned).
     """
     models = {DEFAULT_MODEL_NAME}
     try:
         models.add(load_settings().embedding_model)
     except SettingsError:
         pass
-    missing = sorted(name for name in models if not model_is_cached(name))
+    missing = sorted(
+        name for name in models if not model_is_cached(name, Embedder(name).revision)
+    )
     if not missing or hub_is_reachable():
         return None
     return (

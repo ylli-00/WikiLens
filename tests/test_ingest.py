@@ -542,6 +542,7 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path, report: IngestReport
     meta = dict(_rows(conn, "SELECT `key`, `value` FROM ingest_meta"))
     assert set(meta) == set(META_KEYS)
     assert meta["embedding_model"] == "fake-embedder"
+    assert meta["embedding_revision"] == "main"  # the fake has no pinned revision
     assert meta["embedding_dim"] == str(DIM)
     assert meta["embedding_prefix"] == "true"
     assert meta["chunk_max_words"] == str(CHUNK_MAX_WORDS)

@@ -18,6 +18,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_FILE = REPO_ROOT / ".env"
 
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # chosen in phase 1, see docs/DESIGN.md
+#: The Hugging Face commit of DEFAULT_EMBEDDING_MODEL that results/ were measured with; the
+#: default model is always loaded at this revision (embedding.Embedder), not at the Hub's main.
+DEFAULT_EMBEDDING_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
 DEFAULT_CHUNK_MAX_WORDS = 240  # chosen with results/SUMMARY.md: equal recall at equal retrieved text, half the vectors
 DEFAULT_CHUNK_OVERLAP_UNITS = 1  # one unit of overlap, kept through the experiments
 DEFAULT_VECTOR_DIM = 384  # the model's dimension; sql/schema.sql writes it literally

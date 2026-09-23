@@ -106,7 +106,10 @@ limitation).
   Reason: strong on passage retrieval for its size, fast enough on CPU for a grader, and it fits
   the 8 GB GPU with room to spare. Normalised embeddings, so cosine distance equals
   `1 - dot`.
-- `Embedder(model_name=..., device=None)` loads lazily; `dim` property; `embed_passages(texts,
+- `Embedder(model_name=..., device=None, revision=None)` loads lazily; the default model is
+  pinned to the Hub commit `config.DEFAULT_EMBEDDING_REVISION` (5c38ec7c405e..., the snapshot
+  every result was measured with; since 2026-09-23), so a later update of the model repository
+  cannot change the vectors; `dim` property; `embed_passages(texts,
   batch_size=64) -> np.ndarray[float32, (n, dim)]`; `embed_queries(texts)` prepends the model's
   query instruction (`"Represent this sentence for searching relevant passages: "` for bge).
 - Helpers, independent of the model: `vector_to_bytes(v) -> bytes` (float32 little-endian, the
@@ -268,7 +271,7 @@ connection is still open) and closes the connection:
    statements from fresh statistics (Phase 2 outcomes: stale statistics once lost the index).
 6. Insert `claim` and `claim_evidence` (`parse_element_id`; `page_id` by title, `sentence_id` by
    (`page_id`, `element_key`); cells and captions keep `sentence_id` NULL).
-7. Write `ingest_meta`: `embedding_model`, `embedding_dim`, `embedding_prefix`, `chunk_max_words`,
+7. Write `ingest_meta`: `embedding_model`, `embedding_revision`, `embedding_dim`, `embedding_prefix`, `chunk_max_words`,
    `chunk_overlap_units`, `index_m` and `index_distance` (read from `SHOW CREATE TABLE chunk`,
    so they describe the index that is in place), `hatnote_pattern`, `n_units_hatnote`,
    `analyze_tables`, `analyze_seconds`, `corpus_dir`, `corpus_pages_sha256`,
