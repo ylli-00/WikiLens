@@ -2,69 +2,19 @@
 
 from __future__ import annotations
 
-import struct
-
 import numpy as np
 import pytest
 
+from wikilense import db as dbmod
 from wikilense import embedding as embedding_module
 from wikilense.embedding import (
     BGE_QUERY_INSTRUCTION,
     Embedder,
-    bytes_to_vector,
     text_to_vector,
-    vector_to_bytes,
     vector_to_text,
 )
 
 # --- helpers (no model) -------------------------------------------------------------------------
-
-
-def test_vector_to_bytes_is_float32_little_endian() -> None:
-    values = [1.0, -2.5, 0.125, 3.0e-3]
-    b = vector_to_bytes(np.array(values, dtype=np.float32))
-    assert b == struct.pack("<4f", *values)
-    assert len(b) == 4 * len(values)
-    # Known bit patterns: 1.0f is 0x3F800000, written least significant byte first.
-    assert vector_to_bytes([1.0]) == b"\x00\x00\x80\x3f"
-    assert vector_to_bytes([-2.5]) == b"\x00\x00\x20\xc0"
-
-
-def test_vector_to_bytes_accepts_lists_and_float64() -> None:
-    assert vector_to_bytes([0.5, 0.25]) == struct.pack("<2f", 0.5, 0.25)
-    assert vector_to_bytes(np.array([0.5, 0.25], dtype=np.float64)) == struct.pack("<2f", 0.5, 0.25)
-    # A big-endian float32 input is converted, not copied byte for byte.
-    big = np.array([1.0, 2.0], dtype=">f4")
-    assert vector_to_bytes(big) == struct.pack("<2f", 1.0, 2.0)
-
-
-def test_vector_to_bytes_rejects_non_1d() -> None:
-    with pytest.raises(ValueError):
-        vector_to_bytes(np.zeros((2, 3), dtype=np.float32))
-
-
-def test_bytes_round_trip_is_exact() -> None:
-    rng = np.random.default_rng(0)
-    v = rng.standard_normal(384).astype(np.float32)
-    b = vector_to_bytes(v)
-    assert len(b) == 4 * 384
-    back = bytes_to_vector(b)
-    assert back.dtype == np.float32
-    assert back.shape == (384,)
-    assert back.flags.writeable
-    assert np.array_equal(back, v)
-    assert bytes_to_vector(b"").shape == (0,)
-
-
-def test_bytes_to_vector_accepts_memoryview_and_bytearray() -> None:
-    packed = struct.pack("<3f", 1.0, 2.0, 3.0)
-    assert np.array_equal(bytes_to_vector(bytearray(packed)), [1.0, 2.0, 3.0])
-    assert np.array_equal(bytes_to_vector(memoryview(packed)), [1.0, 2.0, 3.0])
-
-
-def test_bytes_to_vector_rejects_bad_length() -> None:
-    with pytest.raises(ValueError):
-        bytes_to_vector(b"\x00\x00\x00")
 
 
 def test_vector_to_text_format() -> None:
@@ -110,7 +60,7 @@ def test_text_to_vector_rejects_bad_input() -> None:
 def test_bytes_and_text_encode_the_same_vector() -> None:
     rng = np.random.default_rng(2)
     v = rng.standard_normal(16).astype(np.float32)
-    assert np.array_equal(bytes_to_vector(vector_to_bytes(v)), text_to_vector(vector_to_text(v)))
+    assert np.array_equal(dbmod.vec_from_bytes(dbmod.vec_param(v)), text_to_vector(vector_to_text(v)))
 
 
 # --- Embedder, without loading the model --------------------------------------------------------

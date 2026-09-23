@@ -112,9 +112,11 @@ limitation).
   cannot change the vectors; `dim` property; `embed_passages(texts,
   batch_size=64) -> np.ndarray[float32, (n, dim)]`; `embed_queries(texts)` prepends the model's
   query instruction (`"Represent this sentence for searching relevant passages: "` for bge).
-- Helpers, independent of the model: `vector_to_bytes(v) -> bytes` (float32 little-endian, the
-  MariaDB storage format), `bytes_to_vector(b) -> np.ndarray`, `vector_to_text(v) -> "[...]"` for
-  `VEC_FromText`.
+- Helpers, independent of the model: `vector_to_text(v) -> "[...]"` for `VEC_FromText` and
+  `text_to_vector(s)` for what `VEC_ToText` returns. The bytes bound for a `VECTOR` parameter
+  (float32 little-endian, the MariaDB storage format) come from `db.vec_param(v)`, and
+  `db.vec_from_bytes(b)` reads a stored vector back (until 2026-09-23 `embedding.vector_to_bytes`
+  and `bytes_to_vector` duplicated them, used by no code).
 
 ## Database (`sql/schema.sql`, `db.py`, `config.py`)
 

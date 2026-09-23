@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 from dataclasses import replace
 from pathlib import Path
 
@@ -201,6 +202,24 @@ def test_vec_param_and_vec_from_bytes_round_trip_in_memory() -> None:
         dbmod.vec_param(np.array([1.0, np.nan], dtype=np.float32))
     with pytest.raises(ValueError):
         dbmod.vec_from_bytes(b"\x00\x00\x00")
+
+
+def test_vec_param_writes_float32_little_endian_from_any_input() -> None:
+    values = [1.0, -2.5, 0.125, 3.0e-3]
+    assert dbmod.vec_param(np.array(values, dtype=np.float32)) == struct.pack("<4f", *values)
+    # known bit patterns: 1.0f is 0x3F800000, written least significant byte first
+    assert dbmod.vec_param([1.0]) == b"\x00\x00\x80\x3f"
+    assert dbmod.vec_param([-2.5]) == b"\x00\x00\x20\xc0"
+    # a big-endian float32 input is converted, not copied byte for byte
+    assert dbmod.vec_param(np.array([1.0, 2.0], dtype=">f4")) == struct.pack("<2f", 1.0, 2.0)
+
+
+def test_vec_from_bytes_accepts_any_bytes_like_and_returns_a_writable_copy() -> None:
+    packed = struct.pack("<3f", 1.0, 2.0, 3.0)
+    for raw in (packed, bytearray(packed), memoryview(packed)):
+        back = dbmod.vec_from_bytes(raw)
+        assert np.array_equal(back, [1.0, 2.0, 3.0]) and back.flags.writeable
+    assert dbmod.vec_from_bytes(b"").shape == (0,)
 
 
 def test_insert_sql_validates_identifiers() -> None:

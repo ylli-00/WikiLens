@@ -206,15 +206,6 @@ def _element_texts(key: str, element: object) -> list[tuple[str, str]]:
     return []
 
 
-def link_source(element_key: str) -> str:
-    """Return ``"sentence"``, ``"list"`` or ``"table"`` for a link's source element key."""
-    if element_key.startswith("sentence_"):
-        return "sentence"
-    if element_key.startswith("item_"):
-        return "list"
-    return "table"
-
-
 def extract_links(page: dict) -> list[tuple[str, str]]:
     """Return ``(to_title, source_element_key)`` pairs from sentences, list items and table cells.
 

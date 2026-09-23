@@ -4,9 +4,11 @@ The model (chosen in phase 1, see docs/DESIGN.md, "Embedding") is ``BAAI/bge-sma
 dimensions. Embeddings are L2-normalised so that the cosine distance MariaDB computes with
 ``VEC_DISTANCE_COSINE`` equals ``1 - dot``.
 
-The helpers at the bottom of this module do not need the model. ``vector_to_bytes`` produces the
-MariaDB ``VECTOR`` storage format (float32, little-endian, ``4 * dim`` bytes) and
-``vector_to_text`` the ``[x,y,...]`` form accepted by ``VEC_FromText``.
+The two helpers at the bottom of this module do not need the model: ``vector_to_text`` writes
+the ``[x,y,...]`` form that ``VEC_FromText`` accepts and ``text_to_vector`` reads what
+``VEC_ToText`` returns. The bytes that are bound for a ``VECTOR`` parameter (float32,
+little-endian, ``4 * dim`` bytes) come from ``db.vec_param``, and ``db.vec_from_bytes`` reads a
+stored vector back.
 """
 
 from __future__ import annotations
@@ -160,27 +162,6 @@ class Embedder:
         if result.ndim != 2 or result.shape[0] != len(texts):
             raise RuntimeError(f"unexpected embedding shape {result.shape} for {len(texts)} texts")
         return result
-
-
-def vector_to_bytes(v: Sequence[float] | np.ndarray) -> bytes:
-    """Return the vector as float32 little-endian bytes (exactly ``4 * dim`` bytes).
-
-    This is the MariaDB ``VECTOR`` storage format. The input must be one-dimensional.
-    """
-    arr = np.asarray(v, dtype=_VECTOR_DTYPE)
-    if arr.ndim != 1:
-        raise ValueError(f"expected a 1-D vector, got shape {arr.shape}")
-    return arr.tobytes()
-
-
-def bytes_to_vector(b: bytes | bytearray | memoryview) -> np.ndarray:
-    """Return a writable float32 array decoded from little-endian float32 bytes.
-
-    Raises ``ValueError`` when the length is not a multiple of 4.
-    """
-    if len(b) % 4 != 0:
-        raise ValueError(f"vector bytes must be a multiple of 4 bytes long, got {len(b)}")
-    return np.frombuffer(b, dtype=_VECTOR_DTYPE).astype(np.float32, copy=True)
 
 
 def vector_to_text(v: Sequence[float] | np.ndarray) -> str:

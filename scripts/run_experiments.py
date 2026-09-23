@@ -1459,16 +1459,6 @@ class Results:
         comparison = compare_hits(self.out_dir, reference, [other])
         return f"{comparison['runs'][other]['identical_sequence']}/{comparison['n_claims']}"
 
-    def identical_n(self, reference: str, other: str) -> int | None:
-        if not self.has(reference, other):
-            return None
-        return int(compare_hits(self.out_dir, reference, [other])["runs"][other]["identical_sequence"])
-
-    def lost_gold(self, reference: str, other: str) -> list[int]:
-        if not self.has(reference, other):
-            return []
-        return lost_gold_pages(self.out_dir, reference, other)
-
     def ingest_run(self, label: str) -> dict[str, Any] | None:
         runs = self.get(INGEST_RUNS) or []
         for run in reversed(runs):

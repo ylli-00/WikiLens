@@ -10,7 +10,6 @@ from wikilense.wikitext import (
     clean_text,
     extract_links,
     is_hatnote,
-    link_source,
     link_targets,
     normalise_title,
     page_stats,
@@ -201,8 +200,6 @@ def test_normalise_title_and_link_targets() -> None:
     assert normalise_title("Amélie_(film)") == "Amélie (film)"
     assert link_targets("[[A_b#frag|x]] [[C]] [[#self|s]] [[|]] [[D|d") == ["A b", "C", "D"]
     assert link_targets("[[Oak_Hill_Cemetery_(Washington,") == []
-    keys = ("sentence_3", "item_0_1", "cell_0_1_1", "header_cell_0_0_0")
-    assert [link_source(k) for k in keys] == ["sentence", "list", "table", "table"]
 
 
 def test_extract_links_from_all_three_sources() -> None:

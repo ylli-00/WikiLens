@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from wikilense.corpus import (
-    _link_targets,
     claim_pages,
     iter_claims,
     iter_pages,
@@ -170,7 +169,6 @@ def test_link_targets_reads_sentences_items_and_cells():
     assert link_targets(alpha) == {"Gamma", "Delta", "Missing page", "Beta", "Epsilon"}
     assert link_targets(SHARD_PAGES[0]) == set()
     assert link_targets({"title": "X", "order": ["sentence_0"], "sentence_0": "[[A_b#c|x]]"}) == {"A b"}
-    assert _link_targets is link_targets  # the former private name still works
 
 
 def test_iter_pages_keeps_file_order(synthetic):

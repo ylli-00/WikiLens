@@ -273,10 +273,10 @@ def vec_param(v: np.ndarray) -> bytes:
     return arr.tobytes()
 
 
-def vec_from_bytes(b: bytes) -> np.ndarray:
+def vec_from_bytes(b: bytes | bytearray | memoryview) -> np.ndarray:
     """Return the float32 vector stored in a ``VECTOR`` column's raw bytes (little-endian).
 
-    Raises ValueError when the length is not a multiple of 4.
+    The array is a writable copy. Raises ValueError when the length is not a multiple of 4.
     """
     if len(b) % 4:
         raise ValueError(f"vector bytes length {len(b)} is not a multiple of 4")
