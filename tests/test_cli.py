@@ -798,8 +798,9 @@ def test_help_lists_the_subcommands_options_and_exit_codes(capsys: pytest.Captur
                    "--links-to", "--title", "--strategy", "--overfetch", "--ef-search",
                    "--sentences", "--explain", "--json"):  # fmt: skip
         assert option in text
-    for strategy in STRATEGIES:
-        assert f"{strategy}:" in text or f"{{{strategy}" in text or f",{strategy}" in text
+    for strategy in STRATEGIES:  # every strategy has its own line, not the fallback
+        assert f"{strategy}: {' '.join(cli.STRATEGY_HELP[strategy].split())}" in text
+    assert "see wikilense.search" not in text
     assert "exit codes" in text
     assert "WIKILENSE_EF_SEARCH" in text and "server" in text
     assert "page.n_words >= N" in text and "chunk_sentence" in text

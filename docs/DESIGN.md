@@ -88,6 +88,10 @@ limitation).
   the experiments: `max_words` 240 (120 in phases 1 and 2; equal recall at equal retrieved text
   with half the vectors, `results/SUMMARY.md` section 4 and Phase 3 below) and `overlap_units` 1
   (kept, not swept). A chunk never crosses a section boundary.
+- Only *chunkable* units take part (`TextUnit.chunkable`): a unit that is empty after cleaning, or
+  a hatnote (`wikitext.HATNOTE_RE`: "Main article: X", "See also: Y", "For other uses, see Z",
+  ...), is in no chunk and in no `chunk_sentence` row, but stays a `sentence` row so evidence ids
+  resolve (hatnotes since phase 5: 1,316 of the 33,637 units of the corpus).
 - Fill a chunk with consecutive units until adding the next unit would exceed `max_words`; a
   single unit longer than `max_words` becomes its own chunk. The next chunk starts
   `overlap_units` units before the end of the previous chunk, but only when the previous chunk
@@ -127,7 +131,7 @@ All tables InnoDB, `utf8mb4`. Title columns use `utf8mb4_bin` so that matching i
 | `page` | `page_id`, `title` UNIQUE, `n_sentences`, `n_items`, `n_words`, `n_chars`, `n_sections`, `n_tables`, `n_lists` | index on `n_words` for length filters |
 | `section` | `section_id`, `page_id` FK, `ordinal`, `heading`, `level`, `path` | UNIQUE (`page_id`, `ordinal`); index on `heading` |
 | `sentence` | `sentence_id`, `page_id` FK, `section_id` FK, `element_key`, `ordinal`, `text` | UNIQUE (`page_id`, `element_key`); one row per text unit (sentence or list item) |
-| `chunk` | `chunk_id`, `page_id` FK, `section_id` FK, `ordinal`, `text`, `n_words`, `embedding VECTOR(384) NOT NULL` | UNIQUE (`page_id`, `ordinal`); `VECTOR INDEX (embedding) M=16 DISTANCE=cosine` (M=6 in phases 1 and 2; 16 chosen with the M sweep, `results/SUMMARY.md` section 3) |
+| `chunk` | `chunk_id`, `page_id` FK, `section_id` FK, `ordinal`, `text`, `n_words`, `embedding VECTOR(384) NOT NULL` | UNIQUE (`page_id`, `ordinal`); `VECTOR INDEX (embedding) M=16 DISTANCE=cosine` (M=6 in phases 1 and 2; 16 chosen with the M sweep, `results/SUMMARY.md` section 3); `FULLTEXT KEY ft_chunk_text (text)` for the `rrf` strategy (since phase 5) |
 | `chunk_sentence` | (`chunk_id`, `sentence_id`) | the chunk-to-sentence map; index on `sentence_id` |
 | `link` | `link_id`, `from_page_id` FK, `to_title`, `to_page_id` NULL FK, `source_element` | `to_page_id` resolved when the target is in the corpus; indexes on `from_page_id`, `to_page_id`, `to_title` |
 | `claim` | `claim_id` (FEVEROUS id), `split`, `text`, `label`, `challenge` | |
@@ -182,12 +186,15 @@ Deterministic, standard library only, recompute every count from the files.
 
 ## Search (`search.py`), phase 2
 
-- `knn(conn, qvec, k)`: `SELECT chunk_id, page_id, VEC_DISTANCE_COSINE(embedding, %s) AS distance
-  FROM chunk ORDER BY distance LIMIT %s`.
+- The k-nearest-neighbour core, `search.KNN_SQL`: `SELECT chunk_id, VEC_DISTANCE_COSINE(embedding,
+  %s) AS distance FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT %s` (planned as a
+  `knn()` function; it became strategy `none` of `search()`, which joins it back to `page` and
+  `section`).
 - Hybrid variants, each returning the same row shape, each with its `EXPLAIN` recorded:
   predicate on page length (`page.n_words >= %s`), on section heading (`section.heading LIKE %s`
-  or `path`), on link structure (`chunk.page_id IN (SELECT to_page_id FROM link WHERE
-  from_page_id = ...)`), and combinations; joined back to `page`, `section` and, through
+  or `path`), on link structure (planned as `chunk.page_id IN (SELECT to_page_id FROM link WHERE
+  from_page_id = ...)`, built as a join on a `SELECT DISTINCT` derived table, see Phase 2
+  outcomes), and combinations; joined back to `page`, `section` and, through
   `chunk_sentence`, to the `sentence` rows of each hit.
 - Filtering strategies to compare: predicate in the same statement; over-fetch `k * f` by the
   index and filter in an outer query; `mhnsw_ef_search` raised per session.
@@ -281,15 +288,24 @@ connection is still open) and closes the connection:
 
 ## Search (`search.py`), contract for phase 2
 
-- `Hit(chunk_id, page_id, title, section_path, chunk_ordinal, n_words, distance, text)`.
+- `Hit(chunk_id, page_id, title, section_path, chunk_ordinal, n_words, distance, text,
+  score=None)`; `score` is the fused score of `rrf`, `distance` always the cosine distance.
 - `Filters(min_words=None, max_words=None, heading_like=None, path_like=None, linked_from=None,
   links_to=None, titles=None)`; every field optional; `heading_like` and `path_like` are SQL LIKE
   patterns supplied by the caller (parameters, never interpolated).
-- `search(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10, ef_search=None) ->
-  list[Hit]` with strategies: `inline` (predicates and joins in the one statement that carries
-  `ORDER BY VEC_DISTANCE_COSINE(...) LIMIT k`), `overfetch` (an inner index-driven query with
-  `LIMIT k * overfetch`, filtered and re-limited in the outer query), `none` (no filters).
-  `ef_search` sets the session variable for that call and restores it afterwards.
+- `search(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10, ef_search=None,
+  query_text=None) -> list[Hit]` with strategies (`search.STRATEGIES`): `inline` (predicates and
+  joins in the one statement that carries `ORDER BY VEC_DISTANCE_COSINE(...) LIMIT k`),
+  `overfetch` (an inner index-driven query with `LIMIT k * overfetch`, filtered and re-limited in
+  the outer query), `none` (no filters), `rrf` (since phase 5: the vector top-N and the FULLTEXT
+  top-N of `query_text`, N = `k * overfetch`, each ranked with `ROW_NUMBER()` and fused by
+  reciprocal rank fusion, `1 / (60 + rank)` summed over both lists; the filters apply to the
+  fused list). Ties are broken by `chunk_id`: in Python for the vector strategies (a second
+  `ORDER BY` key loses the index), in SQL for `rrf`. `overfetch` is at most `MAX_OVERFETCH`
+  (1000). `ef_search` (1 to 10000, the server's range; None leaves the session alone) sets the
+  session variable for that call and restores it afterwards, also when the statement fails;
+  `resolve_ef_search(requested, default)` gives the CLI, the web page and the harness one rule:
+  a missing value takes `Settings.ef_search`, and 0 means the server's session value.
 - `explain_search(conn, ...)` returns the `EXPLAIN` rows for the same statement.
 - `hit_sentences(conn, chunk_ids) -> dict[chunk_id, list[(element_key, text)]]` through
   `chunk_sentence`, and `page_summary(conn, page_id)`.
@@ -305,7 +321,8 @@ connection is still open) and closes the connection:
 - `evaluate(conn, embedder, ks=(1, 3, 5, 10, 20), repeats=5, strategy=..., filters=None,
   ef_search=None) -> EvalResult` with, per k: article recall (a gold page among the pages of the
   top-k chunks), evidence recall (every unit of at least one sentence-only set covered by the
-  top-k chunks, over the 65 eligible claims), unit coverage (share of gold units covered), and
+  top-k chunks, over the 66 eligible claims: 65 was the phase-1 count before list items counted
+  as text units, see Phase 2 outcomes), unit coverage (share of gold units covered), and
   latency: embedding time and SQL time separately, p50 / p95 / mean over `repeats` warm runs of
   every claim, plus the parameters, `ingest_meta`, machine and versions. The metrics at `k`
   come from the `LIMIT k` search of each claim, the statement whose latency is reported at `k`
@@ -319,10 +336,13 @@ connection is still open) and closes the connection:
 ## CLI and web (`cli.py`, `web.py`), contract for phase 2
 
 `wikilense init-db [--reset]`, `wikilense ingest [--corpus-dir] [--no-reset] [--batch-size]
-[--no-prefix]`, `wikilense query "text" [--k 5] [--min-words N] [--heading PATTERN]
-[--linked-from TITLE] [--strategy inline|overfetch|none] [--ef-search N] [--explain] [--json]`,
-`wikilense eval [--k 1,3,5,10,20] [--repeats 5] [--strategy ...] [--ef-search N] [--out results]
-[--name NAME]`, `wikilense serve [--host 127.0.0.1] [--port 8000]`. The web page is one HTML form
+[--no-prefix]`, `wikilense query "text" [--k 5] [--min-words N] [--max-words N] [--heading
+PATTERN] [--path PATTERN] [--linked-from TITLE] [--links-to TITLE] [--title TITLE ...]
+[--strategy inline|overfetch|none|rrf] [--overfetch N] [--ef-search N|0|server] [--sentences]
+[--explain] [--json]`, `wikilense eval [--k 1,3,5,10,20] [--repeats 5] [--strategy ...]
+[--overfetch N] [--ef-search N|0|server] [--out results] [--name NAME]`, `wikilense serve [--host
+127.0.0.1] [--port 8000]`. Exit codes: 0 success, 1 an expected failure (one line on stderr),
+2 bad arguments, 130 interrupted. The web page is one HTML form
 (query, k, filters) that calls `GET /api/search` and shows hits with title, section path,
 distance, the chunk text and the SQL that ran; no JavaScript framework, no external assets.
 
@@ -463,6 +483,20 @@ reference for every number in the README. Section 7 there is the final configura
 chunks, overlap 1, M=16, prefix on, 4,598 chunks, 1,316 hatnote units excluded): article
 recall@1/5/10/20 63/74/74/74 of 75, evidence recall@1/5/10/20 39/55/60/65 of 66, SQL p50/p95 at
 k=10 0.90/1.41 ms, query embedding 4.7 ms; hit lists identical to the exact ranking for 74/75
-claims, and identical across a server restart for 74/75. The M=6 numbers of the phase-3 section
-above were measured on the pre-hatnote ingest and are superseded by sections 1 to 3 of the
-summary, which repeat them on the current code.
+claims, and identical across a server restart for 74/75. Every number of the phase-3 section
+above was measured on the pre-hatnote ingest and is superseded by sections 1 to 7 of the summary,
+which repeat the measurements on the current code; M=16 included: at ef 20 it now gives article
+recall@10 72/75 and evidence recall@20 61/66 (section 3), not the exact ranking's 74/75 and 63/66,
+which it reaches at ef 100.
+
+## Review pass (2026-09-23)
+
+A code review changed behaviour that later runs will see (commits after 92f1838; the committed
+`results/` predate it). The metrics at `k` now come from the `LIMIT k` query, which changes the
+`overfetch` and `rrf` result files (strategy files of section 6, `final_rrf`, `rrf_120_m6`): those
+need the experiments rerun; `none` and `inline` files had 0 prefix mismatches and do not change.
+The rest changes no number: `wikilense eval --ef-search 0` keeps the server value as documented,
+`WIKILENSE_INDEX_M` is gone (M is the schema's; `ingest_meta` records the live index), the model is
+pinned to revision 5c38ec7c405e, the ingest checks settings and model before dropping anything,
+the rrf full-text list breaks ties by `chunk_id` (hit lists unchanged for 375 of 375 claim / k
+pairs), and `scripts/run_experiments.py` builds no SQL from strings.

@@ -84,6 +84,8 @@ STRATEGY_HELP: dict[str, str] = {
     "overfetch": "the index returns k x OVERFETCH candidates and the filters run on those, "
     "may return fewer than k",
     "none": "plain nearest neighbours, no filter allowed",
+    "rrf": "vector top-N and full-text top-N of the query text fused by reciprocal rank "
+    "(N = k x OVERFETCH), may return fewer than k",
 }
 
 #: ``query`` filter options as (namespace attribute, command-line flag), in help order.
@@ -334,8 +336,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=positive_int,
         default=DEFAULT_OVERFETCH,
         metavar="N",
-        help="overfetch strategy only: the index returns k x N candidates before the filters "
-        f"run (default {DEFAULT_OVERFETCH})",
+        help="overfetch and rrf strategies only: the index (and, for rrf, the full-text search) "
+        f"returns k x N candidates before the filters run (default {DEFAULT_OVERFETCH})",
     )
     p_query.add_argument("--ef-search", type=ef_search_arg, metavar="N", help=EF_SEARCH_HELP)
     p_query.add_argument(
@@ -380,8 +382,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=positive_int,
         default=evaluate.DEFAULT_OVERFETCH,
         metavar="N",
-        help="overfetch strategy only: the index returns k x N candidates before the filters "
-        f"run (default {evaluate.DEFAULT_OVERFETCH})",
+        help="overfetch and rrf strategies only: the index (and, for rrf, the full-text search) "
+        f"returns k x N candidates before the filters run (default {evaluate.DEFAULT_OVERFETCH})",
     )
     p_eval.add_argument("--ef-search", type=ef_search_arg, metavar="N", help=EF_SEARCH_HELP)
     p_eval.add_argument(

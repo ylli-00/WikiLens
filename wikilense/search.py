@@ -5,7 +5,8 @@ README can quote them verbatim. Values are always bound as ``%s`` parameters; th
 ever varies in a statement is the number of placeholders in an ``IN (...)`` list and which
 fixed fragments are present.
 
-Three strategies, measured on MariaDB 11.8.9 (see docs/DESIGN.md and tests/test_search.py):
+Four strategies (:data:`STRATEGIES`), measured on MariaDB 11.8.9 (see docs/DESIGN.md and
+tests/test_search.py):
 
 ``inline``
     One statement: ``chunk STRAIGHT_JOIN page STRAIGHT_JOIN section [...] WHERE <filters>
@@ -25,10 +26,18 @@ Three strategies, measured on MariaDB 11.8.9 (see docs/DESIGN.md and tests/test_
 ``none``
     The ``overfetch`` statement with factor 1 and no filters: plain k-nearest-neighbour search
     joined back to ``page`` and ``section`` for the hit metadata. Filters are ignored.
+``rrf``
+    Hybrid: the vector top-N (the bare index query) and the full-text top-N of ``query_text``
+    over the ``FULLTEXT`` index on ``chunk.text``, N = ``k * overfetch``, each ranked with
+    ``ROW_NUMBER()`` and fused by reciprocal rank fusion (``1 / (60 + rank)`` summed over both
+    lists) in one ``WITH`` statement. Filters apply to the fused list in the outer query, so,
+    like ``overfetch``, it can return fewer than ``k`` rows under a selective filter.
 
-Results are ordered by distance ascending, ties by ``chunk_id``. The tie-break is applied in
-Python: a second ``ORDER BY`` key after ``VEC_DISTANCE_COSINE(...)`` makes MariaDB drop the
-vector index and sort the whole table (measured).
+The vector strategies return hits ordered by distance ascending, ties by ``chunk_id``; the
+tie-break is applied in Python, because a second ``ORDER BY`` key after
+``VEC_DISTANCE_COSINE(...)`` makes MariaDB drop the vector index and sort the whole table
+(measured). ``rrf`` orders by fused score descending, ties by ``chunk_id``, in SQL (that
+``ORDER BY`` does not have to be the index shape).
 """
 
 from __future__ import annotations
