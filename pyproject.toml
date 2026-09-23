@@ -29,6 +29,7 @@ include = ["wikilense*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--strict-markers"  # a mistyped marker (e.g. @pytest.mark.dbb) is an error, not a skip-free test
 markers = [
   "db: needs a running MariaDB (skipped when WIKILENSE_DB_* is not reachable)",
   "slow: downloads or runs the embedding model",

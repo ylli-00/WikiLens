@@ -2,12 +2,18 @@
 
 Tests marked ``db`` need a running MariaDB. They are skipped, with the reason, when no settings
 can be loaded or the server does not accept a TCP connection within one second. The suite only
-ever connects to ``settings.test_db_name`` and refuses to run when that equals the main database.
+ever connects to ``settings.test_db_name``, and refuses to (every ``db`` test is skipped, and the
+``settings`` fixture skips too) unless that name ends in ``_test`` and differs from the main
+database: the db tests reset the schema of the database they use.
 
 Tests marked ``slow`` need the embedding model. They are skipped, with the reason, when the
 model is neither in the Hugging Face cache nor downloadable (``huggingface.co`` does not accept
 a TCP connection within one second, or ``HF_HUB_OFFLINE`` is set), so an offline grader sees
 skips instead of download failures.
+
+Where the database and the model are known to be there (CI), set ``WIKILENSE_REQUIRE_DB=1`` and
+``WIKILENSE_REQUIRE_MODEL=1``: a skip reason then stops the run with an error, so a missing
+service cannot turn into a green run with 66 tests skipped.
 """
 
 from __future__ import annotations
@@ -25,9 +31,34 @@ from wikilense.config import Settings, SettingsError, load_settings
 from wikilense.embedding import DEFAULT_MODEL_NAME, Embedder
 
 CONNECT_TIMEOUT_S = 1.0
+TEST_DB_SUFFIX = "_test"
+#: marker -> environment variable that turns its skip reason into an error.
+REQUIRE_VARIABLES = {"db": "WIKILENSE_REQUIRE_DB", "slow": "WIKILENSE_REQUIRE_MODEL"}
 HF_HUB_HOST = ("huggingface.co", 443)
 #: One of these must be in the cached snapshot for the model to load without the hub.
 MODEL_WEIGHT_FILES = ("model.safetensors", "pytorch_model.bin")
+
+
+def unsafe_test_database(settings: Settings) -> str | None:
+    """Return why ``settings.test_db_name`` must not be used by the db tests, or None when it can.
+
+    The db tests drop and recreate every table of that database, so it has to be a test
+    database: different from ``settings.db_name`` and ending in ``TEST_DB_SUFFIX``.
+    """
+    if settings.test_db_name == settings.db_name:
+        return "refusing to run db tests: WIKILENSE_TEST_DB_NAME equals WIKILENSE_DB_NAME"
+    if not settings.test_db_name.endswith(TEST_DB_SUFFIX):
+        return (
+            f"refusing to run db tests: WIKILENSE_TEST_DB_NAME {settings.test_db_name!r} does not "
+            f"end in {TEST_DB_SUFFIX!r} (the tests reset that database's schema)"
+        )
+    return None
+
+
+def _required(marker: str) -> bool:
+    """Return True when the environment says the ``marker`` tests must run, not skip."""
+    value = os.environ.get(REQUIRE_VARIABLES[marker], "").strip().lower()
+    return value in ("1", "true", "yes", "on")
 
 
 @functools.lru_cache(maxsize=1)
@@ -40,10 +71,9 @@ def _db_state() -> tuple[Settings | None, str | None]:
         settings = load_settings()
     except SettingsError as exc:
         return None, f"settings not available: {exc}"
-    if settings.test_db_name == settings.db_name:
-        return settings, (
-            "refusing to run db tests: WIKILENSE_TEST_DB_NAME equals WIKILENSE_DB_NAME"
-        )
+    refusal = unsafe_test_database(settings)
+    if refusal is not None:
+        return settings, refusal
     try:
         with socket.create_connection((settings.db_host, settings.db_port), CONNECT_TIMEOUT_S):
             pass
@@ -111,7 +141,7 @@ def _slow_state() -> str | None:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip, with the reason, every ``db`` test without a usable server and every ``slow`` test
-    without a loadable model."""
+    without a loadable model; with ``REQUIRE_VARIABLES`` set, stop the run instead."""
     for marker, state in (("db", _db_state), ("slow", _slow_state)):
         if not any(item.get_closest_marker(marker) for item in items):
             continue
@@ -119,6 +149,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         reason = result[1] if isinstance(result, tuple) else result
         if reason is None:
             continue
+        if _required(marker):
+            raise pytest.UsageError(f"{REQUIRE_VARIABLES[marker]} is set, but {reason}")
         for item in items:
             if item.get_closest_marker(marker):
                 item.add_marker(pytest.mark.skip(reason=reason))
@@ -126,10 +158,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 @pytest.fixture(scope="session")
 def settings() -> Settings:
-    """The Settings from the environment and .env; skips the test when they cannot be loaded."""
+    """The Settings from the environment and .env; skips the test when they cannot be loaded or
+    name a test database the db tests must not reset (:func:`unsafe_test_database`)."""
     loaded, reason = _db_state()
     if loaded is None:
         pytest.skip(reason or "settings not available")
+    refusal = unsafe_test_database(loaded)
+    if refusal is not None:
+        pytest.skip(refusal)
     return loaded
 
 

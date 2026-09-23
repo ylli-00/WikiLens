@@ -70,4 +70,9 @@ jobs:
         run: ruff check .
 
       - name: Test
+        # The service and the cached model are there, so a db or slow test must run, not skip:
+        # tests/conftest.py turns a skip reason into an error when these are set.
+        env:
+          WIKILENSE_REQUIRE_DB: "1"
+          WIKILENSE_REQUIRE_MODEL: "1"
         run: python -m pytest -q -rs

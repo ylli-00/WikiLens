@@ -334,6 +334,39 @@ def test_overfetch_above_the_maximum_is_refused() -> None:
     assert params[2] == 2 * searchmod.MAX_OVERFETCH
 
 
+class RowsConn:
+    """A fake connection whose one statement returns the given rows (search() without a server)."""
+
+    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
+        self.rows = rows
+        self.executed: list[str] = []
+
+    def cursor(self) -> contextlib.nullcontext[RowsConn]:
+        return contextlib.nullcontext(self)
+
+    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
+        self.executed.append(sql)
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        return self.rows
+
+
+def _row(chunk_id: int, distance: float, score: float | None = None) -> tuple[Any, ...]:
+    row = (chunk_id, 1, "Alpha", "", 0, 3, distance, f"chunk {chunk_id}")
+    return row if score is None else (*row, score)
+
+
+def test_ties_are_broken_by_chunk_id_in_python() -> None:
+    """The ORDER BY carries only the distance (a second key loses the vector index), so equal
+    distances arrive in any order; search() puts them in chunk_id order."""
+    rows = [_row(9, 0.2), _row(4, 0.1), _row(7, 0.1), _row(2, 0.1)]
+    for strategy in ("inline", "overfetch", "none"):
+        assert _ids(search(RowsConn(rows), QUERY, k=4, strategy=strategy)) == [2, 4, 7, 9]
+    fused = [_row(9, 0.5, 0.02), _row(5, 0.1, 0.03), _row(3, 0.9, 0.02)]
+    hits = search(RowsConn(fused), QUERY, k=3, strategy="rrf", query_text="x")
+    assert _ids(hits) == [5, 3, 9]  # rrf: score descending, then chunk_id
+
+
 def test_schema_declares_the_fulltext_index_on_chunk_text() -> None:
     script = dbmod.SCHEMA_PATH.read_text(encoding="utf-8")
     chunk_ddl = script.split("CREATE TABLE IF NOT EXISTS chunk (")[1].split(") ENGINE=InnoDB")[0]

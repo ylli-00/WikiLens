@@ -186,6 +186,52 @@ def test_schema_file_matches_the_fixed_table_list() -> None:
         assert before.startswith("-- "), match.group(0)
 
 
+#: A column line inside CREATE TABLE: name (optionally in backticks), then its type.
+_COLUMN_LINE = re.compile(r"^\s+`?(\w+)`?\s+(?:INT|TINYINT|SMALLINT|VARCHAR|TEXT|ENUM|VECTOR)\b")
+
+
+def _schema_file_columns() -> dict[str, tuple[str, ...]]:
+    """Return {table: columns in order} parsed from sql/schema.sql, without a server."""
+    columns: dict[str, tuple[str, ...]] = {}
+    for statement in dbmod.split_sql(dbmod.SCHEMA_PATH.read_text(encoding="utf-8")):
+        table = re.match(r"CREATE TABLE IF NOT EXISTS (\w+) \(", statement).group(1)
+        columns[table] = tuple(
+            m.group(1) for line in statement.splitlines() if (m := _COLUMN_LINE.match(line))
+        )
+    return columns
+
+
+def test_schema_file_columns_match_the_code_without_a_server() -> None:
+    """The rubric's "schema that disagrees with the code", checked where anyone can run it:
+    db.SCHEMA_COLUMNS (the INSERT allowlist) is sql/schema.sql column for column, and every
+    column ingest writes exists. test_fixed_column_list_matches_the_database repeats it live."""
+    from wikilense import ingest
+
+    assert _schema_file_columns() == dbmod.SCHEMA_COLUMNS
+    for table, columns in ingest._INSERT_COLUMNS.items():
+        assert set(columns) <= set(dbmod.SCHEMA_COLUMNS[table]), table
+    # link_id is the only schema column ingest leaves to AUTO_INCREMENT
+    written = {c for cols in ingest._INSERT_COLUMNS.values() for c in cols}
+    assert {c for cols in dbmod.SCHEMA_COLUMNS.values() for c in cols} - written == {"link_id"}
+    script = dbmod.SCHEMA_PATH.read_text(encoding="utf-8")
+    assert re.search(rf"embedding\s+VECTOR\({dbmod.VECTOR_DIM}\) NOT NULL", script)
+
+
+def test_the_test_database_guard_refuses_the_corpus_database() -> None:
+    """The db tests reset the schema of settings.test_db_name, so that name must be a test
+    database: never the corpus database, and always ending in ``_test``."""
+    from conftest import unsafe_test_database
+
+    ok = Settings(db_password="x", db_name="wikilense", test_db_name="wikilense_test")
+    assert unsafe_test_database(ok) is None
+    for bad in (
+        replace(ok, test_db_name="wikilense"),  # the corpus database itself
+        replace(ok, db_name="other", test_db_name="wikilense"),  # a corpus-like name
+        replace(ok, test_db_name="scratch"),
+    ):
+        assert unsafe_test_database(bad) is not None, bad.test_db_name
+
+
 def test_vec_param_and_vec_from_bytes_round_trip_in_memory() -> None:
     v = _unit(1)
     b = dbmod.vec_param(v)
