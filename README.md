@@ -79,7 +79,7 @@ The ingest ends with the seconds per stage and a report you can compare against 
   claims 75, evidence ids 114 (page resolved 114, sentence resolved 87)
 ```
 
-Then `make test` (255 tests, 20 s), `make eval` (the headline table below, about 15 s),
+Then `make test` (298 tests, 20 s), `make eval` (the headline table below, about 15 s),
 `make serve` (the web page at http://127.0.0.1:8000), `make experiments` (the whole protocol,
 about 10 minutes) and `make down`.
 
@@ -478,7 +478,8 @@ scripts/            build_corpus.py, fetch_wiki_shard.py, run_experiments.py
 data/corpus/        the committed 100 pages and 75 claims, with MANIFEST.md
 results/            every experiment (JSON + Markdown) and SUMMARY.md
 docs/DESIGN.md      the design contract, every deviation forced by the data, the measured outcomes
-tests/              255 tests: pure tests, `db` tests against wikilense_test, `slow` tests that load the model
+docs/ARCHITECTURE.md  a beginner's guide to the code: the pipeline, every file, one query end to end
+tests/              298 tests: pure tests, `db` tests against wikilense_test, `slow` tests that load the model
 analysis/feverous/  the FEVEROUS analysis that chose the benchmark (earlier phase)
 ```
 

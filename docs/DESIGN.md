@@ -33,6 +33,7 @@ data/feverous/             raw downloads (not committed)
 tests/                     pytest; markers `db` (needs MariaDB) and `slow` (needs the model)
 results/                   harness outputs (committed)
 docs/DESIGN.md             this file
+docs/ARCHITECTURE.md       beginner's guide: pipeline, every file, one query end to end
 ```
 
 Rules for all code: Python 3.10+, standard library where it is enough, type hints, docstrings that

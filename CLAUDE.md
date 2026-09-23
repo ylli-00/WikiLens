@@ -12,7 +12,7 @@ Everything the brief asks for is built, measured and pushed (github.com/ylli-00/
 corpus selection, parsing, chunking, MariaDB schema with `VECTOR` and a cosine `VECTOR INDEX`,
 ingest, hybrid queries (predicates, joins, an RRF full-text hybrid), CLI and web page, the
 recall/latency harness, the experiment protocol (`scripts/run_experiments.py`, `results/SUMMARY.md`),
-255 tests, CI, README. Chosen defaults with evidence: 240-word chunks, overlap 1, bge-small-en-v1.5
+298 tests, CI, README. Chosen defaults with evidence: 240-word chunks, overlap 1, bge-small-en-v1.5
 with the title prefix, index M=16, `mhnsw_ef_search` 100 per query, strategy `inline` for filtered
 queries. The corpus is the 100 pages / 75 claims described below; the decisions of 2026-09-16/17 stand.
 
@@ -157,6 +157,7 @@ Next phase:
 - Pinned versions: `requirements.lock` is the GPU build of `.venv` (PyPI torch with CUDA libraries, what `results/` were produced with); `requirements-cpu.lock` is the CPU-only build (torch from the PyTorch CPU index, about 2 GB smaller) that `.github/workflows/ci.yml` installs from. Both were made with `pip freeze --exclude-editable`; the header of each file says how and which to use. `requirements.txt` / `requirements-dev.txt` keep the unpinned ranges.
 - torch with CUDA works on the RTX 4060 (`torch.cuda.is_available()` is true); the embedding model downloads to `~/.cache/huggingface`.
 - `docs/DESIGN.md` is the module contract: layout, data formats, parsing and chunking rules, schema, provisional settings and their reasons. Update it when a decision changes.
+- `docs/ARCHITECTURE.md` (2026-09-23) is the beginner's guide to how the code is built: the pipeline, key ideas, every file, one query end to end, the database, tests, and what is left for the grading. Keep it true when a file or a flow changes.
 - Git: initialised on `main` on 2026-09-17, local identity `ylli <yrada@constructor.university>`. The owner creates the public GitHub repository and pushes. The README is written last (owner's decision, 2026-09-17); until then, `docs/DESIGN.md` holds the reasoning.
 
 ## Working rules
