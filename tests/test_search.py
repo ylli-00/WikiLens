@@ -231,6 +231,8 @@ def test_rrf_statement_shape_and_parameters() -> None:
     assert "FROM (" + searchmod.KNN_SQL + ") AS knn" in sql  # the HNSW search, LIMIT N
     assert "FROM (" + searchmod.FT_SQL + ") AS matched" in sql  # the full-text search, LIMIT N
     assert "MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE)" in searchmod.FT_SQL
+    # equal relevance is common: chunk_id fixes which tied chunks make the full-text top-N
+    assert searchmod.FT_SQL.endswith("ORDER BY relevance DESC, chunk_id LIMIT %s")
     assert sql.count("ROW_NUMBER() OVER (ORDER BY") == 2
     assert f"SUM(CAST(1 AS DOUBLE) / ({searchmod.RRF_K} + ranked.rnk)) AS score" in sql
     assert "VEC_DISTANCE_COSINE(chunk.embedding, %s) AS distance, chunk.text, fused.score" in sql

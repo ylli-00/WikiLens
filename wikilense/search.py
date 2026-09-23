@@ -123,12 +123,15 @@ OVERFETCH_JOIN_KEYWORD = "JOIN"
 #: The full-text top-N over the FULLTEXT index ``ft_chunk_text`` on ``chunk.text`` (InnoDB,
 #: natural-language mode: the words of the text, stopwords and tokens shorter than
 #: ``innodb_ft_min_token_size`` = 3 dropped, ranked by InnoDB's relevance; a row that contains
-#: none of the words is not returned). Parameters: query text, query text, limit.
+#: none of the words is not returned). Equal relevance is common, so ``chunk_id`` breaks ties
+#: before the LIMIT: which tied chunks make the top-N is then fixed, not left to the server
+#: (the plan, a filesort after the full-text lookup, is the same). Parameters: query text,
+#: query text, limit.
 FT_SQL = (
     "SELECT chunk_id, MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE) AS relevance "
     "FROM chunk "
     "WHERE MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE) "
-    "ORDER BY relevance DESC "
+    "ORDER BY relevance DESC, chunk_id "
     "LIMIT %s"
 )
 #: The RRF smoothing constant (Cormack, Clarke and Buettcher, SIGIR 2009), the value the

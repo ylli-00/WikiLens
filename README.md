@@ -292,7 +292,7 @@ WITH vec AS (SELECT knn.chunk_id, ROW_NUMBER() OVER (ORDER BY knn.distance, knn.
      ft AS (SELECT matched.chunk_id, ROW_NUMBER() OVER (ORDER BY matched.relevance DESC, matched.chunk_id) AS rnk
             FROM (SELECT chunk_id, MATCH(text) AGAINST (? IN NATURAL LANGUAGE MODE) AS relevance
                   FROM chunk WHERE MATCH(text) AGAINST (? IN NATURAL LANGUAGE MODE)
-                  ORDER BY relevance DESC LIMIT ?) AS matched),
+                  ORDER BY relevance DESC, chunk_id LIMIT ?) AS matched),
      fused AS (SELECT ranked.chunk_id, SUM(CAST(1 AS DOUBLE) / (60 + ranked.rnk)) AS score
                FROM (SELECT chunk_id, rnk FROM vec UNION ALL SELECT chunk_id, rnk FROM ft) AS ranked
                GROUP BY ranked.chunk_id)

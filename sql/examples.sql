@@ -61,7 +61,7 @@ WITH vec AS (SELECT knn.chunk_id, ROW_NUMBER() OVER (ORDER BY knn.distance, knn.
      ft AS (SELECT m.chunk_id, ROW_NUMBER() OVER (ORDER BY m.relevance DESC, m.chunk_id) AS rnk
             FROM (SELECT chunk_id, MATCH(text) AGAINST ('Aare river Switzerland' IN NATURAL LANGUAGE MODE) AS relevance
                   FROM chunk WHERE MATCH(text) AGAINST ('Aare river Switzerland' IN NATURAL LANGUAGE MODE)
-                  ORDER BY relevance DESC LIMIT 50) AS m),
+                  ORDER BY relevance DESC, chunk_id LIMIT 50) AS m),
      fused AS (SELECT r.chunk_id, SUM(CAST(1 AS DOUBLE) / (60 + r.rnk)) AS score
                FROM (SELECT chunk_id, rnk FROM vec UNION ALL SELECT chunk_id, rnk FROM ft) AS r
                GROUP BY r.chunk_id)
