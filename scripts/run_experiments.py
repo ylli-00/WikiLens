@@ -14,11 +14,10 @@ given. The evaluations run one after the other, never two at once, so the latenc
 overlap.
 
 ``sql/schema.sql`` builds the vector index with M=16 (``db.VECTOR_INDEX_M``), so a configuration
-with another M rebuilds the index right after the ingest: ``ALTER TABLE chunk DROP INDEX <name>``
-then ``ALTER TABLE chunk ADD VECTOR INDEX <name> (embedding) M=<m> DISTANCE=cosine``, where
-``<name>`` is the index name that ``SHOW CREATE TABLE chunk`` reports (checked against
-``IDENTIFIER_RE``) and ``<m>`` one of ``INDEX_M_VALUES``, followed by ``ANALYZE TABLE chunk`` as
-after an ingest. The ANALYZE is not cosmetic: measured on 2026-09-22 (MariaDB 11.8.9), a rebuilt
+with another M rebuilds the index right after the ingest: ``ALTER TABLE chunk DROP INDEX
+`embedding``` then ``ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=<m>
+DISTANCE=cosine``, fixed literals for each ``<m>`` of ``INDEX_M_VALUES`` (``ADD_INDEX_SQL``),
+followed by ``ANALYZE TABLE chunk`` as after an ingest. The ANALYZE is not cosmetic: measured on 2026-09-22 (MariaDB 11.8.9), a rebuilt
 index that had not been analysed made every vector query after the next server restart re-read
 the whole hidden index table (``Handler_read_rnd_next`` about the number of chunks per query,
 p50 2.84 ms instead of 0.88 ms on 4,598 chunks, 4.1 ms instead of 0.56 ms on 8,658), and
@@ -73,8 +72,8 @@ Groups (``all`` runs them in this order; each can be rerun on its own):
 Every ingest and every index rebuild is appended to results/ingest_runs.json/.md.
 
 Root-level SQL (``SET GLOBAL mhnsw_max_cache_size``, the hidden tablespace size) and the
-container restart go through ``docker exec`` / ``docker compose`` on the container named in
-docker-compose.yml. The root password is read from .env (``WIKILENSE_DB_ROOT_PASSWORD``) and
+container restart go through ``docker exec`` / ``docker restart`` on the container named in
+docker-compose.yml (``CONTAINER``). The root password is read from .env (``WIKILENSE_DB_ROOT_PASSWORD``) and
 handed to docker through the environment, never on a command line, and never printed. When the
 docker group is only reachable through ``sg``:
 
@@ -106,7 +105,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from wikilense import db
-from wikilense.cli import make_embedder
+from wikilense.cli import make_embedder, positive_int
 from wikilense.config import (
     DEFAULT_CHUNK_MAX_WORDS,
     DEFAULT_CHUNK_OVERLAP_UNITS,
@@ -153,7 +152,16 @@ CHUNK240_KS: tuple[int, ...] = (1, 2, 3, 5, 10, 20)
 EF_SWEEP: tuple[int, ...] = (20, 50, 100, 200, 400)
 EF_LOW = 20
 EF_CHOSEN = DEFAULT_EF_SEARCH  # 100: Settings.ef_search, the application default
-INDEX_M_VALUES: tuple[int, ...] = (6, 16, 32)
+#: The ADD of each M the protocol sweeps, as fixed literals (DDL takes no parameters); the index
+#: keeps the name MariaDB gives the unnamed ``VECTOR INDEX (embedding)`` of sql/schema.sql.
+VECTOR_INDEX_NAME = "embedding"
+DROP_INDEX_SQL = "ALTER TABLE chunk DROP INDEX `embedding`"
+ADD_INDEX_SQL: dict[int, str] = {
+    6: "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=6 DISTANCE=cosine",
+    16: "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=16 DISTANCE=cosine",
+    32: "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=32 DISTANCE=cosine",
+}
+INDEX_M_VALUES: tuple[int, ...] = tuple(ADD_INDEX_SQL)
 INDEX_M_EFS: tuple[int, ...] = (EF_LOW, EF_CHOSEN)
 OVERFETCH_DEFAULT = 10  # the overfetch factor of the rrf runs and of overfetch10
 MIN_WORDS_FILTER = 1000
@@ -200,14 +208,23 @@ class Configuration:
             "hatnote_pattern": HATNOTE_RE.pattern,
         }
 
-    def differences(self, meta: dict[str, str], index: dict[str, Any]) -> dict[str, Any]:
+    def differences(
+        self, meta: dict[str, str], index: dict[str, Any], embedding_model: str | None = None
+    ) -> dict[str, Any]:
         """Return what differs between this configuration and the database state, or ``{}``.
 
         ``meta`` is ``ingest_meta`` and ``index`` the :func:`index_definition`. The hatnote
         pattern is compared too, so an ingest made by an older version of the code (no
         ``hatnote_pattern`` key, or another rule) does not count as this configuration.
+        ``embedding_model`` is the model the queries will be embedded with (the Context's
+        settings): an ingest made with another model does not count either, since its passage
+        vectors and the query vectors would come from two models.
         """
         diffs: dict[str, Any] = {}
+        if embedding_model is not None and meta.get("embedding_model") != embedding_model:
+            diffs["ingest_meta.embedding_model"] = {
+                "expected": embedding_model, "found": meta.get("embedding_model")
+            }
         for key, expected in self.ingest_meta_expected().items():
             if meta.get(key) != expected:
                 diffs[f"ingest_meta.{key}"] = {"expected": expected, "found": meta.get(key)}
@@ -236,8 +253,8 @@ CHUNK_SIZE_CASES: tuple[tuple[int, tuple[int, ...], str], ...] = (
 )
 PREFIX_CASES: tuple[tuple[str, bool], ...] = (("on", True), ("off", False))
 
-#: Identifiers read from the server (the vector index name, the database name) must match this
-#: before they are written into an ALTER TABLE or a LIKE pattern.
+#: The vector index name read from the server, and the database name handed to the mariadb client
+#: as its default database, must match this.
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 SHOW_CREATE_CHUNK_SQL = "SHOW CREATE TABLE chunk"
@@ -266,11 +283,12 @@ SENTENCES_HEADING_SQL = (
 UPDATE_META_INDEX_M_SQL = "UPDATE ingest_meta SET `value` = %s WHERE `key` = 'index_m'"
 #: Run after every index rebuild (see the module docstring); the ingest runs it too.
 ANALYZE_CHUNK_SQL = "ANALYZE TABLE chunk"
-#: Hidden InnoDB tablespaces of the vector index (root: needs the PROCESS privilege). The
-#: database name is checked against IDENTIFIER_RE before it is written into the pattern.
+#: Hidden InnoDB tablespaces of the vector index (root: needs the PROCESS privilege). A fixed
+#: statement: the database is the client's default database (Server.root_sql), so DATABASE()
+#: names it and nothing is written into the SQL.
 HIDDEN_TABLESPACE_SQL = (
     "SELECT name, file_size FROM information_schema.innodb_sys_tablespaces "
-    "WHERE name LIKE '{db}/chunk#i#%'"
+    "WHERE name LIKE CONCAT(DATABASE(), '/chunk#i#%')"
 )
 
 INDEX_DEFINITION_RE = re.compile(r"VECTOR KEY `(?P<name>[^`]+)` \(`embedding`\)(?P<options>[^\n]*)")
@@ -337,16 +355,23 @@ class Server:
             )
         return proc.stdout
 
-    def root_sql(self, sql: str) -> list[list[str]]:
-        """Run one statement as root inside the container; rows as lists of strings."""
+    def root_sql(self, sql: str, database: str | None = None) -> list[list[str]]:
+        """Run one statement as root inside the container; rows as lists of strings.
+
+        ``database`` becomes the client's default database (a plain identifier, checked). The
+        password reaches the client through ``MYSQL_PWD`` in the environment: ``-e MYSQL_PWD``
+        names the variable only, so the value is on no command line.
+        """
         if not self._root_password:
             raise ExperimentError(
                 f"{ROOT_PASSWORD_VARIABLE} is not set in {DEFAULT_ENV_FILE.name} or the environment"
             )
+        if database is not None and not IDENTIFIER_RE.match(database):
+            raise ExperimentError(f"database name {database!r} is not a plain identifier")
         env = {**os.environ, "MYSQL_PWD": self._root_password}
         out = self._docker(
             ["exec", "-e", "MYSQL_PWD", CONTAINER, "mariadb", "-uroot", "--batch",
-             "--skip-column-names", "-e", sql],
+             "--skip-column-names", *([database] if database else []), "-e", sql],
             env=env,
         )
         return [line.split("\t") for line in out.splitlines() if line]
@@ -361,25 +386,26 @@ class Server:
 
     def vector_index_tablespace_bytes(self) -> int | None:
         """Return the file size of the hidden InnoDB tablespace(s) of the vector index, or None."""
-        if not IDENTIFIER_RE.match(self.settings.db_name):
-            raise ExperimentError(f"database name {self.settings.db_name!r} is not a plain identifier")
         try:
-            rows = self.root_sql(HIDDEN_TABLESPACE_SQL.format(db=self.settings.db_name))
+            rows = self.root_sql(HIDDEN_TABLESPACE_SQL, database=self.settings.db_name)
         except ExperimentError as exc:
             log.warning("hidden tablespace size not available: %s", exc)
             return None
         return sum(int(row[1]) for row in rows) if rows else None
 
     def restart(self, timeout_s: float = 300.0) -> dict[str, Any]:
-        """``docker compose restart``, wait until healthy and connectable; returns timings.
+        """``docker restart`` the container, wait until healthy and connectable; returns timings.
 
-        The dict has ``container_restart_seconds`` (from the command to the first successful
-        connection) and ``server_uptime_seconds_after_restart`` (the server's ``Uptime`` status
-        right after, which shows that a new server process answered).
+        The container is named, like every other docker call here: ``docker compose restart``
+        acts on the compose project of the checkout's directory name and silently does nothing
+        from another checkout. The dict has ``container_restart_seconds`` (from the command to
+        the first successful connection) and ``server_uptime_seconds_after_restart`` (the
+        server's ``Uptime`` status right after); an uptime longer than the restart took means the
+        server that answered was not restarted, which is an ExperimentError.
         """
         start = time.perf_counter()
         log.info("restarting the container ...")
-        self._docker(["compose", "restart"])
+        self._docker(["restart", CONTAINER])
         deadline = start + timeout_s
         while True:
             status = self._docker(
@@ -405,6 +431,11 @@ class Server:
                     raise ExperimentError(f"server not connectable after restart: {exc}") from exc
                 time.sleep(1.0)
         seconds = time.perf_counter() - start
+        if uptime > seconds + 5:
+            raise ExperimentError(
+                f"the server has been up {uptime} s, but the restart began {seconds:.0f} s ago: "
+                f"{CONTAINER} was not restarted"
+            )
         log.info("container healthy and connectable after %.1f s (server uptime %d s)", seconds, uptime)
         return {
             "container_restart_seconds": round(seconds, 1),
@@ -549,7 +580,7 @@ def describe_state(meta: dict[str, str], index: dict[str, Any]) -> str:
 def check_configuration(ctx: Context, config: Configuration, what: str) -> dict[str, str]:
     """Raise ExperimentError unless the database holds ``config``; returns ``ingest_meta``."""
     meta, index = ctx.database_state()
-    diffs = config.differences(meta, index)
+    diffs = config.differences(meta, index, ctx.settings.embedding_model)
     if diffs:
         raise ExperimentError(
             f"{what}: the database holds {describe_state(meta, index)}, not "
@@ -629,9 +660,9 @@ def append_ingest_run(ctx: Context, info: dict[str, Any]) -> None:
 def rebuild_index(ctx: Context, m: int, *, label: str, record: bool = True) -> dict[str, Any]:
     """DROP and re-ADD the vector index with M=``m``, then ANALYZE TABLE chunk (each timed).
 
-    The index name comes from ``SHOW CREATE TABLE chunk`` (a plain identifier, see
-    :func:`index_definition`), ``m`` must be one of ``INDEX_M_VALUES`` and the distance is
-    ``ingest.INDEX_DISTANCE``; the ANALYZE is explained in the module docstring.
+    The statements are the fixed literals ``DROP_INDEX_SQL`` and ``ADD_INDEX_SQL[m]`` (``m`` one
+    of ``INDEX_M_VALUES``, distance cosine); the index must be the schema's ``embedding``
+    (ExperimentError otherwise). The ANALYZE is explained in the module docstring.
     ``ingest_meta.index_m`` is set to ``m`` afterwards. Returns the timings and sizes. With
     ``record`` the rebuild gets its own row in ingest_runs.json (an ingest that rebuilds right
     away carries the rebuild inside its own row instead).
@@ -642,13 +673,13 @@ def rebuild_index(ctx: Context, m: int, *, label: str, record: bool = True) -> d
     try:
         before = index_definition(conn)
         name = before["name"]
-        if name is None:
-            raise ExperimentError("chunk has no vector index to rebuild (SHOW CREATE TABLE chunk)")
-        drop_sql = f"ALTER TABLE chunk DROP INDEX `{name}`"
-        add_sql = (
-            f"ALTER TABLE chunk ADD VECTOR INDEX `{name}` (embedding) "
-            f"M={int(m)} DISTANCE={INDEX_DISTANCE}"
-        )
+        if name != VECTOR_INDEX_NAME:
+            raise ExperimentError(
+                f"chunk's vector index is {name!r}, not {VECTOR_INDEX_NAME!r} (SHOW CREATE TABLE "
+                "chunk); the rebuild statements are written for the index of sql/schema.sql"
+            )
+        drop_sql = DROP_INDEX_SQL
+        add_sql = ADD_INDEX_SQL[m]
         log.info("rebuilding the vector index `%s`: M=%s -> M=%d (%s)", name, before["m"], m, label)
         with conn.cursor() as cur:
             start = time.perf_counter()
@@ -759,7 +790,7 @@ def ingest_configuration(ctx: Context, config: Configuration, *, label: str) -> 
 def ensure_configuration(ctx: Context, config: Configuration, *, label: str) -> dict[str, Any] | None:
     """Ingest ``config`` unless the database already holds exactly it; returns the ingest record."""
     meta, index = ctx.database_state()
-    diffs = config.differences(meta, index)
+    diffs = config.differences(meta, index, ctx.settings.embedding_model)
     if not diffs:
         log.info("database holds '%s' (%s); no ingest", config.label, describe_state(meta, index))
         return None
@@ -792,8 +823,9 @@ def ingest_runs_markdown(runs: list[dict[str, Any]]) -> str:
     return (
         "# Ingests and index rebuilds run by scripts/run_experiments.py\n\n"
         "One row per `run_ingest` call or `ALTER TABLE` rebuild, in order. Seconds are the "
-        "stages of `IngestReport` (an ingest whose configuration needs another M than the "
-        "schema's is followed by a rebuild, listed on its own row too).\n\n"
+        "stages of `IngestReport`; an ingest whose configuration needs another M than the "
+        "schema's is followed by a rebuild, shown in the same row (`total s`: \"+ rebuild "
+        "M=...\").\n\n"
         + md_table(
             ("label", "kind", "configuration", "chunks", "hatnote units", "words mean",
              "total s", "embed s", "vector index bytes", "at"),
@@ -1298,7 +1330,7 @@ def write_final_restart_comparison(out_dir: Path) -> None:
         comparison_markdown(
             "Final configuration: hit lists before and after a container restart (M=16)",
             (f"Configuration: {FINAL.label}. `final_ef_100` / `final_ef_20` ran before "
-             "`docker compose restart`, `*_after_restart` after it, on the same on-disk index; "
+             "a container restart, `*_after_restart` after it, on the same on-disk index; "
              "`exact_vs_approximate` compares each with the exact ranking `final_inline`. A claim "
              "counts as identical when its 20 hit chunk ids are the same, in the same order."),
             data,
@@ -1448,12 +1480,16 @@ class Results:
             return default
         return data["parameters"].get(key, default)
 
+    def n_claims(self, name: str) -> Any:
+        data = self.get(name)
+        return data["n_claims"] if data else "not found"
+
     def unstable(self, name: str) -> Any:
         data = self.get(name)
         return len(data["unstable_claims"]) if data else "not found"
 
     def identical(self, reference: str, other: str) -> str:
-        """Return "n/75": claims whose max-k hit lists are identical between the two runs."""
+        """Return "n/N": claims whose max-k hit lists are identical between the two runs."""
         if not self.has(reference, other):
             return "not found"
         comparison = compare_hits(self.out_dir, reference, [other])
@@ -1498,16 +1534,18 @@ def summary_markdown(out_dir: Path) -> str:
     header = r.get(FINAL_HEADLINE) or r.get("ef_100") or r.get(STABILITY_512_RUNS[0])
     n_claims = header["n_claims"] if header else "?"
     n_evidence = header["n_evidence_claims"] if header else "?"
+    n_pages = header["parameters"].get("n_pages", "?") if header else "?"
+    repeats = header["parameters"].get("repeats", "?") if header else "?"
     intro = (
         f"Generated {utc_now()} by `scripts/run_experiments.py summary`. Every number below is read "
         "from the JSON files in `results/` written by the same script (`write_results` of the "
         "evaluation harness); the per-run Markdown files hold the full tables. "
-        f"{n_claims} FEVEROUS claims over the 100-page corpus; article recall counts the claims "
+        f"{n_claims} FEVEROUS claims over the {n_pages}-page corpus; article recall counts the claims "
         f"with a gold page among the pages of the top-k chunks (of {n_claims}), evidence recall "
         "the claims whose gold sentences are all inside the top-k chunks (of the "
         f"{n_evidence} claims with a sentence-only evidence set), unit coverage the mean share "
         "of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one "
-        "`search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query "
+        f"`search()` call in milliseconds, p50 / p95 over {repeats} repeats x the claims, warm, query "
         "embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session "
         "by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine "
         "distance, its M as stated per section. Two ingest configurations are used: OLD = "
@@ -1550,7 +1588,7 @@ def summary_stability(r: Results) -> list[str]:
         f"## 1. Stability: the same run repeated (OLD: {OLD.label}; strategy none, ef 20)",
         "",
         ("One fresh ingest, then seven identical evaluations on the same on-disk index: three "
-        "with the 512 MB HNSW cache, one after `docker compose restart`, three after "
+        "with the 512 MB HNSW cache, one after a container restart, three after "
         "`SET GLOBAL mhnsw_max_cache_size = 16777216` (536870912 restored afterwards). "
         "\"unstable\" counts the claims whose LIMIT-20 hits changed between the five repeats of "
         "one run; the last two columns count the claims whose 20 hit chunk ids equal, in order, "
@@ -1940,6 +1978,14 @@ def summary_filters(r: Results) -> list[str]:
     return parts
 
 
+def device_phrase(run: dict[str, Any] | None) -> str:
+    """Return "on the GPU" / "on the CPU" for a run's embedding device ("on ?" when unknown)."""
+    device = str(((run or {}).get("machine") or {}).get("embedding_device") or "?")
+    if device.startswith("cuda"):
+        return "on the GPU"
+    return "on the CPU" if device == "cpu" else f"on {device}"
+
+
 def summary_final(r: Results) -> list[str]:
     h = FINAL_HEADLINE
     parts = [
@@ -1948,7 +1994,7 @@ def summary_final(r: Results) -> list[str]:
         (f"Headline run `{h}`: strategy none (the bare index query joined back to `page` and "
         f"`section`), ef 100, {r.param(h, 'n_chunks')} chunks ({r.param(h, 'n_units_hatnote')} "
         "hatnote units excluded), M=16, 512 MB cache. Query embedding p50 is the time of one "
-        "`embed_queries([claim])` call on the GPU and does not depend on k."),
+        f"`embed_queries([claim])` call {device_phrase(r.get(h))} and does not depend on k."),
         "",
         md_table(
             ("k", "article recall", "evidence recall", "unit coverage", "SQL p50 ms", "SQL p95 ms",
@@ -1965,7 +2011,7 @@ def summary_final(r: Results) -> list[str]:
         "the reference of the last column; `final_oracle_titles` restricts the inline statement "
         "to the claim's gold page with the `titles` filter, so its evidence recall says at which "
         "rank the gold sentences surface once the page is known; the `*_after_restart` runs "
-        "repeat the two approximate runs after `docker compose restart`):"),
+        "repeat the two approximate runs after a container restart):"),
         "",
     ]
     runs = [
@@ -2165,7 +2211,8 @@ def summary_defaults(r: Results) -> list[str]:
         f"without it."),
         (f"- **Filtered queries: strategy inline; overfetch when latency matters more than a full "
         f"result.** Under the selective History filter (section 6) overfetch 10 returned fewer "
-        f"than 10 rows for {short10} of 75 queries and overfetch 50 for {short50}, inline for "
+        f"than 10 rows for {short10} of {r.n_claims('strategy_overfetch10_history')} queries and "
+        f"overfetch 50 for {short50}, inline for "
         f"{r.get('strategy_inline_history')['parameters']['short_results']['10']['queries_short_of_k']}, "
         f"at p50@10 {r.p50('strategy_inline_history', 10)} ms (p95 "
         f"{r.p95('strategy_inline_history', 10)} ms) against "
@@ -2234,7 +2281,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("groups", nargs="+", choices=[*PROTOCOL_ORDER, "all"], metavar="GROUP")
     parser.add_argument("--out", type=Path, default=DEFAULT_RESULTS_DIR,
                         help="results directory (default results/)")
-    parser.add_argument("--repeats", type=int, default=DEFAULT_REPEATS,
+    parser.add_argument("--repeats", type=positive_int, default=DEFAULT_REPEATS,
                         help=f"timed passes per claim after one warm-up (default {DEFAULT_REPEATS})")
     args = parser.parse_args(argv)
     logging.basicConfig(
@@ -2254,8 +2301,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.info("=== group %s ===", group)
         try:
             GROUPS[group](ctx)
-        except ExperimentError as exc:
-            log.error("group %s failed: %s", group, exc)
+        except Exception as exc:
+            if isinstance(exc, ExperimentError):
+                log.error("group %s failed: %s", group, exc)
+            else:  # unexpected: keep the traceback
+                log.exception("group %s failed", group)
+            log.error(
+                "the main database may now hold a group's configuration instead of the defaults "
+                "that `wikilense query`, `serve` and `eval` expect; `scripts/run_experiments.py "
+                "restore` (or `wikilense ingest`) puts them back"
+            )
             return 1
         log.info("=== group %s done in %.0f s ===", group, time.perf_counter() - started)
     return 0
