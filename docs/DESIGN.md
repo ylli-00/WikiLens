@@ -14,14 +14,14 @@ outcomes and chosen defaults" at the end says what was chosen and why, and the R
 
 ```
 wikilense/                 Python package
-  config.py                Settings from environment / .env (DB connection, model, chunk and index parameters)
+  config.py                Settings from environment / .env (DB connection, model, chunk and search parameters)
   corpus.py                Read data/corpus/*.jsonl; element-id parsing; corpus selection logic
   wikitext.py              FEVEROUS page parsing: page order, section tree, text units, links, markup cleaning
   chunking.py              Sentence-window chunker -> Chunk objects that remember their sentence keys
-  embedding.py             Embedder (sentence-transformers) -> float32 numpy; vector <-> bytes/text helpers
+  embedding.py             Embedder (sentence-transformers) -> float32 numpy; vector <-> text helpers
   db.py                    PyMySQL connection, schema apply/reset, vector parameter helpers, bulk inserts
   ingest.py                Pipeline: corpus -> page/section/sentence/link/claim tables -> chunks -> embeddings
-  search.py                Query functions: knn, hybrid (predicates + joins), join back to sentences
+  search.py                search() (strategies inline/overfetch/none/rrf), filters, join back to sentences
   evaluate.py              Recall and latency harness
   cli.py                   `wikilense` command: init-db, ingest, query, eval, serve
   web.py                   Minimal FastAPI query page
@@ -146,7 +146,10 @@ ingest; a mismatch is an error with a clear message.
 `WIKILENSE_EMBEDDING_MODEL` (default above), `WIKILENSE_CHUNK_MAX_WORDS` (240; 120 until
 2026-09-17), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_VECTOR_DIM` (384) and
 `WIKILENSE_EF_SEARCH` (100, `Settings.ef_search`: the `mhnsw_ef_search` value the application
-passes per query, 1 to 10000; 0 keeps the server's session value, whose default stays 20). The
+passes per query, 1 to 10000; 0 keeps the server's session value, whose default stays 20;
+anything else is a `SettingsError` when the settings load), and `WIKILENSE_TEST_DB_NAME`
+(default the database name plus `_test`; the test suite resets that database's schema, so
+`tests/conftest.py` refuses a name that equals the main database or does not end in `_test`). The
 index `M` (16; 6 until 2026-09-17) is written literally in `sql/schema.sql` and named
 `db.VECTOR_INDEX_M` in the code; it is not a setting (`WIKILENSE_INDEX_M` existed until
 2026-09-23 but only changed what `ingest_meta` recorded, never the index).
@@ -318,8 +321,11 @@ connection is still open) and closes the connection:
   sentence_only_sets: list[set[int]])]` from `claim` and `claim_evidence` (resolved ids only; a
   set counts as sentence-only when every element is a `sentence` or `item` with a resolved
   `sentence_id`).
-- `evaluate(conn, embedder, ks=(1, 3, 5, 10, 20), repeats=5, strategy=..., filters=None,
-  ef_search=None) -> EvalResult` with, per k: article recall (a gold page among the pages of the
+- `evaluate(conn, embedder, ks=(1, 3, 5, 10, 20), repeats=5, strategy="none", filters=None,
+  ef_search=None, overfetch=10, claim_filters=None, settings=None) -> EvalResult`; `ef_search`
+  is an int (1 to 10000), None (`settings.ef_search`, where 0 keeps the server's value) or
+  `SERVER_DEFAULT_EF_SEARCH` ("server"); `claim_filters` gives per-claim Filters (the oracle
+  `oracle_title_filters`). Per k: article recall (a gold page among the pages of the
   top-k chunks), evidence recall (every unit of at least one sentence-only set covered by the
   top-k chunks, over the 66 eligible claims: 65 was the phase-1 count before list items counted
   as text units, see Phase 2 outcomes), unit coverage (share of gold units covered), and
@@ -493,8 +499,11 @@ which it reaches at ef 100.
 
 A code review changed behaviour that later runs will see (commits after 92f1838; the committed
 `results/` predate it). The metrics at `k` now come from the `LIMIT k` query, which changes the
-`overfetch` and `rrf` result files (strategy files of section 6, `final_rrf`, `rrf_120_m6`): those
-need the experiments rerun; `none` and `inline` files had 0 prefix mismatches and do not change.
+`overfetch` and `rrf` result files with a non-zero `prefix_mismatches`:
+`strategy_overfetch10_history`, `strategy_overfetch50_history`, `final_rrf` and `rrf_120_m6` need
+the experiments rerun (a read-only recomputation of `final_rrf` on the current database changes
+only evidence recall@1, 35 to 34 of 66). Every other file, the `none` and `inline` ones and the
+two overfetch runs under `min_words`, had 0 prefix mismatches and does not change.
 The rest changes no number: `wikilense eval --ef-search 0` keeps the server value as documented,
 `WIKILENSE_INDEX_M` is gone (M is the schema's; `ingest_meta` records the live index), the model is
 pinned to revision 5c38ec7c405e, the ingest checks settings and model before dropping anything,
