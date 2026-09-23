@@ -46,7 +46,7 @@ from wikilense.evaluate import (
     worst_claims,
     write_results,
 )
-from wikilense.search import Filters
+from wikilense.search import Filters, Hit
 
 DIM = dbmod.VECTOR_DIM
 N_CHUNKS = 12
@@ -351,6 +351,84 @@ def test_strategy_validation_follows_search_strategies(monkeypatch: pytest.Monke
         evaluate(NoConnection(), fake, strategy="rrf", ef_search=SERVER_DEFAULT_EF_SEARCH)
     with pytest.raises(ValueError, match="use one of 'inline' with them"):
         evaluate(NoConnection(), fake, strategy="none", filters=Filters(min_words=1))
+
+
+def _pure_evaluate(
+    monkeypatch: pytest.MonkeyPatch, truths: list[ClaimTruth], search_fn: Any, **kwargs: Any
+) -> EvalResult:
+    """Run ``evaluate`` with every database helper replaced, so only ``search_fn`` decides.
+
+    Chunk ``c`` carries the single sentence id ``c``; the query vectors are all ``E0``.
+    """
+    import contextlib
+
+    from wikilense import evaluate as evalmod
+
+    monkeypatch.setattr(evalmod, "load_ground_truth", lambda conn: truths)
+    monkeypatch.setattr(evalmod, "_corpus_counts",
+                        lambda conn: {"n_pages": 2, "n_chunks": 10, "n_sentences": 10})
+    monkeypatch.setattr(evalmod, "read_ingest_meta", lambda conn: {})
+    monkeypatch.setattr(evalmod, "vector_index_info",
+                        lambda conn: {"index_m": 16, "index_distance": "cosine"})
+    monkeypatch.setattr(evalmod, "global_cache_size", lambda conn: 0)
+    monkeypatch.setattr(evalmod, "versions_info", lambda conn: {})
+    monkeypatch.setattr(evalmod, "ef_search_session",
+                        lambda conn, ef: contextlib.nullcontext())
+    monkeypatch.setattr(evalmod.db, "get_session_var", lambda conn, name: 20)
+    monkeypatch.setattr(evalmod, "chunk_sentence_ids",
+                        lambda conn, ids: {int(c): {int(c)} for c in ids})
+    monkeypatch.setattr(searchmod, "search", search_fn)
+    embedder = VectorEmbedder({t.text: E0 for t in truths})
+    return evaluate(object(), embedder, ef_search=SERVER_DEFAULT_EF_SEARCH, **kwargs)
+
+
+def _hit(chunk_id: int, page_id: int) -> Hit:
+    return Hit(chunk_id, page_id, f"P{page_id}", "", 0, 1, 0.01 * chunk_id, f"chunk {chunk_id}")
+
+
+def test_recall_at_k_comes_from_the_limit_k_query_even_when_it_is_not_a_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An overfetch-like search: the candidates are the first ``k * 2`` chunks of the ranking
+    1..10, and the filter keeps page 2 (chunks 6..10). The LIMIT 1 query sees chunks 1-2 and
+    returns nothing; the LIMIT 3 query sees 1-6 and returns chunk 6. Recall@1 must describe the
+    LIMIT 1 query (0 claims), not the first hit of the LIMIT 3 query."""
+
+    def overfetch_like(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
+                       ef_search=None, query_text=None):
+        pool = range(1, min(k * 2, 10) + 1)
+        return [_hit(c, 2) for c in pool if c >= 6][:k]
+
+    truths = [ClaimTruth(1, "train", "SUPPORTS", "claim one", {2}, [{6}], {"P2"})]
+    result = _pure_evaluate(monkeypatch, truths, overfetch_like, ks=(1, 3), repeats=1,
+                            strategy="overfetch", overfetch=2)
+    assert {m.k: m.article_hits for m in result.per_k} == {1: 0, 3: 1}
+    assert {m.k: m.evidence_hits for m in result.per_k} == {1: 0, 3: 1}
+    assert {m.k: m.unit_coverage for m in result.per_k} == {1: 0.0, 3: 1.0}
+    assert result.prefix_mismatches == {1: 1}  # the LIMIT 1 hits are not the LIMIT 3 prefix
+    assert result.claims[0].hit_chunk_ids == (6,)  # the diagnostics keep the LIMIT max_k list
+    assert result.claims[0].gold_page_rank == 1
+
+
+def test_unstable_claims_are_the_ones_whose_max_k_hits_change_between_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"n": 0}
+
+    def drifting(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
+                 ef_search=None, query_text=None):
+        calls["n"] += 1
+        if query_text == "claim two" and calls["n"] > 4:  # changes after the first timed pass
+            return [_hit(c, 1) for c in (2, 1)][:k]
+        return [_hit(c, 1) for c in (1, 2)][:k]
+
+    truths = [
+        ClaimTruth(1, "train", "SUPPORTS", "claim one", {1}, [{1}], {"P1"}),
+        ClaimTruth(2, "train", "SUPPORTS", "claim two", {1}, [{2}], {"P1"}),
+    ]
+    result = _pure_evaluate(monkeypatch, truths, drifting, ks=(2,), repeats=3, strategy="none")
+    assert result.unstable_claims == [2]
+    assert "Claims whose top-2 hits changed between repeats: 2." in results_markdown(result)
 
 
 def test_parse_vector_index_reads_m_and_distance() -> None:
@@ -675,9 +753,12 @@ def test_evaluate_with_a_global_filter_and_overfetch(
     }
     assert result.parameters["overfetch"] == 3
     by_id = {c.claim_id: c for c in result.claims}
-    assert by_id[3].gold_page_rank == 1
+    assert by_id[3].gold_page_rank == 1  # in the LIMIT 3 query (inner LIMIT 9: chunks 1-9)
     assert all(by_id[i].gold_page_rank is None for i in (1, 2, 4, 5, 6))
-    assert {m.k: m.article_hits for m in result.per_k} == {1: 1, 3: 1}
+    # recall@1 is the LIMIT 1 query: its inner LIMIT 3 sees chunks 1-3 only, no Beta chunk
+    assert {m.k: m.article_hits for m in result.per_k} == {1: 0, 3: 1}
+    # every claim's LIMIT 1 query is empty while its LIMIT 3 query finds Beta chunks
+    assert result.prefix_mismatches == {1: 6}
 
 
 @pytest.mark.db

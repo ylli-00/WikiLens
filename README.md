@@ -379,8 +379,8 @@ embedding`, `r_rows` = `k`, both indexes for `rrf`, session scope of `ef_search`
 
 ## Evaluation
 
-**Method.** Each of the 75 claims is embedded once and searched with `LIMIT 20`; the first `k` hits
-give the metrics at `k`. *Article recall@k*: a gold page of the claim is among the pages of the
+**Method.** Each of the 75 claims is embedded once and searched once per `k` with `LIMIT k`; those
+hits give the metrics at `k`, and the same statement is the one timed. *Article recall@k*: a gold page of the claim is among the pages of the
 top-k chunks (all 75 claims cite one page). *Evidence recall@k*: every sentence or list item of at
 least one gold evidence set is covered by the top-k chunks, through `chunk_sentence`, over the 66
 claims whose gold set is made of text units. *Unit coverage@k*: the share of gold units covered.

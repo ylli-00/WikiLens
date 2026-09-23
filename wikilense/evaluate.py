@@ -17,6 +17,12 @@ reports per ``k``:
 - SQL latency: p50 / p95 / mean / min / max of one ``search`` call in milliseconds, over
   ``repeats`` x claims samples.
 
+The recall values at ``k`` are computed on the hits of the ``LIMIT k`` search of the first timed
+pass, the same statement whose latency is reported at ``k``. For ``none`` and ``inline`` these
+are the first ``k`` hits of the ``LIMIT max(ks)`` search; for ``overfetch`` and ``rrf`` they are
+not, because the inner candidate list is ``k * overfetch`` long (``prefix_mismatches`` counts
+the claims where they differ). The per-claim ranks in ``claims`` come from ``LIMIT max(ks)``.
+
 The query-embedding latency (one ``embed_queries([text])`` call per claim and repeat, after a
 warm-up call) is reported separately; the vectors used for the searches come from one batched
 ``embed_queries`` call, so the SQL timing never includes the model.
@@ -687,21 +693,21 @@ def _run_searches(
     filters: Filters | None,
     claim_filters: ClaimFilters | None,
     overfetch: int,
-) -> tuple[list[list[Hit]], dict[int, list[float]], list[int], dict[int, int]]:
+) -> tuple[list[dict[int, list[Hit]]], dict[int, list[float]], list[int], dict[int, int]]:
     """Run every (claim, k) search once untimed, then ``repeats`` times timed.
 
     Every call gets the claim text as ``query_text`` when ``search.search`` takes it (see
-    :func:`_search_kwargs`). Returns the ``max(ks)`` hits of every claim (from the first timed
-    pass), the SQL times in ms per ``k``, the ids of the claims whose ``max(ks)`` hits changed
-    between passes, and the number of claims per ``k`` whose ``LIMIT k`` hits are not the first
-    ``k`` of ``max(ks)``.
+    :func:`_search_kwargs`). Returns, per claim, the hits of every ``LIMIT k`` search of the
+    first timed pass (``{k: hits}``), the SQL times in ms per ``k``, the ids of the claims whose
+    ``max(ks)`` hits changed between passes, and the number of claims per ``k`` whose ``LIMIT
+    k`` hits are not the first ``k`` of ``max(ks)``.
     """
     max_k = ks[-1]
     per_claim_filters = [
         claim_filters(truth) if claim_filters is not None else filters for truth in truths
     ]
     per_claim_kwargs = [_search_kwargs(truth.text) for truth in truths]
-    hits_max: list[list[Hit]] = [[] for _ in truths]
+    hits_first: list[dict[int, list[Hit]]] = [{} for _ in truths]
     sql_ms: dict[int, list[float]] = {k: [] for k in ks}
     unstable: set[int] = set()
     prefix_mismatches: dict[int, int] = {k: 0 for k in ks if k != max_k}
@@ -728,13 +734,13 @@ def _run_searches(
                 continue
             ids_max = [h.chunk_id for h in hits_by_k[max_k]]
             if pass_index == 0:
-                hits_max[index] = hits_by_k[max_k]
+                hits_first[index] = hits_by_k
                 for k in prefix_mismatches:
                     if [h.chunk_id for h in hits_by_k[k]] != ids_max[:k]:
                         prefix_mismatches[k] += 1
-            elif ids_max != [h.chunk_id for h in hits_max[index]]:
+            elif ids_max != [h.chunk_id for h in hits_first[index][max_k]]:
                 unstable.add(truth.claim_id)
-    return hits_max, sql_ms, sorted(unstable), prefix_mismatches
+    return hits_first, sql_ms, sorted(unstable), prefix_mismatches
 
 
 def evaluate(
@@ -761,9 +767,9 @@ def evaluate(
     (``settings`` defaults to ``load_settings()``), and :data:`SERVER_DEFAULT_EF_SEARCH` keeps
     the server's value; the effective session value, its source, the global
     ``mhnsw_max_cache_size`` and the vector index's ``M`` and ``DISTANCE`` are recorded in the
-    parameters. The metrics use the first ``k`` hits of the ``LIMIT max(ks)`` query of each
-    claim; the SQL latency at ``k`` is measured on the ``LIMIT k`` query. Returns the
-    :class:`EvalResult`.
+    parameters. The metrics and the SQL latency at ``k`` both come from the ``LIMIT k`` query
+    of each claim; the per-claim ranks in ``claims`` from the ``LIMIT max(ks)`` query. Returns
+    the :class:`EvalResult`.
 
     Raises ValueError for invalid ``ks`` / ``repeats`` / ``overfetch`` / ``strategy`` /
     ``ef_search``, for filters combined with strategy ``none``, when the database holds no
@@ -808,7 +814,7 @@ def evaluate(
     with ef_search_session(conn, ef_requested):
         ef_effective = db.get_session_var(conn, EF_SEARCH_VARIABLE)
         sql_start = time.perf_counter()
-        hits_max, sql_ms, unstable, prefix_mismatches = _run_searches(
+        hits_first, sql_ms, unstable, prefix_mismatches = _run_searches(
             conn, truths, vectors, ks_sorted, repeats, strategy, filters, claim_filters, overfetch
         )
     logger.info(
@@ -819,7 +825,9 @@ def evaluate(
         time.perf_counter() - sql_start,
     )
 
-    all_chunk_ids = {hit.chunk_id for hits in hits_max for hit in hits}
+    all_chunk_ids = {
+        hit.chunk_id for by_k in hits_first for hits in by_k.values() for hit in hits
+    }
     units_of = chunk_sentence_ids(conn, all_chunk_ids)
 
     n_eligible = 0
@@ -827,17 +835,22 @@ def evaluate(
     evidence_hits = dict.fromkeys(ks_sorted, 0)
     coverage_sum = dict.fromkeys(ks_sorted, 0.0)
     outcomes: list[ClaimOutcome] = []
-    for truth, hits in zip(truths, hits_max):
-        hit_pages = [hit.page_id for hit in hits]
-        hit_units = [units_of.get(hit.chunk_id, set()) for hit in hits]
+    for truth, by_k in zip(truths, hits_first):
+        # The metrics at k use the LIMIT k query, the statement whose latency is reported at k.
         for k in ks_sorted:
-            article_hits[k] += int(article_recall_at_k(hit_pages, truth.gold_pages, k))
+            hit_pages_k = [hit.page_id for hit in by_k[k]]
+            article_hits[k] += int(article_recall_at_k(hit_pages_k, truth.gold_pages, k))
         if truth.eligible:
             n_eligible += 1
             for k in ks_sorted:
+                units_k = [units_of.get(hit.chunk_id, set()) for hit in by_k[k]]
                 sets = truth.sentence_only_sets
-                evidence_hits[k] += int(evidence_recall_at_k(hit_units, sets, k))
-                coverage_sum[k] += unit_coverage_at_k(hit_units, sets, k)
+                evidence_hits[k] += int(evidence_recall_at_k(units_k, sets, k))
+                coverage_sum[k] += unit_coverage_at_k(units_k, sets, k)
+        # The per-claim diagnostics (ranks, hit ids) come from the LIMIT max(ks) query.
+        hits = by_k[ks_sorted[-1]]
+        hit_pages = [hit.page_id for hit in hits]
+        hit_units = [units_of.get(hit.chunk_id, set()) for hit in hits]
         outcomes.append(
             ClaimOutcome(
                 claim_id=truth.claim_id,
@@ -898,8 +911,9 @@ def evaluate(
             "units covered."
         ),
         (
-            "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order "
-            "search() returned them."
+            "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first "
+            "timed pass), in the order search() returned them; the per-claim ranks use the "
+            "LIMIT max_k search."
         ),
         (
             "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the "

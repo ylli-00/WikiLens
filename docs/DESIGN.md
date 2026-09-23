@@ -287,7 +287,11 @@ load, resolve). Steps, each committed when it completes:
   top-k chunks), evidence recall (every unit of at least one sentence-only set covered by the
   top-k chunks, over the 65 eligible claims), unit coverage (share of gold units covered), and
   latency: embedding time and SQL time separately, p50 / p95 / mean over `repeats` warm runs of
-  every claim, plus the parameters, `ingest_meta`, machine and versions.
+  every claim, plus the parameters, `ingest_meta`, machine and versions. The metrics at `k`
+  come from the `LIMIT k` search of each claim, the statement whose latency is reported at `k`
+  (until 2026-09-23 they were the first `k` hits of the `LIMIT max(ks)` search, which is the same
+  list for `none` and `inline` but not for `overfetch` and `rrf`, whose inner candidate list is
+  `k * overfetch` long; `prefix_mismatches` counts the claims where the two differ).
 - `write_results(result, out_dir="results", name=...)` writes `<name>.json` and `<name>.md` (a
   table per metric).
 - Sweeps are separate CLI runs (`--ef-search`, `--strategy`, `--k`), not hidden loops.
