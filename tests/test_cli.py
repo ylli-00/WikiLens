@@ -567,31 +567,17 @@ def test_format_sentences_pads_keys_wraps_text_and_names_the_empty_case() -> Non
     assert cli.format_sentences([("sentence_0", "")]).endswith("sentence_0  (empty)")
 
 
-def test_query_passes_query_text_only_when_search_accepts_it(
+def test_query_text_reaches_search_the_printed_statement_and_the_explain(
+    capsys: pytest.CaptureFixture[str],
     fake_db: FakeDatabase,
     fake_embedder: FakeEmbedder,
     fake_search: dict[str, Any],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[dict[str, Any]] = []
-
-    def old_search(conn: Any, qvec: Any, k: int = 10, filters: Any = None, strategy: str = "inline",
-                   overfetch: int = 10, ef_search: int | None = None) -> list[Hit]:  # fmt: skip
-        calls.append({"k": k, "strategy": strategy})
-        return HITS[:k]
-
-    monkeypatch.setattr(cli.search, "search", old_search)  # a search() without query_text
-    assert cli.main(["query", "Aare", "--k", "1"]) == 0
-    assert calls == [{"k": 1, "strategy": "inline"}]
-    assert "query_text" not in fake_search  # the recording fake was not called
-
-    def kwargs_search(conn: Any, qvec: Any, **kwargs: Any) -> list[Hit]:
-        calls.append(kwargs)
-        return HITS[:1]
-
-    monkeypatch.setattr(cli.search, "search", kwargs_search)  # **kwargs accepts it
-    assert cli.main(["query", "Aare", "--k", "1"]) == 0
-    assert calls[-1]["query_text"] == "Aare"
+    assert cli.main(["query", "Aare glacier", "--strategy", "rrf", "--explain", "--json"]) == 0
+    assert fake_search["query_text"] == "Aare glacier"
+    assert fake_search["explain"]["query_text"] == "Aare glacier"
+    payload = json.loads(capsys.readouterr().out)
+    assert "MATCH(text) AGAINST (%s IN NATURAL LANGUAGE MODE)" in payload["sql"]  # the rrf SQL
 
 
 def test_strategy_choices_follow_search_strategies(

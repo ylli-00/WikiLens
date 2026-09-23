@@ -45,7 +45,6 @@ the order ``search`` returned the chunks: "top-k chunks" means the first ``k`` h
 
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import os
@@ -623,20 +622,6 @@ def _resolve_ef_search(
     return int(ef_search), "argument"
 
 
-def _search_kwargs(query_text: str) -> dict[str, str]:
-    """Return ``{"query_text": query_text}`` when ``search.search`` accepts it, else ``{}``.
-
-    The signature is inspected so that the harness runs with a search function that has no
-    ``query_text`` parameter yet (or a test double without one).
-    """
-    parameters = inspect.signature(searchmod.search).parameters
-    if "query_text" in parameters or any(
-        p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values()
-    ):
-        return {"query_text": query_text}
-    return {}
-
-
 def _embed_claims(
     embedder: QueryEmbedderLike, texts: Sequence[str], repeats: int
 ) -> tuple[np.ndarray, list[float]]:
@@ -675,8 +660,8 @@ def _run_searches(
 ) -> tuple[list[dict[int, list[Hit]]], dict[int, list[float]], list[int], dict[int, int]]:
     """Run every (claim, k) search once untimed, then ``repeats`` times timed.
 
-    Every call gets the claim text as ``query_text`` when ``search.search`` takes it (see
-    :func:`_search_kwargs`). Returns, per claim, the hits of every ``LIMIT k`` search of the
+    Every call gets the claim text as ``query_text`` (used by ``rrf``, ignored by the other
+    strategies). Returns, per claim, the hits of every ``LIMIT k`` search of the
     first timed pass (``{k: hits}``), the SQL times in ms per ``k``, the ids of the claims whose
     ``max(ks)`` hits changed between passes, and the number of claims per ``k`` whose ``LIMIT
     k`` hits are not the first ``k`` of ``max(ks)``.
@@ -685,7 +670,6 @@ def _run_searches(
     per_claim_filters = [
         claim_filters(truth) if claim_filters is not None else filters for truth in truths
     ]
-    per_claim_kwargs = [_search_kwargs(truth.text) for truth in truths]
     hits_first: list[dict[int, list[Hit]]] = [{} for _ in truths]
     sql_ms: dict[int, list[float]] = {k: [] for k in ks}
     unstable: set[int] = set()
@@ -702,7 +686,7 @@ def _run_searches(
                     filters=per_claim_filters[index],
                     strategy=strategy,
                     overfetch=overfetch,
-                    **per_claim_kwargs[index],
+                    query_text=truth.text,
                 )
                 elapsed = (time.perf_counter() - start) * 1000.0
                 if pass_index < 0:
@@ -1117,46 +1101,3 @@ def write_results(
     )
     md_path.write_text(results_markdown(result, name), encoding="utf-8")
     return json_path, md_path
-
-
-def run_eval(
-    settings: Settings,
-    ks: Sequence[int] = DEFAULT_KS,
-    repeats: int = DEFAULT_REPEATS,
-    strategy: str = DEFAULT_STRATEGY,
-    filters: Filters | None = None,
-    ef_search: int | str | None = None,
-    overfetch: int = DEFAULT_OVERFETCH,
-    claim_filters: ClaimFilters | None = None,
-    out_dir: str | Path = DEFAULT_RESULTS_DIR,
-    name: str = DEFAULT_NAME,
-    device: str | None = None,
-) -> tuple[EvalResult, Path, Path]:
-    """Evaluate ``settings.db_name`` with ``embedding.Embedder(settings.embedding_model)``.
-
-    Opens the connection, runs :func:`evaluate` (with ``settings`` for the ``ef_search``
-    default), writes the results with :func:`write_results` and returns
-    ``(result, json_path, md_path)``. ``device`` is passed to the Embedder. The connection is
-    closed afterwards; nothing is committed.
-    """
-    from wikilense.embedding import Embedder
-
-    embedder = Embedder(settings.embedding_model, device=device)
-    conn = db.connect(settings)
-    try:
-        result = evaluate(
-            conn,
-            embedder,
-            ks=ks,
-            repeats=repeats,
-            strategy=strategy,
-            filters=filters,
-            ef_search=ef_search,
-            overfetch=overfetch,
-            claim_filters=claim_filters,
-            settings=settings,
-        )
-    finally:
-        conn.close()
-    json_path, md_path = write_results(result, out_dir=out_dir, name=name)
-    return result, json_path, md_path

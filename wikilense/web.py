@@ -22,8 +22,8 @@ where ``hits`` are ``search.Hit`` dicts (with ``sentences=1`` each also carries
 ``"sentences": [{"element_key", "text"}, ...]``, the chunk's rows of ``chunk_sentence`` joined to
 ``sentence`` in page order), ``sql`` is the statement that ran (values are bound as parameters,
 so it shows ``%s`` placeholders), ``explain`` its ``EXPLAIN`` rows, ``ef_search`` the effective
-``mhnsw_ef_search`` and the timings are in milliseconds. ``search()`` is called with
-``query_text=<the query>`` whenever it accepts the keyword (``rrf`` needs it).
+``mhnsw_ef_search`` and the timings are in milliseconds. ``search()`` always gets
+``query_text=<the query>`` (``rrf`` needs it; the other strategies ignore it).
 
 The interactive API documentation stays enabled on purpose so that a reader can try the API
 from the browser: Swagger UI at :data:`DOCS_URL` and the schema at :data:`OPENAPI_URL`; the
@@ -43,7 +43,7 @@ from __future__ import annotations
 import html
 import inspect
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Annotated, Any, Literal, Protocol
 
@@ -398,23 +398,6 @@ def _open_connection(settings: Settings, database: str | None) -> pymysql.Connec
         ) from exc
 
 
-def _query_text_kwarg(func: Callable[..., Any], query_text: str) -> dict[str, Any]:
-    """Return ``{"query_text": query_text}`` when ``func`` accepts that keyword, else ``{}``.
-
-    Strategies that re-rank with the query text need it; a ``search`` function without the
-    parameter is called without it, so both versions of the search module work.
-    """
-    try:
-        params = inspect.signature(func).parameters
-    except (TypeError, ValueError):  # builtins and some callables have no signature
-        return {}
-    if "query_text" in params or any(
-        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
-    ):
-        return {"query_text": query_text}
-    return {}
-
-
 def warm_up_embedder(embedder: QueryEmbedder) -> float:
     """Embed :data:`WARM_UP_TEXT` once and return the milliseconds it took (the model load).
 
@@ -567,7 +550,7 @@ def api_search(
                     strategy=strategy_name,
                     overfetch=overfetch,
                     ef_search=ef,
-                    **_query_text_kwarg(search.search, text),
+                    query_text=text,
                 )
             except (TypeError, ValueError) as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -583,7 +566,7 @@ def api_search(
                 filters,
                 strategy_name,
                 overfetch,
-                **_query_text_kwarg(search.search_statement, text),
+                query_text=text,
             )
             explain = search.explain_search(
                 conn,
@@ -592,7 +575,7 @@ def api_search(
                 filters,
                 strategy_name,
                 overfetch,
-                **_query_text_kwarg(search.explain_search, text),
+                query_text=text,
             )
             hit_dicts = [asdict(hit) for hit in hits]
             if sentences:

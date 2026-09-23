@@ -706,18 +706,6 @@ def test_every_search_call_gets_the_claim_text_as_query_text(
     assert {call["query_text"] for call in calls} == set(texts)
     assert result.metrics_at(1).article_hits == 4  # the searches still ran (strategy none)
 
-    # a search function without the parameter is called without it
-    calls.clear()
-
-    def without_query_text(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
-                           ef_search=None):
-        calls.append({"k": k})
-        return real_search(conn, qvec, k=k, filters=filters, strategy="none")
-
-    monkeypatch.setattr(searchmod, "search", without_query_text)
-    result = evaluate(corpus, embedder, ks=(1,), repeats=1, strategy="none", settings=settings)
-    assert len(calls) == 12 and result.metrics_at(1).article_hits == 4
-
 
 @pytest.mark.db
 def test_evaluate_with_oracle_title_filters(

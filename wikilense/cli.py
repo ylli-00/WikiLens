@@ -23,21 +23,19 @@ session value alone. Every ``search.Filters`` field has an option (``--title`` r
 several titles).
 
 The strategy choices are read from ``search.STRATEGIES`` when the parser is built, so a
-strategy added to the search module appears here without a change; ``search()`` is called with
-``query_text=<the query>`` whenever it accepts that keyword (strategies that re-rank with the
-text need it).
+strategy added to the search module appears here without a change; ``search()`` always gets
+``query_text=<the query>`` (the ``rrf`` strategy's full-text half; the others ignore it).
 """
 
 from __future__ import annotations
 
 import argparse
-import inspect
 import json
 import logging
 import sys
 import textwrap
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -504,23 +502,6 @@ def _embed_query(embedder: Embedder, text: str) -> tuple[np.ndarray, float]:
     return vector, (time.perf_counter() - start) * 1000.0
 
 
-def _query_text_kwarg(func: Callable[..., Any], query_text: str) -> dict[str, Any]:
-    """Return ``{"query_text": query_text}`` when ``func`` accepts that keyword, else ``{}``.
-
-    Strategies that re-rank with the query text need it; a ``search`` function without the
-    parameter is called without it, so both versions of the search module work.
-    """
-    try:
-        params = inspect.signature(func).parameters
-    except (TypeError, ValueError):  # builtins and some callables have no signature
-        return {}
-    if "query_text" in params or any(
-        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
-    ):
-        return {"query_text": query_text}
-    return {}
-
-
 def _eval_ef_search(value: int | None) -> int | str | None:
     """Return ``evaluate.evaluate``'s ``ef_search`` for the parsed ``--ef-search``.
 
@@ -832,7 +813,7 @@ def cmd_query(args: argparse.Namespace) -> int:
                 strategy=args.strategy,
                 overfetch=args.overfetch,
                 ef_search=ef_search,
-                **_query_text_kwarg(search.search, args.text),
+                query_text=args.text,
             )
             sql_ms = (time.perf_counter() - start) * 1000.0
             ef_effective = (
@@ -849,7 +830,7 @@ def cmd_query(args: argparse.Namespace) -> int:
                     filters,
                     args.strategy,
                     args.overfetch,
-                    **_query_text_kwarg(search.search_statement, args.text),
+                    query_text=args.text,
                 )
                 explain_rows = search.explain_search(
                     conn,
@@ -858,7 +839,7 @@ def cmd_query(args: argparse.Namespace) -> int:
                     filters,
                     args.strategy,
                     args.overfetch,
-                    **_query_text_kwarg(search.explain_search, args.text),
+                    query_text=args.text,
                 )
         except (TypeError, ValueError) as exc:
             raise CliError(str(exc), exit_code=EXIT_USAGE) from exc
