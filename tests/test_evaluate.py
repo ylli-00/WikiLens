@@ -318,7 +318,7 @@ def test_evaluate_rejects_bad_arguments_before_touching_the_database() -> None:
         evaluate(conn, fake, repeats=0)
     with pytest.raises(ValueError, match="strategy"):
         evaluate(conn, fake, strategy="fast")
-    for bad in (0, -5, "fast", 2.5, True):
+    for bad in (0, -5, searchmod.MAX_EF_SEARCH + 1, "fast", 2.5, True):
         with pytest.raises(ValueError, match="ef_search"):
             evaluate(conn, fake, ef_search=bad)
     with pytest.raises(ValueError, match="ignores filters"):

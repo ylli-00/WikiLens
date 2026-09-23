@@ -589,7 +589,8 @@ def _check_eval_args(
     """Validate the arguments of :func:`evaluate` and return ``ks`` sorted, without duplicates.
 
     ``strategy`` must be one of ``search.STRATEGIES`` (read at call time); ``ef_search`` must be
-    None, a positive int or :data:`SERVER_DEFAULT_EF_SEARCH`. Raises ValueError / TypeError
+    None, an int in the server's range (``search.MIN_EF_SEARCH`` to ``search.MAX_EF_SEARCH``)
+    or :data:`SERVER_DEFAULT_EF_SEARCH`. Raises ValueError / TypeError
     with the offending argument in the message.
     """
     if isinstance(ks, (str, bytes)) or len(ks) == 0:
@@ -605,10 +606,13 @@ def _check_eval_args(
         raise ValueError(f"unknown strategy {strategy!r}; choose one of {strategies}")
     explicit = ef_search is not None and ef_search != SERVER_DEFAULT_EF_SEARCH
     if explicit and (
-        isinstance(ef_search, bool) or not isinstance(ef_search, int) or ef_search < 1
+        isinstance(ef_search, bool)
+        or not isinstance(ef_search, int)
+        or not searchmod.MIN_EF_SEARCH <= ef_search <= searchmod.MAX_EF_SEARCH
     ):
         raise ValueError(
-            f"ef_search must be a positive int, None (settings.ef_search) or "
+            f"ef_search must be an int from {searchmod.MIN_EF_SEARCH} to "
+            f"{searchmod.MAX_EF_SEARCH}, None (settings.ef_search) or "
             f"{SERVER_DEFAULT_EF_SEARCH!r}, got {ef_search!r}"
         )
     if filters is not None and not isinstance(filters, Filters):
@@ -631,16 +635,18 @@ def _resolve_ef_search(
     """Return ``(value to set for the run or None, source)`` for the ``ef_search`` argument.
 
     An int is used as given (source ``"argument"``); None takes ``settings.ef_search``, loading
-    the settings when none were passed (source ``"settings"``); :data:`SERVER_DEFAULT_EF_SEARCH`
-    leaves the session untouched (source ``"server"``). Raises ``config.SettingsError`` when the
-    settings have to be loaded and cannot be.
+    the settings when none were passed (source ``"settings"``); :data:`SERVER_DEFAULT_EF_SEARCH`,
+    and a ``settings.ef_search`` of ``search.EF_SEARCH_SERVER`` (``WIKILENSE_EF_SEARCH=0``, as
+    for the CLI and the web page), leave the session untouched (source ``"server"``). Raises
+    ``config.SettingsError`` when the settings have to be loaded and cannot be.
     """
     if ef_search == SERVER_DEFAULT_EF_SEARCH:
         return None, "server"
     if ef_search is None:
         if settings is None:
             settings = load_settings()
-        return int(settings.ef_search), "settings"
+        value = searchmod.resolve_ef_search(None, int(settings.ef_search))
+        return (None, "server") if value is None else (value, "settings")
     return int(ef_search), "argument"
 
 

@@ -12,6 +12,7 @@ finds nothing else. The pure tests (statement text, argument validation) run wit
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import replace
 from typing import Any
 
@@ -268,6 +269,69 @@ def test_rrf_requires_query_text_and_the_other_strategies_ignore_it() -> None:
     for strategy in ("inline", "overfetch", "none"):
         assert search_statement(QUERY, k=4, strategy=strategy, query_text="ignored") == \
             search_statement(QUERY, k=4, strategy=strategy)
+
+
+class SessionConn:
+    """A fake connection that only knows the session variable ``mhnsw_ef_search``."""
+
+    def __init__(self, value: int = 20) -> None:
+        self.value = value
+        self.sets: list[int] = []
+
+    def cursor(self) -> contextlib.nullcontext[SessionConn]:
+        return contextlib.nullcontext(self)
+
+    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
+        if sql.startswith("SET SESSION mhnsw_ef_search"):
+            self.value = params[0]
+            self.sets.append(params[0])
+        elif sql != "SELECT @@SESSION.mhnsw_ef_search":
+            raise AssertionError(f"unexpected statement {sql!r}")
+
+    def fetchone(self) -> tuple[int]:
+        return (self.value,)
+
+
+def test_ef_search_session_restores_the_value_when_the_block_raises() -> None:
+    conn = SessionConn(value=33)
+    with pytest.raises(RuntimeError, match="inside"), searchmod.ef_search_session(conn, 77):
+        assert conn.value == 77
+        raise RuntimeError("inside the block")
+    assert conn.value == 33 and conn.sets == [77, 33]
+    with searchmod.ef_search_session(conn, None):  # None leaves the session alone
+        pass
+    assert conn.sets == [77, 33]
+
+
+def test_ef_search_outside_the_server_range_is_refused_before_anything_is_set() -> None:
+    """MariaDB clamps mhnsw_ef_search to 1..10000 with a warning only, so 0 would run at 1 and
+    20000 at 10000 while the caller reports its own value."""
+    conn = SessionConn()
+    for bad in (0, -1, searchmod.MAX_EF_SEARCH + 1, 2.5, True, "100"):
+        with (
+            pytest.raises(ValueError, match="ef_search"),
+            searchmod.ef_search_session(conn, bad),  # type: ignore[arg-type]
+        ):
+            raise AssertionError("the block must not run")
+    assert conn.sets == []
+    for good in (searchmod.MIN_EF_SEARCH, searchmod.MAX_EF_SEARCH):
+        with searchmod.ef_search_session(conn, good):
+            assert conn.value == good
+
+
+def test_resolve_ef_search_takes_the_request_then_the_default_and_zero_is_the_server() -> None:
+    assert searchmod.resolve_ef_search(None, 100) == 100
+    assert searchmod.resolve_ef_search(40, 100) == 40
+    assert searchmod.resolve_ef_search(searchmod.EF_SEARCH_SERVER, 100) is None
+    assert searchmod.resolve_ef_search(None, searchmod.EF_SEARCH_SERVER) is None
+
+
+def test_overfetch_above_the_maximum_is_refused() -> None:
+    with pytest.raises(ValueError, match="overfetch"):
+        search_statement(QUERY, strategy="overfetch", overfetch=searchmod.MAX_OVERFETCH + 1)
+    _sql, params = search_statement(QUERY, k=2, strategy="overfetch",
+                                    overfetch=searchmod.MAX_OVERFETCH)
+    assert params[2] == 2 * searchmod.MAX_OVERFETCH
 
 
 def test_schema_declares_the_fulltext_index_on_chunk_text() -> None:
@@ -529,9 +593,6 @@ def test_ef_search_is_set_for_the_call_and_restored_even_when_the_query_raises(c
         cur.execute("DROP TABLE chunk")
     with pytest.raises(pymysql.err.ProgrammingError):
         search(corpus, QUERY, k=2, ef_search=77)
-    assert dbmod.get_session_var(corpus, "mhnsw_ef_search") == 33
-    with pytest.raises(ValueError):  # a Python-side failure restores it too
-        search(corpus, QUERY, k=0, ef_search=77)
     assert dbmod.get_session_var(corpus, "mhnsw_ef_search") == 33
 
 

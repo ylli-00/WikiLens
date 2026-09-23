@@ -25,6 +25,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from wikilense import db as dbmod
+from wikilense import search as searchmod
 from wikilense import web as webmod
 from wikilense.config import Settings
 from wikilense.search import EF_SEARCH_VARIABLE, STRATEGIES, Hit
@@ -211,7 +212,9 @@ def test_api_search_rejects_bad_parameters_with_422_or_400() -> None:
         {"q": "x", "max_words": -1},
         {"q": "x", "strategy": "exact"},
         {"q": "x", "overfetch": 0},
+        {"q": "x", "overfetch": searchmod.MAX_OVERFETCH + 1},
         {"q": "x", "ef_search": -1},
+        {"q": "x", "ef_search": searchmod.MAX_EF_SEARCH + 1},  # the server would clamp it
     ):
         resp = client.get("/api/search", params=params)
         assert resp.status_code == 422, params

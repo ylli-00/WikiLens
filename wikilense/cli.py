@@ -68,9 +68,8 @@ DEFAULT_OVERFETCH = 10
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 
-EF_SEARCH_SERVER = 0
-"""``--ef-search`` value (also spelled ``server``) that leaves the server's session value alone."""
 EF_SEARCH_SERVER_WORD = "server"
+"""``--ef-search server``: the same as ``--ef-search 0`` (``search.EF_SEARCH_SERVER``)."""
 
 WARM_UP_TEXT = "warm-up"
 """Text embedded once before a query is timed, so the model load is measured on its own."""
@@ -148,21 +147,24 @@ def non_negative_int(text: str) -> int:
 
 
 def ef_search_arg(text: str) -> int:
-    """Return ``--ef-search``: an int >= 1, or :data:`EF_SEARCH_SERVER` (0) for ``0``/``server``.
+    """Return ``--ef-search``: an int from 1 to ``search.MAX_EF_SEARCH``, or
+    ``search.EF_SEARCH_SERVER`` (0) for ``0``/``server``.
 
-    Raises ``argparse.ArgumentTypeError`` for anything else.
+    Raises ``argparse.ArgumentTypeError`` for anything else (the server would silently clamp a
+    value above its maximum).
     """
     if text.strip().lower() == EF_SEARCH_SERVER_WORD:
-        return EF_SEARCH_SERVER
+        return search.EF_SEARCH_SERVER
     try:
         value = int(text)
     except ValueError:
         raise argparse.ArgumentTypeError(
             f"expected an integer >= 0 or '{EF_SEARCH_SERVER_WORD}', got {text!r}"
         ) from None
-    if value < 0:
+    if not search.EF_SEARCH_SERVER <= value <= search.MAX_EF_SEARCH:
         raise argparse.ArgumentTypeError(
-            f"expected an integer >= 0 (0 = the server's session value), got {value}"
+            f"expected an integer from 0 (the server's session value) to "
+            f"{search.MAX_EF_SEARCH}, got {value}"
         )
     return value
 
@@ -213,8 +215,9 @@ def strategy_help(default: str) -> str:
 
 EF_SEARCH_HELP = (
     "mhnsw_ef_search for this session: the number of candidates the HNSW index keeps while "
-    "searching (more = closer to the exact ranking, slower). Default WIKILENSE_EF_SEARCH from "
-    f".env; 0 or '{EF_SEARCH_SERVER_WORD}' leaves the server's session value alone"
+    f"searching (more = closer to the exact ranking, slower; at most {search.MAX_EF_SEARCH}). "
+    f"Default WIKILENSE_EF_SEARCH from .env; 0 or '{EF_SEARCH_SERVER_WORD}' leaves the server's "
+    "session value alone"
 )
 
 
@@ -517,15 +520,19 @@ def _query_text_kwarg(func: Callable[..., Any], query_text: str) -> dict[str, An
     return {}
 
 
-def _resolve_ef_search(value: int | None, settings: Settings) -> int | None:
-    """Return the ``ef_search`` to pass to the search: ``None`` means the server's session value.
+def _eval_ef_search(value: int | None) -> int | str | None:
+    """Return ``evaluate.evaluate``'s ``ef_search`` for the parsed ``--ef-search``.
 
-    ``value`` is the parsed ``--ef-search`` (``None`` when not given, then ``settings.ef_search``
-    applies); :data:`EF_SEARCH_SERVER` (0) from either source means leave the session alone.
+    Not given is None (``evaluate`` then takes ``settings.ef_search``, where 0 also means the
+    server's value); ``search.EF_SEARCH_SERVER`` (0 / ``server``) is
+    ``evaluate.SERVER_DEFAULT_EF_SEARCH``; any other value is passed on. ``evaluate`` reads a
+    bare None as "the settings", so the CLI's 0 must not become None here.
     """
     if value is None:
-        value = settings.ef_search
-    return None if value == EF_SEARCH_SERVER else value
+        return None
+    if value == search.EF_SEARCH_SERVER:
+        return evaluate.SERVER_DEFAULT_EF_SEARCH
+    return value
 
 
 def _given_filter_flags(args: argparse.Namespace) -> list[str]:
@@ -803,7 +810,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     """
     settings = load_settings()
     filters = _filters_from_args(args)
-    ef_search = _resolve_ef_search(args.ef_search, settings)
+    ef_search = search.resolve_ef_search(args.ef_search, settings.ef_search)
     conn = _connect(settings)
     sql = ""
     params: tuple[Any, ...] = ()
@@ -886,7 +893,6 @@ def cmd_eval(args: argparse.Namespace) -> int:
     server's session value.
     """
     settings = load_settings()
-    ef_search = _resolve_ef_search(args.ef_search, settings)
     conn = _connect(settings)
     try:
         _require_chunks(conn, settings)
@@ -899,8 +905,9 @@ def cmd_eval(args: argparse.Namespace) -> int:
                 repeats=args.repeats,
                 strategy=args.strategy,
                 filters=None,
-                ef_search=ef_search,
+                ef_search=_eval_ef_search(args.ef_search),
                 overfetch=args.overfetch,
+                settings=settings,
             )
         except ValueError as exc:
             raise CliError(str(exc)) from exc

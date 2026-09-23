@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -22,7 +22,7 @@ import pymysql
 import pytest
 
 import wikilense
-from wikilense import cli
+from wikilense import cli, search
 from wikilense import db as dbmod
 from wikilense import evaluate as evalmod
 from wikilense.config import Settings, SettingsError
@@ -814,8 +814,9 @@ def test_argument_type_helpers() -> None:
     assert cli.non_negative_int("0") == 0
     assert cli.port_number("65535") == 65535
     assert cli.ef_search_arg("5") == 5
-    assert cli.ef_search_arg("0") == cli.EF_SEARCH_SERVER == 0
-    assert cli.ef_search_arg("server") == cli.ef_search_arg(" Server ") == cli.EF_SEARCH_SERVER
+    assert cli.ef_search_arg("0") == search.EF_SEARCH_SERVER == 0
+    assert cli.ef_search_arg("server") == cli.ef_search_arg(" Server ") == search.EF_SEARCH_SERVER
+    assert cli.ef_search_arg(str(search.MAX_EF_SEARCH)) == search.MAX_EF_SEARCH
     for func, value in (
         (cli.k_list, "1,,2"),
         (cli.k_list, "2,2"),
@@ -823,18 +824,11 @@ def test_argument_type_helpers() -> None:
         (cli.non_negative_int, "-1"),
         (cli.port_number, "65536"),
         (cli.ef_search_arg, "-1"),
+        (cli.ef_search_arg, str(search.MAX_EF_SEARCH + 1)),  # the server would clamp it
         (cli.ef_search_arg, "default"),
     ):
         with pytest.raises(argparse.ArgumentTypeError):
             func(value)
-
-
-def test_resolve_ef_search_prefers_the_option_then_the_settings_and_maps_zero_to_none() -> None:
-    assert cli._resolve_ef_search(None, SETTINGS) == SETTINGS.ef_search
-    assert cli._resolve_ef_search(40, SETTINGS) == 40
-    assert cli._resolve_ef_search(0, SETTINGS) is None
-    server_default = Settings(db_password="x", ef_search=0)
-    assert cli._resolve_ef_search(None, server_default) is None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1004,12 +998,34 @@ def test_eval_defaults_follow_the_evaluate_module_and_the_ef_search_setting(
     assert ev["repeats"] == evalmod.DEFAULT_REPEATS
     assert ev["strategy"] == evalmod.DEFAULT_STRATEGY
     assert ev["overfetch"] == evalmod.DEFAULT_OVERFETCH
-    assert ev["ef_search"] == SETTINGS.ef_search == 100
+    assert ev["ef_search"] is None and ev["settings"] is SETTINGS  # evaluate reads the settings
     assert fake_evaluate["write"]["out_dir"] == evalmod.DEFAULT_RESULTS_DIR
     assert fake_evaluate["write"]["name"] == evalmod.DEFAULT_NAME
     for value in ("0", "server"):
         assert cli.main(["eval", "--ef-search", value]) == 0
-        assert fake_evaluate["evaluate"]["ef_search"] is None
+        assert fake_evaluate["evaluate"]["ef_search"] == evalmod.SERVER_DEFAULT_EF_SEARCH
+
+
+def test_eval_ef_search_reaches_evaluate_with_the_documented_meaning(
+    fake_db: FakeDatabase,
+    fake_embedder: FakeEmbedder,
+    fake_evaluate: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What cmd_eval passes, resolved by evaluate's own rule: 0 / server keep the server value,
+    no option takes WIKILENSE_EF_SEARCH, and WIKILENSE_EF_SEARCH=0 keeps the server value too."""
+
+    def resolved(argv: list[str]) -> tuple[int | None, str]:
+        assert cli.main(argv) == 0
+        ev = fake_evaluate["evaluate"]
+        return evalmod._resolve_ef_search(ev["ef_search"], ev["settings"])
+
+    assert resolved(["eval"]) == (SETTINGS.ef_search, "settings")
+    assert resolved(["eval", "--ef-search", "0"]) == (None, "server")
+    assert resolved(["eval", "--ef-search", "server"]) == (None, "server")
+    assert resolved(["eval", "--ef-search", "30"]) == (30, "argument")
+    monkeypatch.setattr(cli, "load_settings", lambda: replace(SETTINGS, ef_search=0))
+    assert resolved(["eval"]) == (None, "server")
 
 
 def test_eval_reports_evaluate_argument_errors_on_one_line(

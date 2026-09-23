@@ -49,6 +49,19 @@ STRATEGIES: tuple[str, ...] = ("inline", "overfetch", "none", "rrf")
 
 EF_SEARCH_VARIABLE = "mhnsw_ef_search"
 
+#: The range MariaDB 11.8 accepts for ``mhnsw_ef_search`` (``information_schema.SYSTEM_VARIABLES``).
+#: The server clamps a value outside it with only a warning, so :func:`ef_search_session`
+#: refuses one instead: a caller would otherwise report a value that did not run.
+MIN_EF_SEARCH = 1
+MAX_EF_SEARCH = 10000
+
+#: The ``ef_search`` value that means "leave the server's session value alone": ``--ef-search 0``
+#: on the command line, ``ef_search=0`` in the web API and ``WIKILENSE_EF_SEARCH=0``.
+EF_SEARCH_SERVER = 0
+
+#: Largest ``overfetch`` factor :func:`search` accepts; ``k * overfetch`` is the inner LIMIT.
+MAX_OVERFETCH = 1000
+
 # ---------------------------------------------------------------------------------------------
 # SQL: the k-nearest-neighbour core
 # ---------------------------------------------------------------------------------------------
@@ -389,7 +402,8 @@ def _check_search_args(
 ) -> tuple[bytes, Filters]:
     """Validate the search arguments and return (vector bytes, effective Filters).
 
-    Raises ValueError for an unknown strategy, ``k`` or ``overfetch`` below 1, a query vector
+    Raises ValueError for an unknown strategy, ``k`` or ``overfetch`` below 1, ``overfetch``
+    above :data:`MAX_OVERFETCH`, a query vector
     whose dimension is not ``db.VECTOR_DIM`` (MariaDB would not fail but return NULL distances
     and an arbitrary order), or a missing or blank ``query_text`` with strategy ``rrf``, and
     TypeError for non-int ``k`` / ``overfetch``, a filters value that is not a Filters or a
@@ -409,6 +423,8 @@ def _check_search_args(
             raise TypeError(f"{name} must be an int, got {type(value).__name__}")
         if value < 1:
             raise ValueError(f"{name} must be >= 1, got {value}")
+    if overfetch > MAX_OVERFETCH:
+        raise ValueError(f"overfetch must be <= {MAX_OVERFETCH}, got {overfetch}")
     if filters is None:
         filters = Filters()
     elif not isinstance(filters, Filters):
@@ -477,16 +493,38 @@ def search_statement(
 # ---------------------------------------------------------------------------------------------
 
 
+def resolve_ef_search(requested: int | None, default: int) -> int | None:
+    """Return the ``mhnsw_ef_search`` to set for a query, or None to keep the session's value.
+
+    ``requested`` is the caller's value (``--ef-search``, the ``ef_search`` query parameter), or
+    None when it was not given; then ``default`` applies (``Settings.ef_search``, from
+    ``WIKILENSE_EF_SEARCH``). :data:`EF_SEARCH_SERVER` (0) from either source means None.
+    """
+    value = default if requested is None else requested
+    return None if value == EF_SEARCH_SERVER else value
+
+
 @contextmanager
 def ef_search_session(conn: pymysql.Connection, ef_search: int | None) -> Iterator[None]:
     """Set ``mhnsw_ef_search`` for the session inside the ``with`` block and restore it after.
 
     ``None`` leaves the session untouched. The previous value is read first and written back
     in a ``finally`` clause, so it is restored even when the block raises. Yields None.
+    Raises ValueError, before anything is set, unless ``ef_search`` is None or an int from
+    :data:`MIN_EF_SEARCH` to :data:`MAX_EF_SEARCH`.
     """
     if ef_search is None:
         yield
         return
+    if (
+        isinstance(ef_search, bool)
+        or not isinstance(ef_search, int)
+        or not MIN_EF_SEARCH <= ef_search <= MAX_EF_SEARCH
+    ):
+        raise ValueError(
+            f"ef_search must be an int from {MIN_EF_SEARCH} to {MAX_EF_SEARCH} (the range of "
+            f"mhnsw_ef_search), got {ef_search!r}"
+        )
     previous = db.get_session_var(conn, EF_SEARCH_VARIABLE)
     db.set_session_var(conn, EF_SEARCH_VARIABLE, ef_search)
     try:

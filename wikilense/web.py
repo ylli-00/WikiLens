@@ -63,8 +63,6 @@ MAX_K = 100
 DEFAULT_OVERFETCH = 10
 DEFAULT_STRATEGY = "inline"
 
-EF_SEARCH_SERVER = 0
-"""``ef_search`` value that leaves the server's session value alone."""
 WARM_UP_TEXT = "warm-up"
 
 DOCS_URL = "/docs"
@@ -417,17 +415,6 @@ def _query_text_kwarg(func: Callable[..., Any], query_text: str) -> dict[str, An
     return {}
 
 
-def _resolve_ef_search(value: int | None, settings: Settings) -> int | None:
-    """Return the ``ef_search`` to pass to the search: ``None`` means the server's session value.
-
-    ``value`` is the request's ``ef_search`` (``None`` when absent, then ``settings.ef_search``
-    applies); :data:`EF_SEARCH_SERVER` (0) from either source means leave the session alone.
-    """
-    if value is None:
-        value = settings.ef_search
-    return None if value == EF_SEARCH_SERVER else value
-
-
 def warm_up_embedder(embedder: QueryEmbedder) -> float:
     """Embed :data:`WARM_UP_TEXT` once and return the milliseconds it took (the model load).
 
@@ -502,6 +489,7 @@ def api_search(
         int,
         Query(
             ge=1,
+            le=search.MAX_OVERFETCH,
             description="overfetch and rrf only: the index returns k x overfetch candidates "
             "before the filters run",
         ),
@@ -509,7 +497,8 @@ def api_search(
     ef_search: Annotated[
         int | None,
         Query(
-            ge=0,
+            ge=search.EF_SEARCH_SERVER,
+            le=search.MAX_EF_SEARCH,
             description="mhnsw_ef_search for this query (candidates the HNSW index keeps); "
             "default WIKILENSE_EF_SEARCH; 0 leaves the server's session value",
         ),
@@ -554,7 +543,7 @@ def api_search(
             detail=f"strategy '{STRATEGY_NO_FILTERS}' runs without filters, but "
             f"{', '.join(given)} given: drop the filter or choose strategy {others}",
         )
-    ef = _resolve_ef_search(ef_search, settings)
+    ef = search.resolve_ef_search(ef_search, settings.ef_search)
 
     start = time.perf_counter()
     try:
