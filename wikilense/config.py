@@ -25,6 +25,13 @@ DEFAULT_CHUNK_MAX_WORDS = 240  # chosen with results/SUMMARY.md: equal recall at
 DEFAULT_CHUNK_OVERLAP_UNITS = 1  # one unit of overlap, kept through the experiments
 DEFAULT_VECTOR_DIM = 384  # the model's dimension; sql/schema.sql writes it literally
 DEFAULT_EF_SEARCH = 100  # mhnsw_ef_search applied per query by the CLI, web page and harness
+#: The range MariaDB 11.8 accepts for mhnsw_ef_search (information_schema.SYSTEM_VARIABLES); the
+#: server clamps anything else with only a warning, so a value outside it is refused here.
+MIN_EF_SEARCH = 1
+MAX_EF_SEARCH = 10000
+#: The ef_search value that means "leave the server's session value alone": WIKILENSE_EF_SEARCH=0,
+#: --ef-search 0 on the command line, ef_search=0 in the web API.
+EF_SEARCH_SERVER = 0
 
 
 class SettingsError(ValueError):
@@ -90,8 +97,9 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
     to the values in ``.env.example`` and docs/DESIGN.md. ``WIKILENSE_TEST_DB_NAME`` defaults to
     the database name plus ``_test``.
 
-    Raises SettingsError, naming the variable, when a required one is missing or an integer
-    variable is malformed.
+    Raises SettingsError, naming the variable, when a required one is missing, an integer
+    variable is malformed, or ``WIKILENSE_EF_SEARCH`` is neither 0 (the server's value) nor in
+    ``MIN_EF_SEARCH`` .. ``MAX_EF_SEARCH``.
     """
     path = DEFAULT_ENV_FILE if env_file is None else Path(env_file)
     file_values: dict[str, str] = {}
@@ -100,6 +108,12 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
     env: dict[str, str] = {**file_values, **os.environ}
 
     db_name = _get_str(env, "WIKILENSE_DB_NAME", "wikilense")
+    ef_search = _get_int(env, "WIKILENSE_EF_SEARCH", DEFAULT_EF_SEARCH)
+    if ef_search != EF_SEARCH_SERVER and not MIN_EF_SEARCH <= ef_search <= MAX_EF_SEARCH:
+        raise SettingsError(
+            f"WIKILENSE_EF_SEARCH must be {EF_SEARCH_SERVER} (keep the server's value) or from "
+            f"{MIN_EF_SEARCH} to {MAX_EF_SEARCH}, got {ef_search}"
+        )
     return Settings(
         db_host=_get_str(env, "WIKILENSE_DB_HOST", "127.0.0.1"),
         db_port=_get_int(env, "WIKILENSE_DB_PORT", 3306),
@@ -113,5 +127,5 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
             env, "WIKILENSE_CHUNK_OVERLAP_UNITS", DEFAULT_CHUNK_OVERLAP_UNITS
         ),
         vector_dim=_get_int(env, "WIKILENSE_VECTOR_DIM", DEFAULT_VECTOR_DIM),
-        ef_search=_get_int(env, "WIKILENSE_EF_SEARCH", DEFAULT_EF_SEARCH),
+        ef_search=ef_search,
     )

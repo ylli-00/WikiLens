@@ -328,9 +328,12 @@ def test_resolve_ef_search_takes_the_request_then_the_default_and_zero_is_the_se
     assert searchmod.resolve_ef_search(None, searchmod.EF_SEARCH_SERVER) is None
 
 
-def test_overfetch_above_the_maximum_is_refused() -> None:
-    with pytest.raises(ValueError, match="overfetch"):
-        search_statement(QUERY, strategy="overfetch", overfetch=searchmod.MAX_OVERFETCH + 1)
+def test_overfetch_above_the_maximum_is_refused_where_it_is_used() -> None:
+    for strategy, kw in (("overfetch", {}), ("rrf", {"query_text": "x"})):
+        with pytest.raises(ValueError, match="overfetch"):
+            search_statement(QUERY, strategy=strategy, overfetch=searchmod.MAX_OVERFETCH + 1, **kw)
+    for strategy in ("inline", "none"):  # these strategies ignore the factor
+        assert search_statement(QUERY, strategy=strategy, overfetch=searchmod.MAX_OVERFETCH + 1)
     _sql, params = search_statement(QUERY, k=2, strategy="overfetch",
                                     overfetch=searchmod.MAX_OVERFETCH)
     assert params[2] == 2 * searchmod.MAX_OVERFETCH

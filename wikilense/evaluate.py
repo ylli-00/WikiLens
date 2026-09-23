@@ -18,10 +18,12 @@ reports per ``k``:
   ``repeats`` x claims samples.
 
 The recall values at ``k`` are computed on the hits of the ``LIMIT k`` search of the first timed
-pass, the same statement whose latency is reported at ``k``. For ``none`` and ``inline`` these
-are the first ``k`` hits of the ``LIMIT max(ks)`` search; for ``overfetch`` and ``rrf`` they are
-not, because the inner candidate list is ``k * overfetch`` long (``prefix_mismatches`` counts
-the claims where they differ). The per-claim ranks in ``claims`` come from ``LIMIT max(ks)``.
+pass, the same statement whose latency is reported at ``k``. For ``inline``, and for ``none``
+when ``mhnsw_ef_search`` is at least ``max(ks)`` (the index looks at ``max(ef_search, LIMIT)``
+candidates), these are the first ``k`` hits of the ``LIMIT max(ks)`` search; for ``overfetch``
+and ``rrf`` they are not, because the inner candidate list is ``k * overfetch`` long
+(``prefix_mismatches`` counts the claims where they differ). The per-claim ranks in ``claims``
+come from ``LIMIT max(ks)``.
 
 The query-embedding latency (one ``embed_queries([text])`` call per claim and repeat, after a
 warm-up call) is reported separately; the vectors used for the searches come from one batched
@@ -30,8 +32,9 @@ warm-up call) is reported separately; the vectors used for the searches come fro
 Every ``search.search`` call also receives the claim text as ``query_text`` (the ``rrf``
 strategy fuses the vector ranking with a full-text ranking of these words; the other strategies
 ignore it). ``strategy`` accepts whatever ``search.STRATEGIES`` lists. ``mhnsw_ef_search``
-defaults to ``settings.ef_search`` (``WIKILENSE_EF_SEARCH``); ``ef_search=SERVER_DEFAULT_EF_SEARCH``
-leaves the server's value in place. The parameters of a run record the effective session
+defaults to ``settings.ef_search`` (``WIKILENSE_EF_SEARCH``; 0 there keeps the server's value,
+as for the CLI); ``ef_search=SERVER_DEFAULT_EF_SEARCH`` leaves the server's value in place, and
+an explicit ``ef_search=0`` is refused (0 is the command-line spelling, not the API's). The parameters of a run record the effective session
 ``mhnsw_ef_search``, the global ``mhnsw_max_cache_size``, the ``M`` and ``DISTANCE`` of the
 vector index as ``SHOW CREATE TABLE chunk`` reports them, and the chunk count, so that a result
 file says which index it was measured on.
@@ -80,7 +83,7 @@ SERVER_DEFAULT_EF_SEARCH = "server"
 """Pass as ``ef_search`` to leave ``mhnsw_ef_search`` at the server's value for the run."""
 
 #: Strategies whose statement uses the ``overfetch`` factor (recorded in the parameters).
-OVERFETCH_STRATEGIES: frozenset[str] = frozenset({"overfetch", "rrf"})
+OVERFETCH_STRATEGIES = searchmod.OVERFETCH_STRATEGIES
 
 #: Element types that are text units (rows of ``sentence``); the others are table content.
 TEXT_UNIT_TYPES = frozenset({"sentence", "item"})
@@ -200,8 +203,8 @@ class EvalResult:
     """The output of :func:`evaluate`; ``to_dict`` gives the JSON form written by ``write_results``.
 
     ``n_claims`` is the denominator of article recall, ``n_evidence_claims`` that of evidence
-    recall and unit coverage. ``unstable_claims`` lists the claims whose ``max(ks)`` hits
-    differed between repeats; ``prefix_mismatches`` counts, per ``k``, the claims whose
+    recall and unit coverage. ``unstable_claims`` lists the claims whose hits, at any ``k``,
+    differed between repeats (from the first timed pass, which the metrics use); ``prefix_mismatches`` counts, per ``k``, the claims whose
     ``LIMIT k`` hits were not the first ``k`` hits of the ``LIMIT max(ks)`` query.
     """
 
@@ -573,6 +576,8 @@ def _check_eval_args(
         raise ValueError(f"repeats must be a positive int, got {repeats!r}")
     if isinstance(overfetch, bool) or not isinstance(overfetch, int) or overfetch < 1:
         raise ValueError(f"overfetch must be a positive int, got {overfetch!r}")
+    if strategy in OVERFETCH_STRATEGIES and overfetch > searchmod.MAX_OVERFETCH:
+        raise ValueError(f"overfetch must be <= {searchmod.MAX_OVERFETCH}, got {overfetch}")
     strategies = tuple(searchmod.STRATEGIES)
     if strategy not in strategies:
         raise ValueError(f"unknown strategy {strategy!r}; choose one of {strategies}")
@@ -663,7 +668,7 @@ def _run_searches(
     Every call gets the claim text as ``query_text`` (used by ``rrf``, ignored by the other
     strategies). Returns, per claim, the hits of every ``LIMIT k`` search of the
     first timed pass (``{k: hits}``), the SQL times in ms per ``k``, the ids of the claims whose
-    ``max(ks)`` hits changed between passes, and the number of claims per ``k`` whose ``LIMIT
+    hits at any ``k`` changed between passes, and the number of claims per ``k`` whose ``LIMIT
     k`` hits are not the first ``k`` of ``max(ks)``.
     """
     max_k = ks[-1]
@@ -701,7 +706,10 @@ def _run_searches(
                 for k in prefix_mismatches:
                     if [h.chunk_id for h in hits_by_k[k]] != ids_max[:k]:
                         prefix_mismatches[k] += 1
-            elif ids_max != [h.chunk_id for h in hits_first[index][max_k]]:
+            elif any(  # every k's list, since the metrics at k use the LIMIT k list
+                [h.chunk_id for h in hits_by_k[k]] != [h.chunk_id for h in hits_first[index][k]]
+                for k in ks
+            ):
                 unstable.add(truth.claim_id)
     return hits_first, sql_ms, sorted(unstable), prefix_mismatches
 
@@ -726,9 +734,9 @@ def evaluate(
     ``query_text`` (``filters`` apply to every claim; ``claim_filters`` is a function returning
     the Filters for one claim, e.g. :func:`oracle_title_filters`, and cannot be combined with
     non-empty ``filters``). ``ef_search`` sets ``mhnsw_ef_search`` for the whole run (restored
-    afterwards): an int is used as given, None (the default) takes ``settings.ef_search``
-    (``settings`` defaults to ``load_settings()``), and :data:`SERVER_DEFAULT_EF_SEARCH` keeps
-    the server's value; the effective session value, its source, the global
+    afterwards): an int (1 to 10000) is used as given, None (the default) takes
+    ``settings.ef_search`` (``settings`` defaults to ``load_settings()``; a settings value of 0
+    keeps the server's value), and :data:`SERVER_DEFAULT_EF_SEARCH` keeps the server's value; the effective session value, its source, the global
     ``mhnsw_max_cache_size`` and the vector index's ``M`` and ``DISTANCE`` are recorded in the
     parameters. The metrics and the SQL latency at ``k`` both come from the ``LIMIT k`` query
     of each claim; the per-claim ranks in ``claims`` from the ``LIMIT max(ks)`` query. Returns
@@ -1062,7 +1070,7 @@ def results_markdown(result: EvalResult, name: str = DEFAULT_NAME) -> str:
     ]
     if result.unstable_claims:
         parts.append(
-            f"Claims whose top-{result.parameters.get('max_k')} hits changed between repeats: "
+            "Claims whose hits changed between repeats: "
             + ", ".join(str(c) for c in result.unstable_claims)
             + "."
         )

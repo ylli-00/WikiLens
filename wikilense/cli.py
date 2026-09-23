@@ -9,9 +9,10 @@ fails before the model is touched. A model that cannot be loaded (a bad name, or
 without a cached copy; sentence-transformers raises ``OSError``) is reported as one line by
 every command that needs it.
 
-Exit codes: 0 success; 1 an expected failure (settings missing, server unreachable, database
-empty or without schema, ingest refused, model not loadable or of another dimension than
-``chunk.embedding``, results not writable), reported as one line on stderr without a traceback;
+Exit codes: 0 success; 1 an expected failure (settings missing or out of range, server
+unreachable, database empty or without schema, ingest refused, model not loadable or of another
+dimension than ``chunk.embedding``, results that could not be written after the run), reported as
+one line on stderr without a traceback;
 2 bad arguments (including a filter given with ``--strategy none``, which would silently drop
 it, and an ``eval --out`` that cannot be a results directory); 130 interrupted. ``query`` writes its result to stdout (text, or JSON
 with ``--json``) and one timing line to stderr, so ``--json`` output can be piped. The timing
@@ -58,10 +59,11 @@ EXIT_USAGE = 2
 EXIT_INTERRUPTED = 130
 
 EXIT_CODES_HELP = (
-    "exit codes: 0 success; 1 an expected failure (settings missing, server unreachable, "
-    "database empty or without schema, ingest refused, embedding model not loadable or of the "
-    "wrong dimension, results not writable), reported as one line on stderr; 2 bad arguments; "
-    "130 interrupted."
+    "exit codes: 0 success; 1 an expected failure (settings missing or out of range, server "
+    "unreachable, database empty or without schema, ingest refused, embedding model not loadable "
+    "or of the wrong dimension, results that could not be written after the run), reported as "
+    "one line on stderr; 2 bad arguments (including an eval --out that cannot be a results "
+    "directory); 130 interrupted."
 )
 
 DEFAULT_K = 5
@@ -168,6 +170,16 @@ def ef_search_arg(text: str) -> int:
         raise argparse.ArgumentTypeError(
             f"expected an integer from 0 (the server's session value) to "
             f"{search.MAX_EF_SEARCH}, got {value}"
+        )
+    return value
+
+
+def overfetch_arg(text: str) -> int:
+    """Return ``--overfetch``: an int from 1 to ``search.MAX_OVERFETCH``; ArgumentTypeError otherwise."""
+    value = positive_int(text)
+    if value > search.MAX_OVERFETCH:
+        raise argparse.ArgumentTypeError(
+            f"expected an integer from 1 to {search.MAX_OVERFETCH}, got {value}"
         )
     return value
 
@@ -333,7 +345,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_query.add_argument(
         "--overfetch",
-        type=positive_int,
+        type=overfetch_arg,
         default=DEFAULT_OVERFETCH,
         metavar="N",
         help="overfetch and rrf strategies only: the index (and, for rrf, the full-text search) "
@@ -379,7 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_eval.add_argument(
         "--overfetch",
-        type=positive_int,
+        type=overfetch_arg,
         default=evaluate.DEFAULT_OVERFETCH,
         metavar="N",
         help="overfetch and rrf strategies only: the index (and, for rrf, the full-text search) "

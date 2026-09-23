@@ -820,6 +820,7 @@ def test_argument_type_helpers() -> None:
     assert cli.ef_search_arg("0") == search.EF_SEARCH_SERVER == 0
     assert cli.ef_search_arg("server") == cli.ef_search_arg(" Server ") == search.EF_SEARCH_SERVER
     assert cli.ef_search_arg(str(search.MAX_EF_SEARCH)) == search.MAX_EF_SEARCH
+    assert cli.overfetch_arg(str(search.MAX_OVERFETCH)) == search.MAX_OVERFETCH
     for func, value in (
         (cli.k_list, "1,,2"),
         (cli.k_list, "2,2"),
@@ -828,6 +829,8 @@ def test_argument_type_helpers() -> None:
         (cli.port_number, "65536"),
         (cli.ef_search_arg, "-1"),
         (cli.ef_search_arg, str(search.MAX_EF_SEARCH + 1)),  # the server would clamp it
+        (cli.overfetch_arg, "0"),
+        (cli.overfetch_arg, str(search.MAX_OVERFETCH + 1)),
         (cli.ef_search_arg, "default"),
     ):
         with pytest.raises(argparse.ArgumentTypeError):

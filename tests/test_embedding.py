@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -89,6 +91,10 @@ def test_the_default_model_is_pinned_to_the_measured_revision(
     assert len(config.DEFAULT_EMBEDDING_REVISION) == 40  # a full commit hash, not a branch
     assert Embedder("sentence-transformers/all-MiniLM-L6-v2").revision is None
     assert Embedder("sentence-transformers/all-MiniLM-L6-v2", revision="abc").revision == "abc"
+    # what ingest_meta.embedding_revision records
+    assert Embedder().revision_label == config.DEFAULT_EMBEDDING_REVISION
+    assert Embedder("sentence-transformers/all-MiniLM-L6-v2").revision_label == "unpinned"
+    assert Embedder(str(Path(__file__).parent)).revision_label == "local"  # a directory
 
     loaded: list[dict] = []
 
@@ -105,6 +111,14 @@ def test_the_default_model_is_pinned_to_the_measured_revision(
     assert isinstance(Embedder(device="cpu").model, RecordingModel)
     assert loaded == [{"name": config.DEFAULT_EMBEDDING_MODEL, "device": "cpu",
                        "revision": config.DEFAULT_EMBEDDING_REVISION}]
+
+
+def test_bad_batch_size_is_refused_before_the_model_loads() -> None:
+    embedder = Embedder(device="cpu")
+    for call in (embedder.embed_passages, embedder.embed_queries):
+        with pytest.raises(ValueError, match="batch_size"):
+            call(["text"], batch_size=0)
+    assert not embedder.is_loaded
 
 
 def test_query_instruction_only_for_bge() -> None:

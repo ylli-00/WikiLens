@@ -410,7 +410,7 @@ def test_recall_at_k_comes_from_the_limit_k_query_even_when_it_is_not_a_prefix(
     assert result.claims[0].gold_page_rank == 1
 
 
-def test_unstable_claims_are_the_ones_whose_max_k_hits_change_between_passes(
+def test_unstable_claims_are_the_ones_whose_hits_change_between_passes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = {"n": 0}
@@ -428,7 +428,56 @@ def test_unstable_claims_are_the_ones_whose_max_k_hits_change_between_passes(
     ]
     result = _pure_evaluate(monkeypatch, truths, drifting, ks=(2,), repeats=3, strategy="none")
     assert result.unstable_claims == [2]
-    assert "Claims whose top-2 hits changed between repeats: 2." in results_markdown(result)
+    assert "Claims whose hits changed between repeats: 2." in results_markdown(result)
+
+
+def test_a_change_in_a_limit_k_list_below_max_k_makes_the_claim_unstable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The metrics at k use the LIMIT k list, so a LIMIT 1 list that changes between passes has
+    to be reported even when the LIMIT 2 list stays the same."""
+    calls = {"n": 0}
+
+    def drifting_at_one(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
+                        ef_search=None, query_text=None):
+        calls["n"] += 1
+        if k == 1:
+            return [_hit(1 if calls["n"] <= 3 else 3, 1)]  # warm-up and first timed pass: [1]
+        return [_hit(1, 1), _hit(2, 1)]
+
+    truths = [ClaimTruth(1, "train", "SUPPORTS", "claim one", {1}, [{1}], {"P1"})]
+    result = _pure_evaluate(monkeypatch, truths, drifting_at_one, ks=(1, 2), repeats=3,
+                            strategy="overfetch", overfetch=2)
+    assert result.unstable_claims == [1]
+    assert result.prefix_mismatches == {1: 0}  # in the first timed pass LIMIT 1 was the prefix
+
+
+def test_units_are_looked_up_for_chunks_only_a_limit_k_query_returned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """rrf and overfetch can return, at a small k, a chunk the LIMIT max(ks) list does not hold;
+    its sentence ids must still count for evidence recall at that k."""
+
+    def rrf_like(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10,
+                 ef_search=None, query_text=None):
+        return [_hit(7, 1)] if k == 1 else [_hit(c, 1) for c in (1, 2, 3)]
+
+    truths = [ClaimTruth(1, "train", "SUPPORTS", "claim one", {1}, [{7}], {"P1"})]
+    result = _pure_evaluate(monkeypatch, truths, rrf_like, ks=(1, 3), repeats=1,
+                            strategy="rrf", overfetch=2)
+    assert {m.k: m.evidence_hits for m in result.per_k} == {1: 1, 3: 0}
+    assert result.claims[0].hit_chunk_ids == (1, 2, 3)
+
+
+def test_overfetch_above_the_maximum_is_refused_before_any_work_where_it_is_used() -> None:
+    class NoConnection:
+        def cursor(self):  # pragma: no cover - reaching it is the failure
+            raise AssertionError("the database must not be touched")
+
+    for strategy in ("overfetch", "rrf"):
+        with pytest.raises(ValueError, match="overfetch"):
+            evaluate(NoConnection(), VectorEmbedder({}), strategy=strategy,
+                     overfetch=searchmod.MAX_OVERFETCH + 1)
 
 
 def test_parse_vector_index_reads_m_and_distance() -> None:

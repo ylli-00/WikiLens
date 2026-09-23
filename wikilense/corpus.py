@@ -97,11 +97,13 @@ def link_targets(page: dict) -> set[str]:
 
     Target = the text before ``|``, without a ``#fragment``, ``_`` replaced by a space, NFC.
     Empty targets (``[[#fragment|shown]]``) are dropped. This is the corpus-selection view of a
-    whole page, and it is a subset of what ingest writes to the ``link`` table
-    (``wikitext.link_targets``): it skips a link whose text contains a single ``[`` or ``]`` and
-    a link cut open by the sentence splitter, and it does not collapse whitespace. It is kept as
-    it is because it defines the committed corpus (``scripts/build_corpus.py`` rebuilds it byte
-    for byte); the ingest parser would pick one different filler page on ``wiki_000``.
+    whole page, and it differs from what ingest writes to the ``link`` table
+    (``wikitext.link_targets``) in three ways: it skips a link whose text contains a single ``[``
+    or ``]``, it skips a link cut open by the sentence splitter, and it does not strip or collapse
+    whitespace (on ``wiki_000`` three pages have a target with a leading space that no page title
+    can equal). It is kept as it is because it defines the committed corpus
+    (``scripts/build_corpus.py`` rebuilds it byte for byte); the ingest parser would pick one
+    different filler page on ``wiki_000``.
     """
     texts: list[str] = []
     for key, value in page.items():

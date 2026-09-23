@@ -717,8 +717,8 @@ class _Ingest:
             index = db.vector_index_info(self.conn)
             values = {
                 "embedding_model": self.model_name,
-                # "main" means the Hub branch at load time, i.e. not pinned (embedding.Embedder)
-                "embedding_revision": str(getattr(self.embedder, "revision", None) or "main"),
+                # the pinned revision, "local" or "unpinned" (embedding.Embedder.revision_label)
+                "embedding_revision": str(getattr(self.embedder, "revision_label", "unpinned")),
                 "embedding_dim": str(settings.vector_dim),
                 "embedding_prefix": "true" if self.use_prefix else "false",
                 "chunk_max_words": str(settings.chunk_max_words),

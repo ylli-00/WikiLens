@@ -367,6 +367,44 @@ def test_a_failed_rollback_does_not_replace_the_original_error(
     assert raised.value is original and conn.closed
 
 
+class AnalyzeConnection:
+    """Answers ANALYZE TABLE with the given (table, op, msg_type, msg_text) rows."""
+
+    def __init__(self, rows: list[tuple[str, str, str, str]]) -> None:
+        self.rows = rows
+        self.executed: list[str] = []
+        self.commits = 0
+
+    def cursor(self) -> closing:  # a context manager whose target is this object
+        return closing(self)
+
+    def close(self) -> None:
+        pass
+
+    def execute(self, sql: str) -> None:
+        self.executed.append(sql)
+
+    def fetchall(self) -> list[tuple[str, str, str, str]]:
+        return self.rows
+
+    def commit(self) -> None:
+        self.commits += 1
+
+
+def test_an_analyze_error_row_is_an_ingest_error(tmp_path: Path) -> None:
+    from wikilense import ingest as ingestmod
+
+    settings = Settings(db_password="x", db_name="a", test_db_name="b")
+    ok = AnalyzeConnection([("a.chunk", "analyze", "status", "OK")])
+    run = ingestmod._Ingest(settings, ok, tmp_path, tmp_path, True, FakeEmbedder(), 64, True, False)
+    run._analyze_tables()
+    assert ok.executed == [f"ANALYZE TABLE `{t}`" for t in ANALYZE_TABLES] and ok.commits == 1
+    bad = AnalyzeConnection([("a.chunk", "analyze", "Error", "Table 'a.chunk' is marked as crashed")])
+    run = ingestmod._Ingest(settings, bad, tmp_path, tmp_path, True, FakeEmbedder(), 64, True, False)
+    with pytest.raises(IngestError, match="ANALYZE TABLE chunk failed: Table 'a.chunk' is marked"):
+        run._analyze_tables()
+
+
 def test_schema_literal_is_the_index_m_constant() -> None:
     """sql/schema.sql is the only place M is set; db.VECTOR_INDEX_M names it for the code."""
     script = dbmod.SCHEMA_PATH.read_text(encoding="utf-8")
@@ -542,7 +580,7 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path, report: IngestReport
     meta = dict(_rows(conn, "SELECT `key`, `value` FROM ingest_meta"))
     assert set(meta) == set(META_KEYS)
     assert meta["embedding_model"] == "fake-embedder"
-    assert meta["embedding_revision"] == "main"  # the fake has no pinned revision
+    assert meta["embedding_revision"] == "unpinned"  # the fake has no revision_label
     assert meta["embedding_dim"] == str(DIM)
     assert meta["embedding_prefix"] == "true"
     assert meta["chunk_max_words"] == str(CHUNK_MAX_WORDS)

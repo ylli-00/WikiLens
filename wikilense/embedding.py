@@ -1,4 +1,4 @@
-"""Embedding of chunk and query texts, and the vector <-> bytes / text helpers for MariaDB.
+"""Embedding of chunk and query texts, and the vector <-> text helpers for VEC_FromText / VEC_ToText.
 
 The model (chosen in phase 1, see docs/DESIGN.md, "Embedding") is ``BAAI/bge-small-en-v1.5``, 384
 dimensions. Embeddings are L2-normalised so that the cosine distance MariaDB computes with
@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -30,8 +31,6 @@ DEFAULT_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
 #: Query instruction of the BGE v1.5 English models. It is prepended to queries only; passages
 #: are embedded as-is (the BGE model card: "no instruction needed for passages").
 BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
-
-_VECTOR_DTYPE = np.dtype("<f4")  # float32, little-endian: the MariaDB VECTOR storage format
 
 
 class Embedder:
@@ -87,6 +86,14 @@ class Embedder:
     def query_instruction(self) -> str:
         """Return the text prepended to queries: the BGE instruction for BGE models, else ``""``."""
         return BGE_QUERY_INSTRUCTION if self.model_name.startswith("BAAI/bge") else ""
+
+    @property
+    def revision_label(self) -> str:
+        """Return what ``ingest_meta.embedding_revision`` records: the pinned revision, ``"local"``
+        for a model directory, or ``"unpinned"`` (the Hub's default branch at load time)."""
+        if self.revision:
+            return self.revision
+        return "local" if Path(self.model_name).is_dir() else "unpinned"
 
     @property
     def is_loaded(self) -> bool:

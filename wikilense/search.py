@@ -52,23 +52,21 @@ import pymysql
 import pymysql.cursors
 
 from wikilense import db
+from wikilense.config import EF_SEARCH_SERVER, MAX_EF_SEARCH, MIN_EF_SEARCH
 
 #: Filtering strategies accepted by :func:`search` and :func:`explain_search`.
 STRATEGIES: tuple[str, ...] = ("inline", "overfetch", "none", "rrf")
 
 EF_SEARCH_VARIABLE = "mhnsw_ef_search"
 
-#: The range MariaDB 11.8 accepts for ``mhnsw_ef_search`` (``information_schema.SYSTEM_VARIABLES``).
-#: The server clamps a value outside it with only a warning, so :func:`ef_search_session`
-#: refuses one instead: a caller would otherwise report a value that did not run.
-MIN_EF_SEARCH = 1
-MAX_EF_SEARCH = 10000
+# MIN_EF_SEARCH / MAX_EF_SEARCH (the server's range for mhnsw_ef_search) and EF_SEARCH_SERVER (0,
+# "keep the server's value" in the CLI, the web API and WIKILENSE_EF_SEARCH) are defined in
+# config and imported above; ef_search_session refuses a value outside the range, because the
+# server would clamp it with only a warning and a caller would report a value that did not run.
 
-#: The ``ef_search`` value that means "leave the server's session value alone": ``--ef-search 0``
-#: on the command line, ``ef_search=0`` in the web API and ``WIKILENSE_EF_SEARCH=0``.
-EF_SEARCH_SERVER = 0
-
-#: Largest ``overfetch`` factor :func:`search` accepts; ``k * overfetch`` is the inner LIMIT.
+#: The strategies whose statement uses the ``overfetch`` factor (inner LIMIT ``k * overfetch``).
+OVERFETCH_STRATEGIES: frozenset[str] = frozenset({"overfetch", "rrf"})
+#: Largest ``overfetch`` factor accepted for those strategies (the others ignore the factor).
 MAX_OVERFETCH = 1000
 
 # ---------------------------------------------------------------------------------------------
@@ -415,7 +413,7 @@ def _check_search_args(
     """Validate the search arguments and return (vector bytes, effective Filters).
 
     Raises ValueError for an unknown strategy, ``k`` or ``overfetch`` below 1, ``overfetch``
-    above :data:`MAX_OVERFETCH`, a query vector
+    above :data:`MAX_OVERFETCH` for a strategy that uses it, a query vector
     whose dimension is not ``db.VECTOR_DIM`` (MariaDB would not fail but return NULL distances
     and an arbitrary order), or a missing or blank ``query_text`` with strategy ``rrf``, and
     TypeError for non-int ``k`` / ``overfetch``, a filters value that is not a Filters or a
@@ -435,7 +433,7 @@ def _check_search_args(
             raise TypeError(f"{name} must be an int, got {type(value).__name__}")
         if value < 1:
             raise ValueError(f"{name} must be >= 1, got {value}")
-    if overfetch > MAX_OVERFETCH:
+    if strategy in OVERFETCH_STRATEGIES and overfetch > MAX_OVERFETCH:
         raise ValueError(f"overfetch must be <= {MAX_OVERFETCH}, got {overfetch}")
     if filters is None:
         filters = Filters()

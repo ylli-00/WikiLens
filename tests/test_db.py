@@ -132,6 +132,23 @@ def test_bad_integer_names_the_variable(tmp_path: Path, monkeypatch) -> None:
         load_settings(env)
 
 
+@pytest.mark.parametrize("value", ["-1", "10001", "20000"])
+def test_ef_search_outside_the_server_range_is_a_settings_error(
+    tmp_path: Path, monkeypatch, value: str
+) -> None:
+    """The server clamps mhnsw_ef_search to 1..10000; 0 is "keep the server's value". Anything
+    else in WIKILENSE_EF_SEARCH is refused when the settings load, naming the variable, instead
+    of failing inside a query after the model has loaded."""
+    _clear_wikilense_env(monkeypatch)
+    env = tmp_path / ".env"
+    env.write_text(f"WIKILENSE_DB_PASSWORD=x\nWIKILENSE_EF_SEARCH={value}\n", encoding="utf-8")
+    with pytest.raises(SettingsError, match="WIKILENSE_EF_SEARCH"):
+        load_settings(env)
+    for ok in ("0", "1", "10000"):
+        env.write_text(f"WIKILENSE_DB_PASSWORD=x\nWIKILENSE_EF_SEARCH={ok}\n", encoding="utf-8")
+        assert load_settings(env).ef_search == int(ok)
+
+
 def test_repr_hides_password_and_settings_are_frozen() -> None:
     s = Settings(db_password="top-secret-value")
     assert "top-secret-value" not in repr(s)
@@ -190,14 +207,28 @@ def test_schema_file_matches_the_fixed_table_list() -> None:
 _COLUMN_LINE = re.compile(r"^\s+`?(\w+)`?\s+(?:INT|TINYINT|SMALLINT|VARCHAR|TEXT|ENUM|VECTOR)\b")
 
 
+#: A line inside CREATE TABLE that declares a key, an index or a constraint, not a column.
+_KEY_LINE = re.compile(r"^\s+(PRIMARY KEY|UNIQUE KEY|KEY|FULLTEXT KEY|VECTOR INDEX|CONSTRAINT|REFERENCES)\b")
+
+
 def _schema_file_columns() -> dict[str, tuple[str, ...]]:
-    """Return {table: columns in order} parsed from sql/schema.sql, without a server."""
+    """Return {table: columns in order} parsed from sql/schema.sql, without a server.
+
+    Every line inside the parentheses must be a column of a known type or a key/constraint
+    line, so a column of a type the regex does not know fails here instead of being skipped.
+    """
     columns: dict[str, tuple[str, ...]] = {}
     for statement in dbmod.split_sql(dbmod.SCHEMA_PATH.read_text(encoding="utf-8")):
         table = re.match(r"CREATE TABLE IF NOT EXISTS (\w+) \(", statement).group(1)
-        columns[table] = tuple(
-            m.group(1) for line in statement.splitlines() if (m := _COLUMN_LINE.match(line))
-        )
+        body = statement.splitlines()[1:-1]  # between "CREATE TABLE ... (" and ") ENGINE=..."
+        names = []
+        for line in body:
+            match = _COLUMN_LINE.match(line)
+            if match:
+                names.append(match.group(1))
+            else:
+                assert _KEY_LINE.match(line), f"{table}: neither a column nor a key: {line!r}"
+        columns[table] = tuple(names)
     return columns
 
 
