@@ -13,7 +13,7 @@ skips instead of download failures.
 
 Where the database and the model are known to be there (CI), set ``WIKILENSE_REQUIRE_DB=1`` and
 ``WIKILENSE_REQUIRE_MODEL=1``: a skip reason then stops the run with an error, so a missing
-service cannot turn into a green run with 66 tests skipped.
+service cannot turn into a green run with every db and slow test skipped.
 """
 
 from __future__ import annotations
@@ -139,6 +139,7 @@ def _slow_state() -> str | None:
     )
 
 
+@pytest.hookimpl(trylast=True)  # after -m / -k deselection: only the tests that will run count
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip, with the reason, every ``db`` test without a usable server and every ``slow`` test
     without a loadable model; with ``REQUIRE_VARIABLES`` set, stop the run instead."""

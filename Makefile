@@ -41,7 +41,7 @@ setup: .env check-env $(VENV)/bin/pip
 # Refuse to start MariaDB while .env still holds the placeholder passwords of .env.example:
 # the first start initialises the data volume with whatever the file says.
 check-env: .env
-	@if grep -Eq '^WIKILENSE_DB_(ROOT_)?PASSWORD=change-me' .env; then \
+	@if grep -Eq "^[[:space:]]*(export[[:space:]]+)?WIKILENSE_DB_(ROOT_)?PASSWORD[[:space:]]*=[[:space:]]*[\"']?change-me(-too)?[\"']?[[:space:]]*\$$" .env; then \
 		echo "WIKILENSE_DB_PASSWORD or WIKILENSE_DB_ROOT_PASSWORD in .env is still the placeholder of .env.example: set both, then run 'make setup' again."; \
 		exit 1; \
 	fi

@@ -60,13 +60,21 @@ def test_compare_hits_counts_identical_lists_and_where_they_part(rexp: Any, tmp_
     assert rexp.lost_gold_pages(tmp_path, "ref", "other") == [2]  # rank 2 -> not retrieved
 
 
+MODEL = "BAAI/bge-small-en-v1.5"
+REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+
+
 def test_configuration_differences_include_the_embedding_model(rexp: Any) -> None:
     config = rexp.FINAL
-    meta = {**config.ingest_meta_expected(), "embedding_model": "BAAI/bge-small-en-v1.5"}
+    meta = {**config.ingest_meta_expected(), "embedding_model": MODEL, "embedding_revision": REVISION}
     index = {"name": "embedding", "m": config.index_m, "distance": "cosine"}
-    assert config.differences(meta, index, "BAAI/bge-small-en-v1.5") == {}
-    diffs = config.differences(meta, index, "some/other-384-model")
+    assert config.differences(meta, index, MODEL, REVISION) == {}
+    diffs = config.differences(meta, index, "some/other-384-model", REVISION)
     assert set(diffs) == {"ingest_meta.embedding_model"}
+    unrecorded = {k: v for k, v in meta.items() if k != "embedding_revision"}  # a pre-pin ingest
+    assert set(config.differences(unrecorded, index, MODEL, REVISION)) == {
+        "ingest_meta.embedding_revision"
+    }
     assert set(config.differences(meta, {**index, "m": 6}, "BAAI/bge-small-en-v1.5")) == {
         "vector_index_m"
     }
@@ -74,6 +82,57 @@ def test_configuration_differences_include_the_embedding_model(rexp: Any) -> Non
     # a configuration changes only the chunking settings; the index M is the schema's
     settings = rexp.OLD.settings(Settings(db_password="x"))
     assert (settings.chunk_max_words, settings.chunk_overlap_units) == (120, 1)
+
+
+class _Embedder:
+    model_name = MODEL
+    revision_label = REVISION
+
+
+def _context(rexp: Any, tmp_path: Path, meta: dict[str, str], index: dict[str, Any]) -> Any:
+    ctx = rexp.Context(settings=Settings(db_password="x"), server=None, out_dir=tmp_path, repeats=1,
+                       _embedder=_Embedder())
+    ctx.database_state = lambda: (meta, index)  # instance attribute: no database
+    return ctx
+
+
+def test_check_configuration_refuses_an_ingest_of_another_model_or_revision(
+    rexp: Any, tmp_path: Path
+) -> None:
+    good = {**rexp.FINAL.ingest_meta_expected(), "embedding_model": MODEL,
+            "embedding_revision": REVISION}
+    index = {"name": "embedding", "m": rexp.FINAL.index_m, "distance": "cosine"}
+    assert rexp.check_configuration(_context(rexp, tmp_path, good, index), rexp.FINAL, "t") == good
+    for key, value in (("embedding_model", "other/model"), ("embedding_revision", "unpinned")):
+        ctx = _context(rexp, tmp_path, {**good, key: value}, index)
+        with pytest.raises(rexp.ExperimentError, match=f"ingest_meta.{key}"):
+            rexp.check_configuration(ctx, rexp.FINAL, "t")
+
+
+def test_rebuild_index_refuses_an_index_that_is_not_the_schemas(rexp: Any, tmp_path: Path) -> None:
+    executed: list[str] = []
+
+    class Conn:
+        def cursor(self) -> Any:
+            import contextlib
+
+            return contextlib.nullcontext(self)
+
+        def execute(self, sql: str, params: Any = None) -> None:
+            executed.append(sql)
+
+        def fetchone(self) -> tuple[str, str]:
+            ddl = "CREATE TABLE `chunk` (\n  VECTOR KEY `other` (`embedding`) `M`='16' `DISTANCE`='cosine'\n)"
+            return ("chunk", ddl)
+
+        def close(self) -> None:
+            pass
+
+    ctx = _context(rexp, tmp_path, {}, {})
+    ctx.connect = Conn
+    with pytest.raises(rexp.ExperimentError, match="not 'embedding'"):
+        rexp.rebuild_index(ctx, 6, label="t")
+    assert executed == ["SHOW CREATE TABLE chunk"]  # nothing was dropped
 
 
 def test_rebuild_and_tablespace_sql_are_fixed_literals(rexp: Any) -> None:
@@ -111,9 +170,30 @@ def test_root_sql_passes_the_password_through_the_environment_only(
         server.root_sql("SELECT 1", database="wikilense; DROP DATABASE x")
 
 
-def test_device_phrase_and_repeats_option(rexp: Any) -> None:
+def test_an_interrupted_group_names_the_way_back_to_the_defaults(
+    rexp: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def interrupted(ctx: Any) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(rexp, "load_settings", lambda: Settings(db_password="x"))
+    monkeypatch.setitem(rexp.GROUPS, "filters", interrupted)
+    monkeypatch.setitem(rexp.GROUPS, "summary", interrupted)
+    with caplog.at_level("ERROR", logger="experiments"):
+        assert rexp.main(["filters", "--out", str(tmp_path)]) == 130
+    assert "interrupted" in caplog.text and "restore" in caplog.text
+    caplog.clear()
+    with caplog.at_level("ERROR", logger="experiments"):
+        assert rexp.main(["summary", "--out", str(tmp_path)]) == 130
+    assert "restore" not in caplog.text  # the summary group never touches the database
+
+
+def test_device_phrase_and_repeats_option(rexp: Any, tmp_path: Path) -> None:
     assert rexp.device_phrase({"machine": {"embedding_device": "cuda"}}) == "on the GPU"
     assert rexp.device_phrase({"machine": {"embedding_device": "cpu"}}) == "on the CPU"
     assert rexp.device_phrase(None) == "on ?"
-    with pytest.raises(SystemExit):  # argparse refuses --repeats 0 before anything runs
-        rexp.main(["summary", "--repeats", "0"])
+    # argparse refuses --repeats 0 before anything runs; --out points at a scratch directory so
+    # that a regression could never rewrite the committed results/SUMMARY.md
+    with pytest.raises(SystemExit):
+        rexp.main(["summary", "--repeats", "0", "--out", str(tmp_path)])
+    assert list(tmp_path.iterdir()) == []

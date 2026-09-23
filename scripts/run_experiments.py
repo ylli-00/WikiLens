@@ -209,7 +209,11 @@ class Configuration:
         }
 
     def differences(
-        self, meta: dict[str, str], index: dict[str, Any], embedding_model: str | None = None
+        self,
+        meta: dict[str, str],
+        index: dict[str, Any],
+        embedding_model: str | None = None,
+        embedding_revision: str | None = None,
     ) -> dict[str, Any]:
         """Return what differs between this configuration and the database state, or ``{}``.
 
@@ -218,13 +222,16 @@ class Configuration:
         ``hatnote_pattern`` key, or another rule) does not count as this configuration.
         ``embedding_model`` is the model the queries will be embedded with (the Context's
         settings): an ingest made with another model does not count either, since its passage
-        vectors and the query vectors would come from two models.
+        vectors and the query vectors would come from two models. ``embedding_revision`` (the
+        query embedder's ``revision_label``) likewise: an ingest from another snapshot of the same
+        model, or one made before the revision was recorded, does not count.
         """
         diffs: dict[str, Any] = {}
-        if embedding_model is not None and meta.get("embedding_model") != embedding_model:
-            diffs["ingest_meta.embedding_model"] = {
-                "expected": embedding_model, "found": meta.get("embedding_model")
-            }
+        for key, expected in (
+            ("embedding_model", embedding_model), ("embedding_revision", embedding_revision)
+        ):
+            if expected is not None and meta.get(key) != expected:
+                diffs[f"ingest_meta.{key}"] = {"expected": expected, "found": meta.get(key)}
         for key, expected in self.ingest_meta_expected().items():
             if meta.get(key) != expected:
                 diffs[f"ingest_meta.{key}"] = {"expected": expected, "found": meta.get(key)}
@@ -451,8 +458,8 @@ class Server:
 def index_definition(conn: pymysql.Connection) -> dict[str, Any]:
     """Return ``{name, m, distance}`` of the vector index from SHOW CREATE TABLE chunk.
 
-    Raises ExperimentError when the index name is not a plain identifier (it is written into
-    the ALTER TABLE statements of :func:`rebuild_index`).
+    Raises ExperimentError when the index name is not a plain identifier (it is recorded in the
+    result files; :func:`rebuild_index` accepts only the schema's ``embedding``).
     """
     with conn.cursor() as cur:
         cur.execute(SHOW_CREATE_CHUNK_SQL)
@@ -529,6 +536,10 @@ class Context:
     def connect(self) -> pymysql.Connection:
         return db.connect(self.settings)
 
+    def query_model(self) -> tuple[str, str]:
+        """Return ``(model name, revision label)`` of the embedder the queries use (not loaded)."""
+        return self.embedder.model_name, self.embedder.revision_label
+
     def database_state(self) -> tuple[dict[str, str], dict[str, Any]]:
         """Return ``(ingest_meta, index_definition)`` from a fresh connection."""
         conn = self.connect()
@@ -580,7 +591,7 @@ def describe_state(meta: dict[str, str], index: dict[str, Any]) -> str:
 def check_configuration(ctx: Context, config: Configuration, what: str) -> dict[str, str]:
     """Raise ExperimentError unless the database holds ``config``; returns ``ingest_meta``."""
     meta, index = ctx.database_state()
-    diffs = config.differences(meta, index, ctx.settings.embedding_model)
+    diffs = config.differences(meta, index, *ctx.query_model())
     if diffs:
         raise ExperimentError(
             f"{what}: the database holds {describe_state(meta, index)}, not "
@@ -790,7 +801,7 @@ def ingest_configuration(ctx: Context, config: Configuration, *, label: str) -> 
 def ensure_configuration(ctx: Context, config: Configuration, *, label: str) -> dict[str, Any] | None:
     """Ingest ``config`` unless the database already holds exactly it; returns the ingest record."""
     meta, index = ctx.database_state()
-    diffs = config.differences(meta, index, ctx.settings.embedding_model)
+    diffs = config.differences(meta, index, *ctx.query_model())
     if not diffs:
         log.info("database holds '%s' (%s); no ingest", config.label, describe_state(meta, index))
         return None
@@ -2270,6 +2281,8 @@ GROUPS = {
     "summary": group_summary,
 }
 PROTOCOL_ORDER = tuple(GROUPS)
+#: Groups that read only the files in results/ (their failure leaves the database as it was).
+NO_DATABASE_GROUPS = frozenset({"summary"})
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -2301,17 +2314,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.info("=== group %s ===", group)
         try:
             GROUPS[group](ctx)
-        except Exception as exc:
-            if isinstance(exc, ExperimentError):
+        except (Exception, KeyboardInterrupt) as exc:
+            if isinstance(exc, KeyboardInterrupt):
+                log.error("group %s interrupted", group)
+            elif isinstance(exc, ExperimentError):
                 log.error("group %s failed: %s", group, exc)
             else:  # unexpected: keep the traceback
                 log.exception("group %s failed", group)
-            log.error(
-                "the main database may now hold a group's configuration instead of the defaults "
-                "that `wikilense query`, `serve` and `eval` expect; `scripts/run_experiments.py "
-                "restore` (or `wikilense ingest`) puts them back"
-            )
-            return 1
+            if group not in NO_DATABASE_GROUPS:
+                log.error(
+                    "the main database may now hold a group's configuration instead of the "
+                    "defaults that `wikilense query`, `serve` and `eval` expect; "
+                    "`scripts/run_experiments.py restore` (or `wikilense ingest`) puts them back"
+                )
+            return 130 if isinstance(exc, KeyboardInterrupt) else 1
         log.info("=== group %s done in %.0f s ===", group, time.perf_counter() - started)
     return 0
 
