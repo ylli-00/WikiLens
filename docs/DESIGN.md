@@ -135,9 +135,12 @@ ingest; a mismatch is an error with a clear message.
 `config.Settings` (from environment, `.env` loaded with python-dotenv): `WIKILENSE_DB_HOST`,
 `WIKILENSE_DB_PORT`, `WIKILENSE_DB_USER`, `WIKILENSE_DB_PASSWORD`, `WIKILENSE_DB_NAME`,
 `WIKILENSE_EMBEDDING_MODEL` (default above), `WIKILENSE_CHUNK_MAX_WORDS` (240; 120 until
-2026-09-17), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_VECTOR_DIM` (384), `WIKILENSE_INDEX_M`
-(16; 6 until 2026-09-17) and `WIKILENSE_EF_SEARCH` (100, `Settings.ef_search`: the
-`mhnsw_ef_search` value the application passes per query; the server default stays 20).
+2026-09-17), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_VECTOR_DIM` (384) and
+`WIKILENSE_EF_SEARCH` (100, `Settings.ef_search`: the `mhnsw_ef_search` value the application
+passes per query, 1 to 10000; 0 keeps the server's session value, whose default stays 20). The
+index `M` (16; 6 until 2026-09-17) is written literally in `sql/schema.sql` and named
+`db.VECTOR_INDEX_M` in the code; it is not a setting (`WIKILENSE_INDEX_M` existed until
+2026-09-23 but only changed what `ingest_meta` recorded, never the index).
 
 `db.connect(settings) -> pymysql.Connection` (autocommit off, `charset="utf8mb4"`).
 `db.apply_schema(conn, reset=False)` runs `sql/schema.sql` statement by statement; `reset=True`
@@ -240,23 +243,35 @@ Corrections to the rules above, forced by the data, and the numbers behind the p
 ## Ingest (`ingest.py`), contract for phase 2
 
 `run_ingest(settings, corpus_dir=DEFAULT_CORPUS_DIR, reset=True, embedder=None, batch_size=64,
-use_prefix=True, progress=True) -> IngestReport` with counts `n_pages, n_sections, n_sentences,
-n_units_empty, n_chunks, n_links, n_links_resolved, n_links_skipped, n_claims, n_evidence,
-n_evidence_page_resolved, n_evidence_sentence_resolved` and `seconds` per stage (parse, embed,
-load, resolve). Steps, each committed when it completes:
+use_prefix=True, progress=True) -> IngestReport` with the counts `n_pages, n_sections,
+n_sentences, n_units_empty, n_units_hatnote, n_chunks, n_links, n_links_resolved,
+n_links_skipped, n_claims, n_evidence, n_evidence_page_resolved, n_evidence_sentence_resolved`
+and `seconds` per stage (`schema, parse, embed, load, resolve, analyze, total`).
 
-1. `apply_schema(reset)`; refuse to run against the test database.
+Before the database is touched: refuse the test database (`settings.test_db_name`), a
+`settings.vector_dim` other than the schema's literal, `chunk_max_words < 1` and
+`chunk_overlap_units < 0` (`IngestError`), then load the embedding model and refuse a dimension
+other than `settings.vector_dim`. A mistake in `.env` therefore never drops the ingest that is in
+place (until 2026-09-23 the model and the chunk settings were checked after the reset). Then seven
+steps, each committed when it completes; a failure rolls back the uncommitted rows (when the
+connection is still open) and closes the connection:
+
+1. `apply_schema(reset)`. `reset=False` is for a schema made by `init-db` and refuses a database
+   that already holds pages.
 2. Parse every page (`parse_page`, `chunk_page`); insert `page`, `section` (lead included),
-   `sentence` (every unit, empty ones too), `link` (`to_title` over 255 characters skipped and
-   counted). Keep chunks in memory with their `embedding_text` (prefix on by default).
+   `sentence` (every unit, empty ones and hatnotes too), `link` (`to_title` over 255 characters
+   skipped and counted). Keep chunks in memory with their `embedding_text` (prefix on by default).
 3. Embed all chunk texts in batches (`embed_passages`), then insert `chunk` rows with
-   `vec_param` bytes and `chunk_sentence` rows through `insert_rows`. Assert `embedder.dim ==
-   settings.vector_dim` before embedding.
+   `vec_param` bytes and `chunk_sentence` rows through `insert_rows`.
 4. Resolve `link.to_page_id` with one `UPDATE link JOIN page ON page.title = link.to_title`.
-5. Insert `claim` and `claim_evidence` (`parse_element_id`; `page_id` by title, `sentence_id` by
+5. `ANALYZE TABLE` for `chunk`, `page`, `section` and `link`, so the optimizer plans the search
+   statements from fresh statistics (Phase 2 outcomes: stale statistics once lost the index).
+6. Insert `claim` and `claim_evidence` (`parse_element_id`; `page_id` by title, `sentence_id` by
    (`page_id`, `element_key`); cells and captions keep `sentence_id` NULL).
-6. Write `ingest_meta`: `embedding_model`, `embedding_dim`, `embedding_prefix`, `chunk_max_words`,
-   `chunk_overlap_units`, `index_m`, `index_distance`, `corpus_dir`, `corpus_pages_sha256`,
+7. Write `ingest_meta`: `embedding_model`, `embedding_dim`, `embedding_prefix`, `chunk_max_words`,
+   `chunk_overlap_units`, `index_m` and `index_distance` (read from `SHOW CREATE TABLE chunk`,
+   so they describe the index that is in place), `hatnote_pattern`, `n_units_hatnote`,
+   `analyze_tables`, `analyze_seconds`, `corpus_dir`, `corpus_pages_sha256`,
    `corpus_claims_sha256`, `mariadb_version`, `wikilense_version`, `ingested_at` (UTC ISO 8601).
 
 ## Search (`search.py`), contract for phase 2

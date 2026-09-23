@@ -1,19 +1,23 @@
 """Ingest pipeline: corpus files -> page, section, sentence, link, claim tables -> chunks -> embeddings.
 
 ``run_ingest`` is the single entry point (docs/DESIGN.md, "Ingest (ingest.py), contract for
-phase 2"). It runs seven steps against ``settings.db_name`` and commits each one when it
-completes:
+phase 2"). Before anything in the database is touched it refuses the test database
+(``settings.test_db_name``), chunk settings out of range, and an embedding model that cannot be
+loaded or whose dimension is not ``settings.vector_dim``, so a mistake in ``.env`` never costs
+the ingest that is in place. Then it runs seven steps against ``settings.db_name`` and commits
+each one when it completes:
 
-1. ``db.apply_schema`` (``reset=True`` drops the tables first). The test database
-   (``settings.test_db_name``) is refused.
+1. ``db.apply_schema`` (``reset=True`` drops the tables first; ``reset=False`` is for a schema
+   made by ``init-db`` and refuses a database that already holds pages).
 2. Every page is parsed (``wikitext.parse_page``, ``chunking.chunk_page``) and its ``page``,
    ``section`` (lead included), ``sentence`` (every text unit: whitespace-only ones and hatnotes
    such as "Main article: X" too, so that evidence ids resolve) and ``link`` rows are written; a
    link target longer than ``MAX_TITLE_LENGTH`` characters is skipped and counted. Chunks stay in
    memory with the text that will be embedded (``chunking.embedding_text`` when ``use_prefix``).
-3. The embedder's dimension is checked against ``settings.vector_dim`` (which must equal the
-   literal in ``sql/schema.sql``), the chunk texts are embedded with ``embed_passages`` and the
-   ``chunk`` rows (``db.vec_param`` bytes) and the ``chunk_sentence`` map are written. A chunk is
+3. The chunk texts are embedded with ``embed_passages`` (the model was loaded and its
+   dimension checked against ``settings.vector_dim``, the literal in ``sql/schema.sql``, before
+   step 1) and the ``chunk`` rows (``db.vec_param`` bytes) and the ``chunk_sentence`` map are
+   written. A chunk is
    mapped to the units it carries; whitespace-only units and hatnotes (``TextUnit.chunkable`` is
    False, see ``wikitext.HATNOTE_RE``) belong to no chunk and are counted as ``n_units_empty``
    and ``n_units_hatnote``.
@@ -26,7 +30,8 @@ completes:
 6. ``claim`` and ``claim_evidence`` are written; ``page_id`` is resolved by title and
    ``sentence_id`` by ``(page_id, element_key)`` for sentences and list items (cells and captions
    keep ``sentence_id`` NULL).
-7. ``ingest_meta`` records the model, chunk and index parameters, the hatnote rule and count,
+7. ``ingest_meta`` records the model, the chunk parameters, the index ``M`` and ``DISTANCE`` as
+   ``SHOW CREATE TABLE chunk`` reports them (``db.vector_index_info``), the hatnote rule and count,
    the ANALYZE tables and seconds, the corpus directory (relative to the repository root when
    inside it, so the value does not leak a home directory), the SHA-256 of both corpus files,
    the server version and the time.
@@ -38,6 +43,7 @@ through the ``logging`` module.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import time
@@ -67,11 +73,11 @@ MAX_TITLE_LENGTH = 255
 """Length of ``link.to_title`` (VARCHAR(255)); longer targets are skipped and counted."""
 
 INDEX_DISTANCE = "cosine"
-"""The DISTANCE of the VECTOR INDEX in sql/schema.sql, recorded in ``ingest_meta``."""
+"""The DISTANCE of the VECTOR INDEX in sql/schema.sql (``ingest_meta`` records the live value)."""
 
 STAGES: tuple[str, ...] = ("schema", "parse", "embed", "load", "resolve", "analyze", "total")
-"""Keys of ``IngestReport.seconds``: parse = parse_page + chunk_page; embed = model dimension
-check (loads the model) + embed_passages; load = every INSERT (plus file hashing);
+"""Keys of ``IngestReport.seconds``: parse = parse_page + chunk_page; embed = model load and
+dimension check (before the schema step) + embed_passages; load = every INSERT (plus file hashing);
 resolve = the link UPDATE and the evidence id lookups; analyze = the ANALYZE TABLE statements;
 total = the whole run."""
 
@@ -105,13 +111,15 @@ RESOLVE_LINKS_SQL = (
     "UPDATE link JOIN page ON page.title = link.to_title SET link.to_page_id = page.page_id"
 )
 VERSION_SQL = "SELECT VERSION()"
+PAGE_COUNT_SQL = "SELECT COUNT(*) FROM page"
 CLEAR_META_SQL = "DELETE FROM ingest_meta"
 #: One parameterless ``ANALYZE TABLE`` per table of the fixed list above.
 _ANALYZE_SQL: dict[str, str] = {table: f"ANALYZE TABLE `{table}`" for table in ANALYZE_TABLES}
 
 # Explicit primary keys are assigned in Python (parents before children, ids consecutive per
 # table) so that foreign keys are known without reading AUTO_INCREMENT values back. Each run
-# starts after the largest existing id; with reset=True every table is empty and ids start at 1.
+# starts after the largest existing id (1 on the empty tables that reset=True, or the page check
+# of reset=False, guarantee).
 _ID_COLUMNS: dict[str, str] = {
     "page": "page_id",
     "section": "section_id",
@@ -351,8 +359,9 @@ class _Ingest:
         self.next_id: dict[str, int] = {}
 
     def run(self) -> IngestReport:
-        """Execute the seven steps and return the report."""
+        """Check the embedder, execute the seven steps and return the report."""
         start = time.perf_counter()
+        self._check_embedder()
         self._apply_schema()
         self._load_pages()
         self._embed_and_load_chunks()
@@ -371,12 +380,48 @@ class _Ingest:
         )
         return self.report
 
+    # before step 1 -----------------------------------------------------------------------------
+
+    def _check_embedder(self) -> None:
+        """Load the embedding model and check its dimension, before any table is touched.
+
+        Raises ``IngestError`` for a dimension other than ``settings.vector_dim``; a model that
+        cannot be loaded raises ``OSError`` from sentence-transformers. Either way the ingest
+        that is in place stays as it was.
+        """
+        with self.timer.stage("embed"):
+            if self.embedder is None:
+                from wikilense.embedding import Embedder
+
+                self.embedder = Embedder(self.settings.embedding_model)
+            self.model_name = str(getattr(self.embedder, "model_name", self.model_name))
+            dim = int(self.embedder.dim)
+        if dim != self.settings.vector_dim:
+            raise IngestError(
+                f"embedding model {self.model_name!r} has dimension {dim}, but the schema "
+                f"and WIKILENSE_VECTOR_DIM expect {self.settings.vector_dim}; nothing was "
+                "changed in the database"
+            )
+
     # step 1 ------------------------------------------------------------------------------------
 
     def _apply_schema(self) -> None:
-        """Apply (or reset and apply) the schema and read the next free ids."""
+        """Apply (or reset and apply) the schema and read the next free ids.
+
+        With ``reset=False`` a database that already holds pages is refused (``IngestError``):
+        the run would add a second corpus whose evidence ids resolve against its own pages only.
+        """
         with self.timer.stage("schema"):
             n_statements = db.apply_schema(self.conn, reset=self.reset)
+            if not self.reset:
+                with self.conn.cursor() as cur:
+                    cur.execute(PAGE_COUNT_SQL)
+                    n_pages = int(cur.fetchone()[0])
+                if n_pages:
+                    raise IngestError(
+                        f"database {self.settings.db_name!r} already holds {n_pages} pages; run "
+                        "'wikilense ingest' without --no-reset to replace them"
+                    )
             self.next_id = {table: _next_id(self.conn, table) for table in _ID_COLUMNS}
         logger.info(
             "schema: %d statements applied (reset=%s) in %.2f s",
@@ -515,20 +560,10 @@ class _Ingest:
     # step 3 ------------------------------------------------------------------------------------
 
     def _embed_and_load_chunks(self) -> None:
-        """Check the model dimension, embed the chunk texts, write chunk and chunk_sentence."""
+        """Embed the chunk texts, write chunk and chunk_sentence."""
+        assert self.embedder is not None  # set by _check_embedder
+        dim = self.settings.vector_dim
         with self.timer.stage("embed"):
-            if self.embedder is None:
-                from wikilense.embedding import Embedder
-
-                self.embedder = Embedder(self.settings.embedding_model)
-            self.model_name = str(getattr(self.embedder, "model_name", self.model_name))
-            dim = int(self.embedder.dim)
-            if dim != self.settings.vector_dim:
-                raise IngestError(
-                    f"embedding model {self.model_name!r} has dimension {dim}, but the schema "
-                    f"and WIKILENSE_VECTOR_DIM expect {self.settings.vector_dim}; no chunk "
-                    "rows were written"
-                )
             texts = [chunk.embedding_text for chunk in self.chunks]
             vectors = self.embedder.embed_passages(
                 texts, batch_size=self.batch_size, show_progress=self.progress
@@ -678,14 +713,15 @@ class _Ingest:
         """Replace the ingest_meta rows with this run's parameters and corpus digests."""
         settings = self.settings
         with self.timer.stage("load"):
+            index = db.vector_index_info(self.conn)
             values = {
                 "embedding_model": self.model_name,
                 "embedding_dim": str(settings.vector_dim),
                 "embedding_prefix": "true" if self.use_prefix else "false",
                 "chunk_max_words": str(settings.chunk_max_words),
                 "chunk_overlap_units": str(settings.chunk_overlap_units),
-                "index_m": str(settings.index_m),
-                "index_distance": INDEX_DISTANCE,
+                "index_m": str(index["index_m"]),
+                "index_distance": str(index["index_distance"]),
                 "hatnote_pattern": HATNOTE_RE.pattern,
                 "n_units_hatnote": str(self.report.n_units_hatnote),
                 "analyze_tables": ",".join(ANALYZE_TABLES),
@@ -723,18 +759,23 @@ def run_ingest(
     """Ingest ``corpus_dir`` into ``settings.db_name`` and return the ``IngestReport``.
 
     ``reset=True`` drops and recreates every table first; ``reset=False`` only creates missing
-    tables, so it is for a database prepared with ``init-db`` (re-ingesting on top of existing
-    rows fails on the unique page title). ``embedder`` defaults to
+    tables, so it is for a database prepared with ``init-db``, and a database that already holds
+    pages is refused. ``embedder`` defaults to
     ``embedding.Embedder(settings.embedding_model)``; ``batch_size`` is the embedding batch;
     ``use_prefix`` embeds ``"title > section path: text"`` instead of the bare chunk text;
     ``progress`` shows tqdm bars. Each of the seven steps (module doc) is committed when it
-    completes.
+    completes. When a step fails, its uncommitted rows are rolled back (when the connection is
+    still open; a failed rollback never replaces the original error) and the connection is
+    closed.
 
     Raises ``IngestError`` when ``settings.db_name`` is the test database, when
-    ``settings.vector_dim`` differs from the literal in ``sql/schema.sql``, when the embedder's
-    dimension differs from ``settings.vector_dim`` (before any chunk row is written), on a
-    duplicate page title, a malformed evidence id or a failed ``ANALYZE TABLE``;
-    ``FileNotFoundError`` when a corpus file is missing; ``ValueError`` for ``batch_size < 1``.
+    ``settings.vector_dim`` differs from the literal in ``sql/schema.sql``, for
+    ``chunk_max_words < 1`` or ``chunk_overlap_units < 0``, when the embedder's dimension differs
+    from ``settings.vector_dim`` (these before the database is touched), when ``reset=False``
+    finds pages, on a duplicate page title, a malformed evidence id or a failed ``ANALYZE
+    TABLE``; ``FileNotFoundError`` when a corpus file is missing; ``OSError`` from
+    sentence-transformers when the model cannot be loaded (also before the database is
+    touched); ``ValueError`` for ``batch_size < 1``.
     """
     if settings.db_name == settings.test_db_name:
         raise IngestError(
@@ -745,6 +786,14 @@ def run_ingest(
         raise IngestError(
             f"WIKILENSE_VECTOR_DIM is {settings.vector_dim}, but sql/schema.sql declares "
             f"VECTOR({db.VECTOR_DIM}); change the schema and db.VECTOR_DIM together"
+        )
+    if settings.chunk_max_words < 1:
+        raise IngestError(
+            f"WIKILENSE_CHUNK_MAX_WORDS must be at least 1, got {settings.chunk_max_words}"
+        )
+    if settings.chunk_overlap_units < 0:
+        raise IngestError(
+            f"WIKILENSE_CHUNK_OVERLAP_UNITS must not be negative, got {settings.chunk_overlap_units}"
         )
     if batch_size < 1:
         raise ValueError(f"batch_size must be at least 1, got {batch_size}")
@@ -765,7 +814,11 @@ def run_ingest(
         try:
             return ingest.run()
         except BaseException:
-            conn.rollback()
+            # A lost connection (or Ctrl-C during a socket read) leaves it closed, and rollback
+            # would then raise InterfaceError(0, '') in place of the error that matters.
+            if conn.open:
+                with contextlib.suppress(pymysql.err.Error):
+                    conn.rollback()
             raise
     finally:
         conn.close()

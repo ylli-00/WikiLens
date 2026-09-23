@@ -50,7 +50,6 @@ import json
 import logging
 import os
 import platform
-import re
 import time
 from collections import defaultdict
 from collections.abc import Callable, Collection, Sequence
@@ -66,6 +65,7 @@ import pymysql
 from wikilense import __version__, db
 from wikilense import search as searchmod
 from wikilense.config import REPO_ROOT, Settings, load_settings
+from wikilense.db import vector_index_info
 from wikilense.search import EF_SEARCH_VARIABLE, Filters, Hit, ef_search_session
 
 logger = logging.getLogger(__name__)
@@ -116,11 +116,6 @@ CORPUS_COUNTS_SQL = (
 )
 VERSION_SQL = "SELECT VERSION()"
 CACHE_SIZE_SQL = "SELECT @@GLOBAL.mhnsw_max_cache_size"
-SHOW_CREATE_CHUNK_SQL = "SHOW CREATE TABLE chunk"
-#: ``M`` and ``DISTANCE`` as SHOW CREATE TABLE prints a vector index on 11.8:
-#: ``VECTOR KEY `embedding` (`embedding`) `M`='16' `DISTANCE`='cosine'``.
-_INDEX_M_RE = re.compile(r"`M`\s*=\s*'?(\d+)'?")
-_INDEX_DISTANCE_RE = re.compile(r"`DISTANCE`\s*=\s*'?([A-Za-z]+)'?")
 
 # ---------------------------------------------------------------------------------------------
 # data classes
@@ -469,28 +464,6 @@ def global_cache_size(conn: pymysql.Connection) -> int:
     with conn.cursor() as cur:
         cur.execute(CACHE_SIZE_SQL)
         return int(cur.fetchone()[0])
-
-
-def parse_vector_index(create_table: str) -> dict[str, Any]:
-    """Return ``{"index_m": int | None, "index_distance": str | None}`` from a CREATE TABLE text.
-
-    The values are the ``M`` and ``DISTANCE`` options of the vector index as ``SHOW CREATE
-    TABLE`` prints them; an option that is not printed (server default) gives None.
-    """
-    m_match = _INDEX_M_RE.search(create_table)
-    distance_match = _INDEX_DISTANCE_RE.search(create_table)
-    return {
-        "index_m": int(m_match.group(1)) if m_match else None,
-        "index_distance": distance_match.group(1).lower() if distance_match else None,
-    }
-
-
-def vector_index_info(conn: pymysql.Connection) -> dict[str, Any]:
-    """Return :func:`parse_vector_index` of ``SHOW CREATE TABLE chunk`` on this connection."""
-    with conn.cursor() as cur:
-        cur.execute(SHOW_CREATE_CHUNK_SQL)
-        row = cur.fetchone()
-    return parse_vector_index(str(row[1]) if row else "")
 
 
 # ---------------------------------------------------------------------------------------------

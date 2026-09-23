@@ -23,6 +23,7 @@ import pytest
 from wikilense import db as dbmod
 from wikilense import search as searchmod
 from wikilense.config import Settings
+from wikilense.db import parse_vector_index
 from wikilense.evaluate import (
     SERVER_DEFAULT_EF_SEARCH,
     ClaimOutcome,
@@ -40,7 +41,6 @@ from wikilense.evaluate import (
     latency_stats,
     load_ground_truth,
     oracle_title_filters,
-    parse_vector_index,
     results_markdown,
     unit_coverage_at_k,
     worst_claims,

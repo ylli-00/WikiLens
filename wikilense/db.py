@@ -12,6 +12,7 @@ install of the checkout (``pip install -e .``); a wheel would not carry the file
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -25,6 +26,17 @@ SCHEMA_PATH = REPO_ROOT / "sql" / "schema.sql"
 
 #: Vector dimension written literally in sql/schema.sql (chunk.embedding VECTOR(384)).
 VECTOR_DIM = 384
+
+#: The ``M`` of the vector index, written literally in sql/schema.sql (``VECTOR INDEX
+#: (embedding) M=16 DISTANCE=cosine``, chosen with results/SUMMARY.md). The schema is the only
+#: place it is set; ingest records what ``SHOW CREATE TABLE chunk`` reports (:func:`vector_index_info`).
+VECTOR_INDEX_M = 16
+
+SHOW_CREATE_CHUNK_SQL = "SHOW CREATE TABLE chunk"
+#: ``M`` and ``DISTANCE`` as SHOW CREATE TABLE prints a vector index on 11.8:
+#: ``VECTOR KEY `embedding` (`embedding`) `M`='16' `DISTANCE`='cosine'``.
+_INDEX_M_RE = re.compile(r"`M`\s*=\s*'?(\d+)'?")
+_INDEX_DISTANCE_RE = re.compile(r"`DISTANCE`\s*=\s*'?([A-Za-z]+)'?")
 
 #: Tables in dependency order (parents first) with their columns, exactly as in sql/schema.sql.
 #: insert_rows() accepts only these identifiers; drops run in the reverse order.
@@ -300,6 +312,28 @@ def get_session_var(conn: pymysql.Connection, name: str) -> int:
         cur.execute(statement)
         row = cur.fetchone()
     return int(row[0])
+
+
+def parse_vector_index(create_table: str) -> dict[str, Any]:
+    """Return ``{"index_m": int | None, "index_distance": str | None}`` from a CREATE TABLE text.
+
+    The values are the ``M`` and ``DISTANCE`` options of the vector index as ``SHOW CREATE
+    TABLE`` prints them; an option that is not printed (server default) gives None.
+    """
+    m_match = _INDEX_M_RE.search(create_table)
+    distance_match = _INDEX_DISTANCE_RE.search(create_table)
+    return {
+        "index_m": int(m_match.group(1)) if m_match else None,
+        "index_distance": distance_match.group(1).lower() if distance_match else None,
+    }
+
+
+def vector_index_info(conn: pymysql.Connection) -> dict[str, Any]:
+    """Return :func:`parse_vector_index` of ``SHOW CREATE TABLE chunk`` on this connection."""
+    with conn.cursor() as cur:
+        cur.execute(SHOW_CREATE_CHUNK_SQL)
+        row = cur.fetchone()
+    return parse_vector_index(str(row[1]) if row else "")
 
 
 def explain(

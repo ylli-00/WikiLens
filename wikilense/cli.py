@@ -254,7 +254,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest.add_argument(
         "--no-reset",
         action="store_true",
-        help="keep existing tables (default: drop and recreate them first)",
+        help="keep the tables made by 'init-db' instead of dropping and recreating them; a "
+        "database that already holds pages is refused",
     )
     p_ingest.add_argument(
         "--batch-size", type=positive_int, default=64, help="embedding batch size (default 64)"

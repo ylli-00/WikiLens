@@ -21,7 +21,6 @@ DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # chosen in phase 1, see doc
 DEFAULT_CHUNK_MAX_WORDS = 240  # chosen with results/SUMMARY.md: equal recall at equal retrieved text, half the vectors
 DEFAULT_CHUNK_OVERLAP_UNITS = 1  # one unit of overlap, kept through the experiments
 DEFAULT_VECTOR_DIM = 384  # the model's dimension; sql/schema.sql writes it literally
-DEFAULT_INDEX_M = 16  # chosen with results/SUMMARY.md: exact-ranking recall at the default ef_search
 DEFAULT_EF_SEARCH = 100  # mhnsw_ef_search applied per query by the CLI, web page and harness
 
 
@@ -31,7 +30,10 @@ class SettingsError(ValueError):
 
 @dataclass(frozen=True, kw_only=True)
 class Settings:
-    """Connection, model, chunking and index parameters. The password is kept out of repr()."""
+    """Connection, model, chunking and search parameters. The password is kept out of repr().
+
+    The vector index's ``M`` is not a setting: sql/schema.sql writes it (``db.VECTOR_INDEX_M``).
+    """
 
     db_host: str = "127.0.0.1"
     db_port: int = 3306
@@ -43,7 +45,6 @@ class Settings:
     chunk_max_words: int = DEFAULT_CHUNK_MAX_WORDS
     chunk_overlap_units: int = DEFAULT_CHUNK_OVERLAP_UNITS
     vector_dim: int = DEFAULT_VECTOR_DIM
-    index_m: int = DEFAULT_INDEX_M
     ef_search: int = DEFAULT_EF_SEARCH
 
 
@@ -109,6 +110,5 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
             env, "WIKILENSE_CHUNK_OVERLAP_UNITS", DEFAULT_CHUNK_OVERLAP_UNITS
         ),
         vector_dim=_get_int(env, "WIKILENSE_VECTOR_DIM", DEFAULT_VECTOR_DIM),
-        index_m=_get_int(env, "WIKILENSE_INDEX_M", DEFAULT_INDEX_M),
         ef_search=_get_int(env, "WIKILENSE_EF_SEARCH", DEFAULT_EF_SEARCH),
     )

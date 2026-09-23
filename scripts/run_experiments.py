@@ -4,7 +4,7 @@
 Every evaluation goes through ``wikilense.evaluate.evaluate`` and ``write_results`` (one JSON and
 one Markdown file per run, named as in the protocol); every ingest through
 ``wikilense.ingest.run_ingest`` with ``dataclasses.replace(settings, chunk_max_words=...,
-chunk_overlap_units=..., index_m=...)`` and an explicit ``use_prefix``. Nothing is inherited from
+chunk_overlap_units=...)`` and an explicit ``use_prefix``. Nothing is inherited from
 the environment or from an earlier run: every group names its configuration (chunk size,
 overlap, index M, prefix) as a :class:`Configuration` and either ingests it or verifies, from
 ``ingest_meta`` and ``SHOW CREATE TABLE chunk``, that the database holds exactly it; every
@@ -13,7 +13,7 @@ and :func:`run_eval` refuses to run when the database does not hold the configur
 given. The evaluations run one after the other, never two at once, so the latency samples never
 overlap.
 
-``sql/schema.sql`` builds the vector index with M=16 (``DEFAULT_INDEX_M``), so a configuration
+``sql/schema.sql`` builds the vector index with M=16 (``db.VECTOR_INDEX_M``), so a configuration
 with another M rebuilds the index right after the ingest: ``ALTER TABLE chunk DROP INDEX <name>``
 then ``ALTER TABLE chunk ADD VECTOR INDEX <name> (embedding) M=<m> DISTANCE=cosine``, where
 ``<name>`` is the index name that ``SHOW CREATE TABLE chunk`` reports (checked against
@@ -112,7 +112,6 @@ from wikilense.config import (
     DEFAULT_CHUNK_OVERLAP_UNITS,
     DEFAULT_EF_SEARCH,
     DEFAULT_ENV_FILE,
-    DEFAULT_INDEX_M,
     Settings,
     load_settings,
 )
@@ -179,12 +178,12 @@ class Configuration:
         )
 
     def settings(self, base: Settings) -> Settings:
-        """Return ``base`` with the chunking and index parameters of this configuration."""
+        """Return ``base`` with the chunking parameters of this configuration (the index M is
+        the schema's; :func:`ingest_configuration` rebuilds the index for another one)."""
         return replace(
             base,
             chunk_max_words=self.chunk_max_words,
             chunk_overlap_units=self.chunk_overlap_units,
-            index_m=self.index_m,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -227,7 +226,7 @@ OLD = Configuration(chunk_max_words=120, chunk_overlap_units=1, index_m=6, use_p
 FINAL = Configuration(
     chunk_max_words=DEFAULT_CHUNK_MAX_WORDS,
     chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
-    index_m=DEFAULT_INDEX_M,
+    index_m=db.VECTOR_INDEX_M,
     use_prefix=True,
 )
 CHUNK_SIZE_CASES: tuple[tuple[int, tuple[int, ...], str], ...] = (
@@ -1105,7 +1104,7 @@ def group_chunk_size(ctx: Context) -> None:
     for words, ks, name in CHUNK_SIZE_CASES:
         config = Configuration(
             chunk_max_words=words, chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
-            index_m=DEFAULT_INDEX_M, use_prefix=True,
+            index_m=db.VECTOR_INDEX_M, use_prefix=True,
         )
         info = ingest_configuration(ctx, config, label=f"chunk{words}")
         run_eval(
@@ -1118,7 +1117,7 @@ def group_prefix(ctx: Context) -> None:
     for label, use_prefix in PREFIX_CASES:
         config = Configuration(
             chunk_max_words=120, chunk_overlap_units=DEFAULT_CHUNK_OVERLAP_UNITS,
-            index_m=DEFAULT_INDEX_M, use_prefix=use_prefix,
+            index_m=db.VECTOR_INDEX_M, use_prefix=use_prefix,
         )
         info = ingest_configuration(ctx, config, label=f"prefix_{label}")
         common = {"group": "prefix", "config": config, "ks": DEFAULT_KS, "extra": {"ingest_run": info}}

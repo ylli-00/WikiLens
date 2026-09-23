@@ -310,6 +310,70 @@ def test_missing_corpus_file_is_named(tmp_path: Path) -> None:
         run_ingest(settings, corpus_dir=tmp_path, embedder=FakeEmbedder(), progress=False)
 
 
+class NoDatabase:
+    """``db.connect`` replacement for the pure tests: reaching the database is the failure."""
+
+    def __call__(self, *args: object, **kwargs: object) -> None:
+        raise AssertionError("the database must not be touched")
+
+
+@pytest.mark.parametrize(
+    ("change", "variable"),
+    [({"chunk_max_words": 0}, "WIKILENSE_CHUNK_MAX_WORDS"),
+     ({"chunk_overlap_units": -1}, "WIKILENSE_CHUNK_OVERLAP_UNITS")],
+)
+def test_bad_chunk_settings_are_refused_before_the_database_is_touched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: dict, variable: str
+) -> None:
+    monkeypatch.setattr(dbmod, "connect", NoDatabase())
+    settings = replace(Settings(db_password="x", db_name="a", test_db_name="b"), **change)
+    corpus = _write_corpus(tmp_path / "corpus", PAGES, CLAIMS)
+    with pytest.raises(IngestError, match=variable):
+        run_ingest(settings, corpus_dir=corpus, embedder=FakeEmbedder(), progress=False)
+
+
+class DeadConnection:
+    """A connection whose socket is gone: rollback raises like PyMySQL's (InterfaceError 0)."""
+
+    def __init__(self, is_open: bool) -> None:
+        self.open = is_open
+        self.closed = False
+
+    def rollback(self) -> None:
+        raise pymysql.err.InterfaceError(0, "")
+
+    def close(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.parametrize("is_open", [False, True])
+@pytest.mark.parametrize("original", [KeyboardInterrupt(), RuntimeError("the real error")])
+def test_a_failed_rollback_does_not_replace_the_original_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, is_open: bool, original: BaseException
+) -> None:
+    from wikilense import ingest as ingestmod
+
+    conn = DeadConnection(is_open)
+    monkeypatch.setattr(dbmod, "connect", lambda settings: conn)
+
+    def fail(self: object) -> None:
+        raise original
+
+    monkeypatch.setattr(ingestmod._Ingest, "run", fail)
+    settings = Settings(db_password="x", db_name="a", test_db_name="b")
+    corpus = _write_corpus(tmp_path / "corpus", PAGES, CLAIMS)
+    with pytest.raises(type(original)) as raised:
+        run_ingest(settings, corpus_dir=corpus, embedder=FakeEmbedder(), progress=False)
+    assert raised.value is original and conn.closed
+
+
+def test_schema_literal_is_the_index_m_constant() -> None:
+    """sql/schema.sql is the only place M is set; db.VECTOR_INDEX_M names it for the code."""
+    script = dbmod.SCHEMA_PATH.read_text(encoding="utf-8")
+    assert f"VECTOR INDEX (embedding) M={dbmod.VECTOR_INDEX_M} DISTANCE=cosine" in script
+    assert not hasattr(Settings(db_password="x"), "index_m")  # not a setting: it did nothing
+
+
 def test_report_counts_and_stages() -> None:
     report = IngestReport()
     assert set(report.counts()) == set(EXPECTED_COUNTS)
@@ -494,7 +558,7 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path, report: IngestReport
         digest = hashlib.sha256((corpus_dir / f"{name}.jsonl").read_bytes()).hexdigest()
         assert meta[f"corpus_{name}_sha256"] == digest
     assert meta["mariadb_version"].startswith("11.")
-    assert meta["index_m"].isdigit()
+    assert meta["index_m"] == str(dbmod.VECTOR_INDEX_M)  # read from the index itself
     assert datetime.fromisoformat(meta["ingested_at"]).utcoffset() is not None
     assert meta["wikilense_version"]
 
@@ -517,16 +581,64 @@ def _check_statistics(conn: pymysql.Connection) -> None:
 
 
 @pytest.mark.db
-def test_wrong_embedder_dim_raises_before_any_chunk_row(
+def test_wrong_embedder_dim_is_refused_before_the_previous_ingest_is_dropped(
     ingest_settings: Settings, corpus_dir: Path
 ) -> None:
+    run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(), progress=False)
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        before = _table_counts(conn)
     with pytest.raises(IngestError, match=f"dimension {DIM + 16}.*expect {DIM}"):
         run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(DIM + 16), progress=False)
     with closing(dbmod.connect(ingest_settings)) as conn:
-        counts = _table_counts(conn)
-    assert counts["chunk"] == 0 and counts["chunk_sentence"] == 0
-    assert counts["page"] == 3  # step 2 was committed before the check
-    assert counts["claim"] == 0 and counts["ingest_meta"] == 0
+        assert _table_counts(conn) == before  # nothing was dropped
+    assert before["chunk"] > 0 and before["ingest_meta"] == len(META_KEYS)
+
+
+@pytest.mark.db
+def test_no_reset_refuses_a_database_that_already_holds_an_ingest(
+    ingest_settings: Settings, corpus_dir: Path
+) -> None:
+    run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(), progress=False)
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        before = _table_counts(conn)
+    with pytest.raises(IngestError, match="already holds 3 pages"):
+        run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(), reset=False,
+                   progress=False)
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        assert _table_counts(conn) == before
+
+
+@pytest.mark.db
+def test_no_reset_ingests_into_an_empty_schema_and_records_the_live_index_m(
+    ingest_settings: Settings, corpus_dir: Path
+) -> None:
+    """``init-db`` then ``ingest --no-reset``; the index was rebuilt with another M in between,
+    and ingest_meta records the M the index has, not a setting."""
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        dbmod.apply_schema(conn, reset=True)
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE chunk DROP INDEX embedding")
+            cur.execute("ALTER TABLE chunk ADD VECTOR INDEX embedding (embedding) M=8 DISTANCE=cosine")
+    report = run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(),
+                        reset=False, progress=False)
+    assert report.counts() == EXPECTED_COUNTS
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        meta = dict(_rows(conn, "SELECT `key`, `value` FROM ingest_meta"))
+        assert dbmod.vector_index_info(conn) == {"index_m": 8, "index_distance": "cosine"}
+    assert meta["index_m"] == "8" and meta["index_distance"] == "cosine"
+
+
+@pytest.mark.db
+def test_duplicate_page_title_and_malformed_evidence_id_are_ingest_errors(
+    ingest_settings: Settings, tmp_path: Path
+) -> None:
+    twice = _write_corpus(tmp_path / "twice", [PAGES[0], PAGES[0]], [])
+    with pytest.raises(IngestError, match="duplicate page title 'Alpha City'"):
+        run_ingest(ingest_settings, corpus_dir=twice, embedder=FakeEmbedder(), progress=False)
+    bad_claim = {**CLAIMS[0], "id": 999, "evidence": [{"content": ["no element id"], "context": {}}]}
+    bad = _write_corpus(tmp_path / "bad", PAGES, [bad_claim])
+    with pytest.raises(IngestError, match="claim 999: not a FEVEROUS element id"):
+        run_ingest(ingest_settings, corpus_dir=bad, embedder=FakeEmbedder(), progress=False)
 
 
 @pytest.mark.db

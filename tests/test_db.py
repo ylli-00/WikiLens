@@ -98,7 +98,7 @@ def test_load_settings_from_file_with_defaults(tmp_path: Path, monkeypatch) -> N
     assert s.test_db_name == "mydb_test"
     assert (s.db_host, s.db_port, s.db_user) == ("127.0.0.1", 3306, "wikilense")
     assert s.embedding_model == "BAAI/bge-small-en-v1.5"
-    assert (s.chunk_max_words, s.chunk_overlap_units, s.vector_dim, s.index_m) == (240, 1, 384, 16)
+    assert (s.chunk_max_words, s.chunk_overlap_units, s.vector_dim) == (240, 1, 384)
     assert s.ef_search == 100
 
 
