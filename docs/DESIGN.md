@@ -363,7 +363,9 @@ PATTERN] [--path PATTERN] [--linked-from TITLE] [--links-to TITLE] [--title TITL
 127.0.0.1] [--port 8000]`. Exit codes: 0 success, 1 an expected failure (one line on stderr),
 2 bad arguments, 130 interrupted. The web page is one HTML form
 (query, k, filters) that calls `GET /api/search` and shows hits with title, section path,
-distance, the chunk text and the SQL that ran; no JavaScript framework, no external assets.
+distance, the chunk text and the SQL that ran; no JavaScript framework, no external assets. Since
+2026-10-22 a link with the form's parameters (`/?q=...&category=...`) fills the form and runs
+the search (the README's screenshot, `docs/img/web_page.png`).
 
 ## Phase 2 outcomes (measured 2026-09-18, 199 tests green, commit b517a67)
 

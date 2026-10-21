@@ -352,6 +352,20 @@ Model load, query embedding and SQL time are reported separately in the status l
       status.textContent = 'Request failed: ' + err;
     });
   });
+
+  // A link with the form's parameters (/?q=...&k=3&category=...) fills the form and runs the
+  // search at once, so a search can be bookmarked or sent to someone.
+  var initial = new URLSearchParams(window.location.search);
+  if (initial.get('q')) {
+    initial.forEach(function (value, name) {
+      var field = form.elements.namedItem(name);
+      if (!field) return;
+      if (name === 'titles') field.value = initial.getAll('titles').join('\\n');
+      else if (field.type === 'checkbox') field.checked = value === '1';
+      else field.value = value;
+    });
+    form.requestSubmit();
+  }
 })();
 </script>
 </body>

@@ -244,9 +244,14 @@ All options:
 - **Output:** `--json` for scripts.
 
 `wikilense serve` starts a web page with the same query and filters.
-- **The API behind it:** `GET /api/search?q=...&k=5&category=...&edited_since=2020-12-01&sentences=1`
-  returns `hits`, the `sql` that ran, its `explain` rows, the effective `ef_search` and `timing_ms`.
+- **Shareable links:** a link with the form's parameters fills the form and runs the search. The
+  screenshot below is
+  `http://127.0.0.1:8000/?q=independence+from+the+Soviet+Union&k=3&category=Member+states+of+the+United+Nations&min_words=1000&edited_since=2020-12-01&linked_from=Asia`.
+- **The API behind it:** `GET /api/search` takes the same parameters and returns `hits`, the `sql`
+  that ran, its `explain` rows, the effective `ef_search` and `timing_ms`.
 - **Swagger:** `/docs` is enabled, so the API can be tried from the browser.
+
+![The web page with the four filters of the brief](docs/img/web_page.png)
 
 [sql/examples.sql](sql/examples.sql) has ten worked statements for the `mariadb` client alone (no
 Python, no model). They include the four-filter statement with its `EXPLAIN`, a page's categories

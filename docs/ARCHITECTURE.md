@@ -393,7 +393,7 @@ What remains for a top score, from the rubric and the grader's remaining suggest
 - [ ] Measure query cost against table size (the `inline` statement ranks exactly over the index,
   so its cost grows with the table: the number to watch).
 - [ ] Possibly compare a second embedding model.
-- [x] Add charts (`docs/img/`, 2026-10-22). A screenshot of the web page is still missing.
+- [x] Add charts and a screenshot of the web page (`docs/img/`, 2026-10-22).
 - [ ] Rewrite the README with the final results.
 
 ## 9. Command cheat sheet

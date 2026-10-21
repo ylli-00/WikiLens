@@ -192,6 +192,8 @@ def test_index_page_is_self_contained_html_with_the_form() -> None:
         assert f'value="{strategy}"' in html
     assert f'placeholder="{OFFLINE_SETTINGS.ef_search} (default)' in html
     assert "/api/search" in html
+    # a link with the form's parameters fills the form and runs the search
+    assert "new URLSearchParams(window.location.search)" in html and "form.requestSubmit()" in html
     assert f'href="{webmod.DOCS_URL}"' in html and f'href="{webmod.OPENAPI_URL}"' in html
     # no external assets, no framework
     assert "<script src" not in html and "<link" not in html and "@import" not in html
