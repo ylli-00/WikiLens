@@ -1,6 +1,6 @@
 # WikiLense evaluation: stability_16mb_run2
 
-Generated 2026-09-22T01:35:18+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-10-21T22:39:00+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,7 +28,7 @@ Generated 2026-09-22T01:35:18+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | stability |
 | configuration | {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 6, "use_prefix": true, "label": "120 words, overlap 1, M=6, prefix on"} |
-| eval_seconds | 3.2 |
+| eval_seconds | 2.8 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -47,20 +47,22 @@ Generated 2026-09-22T01:35:18+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Key | Value |
 |---|---|
-| analyze_seconds | 0.008 |
-| analyze_tables | chunk,page,section,link |
+| analyze_seconds | 0.013 |
+| analyze_tables | chunk,page,section,link,category,page_category |
 | chunk_max_words | 120 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
 | corpus_dir | data/corpus |
+| corpus_page_meta_sha256 | 9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | true |
+| embedding_revision | 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a |
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 6 |
-| ingested_at | 2026-09-22T01:34:49+00:00 |
+| ingested_at | 2026-10-21T22:38:32+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -69,7 +71,7 @@ Generated 2026-09-22T01:35:18+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-31-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
@@ -79,7 +81,7 @@ Generated 2026-09-22T01:35:18+00:00. 75 claims; 66 with a sentence-only evidence
 | python | 3.12.3 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
-| PyMySQL | 1.2.0 |
+| PyMySQL | 1.2.3 |
 | numpy | 2.5.3 |
 | torch | 2.14.0 |
 | sentence-transformers | 6.0.1 |
@@ -90,9 +92,9 @@ A claim counts when a gold page is among the pages of its first k chunks.
 
 | k | claims recalled | of | article recall |
 |---|---|---|---|
-| 1 | 62 | 75 | 0.827 |
-| 3 | 67 | 75 | 0.893 |
-| 5 | 68 | 75 | 0.907 |
+| 1 | 61 | 75 | 0.813 |
+| 3 | 66 | 75 | 0.880 |
+| 5 | 67 | 75 | 0.893 |
 | 10 | 68 | 75 | 0.907 |
 | 20 | 68 | 75 | 0.907 |
 
@@ -102,11 +104,11 @@ A claim counts when every unit of one of its sentence-only evidence sets is insi
 
 | k | claims recalled | of | evidence recall |
 |---|---|---|---|
-| 1 | 35 | 66 | 0.530 |
-| 3 | 43 | 66 | 0.652 |
-| 5 | 46 | 66 | 0.697 |
-| 10 | 53 | 66 | 0.803 |
-| 20 | 58 | 66 | 0.879 |
+| 1 | 26 | 66 | 0.394 |
+| 3 | 36 | 66 | 0.545 |
+| 5 | 39 | 66 | 0.591 |
+| 10 | 46 | 66 | 0.697 |
+| 20 | 51 | 66 | 0.773 |
 
 ## Unit coverage@k
 
@@ -114,11 +116,11 @@ Mean, over the same claims, of the best share of a set's gold units inside the f
 
 | k | of | unit coverage |
 |---|---|---|
-| 1 | 66 | 0.543 |
-| 3 | 66 | 0.669 |
-| 5 | 66 | 0.716 |
-| 10 | 66 | 0.811 |
-| 20 | 66 | 0.879 |
+| 1 | 66 | 0.407 |
+| 3 | 66 | 0.571 |
+| 5 | 66 | 0.617 |
+| 10 | 66 | 0.712 |
+| 20 | 66 | 0.780 |
 
 ## SQL latency per k (ms)
 
@@ -126,11 +128,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.53 | 0.97 | 0.57 | 0.43 | 1.34 |
-| 3 | 375 | 0.49 | 0.85 | 0.53 | 0.41 | 1.39 |
-| 5 | 375 | 0.49 | 0.91 | 0.54 | 0.43 | 1.39 |
-| 10 | 375 | 0.55 | 0.96 | 0.59 | 0.47 | 1.58 |
-| 20 | 375 | 0.69 | 1.23 | 0.75 | 0.59 | 1.79 |
+| 1 | 375 | 0.27 | 0.76 | 0.37 | 0.21 | 1.37 |
+| 3 | 375 | 0.26 | 0.73 | 0.34 | 0.22 | 1.12 |
+| 5 | 375 | 0.27 | 0.73 | 0.36 | 0.23 | 1.14 |
+| 10 | 375 | 0.31 | 0.88 | 0.42 | 0.28 | 1.39 |
+| 20 | 375 | 0.42 | 1.12 | 0.56 | 0.37 | 1.80 |
 
 ## Query embedding latency (ms)
 
@@ -138,7 +140,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.67 | 4.78 | 4.69 | 4.56 | 6.29 |
+| 375 | 4.61 | 4.80 | 4.64 | 4.50 | 5.65 |
 
 ## Claims with the worst rank of their gold page
 
@@ -146,20 +148,20 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 
 | claim | label | gold page | gold page rank | evidence rank | claim text |
 |---|---|---|---|---|---|
-| 9154 | REFUTES | Asia | not in top k | not in top k | A total of 22 foreign NBA players came from Asia, coming from seven of the 48 As |
-| 11910 | SUPPORTS | Jimmy Carter | not in top k | not in top k | Jimmy Carter won the 1980 New Hampshire Primary vote, but lost the Presidential |
-| 13383 | REFUTES | London | not in top k | not in top k | Jackie Tyler is introduced in "Rose", she is attacked by shop window dummies and |
-| 32256 | REFUTES | The Apache Software Foundation | not in top k | not in top k | The Apache Directory (an American nonprofit corporation (classified as a 501(c)( |
-| 69200 | REFUTES | Bangladesh | not in top k | n/a | Uttar Badepasha ( Sylhet District, Bangladesh (capital New York)) had ten names |
-| 79299 | REFUTES | Antlia | not in top k | not in top k | Zeta Antliae is in the Antlia Constellation (originally Antlia Pneumatica, estab |
+| 15823 | REFUTES | Acadia University | not in top k | not in top k | Canadian poet and prose writer Peter Sanger studied at the University of Melbour |
+| 36003 | SUPPORTS | Andorra | not in top k | not in top k | The Principality of Andorra is home to folk dances like the contrapàs and marrat |
+| 43675 | REFUTES | Los Angeles | not in top k | not in top k | Annie Duke born September 13, 1965 lives in Los Angeles, California, U.S. (the s |
+| 64595 | REFUTES | Actinopterygii | not in top k | not in top k | Garra tana is a species of tropical ray-finned fish which are a no longer classi |
+| 74482 | REFUTES | Smithfield, Utah | not in top k | not in top k | Smithfield, Utah is the largest city in the area. |
 | 87976 | NOT ENOUGH INFO | Lincoln, England | not in top k | not in top k | During the Waddington By-Election 17 October 2002, Conservatives won more votes |
+| 90340 | NOT ENOUGH INFO | Agatha Christie | not in top k | not in top k | There have been 50 film adaptations of the works of Agatha Christie, with the la |
+| 13383 | REFUTES | London | 6 | not in top k | Jackie Tyler is introduced in "Rose", she is attacked by shop window dummies and |
 | 76756 | SUPPORTS | Asteraceae | 4 | n/a | The scientific classification of kingdom plantae, order asterales and family ast |
-| 22563 | REFUTES | Asteraceae | 3 | 16 | Genus Hyoseris is classified under tribe Cichorieae,  a tribe in the plant famil |
-| 85631 | REFUTES | Asteraceae | 3 | 3 | Plantae kingdom Diplazoptilon are classified in the Asteraceae family, a very la |
+| 22563 | REFUTES | Asteraceae | 3 | 15 | Genus Hyoseris is classified under tribe Cichorieae,  a tribe in the plant famil |
 
 ## Notes
 
 - article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.
-- Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.
+- Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.
 - sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.
 - embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call.

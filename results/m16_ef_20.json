@@ -34,7 +34,7 @@
       "use_prefix": true,
       "label": "120 words, overlap 1, M=16, prefix on"
     },
-    "eval_seconds": 3.3,
+    "eval_seconds": 3.0,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -55,7 +55,7 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=16 DISTANCE=cosine",
-      "drop_seconds": 0.81,
+      "drop_seconds": 0.87,
       "add_seconds": 2.94,
       "analyze_seconds": 0.002,
       "vector_index_m_after": 16,
@@ -64,30 +64,32 @@
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 17825792,
-      "rebuilt_at": "2026-09-22T01:36:48+00:00"
+      "rebuilt_at": "2026-10-21T22:40:26+00:00"
     }
   },
   "ingest_meta": {
-    "analyze_seconds": "0.008",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.013",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "120",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-09-22T01:34:49+00:00",
+    "ingested_at": "2026-10-21T22:38:32+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -99,7 +101,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -109,92 +111,92 @@
   "per_k": [
     {
       "k": 1,
-      "article_hits": 64,
-      "article_recall": 0.8533333333333334,
-      "evidence_hits": 34,
-      "evidence_recall": 0.5151515151515151,
-      "unit_coverage": 0.5277777777777777,
+      "article_hits": 66,
+      "article_recall": 0.88,
+      "evidence_hits": 35,
+      "evidence_recall": 0.5303030303030303,
+      "unit_coverage": 0.5429292929292928,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.5663669999194099,
-        "p95_ms": 0.7239681002829458,
-        "mean_ms": 0.5948781173647149,
-        "min_ms": 0.453964000371343,
-        "max_ms": 1.4829250003458583
+        "p50_ms": 0.30252000033215154,
+        "p95_ms": 0.6423409004128189,
+        "mean_ms": 0.3559550266412164,
+        "min_ms": 0.22941499992157333,
+        "max_ms": 0.9159210003417684
       }
     },
     {
       "k": 3,
-      "article_hits": 70,
-      "article_recall": 0.9333333333333333,
-      "evidence_hits": 43,
-      "evidence_recall": 0.6515151515151515,
-      "unit_coverage": 0.6767676767676767,
+      "article_hits": 72,
+      "article_recall": 0.96,
+      "evidence_hits": 44,
+      "evidence_recall": 0.6666666666666666,
+      "unit_coverage": 0.6919191919191919,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.5077779997009202,
-        "p95_ms": 0.7042632000775492,
-        "mean_ms": 0.5457760079831738,
-        "min_ms": 0.42572300026222365,
-        "max_ms": 1.4435869998123962
+        "p50_ms": 0.2851209992513759,
+        "p95_ms": 0.5650703993524075,
+        "mean_ms": 0.33556964797511074,
+        "min_ms": 0.2253639995615231,
+        "max_ms": 0.8860090001689969
       }
     },
     {
       "k": 5,
-      "article_hits": 72,
-      "article_recall": 0.96,
-      "evidence_hits": 48,
-      "evidence_recall": 0.7272727272727273,
-      "unit_coverage": 0.7537878787878788,
+      "article_hits": 74,
+      "article_recall": 0.9866666666666667,
+      "evidence_hits": 49,
+      "evidence_recall": 0.7424242424242424,
+      "unit_coverage": 0.7689393939393939,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.5111620002935524,
-        "p95_ms": 0.7117324994396768,
-        "mean_ms": 0.5528194080034154,
-        "min_ms": 0.4369469997982378,
-        "max_ms": 1.6592259999015369
+        "p50_ms": 0.29689799885090906,
+        "p95_ms": 0.6054756993762568,
+        "mean_ms": 0.3503826480834202,
+        "min_ms": 0.23799600057827774,
+        "max_ms": 0.9488530013186391
       }
     },
     {
       "k": 10,
-      "article_hits": 72,
-      "article_recall": 0.96,
-      "evidence_hits": 55,
-      "evidence_recall": 0.8333333333333334,
-      "unit_coverage": 0.8484848484848485,
+      "article_hits": 74,
+      "article_recall": 0.9866666666666667,
+      "evidence_hits": 57,
+      "evidence_recall": 0.8636363636363636,
+      "unit_coverage": 0.8787878787878788,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.5732299996452639,
-        "p95_ms": 0.7984634002241366,
-        "mean_ms": 0.6202421360115599,
-        "min_ms": 0.49017600031220354,
-        "max_ms": 1.902042999972764
+        "p50_ms": 0.34543800029496197,
+        "p95_ms": 0.7016652993115714,
+        "mean_ms": 0.401401800030726,
+        "min_ms": 0.2845479993993649,
+        "max_ms": 0.9851960003288696
       }
     },
     {
       "k": 20,
-      "article_hits": 72,
-      "article_recall": 0.96,
-      "evidence_hits": 61,
-      "evidence_recall": 0.9242424242424242,
-      "unit_coverage": 0.9242424242424242,
+      "article_hits": 74,
+      "article_recall": 0.9866666666666667,
+      "evidence_hits": 64,
+      "evidence_recall": 0.9696969696969697,
+      "unit_coverage": 0.9696969696969697,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.7272639995790087,
-        "p95_ms": 0.9448008002436841,
-        "mean_ms": 0.7679684026710069,
-        "min_ms": 0.590676000683743,
-        "max_ms": 1.907197000036831
+        "p50_ms": 0.4520010006672237,
+        "p95_ms": 0.9087972999623163,
+        "mean_ms": 0.5217252986282498,
+        "min_ms": 0.37785799941048026,
+        "max_ms": 1.2786520001100143
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.641962999812677,
-    "p95_ms": 4.752626899608003,
-    "mean_ms": 4.6496934639993315,
-    "min_ms": 4.525121999904513,
-    "max_ms": 4.91270199927385
+    "p50_ms": 4.671771999710472,
+    "p95_ms": 4.819531700013613,
+    "mean_ms": 4.707019042694204,
+    "min_ms": 4.501842000536271,
+    "max_ms": 10.06215599954885
   },
   "claims": [
     {
@@ -207,7 +209,7 @@
       ],
       "eligible": true,
       "gold_page_rank": 1,
-      "evidence_rank": 17,
+      "evidence_rank": 16,
       "unit_coverage": 1.0,
       "hit_chunk_ids": [
         3763,
@@ -222,14 +224,14 @@
         3770,
         3762,
         3765,
-        4905,
         3761,
         2806,
         3756,
         3795,
         3751,
         3769,
-        3782
+        3782,
+        3749
       ]
     },
     {
@@ -276,30 +278,30 @@
         "Jack Brabham"
       ],
       "eligible": true,
-      "gold_page_rank": null,
-      "evidence_rank": null,
-      "unit_coverage": 0.0,
+      "gold_page_rank": 1,
+      "evidence_rank": 7,
+      "unit_coverage": 1.0,
       "hit_chunk_ids": [
-        5540,
-        5471,
-        5416,
-        5542,
-        5413,
-        5470,
-        5411,
-        5445,
-        1196,
-        5443,
-        5466,
-        5435,
-        5467,
-        5414,
-        5472,
-        5725,
-        1205,
-        5460,
-        5541,
-        5592
+        6452,
+        6455,
+        6458,
+        6416,
+        6453,
+        6417,
+        6454,
+        6459,
+        6450,
+        6464,
+        6449,
+        6422,
+        6426,
+        6460,
+        6436,
+        6441,
+        6423,
+        6440,
+        6424,
+        6451
       ]
     },
     {
@@ -534,9 +536,7 @@
         7510,
         7526,
         7485,
-        2335,
         1754,
-        2337,
         1800,
         1830,
         7515,
@@ -544,7 +544,9 @@
         7528,
         7539,
         7513,
-        7494
+        7494,
+        1888,
+        1886
       ]
     },
     {
@@ -557,15 +559,13 @@
       ],
       "eligible": true,
       "gold_page_rank": 1,
-      "evidence_rank": null,
-      "unit_coverage": 0.0,
+      "evidence_rank": 19,
+      "unit_coverage": 1.0,
       "hit_chunk_ids": [
         4402,
-        8048,
         3489,
         7078,
         7224,
-        8049,
         6264,
         4411,
         4403,
@@ -579,7 +579,9 @@
         7318,
         7223,
         4400,
-        4354
+        4354,
+        4387,
+        5163
       ]
     },
     {
@@ -1276,10 +1278,10 @@
         2478,
         2225,
         2479,
+        486,
         1693,
         1694,
-        1714,
-        2224
+        1714
       ]
     },
     {
@@ -1536,30 +1538,30 @@
         "Los Angeles"
       ],
       "eligible": true,
-      "gold_page_rank": null,
-      "evidence_rank": null,
-      "unit_coverage": 0.0,
+      "gold_page_rank": 1,
+      "evidence_rank": 1,
+      "unit_coverage": 1.0,
       "hit_chunk_ids": [
-        7568,
-        7608,
-        4255,
-        7611,
-        7588,
-        7586,
-        5370,
-        4258,
-        4249,
-        7593,
-        4250,
+        6877,
+        6941,
+        6878,
+        6221,
+        6943,
+        4057,
+        6881,
+        6987,
+        4055,
+        6879,
+        6616,
+        6914,
         5919,
-        7585,
-        7587,
-        4251,
-        4245,
-        7589,
-        7583,
-        5390,
-        6745
+        6882,
+        6988,
+        6773,
+        3954,
+        6956,
+        8063,
+        6781
       ]
     },
     {
@@ -1761,15 +1763,15 @@
         6935,
         6943,
         8082,
+        6747,
+        6737,
         6937,
         6879,
         6938,
+        2467,
+        3512,
         8081,
-        6934,
-        8083,
-        6896,
-        8010,
-        6931
+        2427
       ]
     },
     {
@@ -2073,7 +2075,6 @@
         5065,
         2168,
         3202,
-        7100,
         2211,
         3203,
         5067,
@@ -2084,7 +2085,8 @@
         4905,
         3180,
         5071,
-        728
+        728,
+        5066
       ]
     },
     {
@@ -2209,7 +2211,6 @@
         8294,
         8298,
         6941,
-        8299,
         8295,
         8297,
         8296,
@@ -2224,7 +2225,8 @@
         6681,
         228,
         2534,
-        6063
+        6063,
+        3444
       ]
     },
     {
@@ -2463,13 +2465,13 @@
         2946,
         5847,
         2871,
-        2905,
         2869,
         2931,
         2943,
         2903,
         2922,
-        3092
+        3092,
+        2925
       ]
     },
     {
@@ -2832,9 +2834,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:36:51+00:00"
+  "created_at": "2026-10-21T22:40:29+00:00"
 }

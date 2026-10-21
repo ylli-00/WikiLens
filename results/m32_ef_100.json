@@ -34,7 +34,7 @@
       "use_prefix": true,
       "label": "120 words, overlap 1, M=32, prefix on"
     },
-    "eval_seconds": 3.6,
+    "eval_seconds": 3.4,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -55,8 +55,8 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=32 DISTANCE=cosine",
-      "drop_seconds": 0.84,
-      "add_seconds": 8.98,
+      "drop_seconds": 0.85,
+      "add_seconds": 9.08,
       "analyze_seconds": 0.003,
       "vector_index_m_after": 32,
       "vector_index_distance_after": "cosine",
@@ -64,30 +64,32 @@
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 19922944,
-      "rebuilt_at": "2026-09-22T01:37:05+00:00"
+      "rebuilt_at": "2026-10-21T22:40:43+00:00"
     }
   },
   "ingest_meta": {
-    "analyze_seconds": "0.008",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.013",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "120",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "32",
-    "ingested_at": "2026-09-22T01:34:49+00:00",
+    "ingested_at": "2026-10-21T22:38:32+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -99,7 +101,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -116,11 +118,11 @@
       "unit_coverage": 0.5429292929292928,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.7512399997722241,
-        "p95_ms": 0.9243935000085912,
-        "mean_ms": 0.7643084053391552,
-        "min_ms": 0.5768800001533236,
-        "max_ms": 1.1447260003478732
+        "p50_ms": 0.5983629998809192,
+        "p95_ms": 0.8353720995728509,
+        "mean_ms": 0.6159854639845435,
+        "min_ms": 0.3487489993858617,
+        "max_ms": 1.5420729996549198
       }
     },
     {
@@ -132,11 +134,11 @@
       "unit_coverage": 0.6919191919191919,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.704486999893561,
-        "p95_ms": 0.8919194000554854,
-        "mean_ms": 0.7198448080016533,
-        "min_ms": 0.5192410008021398,
-        "max_ms": 1.4113270008238032
+        "p50_ms": 0.5768970004282892,
+        "p95_ms": 0.7879654996941101,
+        "mean_ms": 0.5901580586554095,
+        "min_ms": 0.3307999995740829,
+        "max_ms": 1.149329998952453
       }
     },
     {
@@ -148,11 +150,11 @@
       "unit_coverage": 0.7689393939393939,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.7164999997257837,
-        "p95_ms": 0.8826904003399251,
-        "mean_ms": 0.7281588106537432,
-        "min_ms": 0.5169569994905032,
-        "max_ms": 1.288358999772754
+        "p50_ms": 0.5703160004486563,
+        "p95_ms": 0.7568585995613831,
+        "mean_ms": 0.5780600906728068,
+        "min_ms": 0.3307110000605462,
+        "max_ms": 1.2334969997027656
       }
     },
     {
@@ -164,11 +166,11 @@
       "unit_coverage": 0.8787878787878788,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.772424999922805,
-        "p95_ms": 0.9506732997579093,
-        "mean_ms": 0.7861112079917802,
-        "min_ms": 0.5901759996049805,
-        "max_ms": 1.2380269999994198
+        "p50_ms": 0.6255780008359579,
+        "p95_ms": 0.8438969995040679,
+        "mean_ms": 0.6404947946866741,
+        "min_ms": 0.35870299871021416,
+        "max_ms": 1.4423319989873562
       }
     },
     {
@@ -180,21 +182,21 @@
       "unit_coverage": 0.9545454545454546,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.9056369999598246,
-        "p95_ms": 1.0755412999060354,
-        "mean_ms": 0.91961466401699,
-        "min_ms": 0.7229920001918799,
-        "max_ms": 1.6067110000221874
+        "p50_ms": 0.7422929993481375,
+        "p95_ms": 1.0589232011625427,
+        "mean_ms": 0.7762066800302515,
+        "min_ms": 0.461428999187774,
+        "max_ms": 1.8801650003297254
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.666342999371409,
-    "p95_ms": 4.7494146999270015,
-    "mean_ms": 4.672411679986301,
-    "min_ms": 4.554897000161873,
-    "max_ms": 5.113881000397669
+    "p50_ms": 4.623580000043148,
+    "p95_ms": 5.402601600326307,
+    "mean_ms": 4.782657018692892,
+    "min_ms": 4.473644999961834,
+    "max_ms": 12.823409000702668
   },
   "claims": [
     {
@@ -470,11 +472,11 @@
         5933,
         5959,
         5941,
-        5919,
         5961,
         5963,
         5926,
-        5960
+        5960,
+        5946
       ]
     },
     {
@@ -1898,7 +1900,6 @@
         6329,
         6338,
         6328,
-        6294,
         6317,
         6330,
         6333,
@@ -1909,7 +1910,8 @@
         6319,
         6335,
         6322,
-        6315
+        6315,
+        6298
       ]
     },
     {
@@ -2832,9 +2834,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:37:12+00:00"
+  "created_at": "2026-10-21T22:40:49+00:00"
 }

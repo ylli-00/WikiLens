@@ -34,7 +34,7 @@
       "use_prefix": true,
       "label": "240 words, overlap 1, M=16, prefix on"
     },
-    "eval_seconds": 4.1,
+    "eval_seconds": 3.1,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -57,7 +57,7 @@
         "use_prefix": true,
         "label": "240 words, overlap 1, M=16, prefix on"
       },
-      "ingested_at": "2026-09-22T01:41:38+00:00",
+      "ingested_at": "2026-10-21T22:45:05+00:00",
       "counts": {
         "n_pages": 100,
         "n_sections": 3173,
@@ -71,16 +71,19 @@
         "n_claims": 75,
         "n_evidence": 114,
         "n_evidence_page_resolved": 114,
-        "n_evidence_sentence_resolved": 87
+        "n_evidence_sentence_resolved": 87,
+        "n_pages_with_meta": 100,
+        "n_categories": 1005,
+        "n_page_categories": 1123
       },
       "seconds": {
-        "schema": 0.1,
-        "parse": 0.84,
-        "embed": 16.55,
-        "load": 3.58,
-        "resolve": 0.0,
+        "schema": 0.13,
+        "parse": 0.87,
+        "embed": 16.95,
+        "load": 3.3,
+        "resolve": 0.01,
         "analyze": 0.01,
-        "total": 21.14
+        "total": 21.32
       },
       "n_units_hatnote": 1316,
       "chunk_words_mean": 156.6,
@@ -99,26 +102,28 @@
     "server_uptime_seconds_after_restart": 5
   },
   "ingest_meta": {
-    "analyze_seconds": "0.008",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.010",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "240",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-09-22T01:41:38+00:00",
+    "ingested_at": "2026-10-21T22:45:05+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -130,7 +135,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -147,11 +152,11 @@
       "unit_coverage": 0.595959595959596,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.9053329995367676,
-        "p95_ms": 1.2835538997023832,
-        "mean_ms": 0.9249384133509011,
-        "min_ms": 0.5301900000631576,
-        "max_ms": 1.5879789998507476
+        "p50_ms": 0.45556199984275736,
+        "p95_ms": 0.8440500005235664,
+        "mean_ms": 0.49589085062325466,
+        "min_ms": 0.2857139988918789,
+        "max_ms": 1.420771999619319
       }
     },
     {
@@ -163,11 +168,11 @@
       "unit_coverage": 0.8080808080808081,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.8899640006347909,
-        "p95_ms": 1.3026693997744587,
-        "mean_ms": 0.8958961840156311,
-        "min_ms": 0.49606399988988414,
-        "max_ms": 1.6418650002378854
+        "p50_ms": 0.4320330008340534,
+        "p95_ms": 0.7661589996132534,
+        "mean_ms": 0.4650712773000123,
+        "min_ms": 0.2747999988059746,
+        "max_ms": 1.1608800014073495
       }
     },
     {
@@ -179,11 +184,11 @@
       "unit_coverage": 0.8522727272727273,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.9093339995160932,
-        "p95_ms": 1.3303941998856317,
-        "mean_ms": 0.9169880533227115,
-        "min_ms": 0.4792769996129209,
-        "max_ms": 1.6409659992859815
+        "p50_ms": 0.45243799831951037,
+        "p95_ms": 0.8068942006502766,
+        "mean_ms": 0.486127706685996,
+        "min_ms": 0.27893599872186314,
+        "max_ms": 1.2568519996420946
       }
     },
     {
@@ -195,11 +200,11 @@
       "unit_coverage": 0.9166666666666666,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.9981190005419194,
-        "p95_ms": 1.4339443000608298,
-        "mean_ms": 1.0056621146650286,
-        "min_ms": 0.5511970002771704,
-        "max_ms": 1.6804120004962897
+        "p50_ms": 0.5155850012670271,
+        "p95_ms": 0.9321572002590983,
+        "mean_ms": 0.5547809814015636,
+        "min_ms": 0.3224829997634515,
+        "max_ms": 1.4892879989929497
       }
     },
     {
@@ -211,21 +216,21 @@
       "unit_coverage": 0.9848484848484849,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 1.145605999226973,
-        "p95_ms": 1.6414857997915535,
-        "mean_ms": 1.1630359626651625,
-        "min_ms": 0.6894600001032813,
-        "max_ms": 2.0063700003447593
+        "p50_ms": 0.6385159995261347,
+        "p95_ms": 1.150001399582834,
+        "mean_ms": 0.6808454479372207,
+        "min_ms": 0.4391069996927399,
+        "max_ms": 1.614421998965554
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.698085000200081,
-    "p95_ms": 4.807251599686424,
-    "mean_ms": 4.70345504797054,
-    "min_ms": 4.584761999467446,
-    "max_ms": 5.100499999571184
+    "p50_ms": 4.611002001183806,
+    "p95_ms": 4.734597601054702,
+    "mean_ms": 4.62107075205131,
+    "min_ms": 4.507412999373628,
+    "max_ms": 5.113950001032208
   },
   "claims": [
     {
@@ -286,6 +291,7 @@
         891,
         914,
         911,
+        910,
         902,
         913,
         762,
@@ -294,8 +300,7 @@
         890,
         894,
         756,
-        895,
-        899
+        895
       ]
     },
     {
@@ -1301,12 +1306,12 @@
         1287,
         1293,
         889,
+        4116,
         896,
         4597,
         1355,
         902,
         719,
-        2089,
         909,
         921,
         1676,
@@ -2863,9 +2868,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:42:37+00:00"
+  "created_at": "2026-10-21T22:45:57+00:00"
 }

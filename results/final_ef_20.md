@@ -1,6 +1,6 @@
 # WikiLense evaluation: final_ef_20
 
-Generated 2026-09-22T01:41:46+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-10-21T22:45:11+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,7 +28,7 @@ Generated 2026-09-22T01:41:46+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | final |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 3.4 |
+| eval_seconds | 2.8 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -41,26 +41,28 @@ Generated 2026-09-22T01:41:46+00:00. 75 claims; 66 with a sentence-only evidence
 | chunk_words_median | 183.5 |
 | chunk_words_p95 | 238.0 |
 | chunk_words_max | 240 |
-| ingest_run | {"label": "final", "kind": "ingest", "configuration": {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"}, "ingested_at": "2026-09-22T01:41:38+00:00", "counts": {"n_pages": 100, "n_sections": 3173, "n_sentences": 33637, "n_units_empty": 372, "n_units_hatnote": 1316, "n_chunks": 4598, "n_links": 40542, "n_links_resolved": 373, "n_links_skipped": 0, "n_claims": 75, "n_evidence": 114, "n_evidence_page_resolved": 114, "n_evidence_sentence_resolved": 87}, "seconds": {"schema": 0.1, "parse": 0.84, "embed": 16.55, "load": 3.58, "resolve": 0.0, "analyze": 0.01, "total": 21.14}, "n_units_hatnote": 1316, "chunk_words_mean": 156.6, "chunk_words_median": 183.5, "chunk_words_p95": 238.0, "chunk_words_max": 240, "vector_index_name": "embedding", "vector_index_m": 16, "vector_index_distance": "cosine", "chunk_data_length": 14172160, "chunk_index_length": 344064, "vector_index_tablespace_bytes": 13631488, "index_rebuild": null} |
+| ingest_run | {"label": "final", "kind": "ingest", "configuration": {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"}, "ingested_at": "2026-10-21T22:45:05+00:00", "counts": {"n_pages": 100, "n_sections": 3173, "n_sentences": 33637, "n_units_empty": 372, "n_units_hatnote": 1316, "n_chunks": 4598, "n_links": 40542, "n_links_resolved": 373, "n_links_skipped": 0, "n_claims": 75, "n_evidence": 114, "n_evidence_page_resolved": 114, "n_evidence_sentence_resolved": 87, "n_pages_with_meta": 100, "n_categories": 1005, "n_page_categories": 1123}, "seconds": {"schema": 0.13, "parse": 0.87, "embed": 16.95, "load": 3.3, "resolve": 0.01, "analyze": 0.01, "total": 21.32}, "n_units_hatnote": 1316, "chunk_words_mean": 156.6, "chunk_words_median": 183.5, "chunk_words_p95": 238.0, "chunk_words_max": 240, "vector_index_name": "embedding", "vector_index_m": 16, "vector_index_distance": "cosine", "chunk_data_length": 14172160, "chunk_index_length": 344064, "vector_index_tablespace_bytes": 13631488, "index_rebuild": null} |
 
 ## Ingest parameters (ingest_meta)
 
 | Key | Value |
 |---|---|
-| analyze_seconds | 0.008 |
-| analyze_tables | chunk,page,section,link |
+| analyze_seconds | 0.010 |
+| analyze_tables | chunk,page,section,link,category,page_category |
 | chunk_max_words | 240 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
 | corpus_dir | data/corpus |
+| corpus_page_meta_sha256 | 9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | true |
+| embedding_revision | 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a |
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-09-22T01:41:38+00:00 |
+| ingested_at | 2026-10-21T22:45:05+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -69,7 +71,7 @@ Generated 2026-09-22T01:41:46+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-31-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
@@ -79,7 +81,7 @@ Generated 2026-09-22T01:41:46+00:00. 75 claims; 66 with a sentence-only evidence
 | python | 3.12.3 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
-| PyMySQL | 1.2.0 |
+| PyMySQL | 1.2.3 |
 | numpy | 2.5.3 |
 | torch | 2.14.0 |
 | sentence-transformers | 6.0.1 |
@@ -126,11 +128,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.60 | 0.82 | 0.62 | 0.47 | 1.81 |
-| 3 | 375 | 0.59 | 0.85 | 0.60 | 0.44 | 1.72 |
-| 5 | 375 | 0.62 | 0.87 | 0.62 | 0.44 | 1.71 |
-| 10 | 375 | 0.69 | 0.87 | 0.70 | 0.52 | 1.76 |
-| 20 | 375 | 0.83 | 1.02 | 0.84 | 0.63 | 2.06 |
+| 1 | 375 | 0.38 | 0.66 | 0.40 | 0.22 | 0.92 |
+| 3 | 375 | 0.38 | 0.60 | 0.37 | 0.23 | 0.99 |
+| 5 | 375 | 0.39 | 0.61 | 0.38 | 0.23 | 0.89 |
+| 10 | 375 | 0.45 | 0.70 | 0.45 | 0.29 | 1.10 |
+| 20 | 375 | 0.57 | 0.93 | 0.58 | 0.38 | 1.32 |
 
 ## Query embedding latency (ms)
 
@@ -138,7 +140,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.67 | 4.82 | 4.69 | 4.54 | 5.58 |
+| 375 | 4.60 | 4.79 | 4.62 | 4.44 | 5.82 |
 
 ## Claims with the worst rank of their gold page
 
@@ -147,10 +149,10 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 | claim | label | gold page | gold page rank | evidence rank | claim text |
 |---|---|---|---|---|---|
 | 87976 | NOT ENOUGH INFO | Lincoln, England | not in top k | not in top k | During the Waddington By-Election 17 October 2002, Conservatives won more votes |
+| 7971 | REFUTES | Kabul | 3 | 15 | Urban decay is a process by which a city falls into a state of disrepair and neg |
 | 76756 | SUPPORTS | Asteraceae | 3 | n/a | The scientific classification of kingdom plantae, order asterales and family ast |
 | 85631 | REFUTES | Asteraceae | 3 | 3 | Plantae kingdom Diplazoptilon are classified in the Asteraceae family, a very la |
 | 95085 | SUPPORTS | Asteraceae | 3 | n/a | The scientific classification of kingdom plantae, order asterales and family ast |
-| 7971 | REFUTES | Kabul | 2 | 11 | Urban decay is a process by which a city falls into a state of disrepair and neg |
 | 9154 | REFUTES | Asia | 2 | 20 | A total of 22 foreign NBA players came from Asia, coming from seven of the 48 As |
 | 11235 | REFUTES | London Underground | 2 | 10 | London's Underground is one of the few Railway electrification systems that util |
 | 11439 | REFUTES | Juventus F.C. | 2 | 2 | Roma, colloquially known as Juve (pronounced [ˈjuːve), is a professional footbal |
@@ -160,6 +162,6 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 ## Notes
 
 - article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.
-- Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.
+- Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.
 - sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.
 - embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call.

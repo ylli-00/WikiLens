@@ -34,7 +34,7 @@
       "use_prefix": true,
       "label": "120 words, overlap 1, M=32, prefix on"
     },
-    "eval_seconds": 3.7,
+    "eval_seconds": 3.0,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -55,8 +55,8 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=32 DISTANCE=cosine",
-      "drop_seconds": 0.84,
-      "add_seconds": 8.98,
+      "drop_seconds": 0.85,
+      "add_seconds": 9.08,
       "analyze_seconds": 0.003,
       "vector_index_m_after": 32,
       "vector_index_distance_after": "cosine",
@@ -64,30 +64,32 @@
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 19922944,
-      "rebuilt_at": "2026-09-22T01:37:05+00:00"
+      "rebuilt_at": "2026-10-21T22:40:43+00:00"
     }
   },
   "ingest_meta": {
-    "analyze_seconds": "0.008",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.013",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "120",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "32",
-    "ingested_at": "2026-09-22T01:34:49+00:00",
+    "ingested_at": "2026-10-21T22:38:32+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -99,7 +101,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -109,92 +111,92 @@
   "per_k": [
     {
       "k": 1,
-      "article_hits": 66,
-      "article_recall": 0.88,
-      "evidence_hits": 35,
-      "evidence_recall": 0.5303030303030303,
-      "unit_coverage": 0.5429292929292928,
+      "article_hits": 65,
+      "article_recall": 0.8666666666666667,
+      "evidence_hits": 34,
+      "evidence_recall": 0.5151515151515151,
+      "unit_coverage": 0.5277777777777777,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6759960006093024,
-        "p95_ms": 0.8059096996476001,
-        "mean_ms": 0.6959435466390763,
-        "min_ms": 0.593549999393872,
-        "max_ms": 1.1201919996892684
+        "p50_ms": 0.31860199851507787,
+        "p95_ms": 0.5251067001154297,
+        "mean_ms": 0.34741786669959157,
+        "min_ms": 0.24596700131951366,
+        "max_ms": 0.7958879996294854
       }
     },
     {
       "k": 3,
-      "article_hits": 72,
-      "article_recall": 0.96,
-      "evidence_hits": 44,
-      "evidence_recall": 0.6666666666666666,
-      "unit_coverage": 0.6919191919191919,
+      "article_hits": 71,
+      "article_recall": 0.9466666666666667,
+      "evidence_hits": 43,
+      "evidence_recall": 0.6515151515151515,
+      "unit_coverage": 0.6767676767676767,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6688479998047114,
-        "p95_ms": 0.7788645001710393,
-        "mean_ms": 0.6799451840003409,
-        "min_ms": 0.5950679997113184,
-        "max_ms": 0.8606949995737523
+        "p50_ms": 0.30538499959220644,
+        "p95_ms": 0.4642852989491075,
+        "mean_ms": 0.33075546930679894,
+        "min_ms": 0.24398400091740768,
+        "max_ms": 0.7550890004495159
       }
     },
     {
       "k": 5,
-      "article_hits": 74,
-      "article_recall": 0.9866666666666667,
-      "evidence_hits": 49,
-      "evidence_recall": 0.7424242424242424,
-      "unit_coverage": 0.7689393939393939,
+      "article_hits": 73,
+      "article_recall": 0.9733333333333334,
+      "evidence_hits": 48,
+      "evidence_recall": 0.7272727272727273,
+      "unit_coverage": 0.7537878787878788,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.688415000695386,
-        "p95_ms": 0.7926021999992372,
-        "mean_ms": 0.6982854266946864,
-        "min_ms": 0.6120400003055693,
-        "max_ms": 0.9160530007648049
+        "p50_ms": 0.31403499997395556,
+        "p95_ms": 0.49720809984137315,
+        "mean_ms": 0.3445600187163412,
+        "min_ms": 0.2502229999663541,
+        "max_ms": 0.9543060004943982
       }
     },
     {
       "k": 10,
-      "article_hits": 74,
-      "article_recall": 0.9866666666666667,
-      "evidence_hits": 57,
-      "evidence_recall": 0.8636363636363636,
-      "unit_coverage": 0.8787878787878788,
+      "article_hits": 73,
+      "article_recall": 0.9733333333333334,
+      "evidence_hits": 56,
+      "evidence_recall": 0.8484848484848485,
+      "unit_coverage": 0.8636363636363636,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.7571749993076082,
-        "p95_ms": 0.8580552999774227,
-        "mean_ms": 0.7684091680057463,
-        "min_ms": 0.6571840003744001,
-        "max_ms": 0.9988629999497789
+        "p50_ms": 0.3650149992608931,
+        "p95_ms": 0.5609854995782372,
+        "mean_ms": 0.39393516270987067,
+        "min_ms": 0.29666900081792846,
+        "max_ms": 0.901467999938177
       }
     },
     {
       "k": 20,
-      "article_hits": 74,
-      "article_recall": 0.9866666666666667,
-      "evidence_hits": 63,
-      "evidence_recall": 0.9545454545454546,
-      "unit_coverage": 0.9545454545454546,
+      "article_hits": 73,
+      "article_recall": 0.9733333333333334,
+      "evidence_hits": 62,
+      "evidence_recall": 0.9393939393939394,
+      "unit_coverage": 0.9393939393939394,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.8989269999801763,
-        "p95_ms": 0.9973228995477257,
-        "mean_ms": 0.9018106799946205,
-        "min_ms": 0.7811449995642761,
-        "max_ms": 1.2740769998345058
+        "p50_ms": 0.47815899961278774,
+        "p95_ms": 0.7136427992008976,
+        "mean_ms": 0.5190640585739553,
+        "min_ms": 0.3935469994758023,
+        "max_ms": 1.03265599864244
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.702922000433318,
-    "p95_ms": 4.81878010004948,
-    "mean_ms": 4.709578437345044,
-    "min_ms": 4.557418999866059,
-    "max_ms": 5.254683000202931
+    "p50_ms": 4.581277000397677,
+    "p95_ms": 4.736713499551115,
+    "mean_ms": 4.589583704034642,
+    "min_ms": 4.455824000615394,
+    "max_ms": 5.20394699924509
   },
   "claims": [
     {
@@ -470,11 +472,11 @@
         5933,
         5959,
         5941,
-        5919,
         5961,
         5963,
         5926,
-        5960
+        5960,
+        5946
       ]
     },
     {
@@ -531,7 +533,6 @@
         7484,
         7481,
         7519,
-        3479,
         7510,
         7526,
         7485,
@@ -544,7 +545,8 @@
         1765,
         7528,
         7539,
-        7513
+        7513,
+        7494
       ]
     },
     {
@@ -1347,9 +1349,9 @@
         1382,
         1405,
         1432,
-        2670,
         1381,
-        1401
+        1401,
+        1423
       ]
     },
     {
@@ -1536,30 +1538,30 @@
         "Los Angeles"
       ],
       "eligible": true,
-      "gold_page_rank": 1,
-      "evidence_rank": 1,
-      "unit_coverage": 1.0,
+      "gold_page_rank": null,
+      "evidence_rank": null,
+      "unit_coverage": 0.0,
       "hit_chunk_ids": [
-        6877,
-        6941,
-        6878,
         5731,
-        6221,
-        6943,
         4057,
         7568,
-        6881,
         7608,
-        6987,
         4255,
         4055,
-        6879,
         7611,
         7588,
         7586,
+        5370,
         4258,
-        3839,
-        4249
+        4249,
+        7593,
+        4250,
+        7585,
+        7587,
+        4251,
+        3954,
+        4245,
+        5730
       ]
     },
     {
@@ -1898,7 +1900,6 @@
         6329,
         6338,
         6328,
-        6294,
         6317,
         6330,
         6333,
@@ -1909,7 +1910,8 @@
         6319,
         6335,
         6322,
-        6315
+        6315,
+        6298
       ]
     },
     {
@@ -2207,11 +2209,9 @@
       "hit_chunk_ids": [
         8293,
         8294,
+        8298,
         6941,
         8299,
-        8295,
-        8297,
-        8296,
         6678,
         6877,
         6878,
@@ -2224,7 +2224,9 @@
         228,
         2534,
         6063,
-        3444
+        3444,
+        6065,
+        6679
       ]
     },
     {
@@ -2832,9 +2834,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:37:08+00:00"
+  "created_at": "2026-10-21T22:40:46+00:00"
 }

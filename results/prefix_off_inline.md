@@ -1,6 +1,6 @@
 # WikiLense evaluation: prefix_off_inline
 
-Generated 2026-09-22T01:40:10+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-10-21T22:43:40+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,7 +28,7 @@ Generated 2026-09-22T01:40:10+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | prefix |
 | configuration | {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": false, "label": "120 words, overlap 1, M=16, prefix off"} |
-| eval_seconds | 11.7 |
+| eval_seconds | 11.4 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -41,26 +41,28 @@ Generated 2026-09-22T01:40:10+00:00. 75 claims; 66 with a sentence-only evidence
 | chunk_words_median | 104.0 |
 | chunk_words_p95 | 119.0 |
 | chunk_words_max | 174 |
-| ingest_run | {"label": "prefix_off", "kind": "ingest", "configuration": {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": false, "label": "120 words, overlap 1, M=16, prefix off"}, "ingested_at": "2026-09-22T01:39:53+00:00", "counts": {"n_pages": 100, "n_sections": 3173, "n_sentences": 33637, "n_units_empty": 372, "n_units_hatnote": 1316, "n_chunks": 8658, "n_links": 40542, "n_links_resolved": 373, "n_links_skipped": 0, "n_claims": 75, "n_evidence": 114, "n_evidence_page_resolved": 114, "n_evidence_sentence_resolved": 87}, "seconds": {"schema": 0.1, "parse": 0.86, "embed": 17.19, "load": 5.82, "resolve": 0.0, "analyze": 0.01, "total": 24.03}, "n_units_hatnote": 1316, "chunk_words_mean": 93.8, "chunk_words_median": 104.0, "chunk_words_p95": 119.0, "chunk_words_max": 174, "vector_index_name": "embedding", "vector_index_m": 16, "vector_index_distance": "cosine", "chunk_data_length": 22593536, "chunk_index_length": 524288, "vector_index_tablespace_bytes": 17825792, "index_rebuild": null} |
+| ingest_run | {"label": "prefix_off", "kind": "ingest", "configuration": {"chunk_max_words": 120, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": false, "label": "120 words, overlap 1, M=16, prefix off"}, "ingested_at": "2026-10-21T22:43:25+00:00", "counts": {"n_pages": 100, "n_sections": 3173, "n_sentences": 33637, "n_units_empty": 372, "n_units_hatnote": 1316, "n_chunks": 8658, "n_links": 40542, "n_links_resolved": 373, "n_links_skipped": 0, "n_claims": 75, "n_evidence": 114, "n_evidence_page_resolved": 114, "n_evidence_sentence_resolved": 87, "n_pages_with_meta": 100, "n_categories": 1005, "n_page_categories": 1123}, "seconds": {"schema": 0.09, "parse": 0.87, "embed": 17.6, "load": 4.79, "resolve": 0.01, "analyze": 0.01, "total": 23.43}, "n_units_hatnote": 1316, "chunk_words_mean": 93.8, "chunk_words_median": 104.0, "chunk_words_p95": 119.0, "chunk_words_max": 174, "vector_index_name": "embedding", "vector_index_m": 16, "vector_index_distance": "cosine", "chunk_data_length": 22593536, "chunk_index_length": 524288, "vector_index_tablespace_bytes": 17825792, "index_rebuild": null} |
 
 ## Ingest parameters (ingest_meta)
 
 | Key | Value |
 |---|---|
-| analyze_seconds | 0.008 |
-| analyze_tables | chunk,page,section,link |
+| analyze_seconds | 0.011 |
+| analyze_tables | chunk,page,section,link,category,page_category |
 | chunk_max_words | 120 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
 | corpus_dir | data/corpus |
+| corpus_page_meta_sha256 | 9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | false |
+| embedding_revision | 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a |
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-09-22T01:39:53+00:00 |
+| ingested_at | 2026-10-21T22:43:25+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -69,7 +71,7 @@ Generated 2026-09-22T01:40:10+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-31-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
@@ -79,7 +81,7 @@ Generated 2026-09-22T01:40:10+00:00. 75 claims; 66 with a sentence-only evidence
 | python | 3.12.3 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
-| PyMySQL | 1.2.0 |
+| PyMySQL | 1.2.3 |
 | numpy | 2.5.3 |
 | torch | 2.14.0 |
 | sentence-transformers | 6.0.1 |
@@ -126,11 +128,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 4.24 | 4.64 | 4.31 | 4.02 | 8.53 |
-| 3 | 375 | 4.22 | 4.67 | 4.31 | 4.03 | 7.79 |
-| 5 | 375 | 4.24 | 4.65 | 4.30 | 4.06 | 6.10 |
-| 10 | 375 | 4.31 | 4.68 | 4.38 | 4.14 | 7.27 |
-| 20 | 375 | 4.46 | 4.92 | 4.54 | 4.22 | 8.87 |
+| 1 | 375 | 4.20 | 4.52 | 4.23 | 3.90 | 5.58 |
+| 3 | 375 | 4.14 | 4.51 | 4.19 | 3.89 | 5.45 |
+| 5 | 375 | 4.17 | 4.60 | 4.24 | 3.89 | 8.60 |
+| 10 | 375 | 4.23 | 4.65 | 4.29 | 3.97 | 7.40 |
+| 20 | 375 | 4.33 | 4.78 | 4.39 | 4.00 | 6.33 |
 
 ## Query embedding latency (ms)
 
@@ -138,7 +140,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.64 | 4.81 | 4.67 | 4.53 | 5.74 |
+| 375 | 4.68 | 4.80 | 4.69 | 4.52 | 4.97 |
 
 ## Claims with the worst rank of their gold page
 
@@ -160,6 +162,6 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 ## Notes
 
 - article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.
-- Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.
+- Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.
 - sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.
 - embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call.

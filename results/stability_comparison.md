@@ -1,18 +1,18 @@
 # Stability of the HNSW results (per-claim hit chunk ids, LIMIT 20)
 
-Generated 2026-09-22T01:35:21+00:00. Configuration: 120 words, overlap 1, M=6, prefix on; strategy none, ef 20. A claim counts as identical when its 20 hit chunk ids are the same, in the same order; `identical (set)` ignores the order. The container was restarted between `stability_512mb_run3` and `stability_512mb_after_restart`; `SET GLOBAL mhnsw_max_cache_size = 16777216` was issued before `stability_16mb_run1` and 536870912 restored afterwards.
+Generated 2026-10-21T22:39:04+00:00. Configuration: 120 words, overlap 1, M=6, prefix on; strategy none, ef 20. A claim counts as identical when its 20 hit chunk ids are the same, in the same order; `identical (set)` ignores the order. The container was restarted between `stability_512mb_run3` and `stability_512mb_after_restart`; `SET GLOBAL mhnsw_max_cache_size = 16777216` was issued before `stability_16mb_run1` and 536870912 restored afterwards.
 
 ## Runs
 
 | run | created_at | index ingested_at | cache bytes | ef_search | M | chunks | unstable claims | article hits @1/5/10/20 | evidence hits @5/10/20 |
 |---|---|---|---|---|---|---|---|---|---|
-| stability_512mb_run1 | 2026-09-22T01:34:54+00:00 | 2026-09-22T01:34:49+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
-| stability_512mb_run2 | 2026-09-22T01:34:58+00:00 | 2026-09-22T01:34:49+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
-| stability_512mb_run3 | 2026-09-22T01:35:02+00:00 | 2026-09-22T01:34:49+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
-| stability_512mb_after_restart | 2026-09-22T01:35:11+00:00 | 2026-09-22T01:34:49+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
-| stability_16mb_run1 | 2026-09-22T01:35:14+00:00 | 2026-09-22T01:34:49+00:00 | 16777216 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
-| stability_16mb_run2 | 2026-09-22T01:35:18+00:00 | 2026-09-22T01:34:49+00:00 | 16777216 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
-| stability_16mb_run3 | 2026-09-22T01:35:21+00:00 | 2026-09-22T01:34:49+00:00 | 16777216 | 20 | 6 | 8658 | 0 | 62/68/68/68 | 46/53/58 |
+| stability_512mb_run1 | 2026-10-21T22:38:38+00:00 | 2026-10-21T22:38:32+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
+| stability_512mb_run2 | 2026-10-21T22:38:41+00:00 | 2026-10-21T22:38:32+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
+| stability_512mb_run3 | 2026-10-21T22:38:45+00:00 | 2026-10-21T22:38:32+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
+| stability_512mb_after_restart | 2026-10-21T22:38:54+00:00 | 2026-10-21T22:38:32+00:00 | 536870912 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
+| stability_16mb_run1 | 2026-10-21T22:38:58+00:00 | 2026-10-21T22:38:32+00:00 | 16777216 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
+| stability_16mb_run2 | 2026-10-21T22:39:00+00:00 | 2026-10-21T22:38:32+00:00 | 16777216 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
+| stability_16mb_run3 | 2026-10-21T22:39:04+00:00 | 2026-10-21T22:38:32+00:00 | 16777216 | 20 | 6 | 8658 | 0 | 61/67/68/68 | 39/46/51 |
 
 ## Comparisons
 
@@ -27,7 +27,7 @@ Generated 2026-09-22T01:35:21+00:00. Configuration: 120 words, overlap 1, M=6, p
 
 | reference | run | identical (sequence) | identical (set) | of | claims that differ |
 |---|---|---|---|---|---|
-| stability_512mb_run1 | stability_512mb_after_restart | 72 | 72 | 75 | 50355, 63422, 87976 |
+| stability_512mb_run1 | stability_512mb_after_restart | 74 | 74 | 75 | 7971 |
 
 ### after_restart_vs_16mb
 
@@ -46,6 +46,6 @@ Generated 2026-09-22T01:35:21+00:00. Configuration: 120 words, overlap 1, M=6, p
 
 | reference | run | identical (sequence) | identical (set) | of | claims that differ |
 |---|---|---|---|---|---|
-| stability_512mb_run1 | stability_16mb_run1 | 72 | 72 | 75 | 50355, 63422, 87976 |
-| stability_512mb_run1 | stability_16mb_run2 | 72 | 72 | 75 | 50355, 63422, 87976 |
-| stability_512mb_run1 | stability_16mb_run3 | 72 | 72 | 75 | 50355, 63422, 87976 |
+| stability_512mb_run1 | stability_16mb_run1 | 74 | 74 | 75 | 7971 |
+| stability_512mb_run1 | stability_16mb_run2 | 74 | 74 | 75 | 7971 |
+| stability_512mb_run1 | stability_16mb_run3 | 74 | 74 | 75 | 7971 |

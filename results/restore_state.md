@@ -1,6 +1,6 @@
 # Restored default state
 
-Generated 2026-09-22T01:43:02+00:00. A fresh `run_ingest` with the defaults ('240 words, overlap 1, M=16, prefix on', what `wikilense ingest` produces), then `ingest_meta`, the index and the HNSW cache size checked.
+Generated 2026-10-21T22:46:21+00:00. A fresh `run_ingest` with the defaults ('240 words, overlap 1, M=16, prefix on', what `wikilense ingest` produces), then `ingest_meta`, the index and the HNSW cache size checked.
 
 | check | expected | found | ok |
 |---|---|---|---|
@@ -17,4 +17,4 @@ Generated 2026-09-22T01:43:02+00:00. A fresh `run_ingest` with the defaults ('24
 | @@GLOBAL.mhnsw_max_cache_size | 536870912 | 536870912 | yes |
 | ingest_meta equals final_ef_100's (ingested_at, analyze_seconds excepted) | identical | identical | yes |
 
-Ingest: 4598 chunks, 1316 hatnote units excluded, 21.0 s (embed 16.44 s); vector index tablespace 13631488 bytes.
+Ingest: 4598 chunks, 1316 hatnote units excluded, 21.14 s (embed 16.83 s); vector index tablespace 13631488 bytes.

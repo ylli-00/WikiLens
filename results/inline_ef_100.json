@@ -34,7 +34,7 @@
       "use_prefix": true,
       "label": "120 words, overlap 1, M=6, prefix on"
     },
-    "eval_seconds": 11.2,
+    "eval_seconds": 10.7,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -49,26 +49,28 @@
     "chunk_words_max": 174
   },
   "ingest_meta": {
-    "analyze_seconds": "0.008",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.013",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "120",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "6",
-    "ingested_at": "2026-09-22T01:34:49+00:00",
+    "ingested_at": "2026-10-21T22:38:32+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -80,7 +82,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -97,11 +99,11 @@
       "unit_coverage": 0.5429292929292928,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 4.043619000185572,
-        "p95_ms": 4.314209200674668,
-        "mean_ms": 4.087188464019467,
-        "min_ms": 3.7497280000025057,
-        "max_ms": 7.999768999980006
+        "p50_ms": 3.8346299988916144,
+        "p95_ms": 4.234034200271708,
+        "mean_ms": 3.8962039867086182,
+        "min_ms": 3.5769349997281097,
+        "max_ms": 6.604615000469494
       }
     },
     {
@@ -113,11 +115,11 @@
       "unit_coverage": 0.6919191919191919,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 4.03324499984592,
-        "p95_ms": 4.397633499775111,
-        "mean_ms": 4.101845759997862,
-        "min_ms": 3.720386999702896,
-        "max_ms": 8.19713600048999
+        "p50_ms": 3.8080470003478695,
+        "p95_ms": 4.354517600222607,
+        "mean_ms": 3.8860691173904343,
+        "min_ms": 3.50946899925475,
+        "max_ms": 7.2123379995900905
       }
     },
     {
@@ -129,11 +131,11 @@
       "unit_coverage": 0.7689393939393939,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 4.057733000081498,
-        "p95_ms": 4.413701399789716,
-        "mean_ms": 4.109840429317653,
-        "min_ms": 3.7713069996243576,
-        "max_ms": 6.363110999700439
+        "p50_ms": 3.8316930003929883,
+        "p95_ms": 4.337727600795915,
+        "mean_ms": 3.902932069317709,
+        "min_ms": 3.4777050004777266,
+        "max_ms": 6.589299999177456
       }
     },
     {
@@ -145,11 +147,11 @@
       "unit_coverage": 0.8787878787878788,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 4.1218859996661195,
-        "p95_ms": 4.427231700265111,
-        "mean_ms": 4.158099119988037,
-        "min_ms": 3.8055960003475775,
-        "max_ms": 6.313793999652262
+        "p50_ms": 3.8858099997014506,
+        "p95_ms": 4.538143100035086,
+        "mean_ms": 3.9605882133425134,
+        "min_ms": 3.5509389999788254,
+        "max_ms": 6.569032999323099
       }
     },
     {
@@ -161,21 +163,21 @@
       "unit_coverage": 0.9545454545454546,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 4.23831300031452,
-        "p95_ms": 4.549244900135818,
-        "mean_ms": 4.2762598613335285,
-        "min_ms": 3.9393950000885525,
-        "max_ms": 6.094850999943446
+        "p50_ms": 4.00019200060342,
+        "p95_ms": 4.671760200835706,
+        "mean_ms": 4.08565580266198,
+        "min_ms": 3.6787429999094456,
+        "max_ms": 6.455041999288369
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.681818999415555,
-    "p95_ms": 4.801089400461933,
-    "mean_ms": 4.684094738690571,
-    "min_ms": 4.515761999755341,
-    "max_ms": 5.097936000311165
+    "p50_ms": 4.579305999868666,
+    "p95_ms": 4.7312345006503165,
+    "mean_ms": 4.607369922707828,
+    "min_ms": 4.422793001140235,
+    "max_ms": 8.025097999052377
   },
   "claims": [
     {
@@ -2813,9 +2815,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:36:03+00:00"
+  "created_at": "2026-10-21T22:39:43+00:00"
 }

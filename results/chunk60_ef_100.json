@@ -37,7 +37,7 @@
       "use_prefix": true,
       "label": "60 words, overlap 1, M=16, prefix on"
     },
-    "eval_seconds": 4.9,
+    "eval_seconds": 4.4,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -60,7 +60,7 @@
         "use_prefix": true,
         "label": "60 words, overlap 1, M=16, prefix on"
       },
-      "ingested_at": "2026-09-22T01:37:48+00:00",
+      "ingested_at": "2026-10-21T22:41:24+00:00",
       "counts": {
         "n_pages": 100,
         "n_sections": 3173,
@@ -74,16 +74,19 @@
         "n_claims": 75,
         "n_evidence": 114,
         "n_evidence_page_resolved": 114,
-        "n_evidence_sentence_resolved": 87
+        "n_evidence_sentence_resolved": 87,
+        "n_pages_with_meta": 100,
+        "n_categories": 1005,
+        "n_page_categories": 1123
       },
       "seconds": {
-        "schema": 0.1,
+        "schema": 0.06,
         "parse": 0.87,
-        "embed": 22.51,
-        "load": 10.34,
+        "embed": 22.81,
+        "load": 8.54,
         "resolve": 0.02,
         "analyze": 0.02,
-        "total": 33.92
+        "total": 32.37
       },
       "n_units_hatnote": 1316,
       "chunk_words_mean": 48.1,
@@ -100,26 +103,28 @@
     }
   },
   "ingest_meta": {
-    "analyze_seconds": "0.025",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.024",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "60",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-09-22T01:37:48+00:00",
+    "ingested_at": "2026-10-21T22:41:24+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -131,7 +136,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -148,11 +153,11 @@
       "unit_coverage": 0.4797979797979798,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.7454039996446227,
-        "p95_ms": 0.9685126001386379,
-        "mean_ms": 0.7523481546450057,
-        "min_ms": 0.5299140002534841,
-        "max_ms": 1.2828799999624607
+        "p50_ms": 0.6634420005866559,
+        "p95_ms": 1.0848466996321804,
+        "mean_ms": 0.6961005120683694,
+        "min_ms": 0.3154340010951273,
+        "max_ms": 1.4206280011421768
       }
     },
     {
@@ -164,11 +169,11 @@
       "unit_coverage": 0.5606060606060606,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.652278999950795,
-        "p95_ms": 0.8545960998162627,
-        "mean_ms": 0.6596227626529677,
-        "min_ms": 0.4605449994414812,
-        "max_ms": 1.1851589997604606
+        "p50_ms": 0.5762639993918128,
+        "p95_ms": 0.9985517999666629,
+        "mean_ms": 0.6004338186370054,
+        "min_ms": 0.2638200003275415,
+        "max_ms": 1.3330599995242665
       }
     },
     {
@@ -180,11 +185,11 @@
       "unit_coverage": 0.6313131313131313,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6299489996308694,
-        "p95_ms": 0.8186799000213797,
-        "mean_ms": 0.6463045413280876,
-        "min_ms": 0.4572589996314491,
-        "max_ms": 1.2170219997642562
+        "p50_ms": 0.5145020004420076,
+        "p95_ms": 0.9522308995656203,
+        "mean_ms": 0.5501121040530658,
+        "min_ms": 0.2620619998197071,
+        "max_ms": 1.0722610004449962
       }
     },
     {
@@ -196,11 +201,11 @@
       "unit_coverage": 0.6957070707070707,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6394580004780437,
-        "p95_ms": 0.8504845000061324,
-        "mean_ms": 0.6588866613189263,
-        "min_ms": 0.48195399995165644,
-        "max_ms": 1.3256279999040999
+        "p50_ms": 0.5177880011615343,
+        "p95_ms": 0.9863281000434655,
+        "mean_ms": 0.5631156613380881,
+        "min_ms": 0.26813700060301926,
+        "max_ms": 1.19895500029088
       }
     },
     {
@@ -212,11 +217,11 @@
       "unit_coverage": 0.7108585858585859,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6625730002269847,
-        "p95_ms": 0.8490811996125559,
-        "mean_ms": 0.6749749093311644,
-        "min_ms": 0.48526899990974925,
-        "max_ms": 1.2157820001448272
+        "p50_ms": 0.5215430010139244,
+        "p95_ms": 1.009308598440839,
+        "mean_ms": 0.5729307572910329,
+        "min_ms": 0.27781599965237547,
+        "max_ms": 1.240916999449837
       }
     },
     {
@@ -228,11 +233,11 @@
       "unit_coverage": 0.7714646464646464,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.7156760002544615,
-        "p95_ms": 0.8974217999821122,
-        "mean_ms": 0.7273710560184554,
-        "min_ms": 0.5348340000637108,
-        "max_ms": 1.243518000592303
+        "p50_ms": 0.5790670002170373,
+        "p95_ms": 1.0542749001615448,
+        "mean_ms": 0.625235701285419,
+        "min_ms": 0.32387200008088257,
+        "max_ms": 1.296718000958208
       }
     },
     {
@@ -244,11 +249,11 @@
       "unit_coverage": 0.8472222222222222,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.8319159996972303,
-        "p95_ms": 1.0581918000752921,
-        "mean_ms": 0.8515983146498911,
-        "min_ms": 0.652488000014273,
-        "max_ms": 1.489367999965907
+        "p50_ms": 0.7106330012902617,
+        "p95_ms": 1.1512616996697034,
+        "mean_ms": 0.7429871280085839,
+        "min_ms": 0.41393700121261645,
+        "max_ms": 1.4151569994282909
       }
     },
     {
@@ -260,21 +265,21 @@
       "unit_coverage": 0.9318181818181818,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 1.0580999996818719,
-        "p95_ms": 1.2690590997408437,
-        "mean_ms": 1.0821578346925282,
-        "min_ms": 0.8729219998713234,
-        "max_ms": 2.082521999909659
+        "p50_ms": 0.9297830001742113,
+        "p95_ms": 1.394767600686464,
+        "mean_ms": 0.983520834609711,
+        "min_ms": 0.61406100030581,
+        "max_ms": 2.9520339994633105
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.764586000419513,
-    "p95_ms": 5.027454799346743,
-    "mean_ms": 4.7935399626779445,
-    "min_ms": 4.577488999530033,
-    "max_ms": 7.16375399952085
+    "p50_ms": 4.573517000608263,
+    "p95_ms": 4.688851300852548,
+    "mean_ms": 4.584813338675303,
+    "min_ms": 4.4678859994746745,
+    "max_ms": 5.34614600110217
   },
   "claims": [
     {
@@ -782,7 +787,7 @@
       ],
       "eligible": true,
       "gold_page_rank": 1,
-      "evidence_rank": 9,
+      "evidence_rank": 10,
       "unit_coverage": 1.0,
       "hit_chunk_ids": [
         16893,
@@ -792,6 +797,7 @@
         16840,
         16759,
         4040,
+        7708,
         4041,
         16852,
         16844,
@@ -801,12 +807,14 @@
         5200,
         16939,
         16873,
+        7709,
         5436,
         16752,
         16843,
         16761,
         4038,
         16851,
+        2924,
         16830,
         8551,
         5197,
@@ -814,17 +822,14 @@
         4086,
         13635,
         16870,
+        13719,
         16751,
         3972,
         16750,
         16831,
         3881,
         18549,
-        16758,
-        8604,
-        16760,
-        16524,
-        16835
+        16758
       ]
     },
     {
@@ -861,11 +866,13 @@
         14094,
         11596,
         780,
+        6424,
         17961,
         9206,
         11587,
         9744,
         9753,
+        15850,
         13803,
         16201,
         14095,
@@ -877,9 +884,7 @@
         9752,
         7736,
         4816,
-        11594,
-        15566,
-        9758
+        11594
       ]
     },
     {
@@ -1119,7 +1124,6 @@
         18884,
         18886,
         18933,
-        18945,
         18943,
         18901,
         19042,
@@ -1154,7 +1158,8 @@
         18900,
         19052,
         19060,
-        18974
+        18974,
+        19031
       ]
     },
     {
@@ -1167,7 +1172,7 @@
       ],
       "eligible": true,
       "gold_page_rank": 1,
-      "evidence_rank": 24,
+      "evidence_rank": 23,
       "unit_coverage": 1.0,
       "hit_chunk_ids": [
         13926,
@@ -1191,7 +1196,6 @@
         17144,
         9433,
         13651,
-        13399,
         17157,
         13603,
         17005,
@@ -1200,6 +1204,7 @@
         13935,
         17006,
         9444,
+        14393,
         18886,
         9412,
         17180,
@@ -1687,6 +1692,7 @@
         18808,
         18803,
         18811,
+        18807,
         18809,
         18816,
         18806,
@@ -1703,8 +1709,7 @@
         18863,
         18805,
         18853,
-        18869,
-        18810
+        18869
       ]
     },
     {
@@ -1753,13 +1758,13 @@
         14256,
         5641,
         14259,
+        8649,
         8004,
         16722,
         5644,
         9175,
         8954,
-        10978,
-        14
+        10978
       ]
     },
     {
@@ -1965,6 +1970,7 @@
         5499,
         5500,
         5493,
+        1015,
         3728,
         4948,
         3735,
@@ -1975,11 +1981,10 @@
         3851,
         5513,
         770,
+        3589,
         3786,
         3813,
-        5517,
-        5711,
-        3734
+        5517
       ]
     },
     {
@@ -2254,7 +2259,7 @@
         2534,
         2419,
         2521,
-        2509
+        18238
       ]
     },
     {
@@ -2389,7 +2394,6 @@
         13984,
         15399,
         13284,
-        12851,
         15394,
         17067,
         16994,
@@ -2399,8 +2403,6 @@
         17008,
         15395,
         9384,
-        12788,
-        12852,
         15407,
         9379,
         9382,
@@ -2408,7 +2410,6 @@
         15406,
         17058,
         9387,
-        8763,
         17079,
         15405,
         15552,
@@ -2419,7 +2420,11 @@
         15641,
         13835,
         13405,
-        15583
+        15583,
+        16963,
+        16983,
+        12067,
+        12068
       ]
     },
     {
@@ -2740,6 +2745,7 @@
         18027,
         18033,
         18026,
+        12512,
         5401,
         15552,
         15540,
@@ -2748,8 +2754,7 @@
         7625,
         13400,
         15545,
-        15147,
-        17915
+        15147
       ]
     },
     {
@@ -3013,6 +3018,7 @@
         4830,
         11194,
         12668,
+        8437,
         17231,
         4867,
         11228,
@@ -3023,8 +3029,7 @@
         3860,
         4831,
         4843,
-        1250,
-        4835
+        1250
       ]
     },
     {
@@ -3397,6 +3402,7 @@
         13069,
         7034,
         11264,
+        12880,
         11285,
         11271,
         7035,
@@ -3408,8 +3414,7 @@
         11240,
         11245,
         11248,
-        7022,
-        13087
+        7022
       ]
     },
     {
@@ -3681,10 +3686,10 @@
         9267,
         9310,
         9087,
-        7811,
         9088,
         9318,
-        9266
+        9266,
+        9362
       ]
     },
     {
@@ -4055,6 +4060,7 @@
         8930,
         9005,
         9010,
+        13646,
         8956,
         8916,
         7098,
@@ -4068,8 +4074,7 @@
         11024,
         8403,
         15010,
-        3949,
-        9119
+        3949
       ]
     },
     {
@@ -4115,7 +4120,6 @@
         3949,
         11033,
         1867,
-        3456,
         3348,
         3354,
         3961,
@@ -4124,7 +4128,8 @@
         15902,
         11026,
         3345,
-        13288
+        13288,
+        13312
       ]
     },
     {
@@ -4415,9 +4420,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:37:54+00:00"
+  "created_at": "2026-10-21T22:41:29+00:00"
 }

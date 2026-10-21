@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-09-22T01:37:14+00:00",
+  "created_at": "2026-10-21T22:40:51+00:00",
   "configuration": {
     "chunk_max_words": 120,
     "chunk_overlap_units": 1,
@@ -16,16 +16,16 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=6 DISTANCE=cosine",
-      "drop_seconds": 0.83,
-      "add_seconds": 1.13,
-      "analyze_seconds": 0.003,
+      "drop_seconds": 0.84,
+      "add_seconds": 1.11,
+      "analyze_seconds": 0.002,
       "vector_index_m_after": 6,
       "vector_index_distance_after": "cosine",
       "n_chunks": 8658,
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 16777216,
-      "rebuilt_at": "2026-09-22T01:36:37+00:00"
+      "rebuilt_at": "2026-10-21T22:40:16+00:00"
     },
     {
       "label": "index_m_sweep_m16",
@@ -35,7 +35,7 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=16 DISTANCE=cosine",
-      "drop_seconds": 0.81,
+      "drop_seconds": 0.87,
       "add_seconds": 2.94,
       "analyze_seconds": 0.002,
       "vector_index_m_after": 16,
@@ -44,7 +44,7 @@
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 17825792,
-      "rebuilt_at": "2026-09-22T01:36:48+00:00"
+      "rebuilt_at": "2026-10-21T22:40:26+00:00"
     },
     {
       "label": "index_m_sweep_m32",
@@ -54,8 +54,8 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=32 DISTANCE=cosine",
-      "drop_seconds": 0.84,
-      "add_seconds": 8.98,
+      "drop_seconds": 0.85,
+      "add_seconds": 9.08,
       "analyze_seconds": 0.003,
       "vector_index_m_after": 32,
       "vector_index_distance_after": "cosine",
@@ -63,7 +63,7 @@
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 19922944,
-      "rebuilt_at": "2026-09-22T01:37:05+00:00"
+      "rebuilt_at": "2026-10-21T22:40:43+00:00"
     },
     {
       "label": "index_m_restore_m6",
@@ -73,8 +73,8 @@
       "index_name": "embedding",
       "drop_sql": "ALTER TABLE chunk DROP INDEX `embedding`",
       "add_sql": "ALTER TABLE chunk ADD VECTOR INDEX `embedding` (embedding) M=6 DISTANCE=cosine",
-      "drop_seconds": 0.81,
-      "add_seconds": 1.1,
+      "drop_seconds": 0.87,
+      "add_seconds": 1.15,
       "analyze_seconds": 0.002,
       "vector_index_m_after": 6,
       "vector_index_distance_after": "cosine",
@@ -82,7 +82,7 @@
       "chunk_index_length": 524288,
       "chunk_data_length": 22593536,
       "vector_index_tablespace_bytes": 16777216,
-      "rebuilt_at": "2026-09-22T01:37:14+00:00"
+      "rebuilt_at": "2026-10-21T22:40:51+00:00"
     }
   ],
   "comparisons": {
@@ -91,1664 +91,27 @@
       "n_claims": 75,
       "runs": {
         "m6_ef_20": {
-          "identical_sequence": 16,
-          "identical_set": 16,
-          "differing_claims": [
-            3482,
-            4212,
-            5121,
-            5753,
-            6419,
-            7831,
-            7971,
-            9154,
-            11439,
-            11910,
-            13207,
-            13383,
-            14909,
-            15195,
-            15823,
-            19145,
-            22563,
-            25324,
-            26799,
-            31383,
-            32256,
-            32645,
-            34024,
-            36003,
-            36109,
-            40707,
-            40804,
-            42937,
-            43675,
-            44563,
-            45340,
-            45793,
-            46127,
-            48999,
-            50355,
-            54047,
-            61236,
-            62373,
-            63422,
-            64595,
-            65842,
-            66646,
-            69200,
-            69572,
-            74482,
-            76756,
-            76962,
-            79299,
-            79567,
-            82504,
-            83276,
-            85631,
-            85881,
-            87976,
-            89819,
-            90340,
-            93234,
-            94092,
-            95085
-          ],
-          "differing_details": [
-            {
-              "claim_id": 3482,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 4212,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 5121,
-              "first_differing_position": 2,
-              "common_chunks": 7,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 5753,
-              "first_differing_position": 17,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 6419,
-              "first_differing_position": 1,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 7831,
-              "first_differing_position": 7,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 7971,
-              "first_differing_position": 1,
-              "common_chunks": 1,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 9154,
-              "first_differing_position": 1,
-              "common_chunks": 1,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 11439,
-              "first_differing_position": 9,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 11910,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 13207,
-              "first_differing_position": 12,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 13383,
-              "first_differing_position": 2,
-              "common_chunks": 14,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 14909,
-              "first_differing_position": 15,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 15195,
-              "first_differing_position": 4,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 15823,
-              "first_differing_position": 1,
-              "common_chunks": 6,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 19145,
-              "first_differing_position": 8,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 22563,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 25324,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 26799,
-              "first_differing_position": 3,
-              "common_chunks": 7,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 31383,
-              "first_differing_position": 8,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 32256,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 32645,
-              "first_differing_position": 3,
-              "common_chunks": 13,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 34024,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 36003,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 36109,
-              "first_differing_position": 1,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40707,
-              "first_differing_position": 17,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40804,
-              "first_differing_position": 13,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 42937,
-              "first_differing_position": 16,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 43675,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 44563,
-              "first_differing_position": 5,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 45340,
-              "first_differing_position": 3,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 45793,
-              "first_differing_position": 7,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 46127,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 48999,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 50355,
-              "first_differing_position": 4,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 54047,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 61236,
-              "first_differing_position": 1,
-              "common_chunks": 8,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 62373,
-              "first_differing_position": 8,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 63422,
-              "first_differing_position": 12,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 64595,
-              "first_differing_position": 12,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 65842,
-              "first_differing_position": 2,
-              "common_chunks": 1,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 66646,
-              "first_differing_position": 8,
-              "common_chunks": 14,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 69200,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 69572,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 74482,
-              "first_differing_position": 2,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 76756,
-              "first_differing_position": 7,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 4,
-              "gold_page_rank_other": 4
-            },
-            {
-              "claim_id": 76962,
-              "first_differing_position": 3,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79299,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79567,
-              "first_differing_position": 1,
-              "common_chunks": 16,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 82504,
-              "first_differing_position": 8,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 83276,
-              "first_differing_position": 1,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 85631,
-              "first_differing_position": 12,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            },
-            {
-              "claim_id": 85881,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 87976,
-              "first_differing_position": 1,
-              "common_chunks": 10,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 89819,
-              "first_differing_position": 5,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 90340,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 93234,
-              "first_differing_position": 10,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 94092,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 95085,
-              "first_differing_position": 16,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            }
-          ]
-        }
-      },
-      "identical_in_all": 16,
-      "differing_claims_any": [
-        3482,
-        4212,
-        5121,
-        5753,
-        6419,
-        7831,
-        7971,
-        9154,
-        11439,
-        11910,
-        13207,
-        13383,
-        14909,
-        15195,
-        15823,
-        19145,
-        22563,
-        25324,
-        26799,
-        31383,
-        32256,
-        32645,
-        34024,
-        36003,
-        36109,
-        40707,
-        40804,
-        42937,
-        43675,
-        44563,
-        45340,
-        45793,
-        46127,
-        48999,
-        50355,
-        54047,
-        61236,
-        62373,
-        63422,
-        64595,
-        65842,
-        66646,
-        69200,
-        69572,
-        74482,
-        76756,
-        76962,
-        79299,
-        79567,
-        82504,
-        83276,
-        85631,
-        85881,
-        87976,
-        89819,
-        90340,
-        93234,
-        94092,
-        95085
-      ]
-    },
-    "m6_ef_20_vs_stability_512mb_run1": {
-      "reference": "stability_512mb_run1",
-      "n_claims": 75,
-      "runs": {
-        "m6_ef_20": {
-          "identical_sequence": 16,
-          "identical_set": 16,
-          "differing_claims": [
-            3482,
-            4212,
-            5121,
-            5753,
-            6419,
-            7831,
-            7971,
-            9154,
-            11439,
-            11910,
-            13207,
-            13383,
-            14909,
-            15195,
-            15823,
-            19145,
-            22563,
-            25324,
-            26799,
-            31383,
-            32256,
-            32645,
-            34024,
-            36003,
-            36109,
-            40707,
-            40804,
-            42937,
-            43675,
-            44563,
-            45340,
-            45793,
-            46127,
-            48999,
-            50355,
-            54047,
-            61236,
-            62373,
-            63422,
-            64595,
-            65842,
-            66646,
-            69200,
-            69572,
-            74482,
-            76756,
-            76962,
-            79299,
-            79567,
-            82504,
-            83276,
-            85631,
-            85881,
-            87976,
-            89819,
-            90340,
-            93234,
-            94092,
-            95085
-          ],
-          "differing_details": [
-            {
-              "claim_id": 3482,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 4212,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 5121,
-              "first_differing_position": 2,
-              "common_chunks": 7,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 5753,
-              "first_differing_position": 17,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 6419,
-              "first_differing_position": 1,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 7831,
-              "first_differing_position": 7,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 7971,
-              "first_differing_position": 1,
-              "common_chunks": 1,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 9154,
-              "first_differing_position": 1,
-              "common_chunks": 1,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 11439,
-              "first_differing_position": 9,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 11910,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 13207,
-              "first_differing_position": 12,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 13383,
-              "first_differing_position": 2,
-              "common_chunks": 14,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 14909,
-              "first_differing_position": 15,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 15195,
-              "first_differing_position": 4,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 15823,
-              "first_differing_position": 1,
-              "common_chunks": 6,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 19145,
-              "first_differing_position": 8,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 22563,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 25324,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 26799,
-              "first_differing_position": 3,
-              "common_chunks": 7,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 31383,
-              "first_differing_position": 8,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 32256,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 32645,
-              "first_differing_position": 3,
-              "common_chunks": 13,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 34024,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 36003,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 36109,
-              "first_differing_position": 1,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40707,
-              "first_differing_position": 17,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40804,
-              "first_differing_position": 13,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 42937,
-              "first_differing_position": 16,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 43675,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 44563,
-              "first_differing_position": 5,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 45340,
-              "first_differing_position": 3,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 45793,
-              "first_differing_position": 7,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 46127,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 48999,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 50355,
-              "first_differing_position": 8,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 54047,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 61236,
-              "first_differing_position": 1,
-              "common_chunks": 8,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 62373,
-              "first_differing_position": 8,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 63422,
-              "first_differing_position": 12,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 64595,
-              "first_differing_position": 12,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 65842,
-              "first_differing_position": 2,
-              "common_chunks": 1,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 66646,
-              "first_differing_position": 8,
-              "common_chunks": 14,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 69200,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 69572,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 74482,
-              "first_differing_position": 2,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 76756,
-              "first_differing_position": 7,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 4,
-              "gold_page_rank_other": 4
-            },
-            {
-              "claim_id": 76962,
-              "first_differing_position": 3,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79299,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79567,
-              "first_differing_position": 1,
-              "common_chunks": 16,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 82504,
-              "first_differing_position": 8,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 83276,
-              "first_differing_position": 1,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 85631,
-              "first_differing_position": 12,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            },
-            {
-              "claim_id": 85881,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 87976,
-              "first_differing_position": 1,
-              "common_chunks": 10,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 89819,
-              "first_differing_position": 5,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 90340,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 93234,
-              "first_differing_position": 10,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 94092,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 95085,
-              "first_differing_position": 16,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            }
-          ]
-        }
-      },
-      "identical_in_all": 16,
-      "differing_claims_any": [
-        3482,
-        4212,
-        5121,
-        5753,
-        6419,
-        7831,
-        7971,
-        9154,
-        11439,
-        11910,
-        13207,
-        13383,
-        14909,
-        15195,
-        15823,
-        19145,
-        22563,
-        25324,
-        26799,
-        31383,
-        32256,
-        32645,
-        34024,
-        36003,
-        36109,
-        40707,
-        40804,
-        42937,
-        43675,
-        44563,
-        45340,
-        45793,
-        46127,
-        48999,
-        50355,
-        54047,
-        61236,
-        62373,
-        63422,
-        64595,
-        65842,
-        66646,
-        69200,
-        69572,
-        74482,
-        76756,
-        76962,
-        79299,
-        79567,
-        82504,
-        83276,
-        85631,
-        85881,
-        87976,
-        89819,
-        90340,
-        93234,
-        94092,
-        95085
-      ]
-    },
-    "m6_ef_20_vs_stability_512mb_after_restart": {
-      "reference": "stability_512mb_after_restart",
-      "n_claims": 75,
-      "runs": {
-        "m6_ef_20": {
-          "identical_sequence": 16,
-          "identical_set": 16,
-          "differing_claims": [
-            3482,
-            4212,
-            5121,
-            5753,
-            6419,
-            7831,
-            7971,
-            9154,
-            11439,
-            11910,
-            13207,
-            13383,
-            14909,
-            15195,
-            15823,
-            19145,
-            22563,
-            25324,
-            26799,
-            31383,
-            32256,
-            32645,
-            34024,
-            36003,
-            36109,
-            40707,
-            40804,
-            42937,
-            43675,
-            44563,
-            45340,
-            45793,
-            46127,
-            48999,
-            50355,
-            54047,
-            61236,
-            62373,
-            63422,
-            64595,
-            65842,
-            66646,
-            69200,
-            69572,
-            74482,
-            76756,
-            76962,
-            79299,
-            79567,
-            82504,
-            83276,
-            85631,
-            85881,
-            87976,
-            89819,
-            90340,
-            93234,
-            94092,
-            95085
-          ],
-          "differing_details": [
-            {
-              "claim_id": 3482,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 4212,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 5121,
-              "first_differing_position": 2,
-              "common_chunks": 7,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 5753,
-              "first_differing_position": 17,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 6419,
-              "first_differing_position": 1,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 7831,
-              "first_differing_position": 7,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 7971,
-              "first_differing_position": 1,
-              "common_chunks": 1,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 9154,
-              "first_differing_position": 1,
-              "common_chunks": 1,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 11439,
-              "first_differing_position": 9,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 11910,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 13207,
-              "first_differing_position": 12,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 13383,
-              "first_differing_position": 2,
-              "common_chunks": 14,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 14909,
-              "first_differing_position": 15,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 15195,
-              "first_differing_position": 4,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 15823,
-              "first_differing_position": 1,
-              "common_chunks": 6,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 19145,
-              "first_differing_position": 8,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 22563,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 25324,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 26799,
-              "first_differing_position": 3,
-              "common_chunks": 7,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 31383,
-              "first_differing_position": 8,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 32256,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 32645,
-              "first_differing_position": 3,
-              "common_chunks": 13,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 34024,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 36003,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 36109,
-              "first_differing_position": 1,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40707,
-              "first_differing_position": 17,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40804,
-              "first_differing_position": 13,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 42937,
-              "first_differing_position": 16,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 43675,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 44563,
-              "first_differing_position": 5,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 45340,
-              "first_differing_position": 3,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 45793,
-              "first_differing_position": 7,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 46127,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 48999,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 50355,
-              "first_differing_position": 4,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 54047,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 61236,
-              "first_differing_position": 1,
-              "common_chunks": 8,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 62373,
-              "first_differing_position": 8,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 63422,
-              "first_differing_position": 12,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 64595,
-              "first_differing_position": 12,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 65842,
-              "first_differing_position": 2,
-              "common_chunks": 1,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 66646,
-              "first_differing_position": 8,
-              "common_chunks": 14,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 69200,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 69572,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 74482,
-              "first_differing_position": 2,
-              "common_chunks": 15,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 76756,
-              "first_differing_position": 7,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 4,
-              "gold_page_rank_other": 4
-            },
-            {
-              "claim_id": 76962,
-              "first_differing_position": 3,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79299,
-              "first_differing_position": 1,
-              "common_chunks": 0,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79567,
-              "first_differing_position": 1,
-              "common_chunks": 16,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 82504,
-              "first_differing_position": 8,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 83276,
-              "first_differing_position": 1,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 85631,
-              "first_differing_position": 12,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            },
-            {
-              "claim_id": 85881,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 87976,
-              "first_differing_position": 1,
-              "common_chunks": 10,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 89819,
-              "first_differing_position": 5,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 90340,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 93234,
-              "first_differing_position": 10,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 94092,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 95085,
-              "first_differing_position": 16,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            }
-          ]
-        }
-      },
-      "identical_in_all": 16,
-      "differing_claims_any": [
-        3482,
-        4212,
-        5121,
-        5753,
-        6419,
-        7831,
-        7971,
-        9154,
-        11439,
-        11910,
-        13207,
-        13383,
-        14909,
-        15195,
-        15823,
-        19145,
-        22563,
-        25324,
-        26799,
-        31383,
-        32256,
-        32645,
-        34024,
-        36003,
-        36109,
-        40707,
-        40804,
-        42937,
-        43675,
-        44563,
-        45340,
-        45793,
-        46127,
-        48999,
-        50355,
-        54047,
-        61236,
-        62373,
-        63422,
-        64595,
-        65842,
-        66646,
-        69200,
-        69572,
-        74482,
-        76756,
-        76962,
-        79299,
-        79567,
-        82504,
-        83276,
-        85631,
-        85881,
-        87976,
-        89819,
-        90340,
-        93234,
-        94092,
-        95085
-      ]
-    },
-    "exact_vs_rebuilt": {
-      "reference": "inline_ef_20",
-      "n_claims": 75,
-      "runs": {
-        "m6_ef_20": {
-          "identical_sequence": 24,
-          "identical_set": 24,
+          "identical_sequence": 12,
+          "identical_set": 12,
           "differing_claims": [
             854,
+            2835,
             3482,
-            4212,
             5121,
+            5753,
+            5848,
             6419,
             7831,
             7971,
             9154,
+            11235,
+            11435,
             11439,
             13207,
             13383,
+            14253,
+            14909,
+            15195,
             15823,
             17676,
             19145,
@@ -1763,6 +126,7 @@
             40707,
             40804,
             43675,
+            44563,
             45340,
             45793,
             46127,
@@ -1776,24 +140,35 @@
             64595,
             65842,
             66646,
-            67426,
-            69572,
+            69200,
+            69299,
             74482,
+            76756,
             76962,
-            79299,
             79567,
+            82504,
+            82761,
             83276,
+            84120,
             85631,
+            85881,
             87976,
             89819,
             90340,
-            93234,
-            95085
+            93212,
+            93234
           ],
           "differing_details": [
             {
               "claim_id": 854,
-              "first_differing_position": 13,
+              "first_differing_position": 19,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 2835,
+              "first_differing_position": 9,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -1801,42 +176,1756 @@
             {
               "claim_id": 3482,
               "first_differing_position": 1,
-              "common_chunks": 0,
+              "common_chunks": 4,
               "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
+              "gold_page_rank_other": 1
             },
             {
-              "claim_id": 4212,
+              "claim_id": 5121,
+              "first_differing_position": 1,
+              "common_chunks": 6,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5753,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5848,
               "first_differing_position": 1,
               "common_chunks": 0,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": null
             },
             {
-              "claim_id": 5121,
-              "first_differing_position": 16,
+              "claim_id": 6419,
+              "first_differing_position": 11,
               "common_chunks": 18,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 6419,
-              "first_differing_position": 1,
-              "common_chunks": 16,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
               "claim_id": 7831,
-              "first_differing_position": 7,
-              "common_chunks": 17,
+              "first_differing_position": 9,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 7971,
               "first_differing_position": 7,
-              "common_chunks": 13,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 9154,
+              "first_differing_position": 2,
+              "common_chunks": 11,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 11235,
+              "first_differing_position": 15,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 2,
+              "gold_page_rank_other": 2
+            },
+            {
+              "claim_id": 11435,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 11439,
+              "first_differing_position": 2,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 13207,
+              "first_differing_position": 1,
+              "common_chunks": 8,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 13383,
+              "first_differing_position": 3,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 6,
+              "gold_page_rank_other": 5
+            },
+            {
+              "claim_id": 14253,
+              "first_differing_position": 16,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 2,
+              "gold_page_rank_other": 2
+            },
+            {
+              "claim_id": 14909,
+              "first_differing_position": 19,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 15195,
+              "first_differing_position": 15,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 15823,
+              "first_differing_position": 3,
+              "common_chunks": 11,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 17676,
+              "first_differing_position": 16,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 19145,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 22563,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 25324,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 26799,
+              "first_differing_position": 6,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 31383,
+              "first_differing_position": 3,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32256,
+              "first_differing_position": 1,
+              "common_chunks": 9,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32645,
+              "first_differing_position": 4,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 34024,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 36003,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 40707,
+              "first_differing_position": 1,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 40804,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 43675,
+              "first_differing_position": 1,
+              "common_chunks": 1,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 44563,
+              "first_differing_position": 5,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 45340,
+              "first_differing_position": 3,
+              "common_chunks": 14,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 45793,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 46127,
+              "first_differing_position": 1,
+              "common_chunks": 2,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 48999,
+              "first_differing_position": 4,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 50355,
+              "first_differing_position": 15,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 54047,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 56899,
+              "first_differing_position": 17,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 61236,
+              "first_differing_position": 4,
+              "common_chunks": 9,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 62373,
+              "first_differing_position": 1,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 63422,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 64595,
+              "first_differing_position": 1,
+              "common_chunks": 3,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 65842,
+              "first_differing_position": 14,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 66646,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69200,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69299,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 74482,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 76756,
+              "first_differing_position": 20,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 4,
+              "gold_page_rank_other": 4
+            },
+            {
+              "claim_id": 76962,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 79567,
+              "first_differing_position": 1,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 82504,
+              "first_differing_position": 4,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 82761,
+              "first_differing_position": 18,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 83276,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 84120,
+              "first_differing_position": 13,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 85631,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 85881,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 87976,
+              "first_differing_position": 1,
+              "common_chunks": 1,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 89819,
+              "first_differing_position": 5,
+              "common_chunks": 16,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 90340,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93212,
+              "first_differing_position": 8,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93234,
+              "first_differing_position": 19,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            }
+          ]
+        }
+      },
+      "identical_in_all": 12,
+      "differing_claims_any": [
+        854,
+        2835,
+        3482,
+        5121,
+        5753,
+        5848,
+        6419,
+        7831,
+        7971,
+        9154,
+        11235,
+        11435,
+        11439,
+        13207,
+        13383,
+        14253,
+        14909,
+        15195,
+        15823,
+        17676,
+        19145,
+        22563,
+        25324,
+        26799,
+        31383,
+        32256,
+        32645,
+        34024,
+        36003,
+        40707,
+        40804,
+        43675,
+        44563,
+        45340,
+        45793,
+        46127,
+        48999,
+        50355,
+        54047,
+        56899,
+        61236,
+        62373,
+        63422,
+        64595,
+        65842,
+        66646,
+        69200,
+        69299,
+        74482,
+        76756,
+        76962,
+        79567,
+        82504,
+        82761,
+        83276,
+        84120,
+        85631,
+        85881,
+        87976,
+        89819,
+        90340,
+        93212,
+        93234
+      ]
+    },
+    "m6_ef_20_vs_stability_512mb_run1": {
+      "reference": "stability_512mb_run1",
+      "n_claims": 75,
+      "runs": {
+        "m6_ef_20": {
+          "identical_sequence": 12,
+          "identical_set": 12,
+          "differing_claims": [
+            854,
+            2835,
+            3482,
+            5121,
+            5753,
+            5848,
+            6419,
+            7831,
+            7971,
+            9154,
+            11235,
+            11435,
+            11439,
+            13207,
+            13383,
+            14253,
+            14909,
+            15195,
+            15823,
+            17676,
+            19145,
+            22563,
+            25324,
+            26799,
+            31383,
+            32256,
+            32645,
+            34024,
+            36003,
+            40707,
+            40804,
+            43675,
+            44563,
+            45340,
+            45793,
+            46127,
+            48999,
+            50355,
+            54047,
+            56899,
+            61236,
+            62373,
+            63422,
+            64595,
+            65842,
+            66646,
+            69200,
+            69299,
+            74482,
+            76756,
+            76962,
+            79567,
+            82504,
+            82761,
+            83276,
+            84120,
+            85631,
+            85881,
+            87976,
+            89819,
+            90340,
+            93212,
+            93234
+          ],
+          "differing_details": [
+            {
+              "claim_id": 854,
+              "first_differing_position": 19,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 2835,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 3482,
+              "first_differing_position": 1,
+              "common_chunks": 4,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5121,
+              "first_differing_position": 1,
+              "common_chunks": 6,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5753,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5848,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 6419,
+              "first_differing_position": 11,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 7831,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 7971,
+              "first_differing_position": 7,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 9154,
+              "first_differing_position": 2,
+              "common_chunks": 11,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 11235,
+              "first_differing_position": 15,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 2,
+              "gold_page_rank_other": 2
+            },
+            {
+              "claim_id": 11435,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 11439,
+              "first_differing_position": 2,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 13207,
+              "first_differing_position": 1,
+              "common_chunks": 8,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 13383,
+              "first_differing_position": 3,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 6,
+              "gold_page_rank_other": 5
+            },
+            {
+              "claim_id": 14253,
+              "first_differing_position": 16,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 2,
+              "gold_page_rank_other": 2
+            },
+            {
+              "claim_id": 14909,
+              "first_differing_position": 19,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 15195,
+              "first_differing_position": 15,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 15823,
+              "first_differing_position": 3,
+              "common_chunks": 11,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 17676,
+              "first_differing_position": 16,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 19145,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 22563,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 25324,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 26799,
+              "first_differing_position": 6,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 31383,
+              "first_differing_position": 3,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32256,
+              "first_differing_position": 1,
+              "common_chunks": 9,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32645,
+              "first_differing_position": 4,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 34024,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 36003,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 40707,
+              "first_differing_position": 1,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 40804,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 43675,
+              "first_differing_position": 1,
+              "common_chunks": 1,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 44563,
+              "first_differing_position": 5,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 45340,
+              "first_differing_position": 3,
+              "common_chunks": 14,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 45793,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 46127,
+              "first_differing_position": 1,
+              "common_chunks": 2,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 48999,
+              "first_differing_position": 4,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 50355,
+              "first_differing_position": 15,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 54047,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 56899,
+              "first_differing_position": 17,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 61236,
+              "first_differing_position": 4,
+              "common_chunks": 9,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 62373,
+              "first_differing_position": 1,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 63422,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 64595,
+              "first_differing_position": 1,
+              "common_chunks": 3,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 65842,
+              "first_differing_position": 14,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 66646,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69200,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69299,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 74482,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 76756,
+              "first_differing_position": 20,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 4,
+              "gold_page_rank_other": 4
+            },
+            {
+              "claim_id": 76962,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 79567,
+              "first_differing_position": 1,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 82504,
+              "first_differing_position": 4,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 82761,
+              "first_differing_position": 18,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 83276,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 84120,
+              "first_differing_position": 13,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 85631,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 85881,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 87976,
+              "first_differing_position": 1,
+              "common_chunks": 1,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 89819,
+              "first_differing_position": 5,
+              "common_chunks": 16,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 90340,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93212,
+              "first_differing_position": 8,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93234,
+              "first_differing_position": 19,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            }
+          ]
+        }
+      },
+      "identical_in_all": 12,
+      "differing_claims_any": [
+        854,
+        2835,
+        3482,
+        5121,
+        5753,
+        5848,
+        6419,
+        7831,
+        7971,
+        9154,
+        11235,
+        11435,
+        11439,
+        13207,
+        13383,
+        14253,
+        14909,
+        15195,
+        15823,
+        17676,
+        19145,
+        22563,
+        25324,
+        26799,
+        31383,
+        32256,
+        32645,
+        34024,
+        36003,
+        40707,
+        40804,
+        43675,
+        44563,
+        45340,
+        45793,
+        46127,
+        48999,
+        50355,
+        54047,
+        56899,
+        61236,
+        62373,
+        63422,
+        64595,
+        65842,
+        66646,
+        69200,
+        69299,
+        74482,
+        76756,
+        76962,
+        79567,
+        82504,
+        82761,
+        83276,
+        84120,
+        85631,
+        85881,
+        87976,
+        89819,
+        90340,
+        93212,
+        93234
+      ]
+    },
+    "m6_ef_20_vs_stability_512mb_after_restart": {
+      "reference": "stability_512mb_after_restart",
+      "n_claims": 75,
+      "runs": {
+        "m6_ef_20": {
+          "identical_sequence": 12,
+          "identical_set": 12,
+          "differing_claims": [
+            854,
+            2835,
+            3482,
+            5121,
+            5753,
+            5848,
+            6419,
+            7831,
+            7971,
+            9154,
+            11235,
+            11435,
+            11439,
+            13207,
+            13383,
+            14253,
+            14909,
+            15195,
+            15823,
+            17676,
+            19145,
+            22563,
+            25324,
+            26799,
+            31383,
+            32256,
+            32645,
+            34024,
+            36003,
+            40707,
+            40804,
+            43675,
+            44563,
+            45340,
+            45793,
+            46127,
+            48999,
+            50355,
+            54047,
+            56899,
+            61236,
+            62373,
+            63422,
+            64595,
+            65842,
+            66646,
+            69200,
+            69299,
+            74482,
+            76756,
+            76962,
+            79567,
+            82504,
+            82761,
+            83276,
+            84120,
+            85631,
+            85881,
+            87976,
+            89819,
+            90340,
+            93212,
+            93234
+          ],
+          "differing_details": [
+            {
+              "claim_id": 854,
+              "first_differing_position": 19,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 2835,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 3482,
+              "first_differing_position": 1,
+              "common_chunks": 4,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5121,
+              "first_differing_position": 1,
+              "common_chunks": 6,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5753,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5848,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 6419,
+              "first_differing_position": 11,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 7831,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 7971,
+              "first_differing_position": 7,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 9154,
+              "first_differing_position": 2,
+              "common_chunks": 11,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 11235,
+              "first_differing_position": 15,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 2,
+              "gold_page_rank_other": 2
+            },
+            {
+              "claim_id": 11435,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 11439,
+              "first_differing_position": 2,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 13207,
+              "first_differing_position": 1,
+              "common_chunks": 8,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 13383,
+              "first_differing_position": 3,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 6,
+              "gold_page_rank_other": 5
+            },
+            {
+              "claim_id": 14253,
+              "first_differing_position": 16,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 2,
+              "gold_page_rank_other": 2
+            },
+            {
+              "claim_id": 14909,
+              "first_differing_position": 19,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 15195,
+              "first_differing_position": 15,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 15823,
+              "first_differing_position": 3,
+              "common_chunks": 11,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 17676,
+              "first_differing_position": 16,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 19145,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 22563,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 25324,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 26799,
+              "first_differing_position": 6,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 31383,
+              "first_differing_position": 3,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32256,
+              "first_differing_position": 1,
+              "common_chunks": 9,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32645,
+              "first_differing_position": 4,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 34024,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 36003,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 40707,
+              "first_differing_position": 1,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 40804,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 43675,
+              "first_differing_position": 1,
+              "common_chunks": 1,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 44563,
+              "first_differing_position": 5,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 45340,
+              "first_differing_position": 3,
+              "common_chunks": 14,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 45793,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 46127,
+              "first_differing_position": 1,
+              "common_chunks": 2,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 48999,
+              "first_differing_position": 4,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 50355,
+              "first_differing_position": 15,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 54047,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 56899,
+              "first_differing_position": 17,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 61236,
+              "first_differing_position": 4,
+              "common_chunks": 9,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 62373,
+              "first_differing_position": 1,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 63422,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 64595,
+              "first_differing_position": 1,
+              "common_chunks": 3,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 65842,
+              "first_differing_position": 14,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 66646,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69200,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69299,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 74482,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 76756,
+              "first_differing_position": 20,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 4,
+              "gold_page_rank_other": 4
+            },
+            {
+              "claim_id": 76962,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 79567,
+              "first_differing_position": 1,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 82504,
+              "first_differing_position": 4,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 82761,
+              "first_differing_position": 18,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 83276,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 84120,
+              "first_differing_position": 13,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 85631,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 85881,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 87976,
+              "first_differing_position": 1,
+              "common_chunks": 1,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 89819,
+              "first_differing_position": 5,
+              "common_chunks": 16,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 90340,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93212,
+              "first_differing_position": 8,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93234,
+              "first_differing_position": 19,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            }
+          ]
+        }
+      },
+      "identical_in_all": 12,
+      "differing_claims_any": [
+        854,
+        2835,
+        3482,
+        5121,
+        5753,
+        5848,
+        6419,
+        7831,
+        7971,
+        9154,
+        11235,
+        11435,
+        11439,
+        13207,
+        13383,
+        14253,
+        14909,
+        15195,
+        15823,
+        17676,
+        19145,
+        22563,
+        25324,
+        26799,
+        31383,
+        32256,
+        32645,
+        34024,
+        36003,
+        40707,
+        40804,
+        43675,
+        44563,
+        45340,
+        45793,
+        46127,
+        48999,
+        50355,
+        54047,
+        56899,
+        61236,
+        62373,
+        63422,
+        64595,
+        65842,
+        66646,
+        69200,
+        69299,
+        74482,
+        76756,
+        76962,
+        79567,
+        82504,
+        82761,
+        83276,
+        84120,
+        85631,
+        85881,
+        87976,
+        89819,
+        90340,
+        93212,
+        93234
+      ]
+    },
+    "exact_vs_rebuilt": {
+      "reference": "inline_ef_20",
+      "n_claims": 75,
+      "runs": {
+        "m6_ef_20": {
+          "identical_sequence": 29,
+          "identical_set": 29,
+          "differing_claims": [
+            854,
+            5121,
+            5848,
+            7831,
+            7971,
+            9154,
+            11439,
+            13207,
+            13383,
+            15195,
+            15823,
+            17676,
+            19145,
+            25324,
+            26799,
+            31383,
+            32256,
+            32645,
+            34024,
+            36003,
+            40707,
+            43675,
+            44563,
+            45340,
+            45793,
+            48999,
+            50355,
+            54047,
+            56899,
+            61236,
+            62373,
+            64595,
+            65842,
+            66646,
+            67426,
+            69200,
+            69299,
+            74482,
+            76962,
+            79567,
+            82504,
+            83276,
+            85881,
+            87976,
+            89819,
+            93234
+          ],
+          "differing_details": [
+            {
+              "claim_id": 854,
+              "first_differing_position": 19,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5121,
+              "first_differing_position": 11,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 5848,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 7831,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 7971,
+              "first_differing_position": 7,
+              "common_chunks": 15,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -1849,140 +1938,133 @@
             },
             {
               "claim_id": 11439,
-              "first_differing_position": 9,
-              "common_chunks": 18,
+              "first_differing_position": 12,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 13207,
-              "first_differing_position": 8,
-              "common_chunks": 19,
+              "first_differing_position": 2,
+              "common_chunks": 8,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 13383,
-              "first_differing_position": 2,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 5,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 15823,
-              "first_differing_position": 1,
-              "common_chunks": 6,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
-            },
-            {
-              "claim_id": 17676,
-              "first_differing_position": 16,
-              "common_chunks": 17,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 19145,
-              "first_differing_position": 10,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 22563,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 2
-            },
-            {
-              "claim_id": 25324,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 26799,
-              "first_differing_position": 18,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 31383,
               "first_differing_position": 8,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
+              "common_chunks": 15,
+              "gold_page_rank_reference": 5,
+              "gold_page_rank_other": 5
             },
             {
-              "claim_id": 32256,
+              "claim_id": 15195,
               "first_differing_position": 15,
               "common_chunks": 17,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 32645,
-              "first_differing_position": 3,
-              "common_chunks": 12,
+              "claim_id": 15823,
+              "first_differing_position": 1,
+              "common_chunks": 7,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 17676,
+              "first_differing_position": 20,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 34024,
-              "first_differing_position": 18,
+              "claim_id": 19145,
+              "first_differing_position": 1,
+              "common_chunks": 7,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 25324,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 26799,
+              "first_differing_position": 14,
+              "common_chunks": 16,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 31383,
+              "first_differing_position": 3,
               "common_chunks": 18,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 36003,
+              "claim_id": 32256,
+              "first_differing_position": 1,
+              "common_chunks": 14,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 32645,
               "first_differing_position": 4,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 40707,
+              "claim_id": 34024,
               "first_differing_position": 1,
-              "common_chunks": 16,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 40804,
-              "first_differing_position": 13,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 43675,
-              "first_differing_position": 1,
-              "common_chunks": 3,
+              "common_chunks": 1,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": null
             },
             {
+              "claim_id": 36003,
+              "first_differing_position": 12,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 40707,
+              "first_differing_position": 7,
+              "common_chunks": 16,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
+            },
+            {
+              "claim_id": 43675,
+              "first_differing_position": 5,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 44563,
+              "first_differing_position": 5,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
               "claim_id": 45340,
               "first_differing_position": 3,
-              "common_chunks": 18,
+              "common_chunks": 14,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 45793,
               "first_differing_position": 8,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 46127,
-              "first_differing_position": 19,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2010,84 +2092,77 @@
             },
             {
               "claim_id": 56899,
-              "first_differing_position": 16,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 61236,
-              "first_differing_position": 1,
-              "common_chunks": 8,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 62373,
-              "first_differing_position": 11,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 63422,
-              "first_differing_position": 12,
+              "first_differing_position": 8,
               "common_chunks": 18,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 64595,
+              "claim_id": 61236,
               "first_differing_position": 6,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 62373,
+              "first_differing_position": 1,
+              "common_chunks": 14,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 64595,
+              "first_differing_position": 5,
               "common_chunks": 15,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 65842,
-              "first_differing_position": 1,
-              "common_chunks": 5,
+              "first_differing_position": 14,
+              "common_chunks": 17,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 66646,
-              "first_differing_position": 8,
-              "common_chunks": 14,
+              "first_differing_position": 12,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 67426,
               "first_differing_position": 19,
-              "common_chunks": 18,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 69572,
-              "first_differing_position": 2,
+              "claim_id": 69200,
+              "first_differing_position": 7,
               "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 69299,
+              "first_differing_position": 1,
+              "common_chunks": 12,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 74482,
               "first_differing_position": 2,
-              "common_chunks": 17,
+              "common_chunks": 13,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 76962,
-              "first_differing_position": 3,
-              "common_chunks": 11,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79299,
-              "first_differing_position": 4,
+              "first_differing_position": 7,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2095,122 +2170,121 @@
             {
               "claim_id": 79567,
               "first_differing_position": 1,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 83276,
-              "first_differing_position": 1,
-              "common_chunks": 12,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 85631,
-              "first_differing_position": 13,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
-            },
-            {
-              "claim_id": 87976,
-              "first_differing_position": 2,
               "common_chunks": 17,
-              "gold_page_rank_reference": null,
-              "gold_page_rank_other": null
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
             },
             {
-              "claim_id": 89819,
+              "claim_id": 82504,
               "first_differing_position": 7,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 90340,
-              "first_differing_position": 19,
+              "claim_id": 83276,
+              "first_differing_position": 9,
               "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 85881,
+              "first_differing_position": 1,
+              "common_chunks": 0,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 87976,
+              "first_differing_position": 6,
+              "common_chunks": 11,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 89819,
+              "first_differing_position": 6,
+              "common_chunks": 15,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 93234,
-              "first_differing_position": 10,
-              "common_chunks": 17,
+              "first_differing_position": 17,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 95085,
-              "first_differing_position": 19,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 3,
-              "gold_page_rank_other": 3
             }
           ]
         },
         "m6_ef_100": {
-          "identical_sequence": 44,
-          "identical_set": 44,
+          "identical_sequence": 38,
+          "identical_set": 38,
           "differing_claims": [
-            3482,
+            854,
             5121,
             7831,
             7971,
             9154,
             11439,
             13207,
-            13383,
+            15195,
             15823,
             19145,
             25324,
             26799,
             31383,
             32256,
-            34024,
-            40804,
+            32645,
+            36003,
+            40707,
             43675,
+            44563,
             45793,
             48999,
+            50355,
+            54047,
+            56899,
             61236,
             62373,
             64595,
             65842,
             66646,
             67426,
-            69572,
-            74482,
-            79299,
+            69200,
+            69299,
+            76962,
             79567,
+            87976,
             89819,
-            90340
+            93234
           ],
           "differing_details": [
             {
-              "claim_id": 3482,
-              "first_differing_position": 1,
-              "common_chunks": 1,
+              "claim_id": 854,
+              "first_differing_position": 20,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 5121,
-              "first_differing_position": 18,
+              "first_differing_position": 11,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 7831,
-              "first_differing_position": 7,
-              "common_chunks": 17,
+              "first_differing_position": 9,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 7971,
-              "first_differing_position": 7,
+              "first_differing_position": 12,
               "common_chunks": 17,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2218,62 +2292,62 @@
             {
               "claim_id": 9154,
               "first_differing_position": 2,
-              "common_chunks": 12,
+              "common_chunks": 16,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 11439,
-              "first_differing_position": 9,
-              "common_chunks": 18,
+              "first_differing_position": 12,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 13207,
-              "first_differing_position": 8,
-              "common_chunks": 19,
+              "first_differing_position": 2,
+              "common_chunks": 8,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 13383,
-              "first_differing_position": 2,
-              "common_chunks": 14,
-              "gold_page_rank_reference": 5,
-              "gold_page_rank_other": 2
+              "claim_id": 15195,
+              "first_differing_position": 15,
+              "common_chunks": 17,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
             },
             {
               "claim_id": 15823,
-              "first_differing_position": 5,
-              "common_chunks": 14,
+              "first_differing_position": 1,
+              "common_chunks": 7,
               "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
+              "gold_page_rank_other": null
             },
             {
               "claim_id": 19145,
-              "first_differing_position": 10,
-              "common_chunks": 19,
+              "first_differing_position": 5,
+              "common_chunks": 15,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 25324,
-              "first_differing_position": 11,
-              "common_chunks": 19,
+              "first_differing_position": 7,
+              "common_chunks": 14,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 26799,
-              "first_differing_position": 20,
-              "common_chunks": 19,
+              "first_differing_position": 14,
+              "common_chunks": 18,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 31383,
-              "first_differing_position": 8,
+              "first_differing_position": 3,
               "common_chunks": 18,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2286,30 +2360,44 @@
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 34024,
-              "first_differing_position": 20,
+              "claim_id": 32645,
+              "first_differing_position": 4,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 40804,
-              "first_differing_position": 13,
+              "claim_id": 36003,
+              "first_differing_position": 12,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 40707,
+              "first_differing_position": 7,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 3,
+              "gold_page_rank_other": 3
             },
             {
               "claim_id": 43675,
-              "first_differing_position": 5,
-              "common_chunks": 13,
+              "first_differing_position": 7,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 44563,
+              "first_differing_position": 7,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 45793,
               "first_differing_position": 8,
-              "common_chunks": 18,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2321,16 +2409,37 @@
               "gold_page_rank_other": 1
             },
             {
+              "claim_id": 50355,
+              "first_differing_position": 17,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 54047,
+              "first_differing_position": 14,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 56899,
+              "first_differing_position": 8,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
               "claim_id": 61236,
-              "first_differing_position": 1,
-              "common_chunks": 9,
+              "first_differing_position": 6,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 62373,
-              "first_differing_position": 11,
-              "common_chunks": 19,
+              "first_differing_position": 1,
+              "common_chunks": 14,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2343,15 +2452,15 @@
             },
             {
               "claim_id": 65842,
-              "first_differing_position": 1,
-              "common_chunks": 5,
+              "first_differing_position": 14,
+              "common_chunks": 17,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 66646,
-              "first_differing_position": 8,
-              "common_chunks": 14,
+              "first_differing_position": 12,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2363,43 +2472,50 @@
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 69572,
-              "first_differing_position": 2,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 74482,
-              "first_differing_position": 2,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79299,
-              "first_differing_position": 4,
-              "common_chunks": 19,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 79567,
-              "first_differing_position": 1,
-              "common_chunks": 18,
-              "gold_page_rank_reference": 1,
-              "gold_page_rank_other": 1
-            },
-            {
-              "claim_id": 89819,
+              "claim_id": 69200,
               "first_differing_position": 7,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 90340,
-              "first_differing_position": 19,
+              "claim_id": 69299,
+              "first_differing_position": 1,
+              "common_chunks": 12,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 76962,
+              "first_differing_position": 7,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 79567,
+              "first_differing_position": 11,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 87976,
+              "first_differing_position": 6,
+              "common_chunks": 13,
+              "gold_page_rank_reference": null,
+              "gold_page_rank_other": null
+            },
+            {
+              "claim_id": 89819,
+              "first_differing_position": 6,
+              "common_chunks": 15,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 93234,
+              "first_differing_position": 17,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2407,10 +2523,10 @@
           ]
         },
         "m16_ef_20": {
-          "identical_sequence": 62,
-          "identical_set": 62,
+          "identical_sequence": 60,
+          "identical_set": 60,
           "differing_claims": [
-            3482,
+            854,
             7971,
             9154,
             13383,
@@ -2422,27 +2538,29 @@
             50355,
             64595,
             67426,
+            74482,
+            83276,
             89819
           ],
           "differing_details": [
             {
-              "claim_id": 3482,
-              "first_differing_position": 1,
-              "common_chunks": 0,
+              "claim_id": 854,
+              "first_differing_position": 13,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
+              "gold_page_rank_other": 1
             },
             {
               "claim_id": 7971,
               "first_differing_position": 7,
-              "common_chunks": 17,
+              "common_chunks": 15,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
               "claim_id": 9154,
-              "first_differing_position": 10,
-              "common_chunks": 18,
+              "first_differing_position": 2,
+              "common_chunks": 16,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2462,8 +2580,8 @@
             },
             {
               "claim_id": 32256,
-              "first_differing_position": 17,
-              "common_chunks": 18,
+              "first_differing_position": 19,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2476,10 +2594,10 @@
             },
             {
               "claim_id": 43675,
-              "first_differing_position": 1,
-              "common_chunks": 8,
+              "first_differing_position": 4,
+              "common_chunks": 10,
               "gold_page_rank_reference": 1,
-              "gold_page_rank_other": null
+              "gold_page_rank_other": 1
             },
             {
               "claim_id": 45340,
@@ -2490,8 +2608,8 @@
             },
             {
               "claim_id": 50355,
-              "first_differing_position": 12,
-              "common_chunks": 15,
+              "first_differing_position": 17,
+              "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2504,7 +2622,21 @@
             },
             {
               "claim_id": 67426,
-              "first_differing_position": 19,
+              "first_differing_position": 9,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 74482,
+              "first_differing_position": 5,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 83276,
+              "first_differing_position": 14,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2519,15 +2651,24 @@
           ]
         },
         "m16_ef_100": {
-          "identical_sequence": 71,
-          "identical_set": 71,
+          "identical_sequence": 69,
+          "identical_set": 69,
           "differing_claims": [
+            7971,
             32256,
             43675,
             64595,
+            83276,
             89819
           ],
           "differing_details": [
+            {
+              "claim_id": 7971,
+              "first_differing_position": 8,
+              "common_chunks": 18,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
             {
               "claim_id": 32256,
               "first_differing_position": 19,
@@ -2550,6 +2691,13 @@
               "gold_page_rank_other": 1
             },
             {
+              "claim_id": 83276,
+              "first_differing_position": 14,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
               "claim_id": 89819,
               "first_differing_position": 17,
               "common_chunks": 19,
@@ -2559,24 +2707,34 @@
           ]
         },
         "m32_ef_20": {
-          "identical_sequence": 66,
-          "identical_set": 66,
+          "identical_sequence": 63,
+          "identical_set": 63,
           "differing_claims": [
+            6419,
             7971,
             9154,
             26799,
             32256,
+            34024,
             43675,
             50355,
+            62373,
             64595,
             67426,
             74482
           ],
           "differing_details": [
             {
+              "claim_id": 6419,
+              "first_differing_position": 16,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
               "claim_id": 7971,
-              "first_differing_position": 8,
-              "common_chunks": 18,
+              "first_differing_position": 7,
+              "common_chunks": 17,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
@@ -2602,15 +2760,29 @@
               "gold_page_rank_other": 1
             },
             {
-              "claim_id": 43675,
+              "claim_id": 34024,
               "first_differing_position": 18,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             },
             {
+              "claim_id": 43675,
+              "first_differing_position": 1,
+              "common_chunks": 11,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": null
+            },
+            {
               "claim_id": 50355,
               "first_differing_position": 17,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 62373,
+              "first_differing_position": 9,
               "common_chunks": 19,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
@@ -2631,26 +2803,43 @@
             },
             {
               "claim_id": 74482,
-              "first_differing_position": 3,
-              "common_chunks": 19,
+              "first_differing_position": 6,
+              "common_chunks": 17,
               "gold_page_rank_reference": 1,
               "gold_page_rank_other": 1
             }
           ]
         },
         "m32_ef_100": {
-          "identical_sequence": 75,
-          "identical_set": 75,
-          "differing_claims": [],
-          "differing_details": []
+          "identical_sequence": 73,
+          "identical_set": 73,
+          "differing_claims": [
+            6419,
+            62373
+          ],
+          "differing_details": [
+            {
+              "claim_id": 6419,
+              "first_differing_position": 16,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            },
+            {
+              "claim_id": 62373,
+              "first_differing_position": 9,
+              "common_chunks": 19,
+              "gold_page_rank_reference": 1,
+              "gold_page_rank_other": 1
+            }
+          ]
         }
       },
-      "identical_in_all": 24,
+      "identical_in_all": 28,
       "differing_claims_any": [
         854,
-        3482,
-        4212,
         5121,
+        5848,
         6419,
         7831,
         7971,
@@ -2658,10 +2847,10 @@
         11439,
         13207,
         13383,
+        15195,
         15823,
         17676,
         19145,
-        22563,
         25324,
         26799,
         31383,
@@ -2670,34 +2859,31 @@
         34024,
         36003,
         40707,
-        40804,
         43675,
+        44563,
         45340,
         45793,
-        46127,
         48999,
         50355,
         54047,
         56899,
         61236,
         62373,
-        63422,
         64595,
         65842,
         66646,
         67426,
-        69572,
+        69200,
+        69299,
         74482,
         76962,
-        79299,
         79567,
+        82504,
         83276,
-        85631,
+        85881,
         87976,
         89819,
-        90340,
-        93234,
-        95085
+        93234
       ]
     }
   }

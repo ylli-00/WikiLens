@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_overfetch50_history
 
-Generated 2026-09-22T01:41:17+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-10-21T22:44:44+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -11,7 +11,7 @@ Generated 2026-09-22T01:41:17+00:00. 75 claims; 66 with a sentence-only evidence
 | repeats | 5 |
 | strategy | overfetch |
 | overfetch | 50 |
-| filters | {"min_words": null, "max_words": null, "heading_like": "%History%", "path_like": null, "linked_from": null, "links_to": null, "titles": null} |
+| filters | {"min_words": null, "max_words": null, "heading_like": "%History%", "path_like": null, "linked_from": null, "links_to": null, "titles": null, "category": null, "edited_since": null, "edited_before": null} |
 | claim_filters | - |
 | ef_search | 100 |
 | ef_search_source | argument |
@@ -28,7 +28,7 @@ Generated 2026-09-22T01:41:17+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | filters |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 7.2 |
+| eval_seconds | 6.3 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -42,26 +42,28 @@ Generated 2026-09-22T01:41:17+00:00. 75 claims; 66 with a sentence-only evidence
 | chunk_words_p95 | 238.0 |
 | chunk_words_max | 240 |
 | filter_ground_truth | {"filter": {"heading_like": "%History%"}, "n_chunks": 4598, "n_chunks_passing": 117, "n_pages_passing": 66, "claims_gold_page_excluded": 37, "claims_gold_page_excluded_ids": [3482, 5753, 5848, 6419, 11910, 13207, 14253, 14727, 14909, 17676, 22563, 25324, 28863, 30562, 31383, 40707, 42937, 45793, 46127, 48999, 54047, 56899, 63422, 64595, 65842, 66646, 69572, 76756, 82504, 82761, 85631, 85881, 89819, 90340, 93212, 94092, 95085], "article_recall_ceiling": 38, "n_claims": 75, "evidence_recall_ceiling": 0, "n_evidence_claims": 66} |
-| short_results | {"1": {"queries_short_of_k": 38, "queries_with_no_rows": 38, "rows_min": 0, "rows_mean": 0.49, "short_claim_ids": [5753, 5848, 6419, 7831, 9154, 11235, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 19145, 22563, 28863, 31383, 40707, 40804, 42937, 46127, 48999, 62373, 64595, 65842, 66646, 69200, 74482, 79567, 82761, 84120, 85631, 85881, 90340, 93212, 93234, 94092, 95085]}, "3": {"queries_short_of_k": 30, "queries_with_no_rows": 10, "rows_min": 0, "rows_mean": 2.2, "short_claim_ids": [2835, 5753, 5848, 11235, 11910, 13207, 14253, 14909, 15195, 19145, 30562, 36003, 40804, 43675, 48999, 62373, 64595, 65842, 66646, 69299, 74482, 76756, 79567, 82761, 85631, 85881, 90340, 93212, 93234, 95085]}, "5": {"queries_short_of_k": 26, "queries_with_no_rows": 2, "rows_min": 0, "rows_mean": 4.12, "short_claim_ids": [854, 2835, 5753, 5848, 11235, 11910, 13207, 14253, 14727, 14909, 19145, 40804, 43675, 48999, 50355, 65842, 66646, 69299, 74482, 76756, 79567, 85631, 90340, 93212, 93234, 95085]}, "10": {"queries_short_of_k": 20, "queries_with_no_rows": 0, "rows_min": 2, "rows_mean": 9.13, "short_claim_ids": [854, 2835, 5848, 13207, 14727, 14909, 15823, 19145, 40804, 43675, 48999, 50355, 65842, 66646, 69299, 74482, 85631, 90340, 93234, 95085]}, "20": {"queries_short_of_k": 9, "queries_with_no_rows": 0, "rows_min": 9, "rows_mean": 19.36, "short_claim_ids": [13207, 15823, 40804, 43675, 50355, 65842, 69299, 90340, 93234]}} |
+| short_results | {"1": {"queries_short_of_k": 38, "queries_with_no_rows": 38, "rows_min": 0, "rows_mean": 0.49, "short_claim_ids": [5753, 5848, 6419, 7831, 9154, 11235, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 19145, 22563, 28863, 31383, 40707, 40804, 42937, 46127, 48999, 62373, 64595, 65842, 66646, 69200, 74482, 79567, 82761, 84120, 85631, 85881, 90340, 93212, 93234, 94092, 95085]}, "3": {"queries_short_of_k": 30, "queries_with_no_rows": 10, "rows_min": 0, "rows_mean": 2.2, "short_claim_ids": [2835, 5753, 5848, 11235, 11910, 13207, 14253, 14909, 15195, 19145, 30562, 36003, 40804, 43675, 48999, 62373, 64595, 65842, 66646, 69299, 74482, 76756, 79567, 82761, 85631, 85881, 90340, 93212, 93234, 95085]}, "5": {"queries_short_of_k": 26, "queries_with_no_rows": 2, "rows_min": 0, "rows_mean": 4.12, "short_claim_ids": [854, 2835, 5753, 5848, 11235, 11910, 13207, 14253, 14727, 14909, 19145, 40804, 43675, 48999, 50355, 65842, 66646, 69299, 74482, 76756, 79567, 85631, 90340, 93212, 93234, 95085]}, "10": {"queries_short_of_k": 20, "queries_with_no_rows": 0, "rows_min": 2, "rows_mean": 9.15, "short_claim_ids": [854, 2835, 5848, 13207, 14727, 14909, 15823, 19145, 40804, 43675, 48999, 50355, 65842, 66646, 69299, 74482, 85631, 90340, 93234, 95085]}, "20": {"queries_short_of_k": 9, "queries_with_no_rows": 0, "rows_min": 9, "rows_mean": 19.36, "short_claim_ids": [13207, 15823, 40804, 43675, 50355, 65842, 69299, 90340, 93234]}} |
 
 ## Ingest parameters (ingest_meta)
 
 | Key | Value |
 |---|---|
-| analyze_seconds | 0.009 |
-| analyze_tables | chunk,page,section,link |
+| analyze_seconds | 0.010 |
+| analyze_tables | chunk,page,section,link,category,page_category |
 | chunk_max_words | 240 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
 | corpus_dir | data/corpus |
+| corpus_page_meta_sha256 | 9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | true |
+| embedding_revision | 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a |
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-09-22T01:40:31+00:00 |
+| ingested_at | 2026-10-21T22:44:02+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -70,7 +72,7 @@ Generated 2026-09-22T01:41:17+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-31-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
@@ -80,7 +82,7 @@ Generated 2026-09-22T01:41:17+00:00. 75 claims; 66 with a sentence-only evidence
 | python | 3.12.3 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
-| PyMySQL | 1.2.0 |
+| PyMySQL | 1.2.3 |
 | numpy | 2.5.3 |
 | torch | 2.14.0 |
 | sentence-transformers | 6.0.1 |
@@ -91,8 +93,8 @@ A claim counts when a gold page is among the pages of its first k chunks.
 
 | k | claims recalled | of | article recall |
 |---|---|---|---|
-| 1 | 21 | 75 | 0.280 |
-| 3 | 24 | 75 | 0.320 |
+| 1 | 19 | 75 | 0.253 |
+| 3 | 23 | 75 | 0.307 |
 | 5 | 25 | 75 | 0.333 |
 | 10 | 25 | 75 | 0.333 |
 | 20 | 25 | 75 | 0.333 |
@@ -127,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 1.17 | 1.47 | 1.19 | 0.86 | 2.04 |
-| 3 | 375 | 1.50 | 1.84 | 1.50 | 1.04 | 2.49 |
-| 5 | 375 | 1.90 | 2.23 | 1.86 | 1.16 | 3.32 |
-| 10 | 375 | 2.76 | 3.28 | 2.76 | 1.98 | 4.86 |
-| 20 | 375 | 4.23 | 5.15 | 4.30 | 3.18 | 7.38 |
+| 1 | 375 | 0.86 | 1.09 | 0.87 | 0.53 | 1.89 |
+| 3 | 375 | 1.18 | 1.42 | 1.17 | 0.71 | 2.23 |
+| 5 | 375 | 1.51 | 1.89 | 1.52 | 0.92 | 2.92 |
+| 10 | 375 | 2.37 | 2.81 | 2.38 | 1.56 | 5.11 |
+| 20 | 375 | 3.75 | 4.55 | 3.82 | 2.84 | 7.37 |
 
 ## Query embedding latency (ms)
 
@@ -139,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.70 | 4.82 | 4.70 | 4.57 | 5.06 |
+| 375 | 4.68 | 4.76 | 4.68 | 4.55 | 4.92 |
 
 ## Claims with the worst rank of their gold page
 
@@ -158,11 +160,11 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 | 11910 | SUPPORTS | Jimmy Carter | not in top k | not in top k | Jimmy Carter won the 1980 New Hampshire Primary vote, but lost the Presidential |
 | 13207 | REFUTES | The Hunger Games (film) | not in top k | not in top k | Leigha Hancock appeared in The Hunger Games (2012), which Gary Valenciano direct |
 
-Claims whose LIMIT k hits were not the first k of LIMIT max_k, per k: {"1": 38, "3": 30, "5": 27, "10": 21}.
+Claims whose LIMIT k hits were not the first k of LIMIT max_k, per k: {"1": 38, "3": 30, "5": 27, "10": 22}.
 
 ## Notes
 
 - article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.
-- Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.
+- Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.
 - sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.
 - embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call.

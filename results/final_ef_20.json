@@ -34,7 +34,7 @@
       "use_prefix": true,
       "label": "240 words, overlap 1, M=16, prefix on"
     },
-    "eval_seconds": 3.4,
+    "eval_seconds": 2.8,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -57,7 +57,7 @@
         "use_prefix": true,
         "label": "240 words, overlap 1, M=16, prefix on"
       },
-      "ingested_at": "2026-09-22T01:41:38+00:00",
+      "ingested_at": "2026-10-21T22:45:05+00:00",
       "counts": {
         "n_pages": 100,
         "n_sections": 3173,
@@ -71,16 +71,19 @@
         "n_claims": 75,
         "n_evidence": 114,
         "n_evidence_page_resolved": 114,
-        "n_evidence_sentence_resolved": 87
+        "n_evidence_sentence_resolved": 87,
+        "n_pages_with_meta": 100,
+        "n_categories": 1005,
+        "n_page_categories": 1123
       },
       "seconds": {
-        "schema": 0.1,
-        "parse": 0.84,
-        "embed": 16.55,
-        "load": 3.58,
-        "resolve": 0.0,
+        "schema": 0.13,
+        "parse": 0.87,
+        "embed": 16.95,
+        "load": 3.3,
+        "resolve": 0.01,
         "analyze": 0.01,
-        "total": 21.14
+        "total": 21.32
       },
       "n_units_hatnote": 1316,
       "chunk_words_mean": 156.6,
@@ -97,26 +100,28 @@
     }
   },
   "ingest_meta": {
-    "analyze_seconds": "0.008",
-    "analyze_tables": "chunk,page,section,link",
+    "analyze_seconds": "0.010",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
     "chunk_max_words": "240",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
     "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
     "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
     "embedding_dim": "384",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-09-22T01:41:38+00:00",
+    "ingested_at": "2026-10-21T22:45:05+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
@@ -128,7 +133,7 @@
     "python": "3.12.3",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
-    "PyMySQL": "1.2.0",
+    "PyMySQL": "1.2.3",
     "numpy": "2.5.3",
     "torch": "2.14.0",
     "sentence-transformers": "6.0.1"
@@ -145,11 +150,11 @@
       "unit_coverage": 0.595959595959596,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6010249999235384,
-        "p95_ms": 0.8171687000867679,
-        "mean_ms": 0.6209452373417056,
-        "min_ms": 0.4655309994632262,
-        "max_ms": 1.8050939997920068
+        "p50_ms": 0.3819680005108239,
+        "p95_ms": 0.6580061002750882,
+        "mean_ms": 0.3950257573208849,
+        "min_ms": 0.2248760010843398,
+        "max_ms": 0.9188499989249976
       }
     },
     {
@@ -161,11 +166,11 @@
       "unit_coverage": 0.8080808080808081,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.5913960003454122,
-        "p95_ms": 0.8458313998744416,
-        "mean_ms": 0.6047922239934754,
-        "min_ms": 0.4411899999468005,
-        "max_ms": 1.7181590001200675
+        "p50_ms": 0.37653299841622356,
+        "p95_ms": 0.5956034998234829,
+        "mean_ms": 0.3676349892872774,
+        "min_ms": 0.22711800011165906,
+        "max_ms": 0.9865709998848615
       }
     },
     {
@@ -177,11 +182,11 @@
       "unit_coverage": 0.8522727272727273,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.6226670002433821,
-        "p95_ms": 0.8711039998161142,
-        "mean_ms": 0.6240596746477726,
-        "min_ms": 0.4447510000318289,
-        "max_ms": 1.7055879998224555
+        "p50_ms": 0.39424299939128105,
+        "p95_ms": 0.6051868000213291,
+        "mean_ms": 0.38298140532181907,
+        "min_ms": 0.23356500059890095,
+        "max_ms": 0.8907939991331659
       }
     },
     {
@@ -193,11 +198,11 @@
       "unit_coverage": 0.9166666666666666,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.686317000145209,
-        "p95_ms": 0.870718799524184,
-        "mean_ms": 0.6958996426789478,
-        "min_ms": 0.5167509998500464,
-        "max_ms": 1.7626389999350067
+        "p50_ms": 0.4511279985308647,
+        "p95_ms": 0.7038582009045059,
+        "mean_ms": 0.44985910133982543,
+        "min_ms": 0.28779399872291833,
+        "max_ms": 1.1041669986298075
       }
     },
     {
@@ -209,21 +214,21 @@
       "unit_coverage": 0.9848484848484849,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.8298909997392911,
-        "p95_ms": 1.0224786000435415,
-        "mean_ms": 0.8424791813231423,
-        "min_ms": 0.6253499996091705,
-        "max_ms": 2.0634310003515566
+        "p50_ms": 0.573568000618252,
+        "p95_ms": 0.9258066997062999,
+        "mean_ms": 0.5832351759260442,
+        "min_ms": 0.37703899943153374,
+        "max_ms": 1.322214999163407
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.672936999668309,
-    "p95_ms": 4.819940199831763,
-    "mean_ms": 4.687387143950521,
-    "min_ms": 4.540742000244791,
-    "max_ms": 5.5802089991630055
+    "p50_ms": 4.595722000885871,
+    "p95_ms": 4.794288000084634,
+    "mean_ms": 4.619586672013004,
+    "min_ms": 4.444553998837364,
+    "max_ms": 5.8179480001854245
   },
   "claims": [
     {
@@ -550,30 +555,30 @@
         "Kabul"
       ],
       "eligible": true,
-      "gold_page_rank": 2,
-      "evidence_rank": 11,
+      "gold_page_rank": 3,
+      "evidence_rank": 15,
       "unit_coverage": 1.0,
       "hit_chunk_ids": [
         961,
+        1204,
         3904,
         3918,
         3903,
+        1216,
+        1217,
         923,
         3930,
         3926,
         3931,
         3921,
+        3166,
         3919,
         3920,
         3925,
         3928,
         3917,
         3907,
-        946,
-        925,
-        991,
-        3906,
-        3909
+        946
       ]
     },
     {
@@ -818,7 +823,7 @@
         4562,
         3993,
         3151,
-        3163
+        3311
       ]
     },
     {
@@ -1232,13 +1237,13 @@
         1959,
         2416,
         1950,
-        3185,
         1962,
         365,
         2705,
         2426,
         2417,
-        1958
+        1958,
+        2413
       ]
     },
     {
@@ -1300,7 +1305,6 @@
         1293,
         889,
         896,
-        1355,
         902,
         719,
         909,
@@ -1308,7 +1312,8 @@
         1676,
         1304,
         717,
-        922
+        922,
+        1158
       ]
     },
     {
@@ -1776,7 +1781,7 @@
       ],
       "eligible": true,
       "gold_page_rank": 1,
-      "evidence_rank": 18,
+      "evidence_rank": 19,
       "unit_coverage": 1.0,
       "hit_chunk_ids": [
         3588,
@@ -1790,6 +1795,7 @@
         4218,
         1284,
         1813,
+        1864,
         4217,
         3594,
         3617,
@@ -1797,8 +1803,7 @@
         4180,
         3589,
         3585,
-        3615,
-        1282
+        3615
       ]
     },
     {
@@ -2235,10 +2240,10 @@
       "unit_coverage": 1.0,
       "hit_chunk_ids": [
         4330,
+        4331,
         4334,
         4333,
         4332,
-        4335,
         3469,
         3585,
         3617,
@@ -2627,6 +2632,7 @@
         3458,
         1997,
         3030,
+        243,
         2123,
         3031,
         3159,
@@ -2637,8 +2643,7 @@
         3456,
         3043,
         3170,
-        3474,
-        806
+        3474
       ]
     },
     {
@@ -2861,9 +2866,9 @@
   },
   "notes": [
     "article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.",
-    "Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.",
+    "Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.",
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-09-22T01:41:46+00:00"
+  "created_at": "2026-10-21T22:45:11+00:00"
 }

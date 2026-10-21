@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_overfetch10_minwords1000
 
-Generated 2026-09-22T01:40:45+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-10-21T22:44:14+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -11,7 +11,7 @@ Generated 2026-09-22T01:40:45+00:00. 75 claims; 66 with a sentence-only evidence
 | repeats | 5 |
 | strategy | overfetch |
 | overfetch | 10 |
-| filters | {"min_words": 1000, "max_words": null, "heading_like": null, "path_like": null, "linked_from": null, "links_to": null, "titles": null} |
+| filters | {"min_words": 1000, "max_words": null, "heading_like": null, "path_like": null, "linked_from": null, "links_to": null, "titles": null, "category": null, "edited_since": null, "edited_before": null} |
 | claim_filters | - |
 | ef_search | 100 |
 | ef_search_source | argument |
@@ -28,7 +28,7 @@ Generated 2026-09-22T01:40:45+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | filters |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 4.2 |
+| eval_seconds | 3.5 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -48,20 +48,22 @@ Generated 2026-09-22T01:40:45+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Key | Value |
 |---|---|
-| analyze_seconds | 0.009 |
-| analyze_tables | chunk,page,section,link |
+| analyze_seconds | 0.010 |
+| analyze_tables | chunk,page,section,link,category,page_category |
 | chunk_max_words | 240 |
 | chunk_overlap_units | 1 |
 | corpus_claims_sha256 | a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac |
 | corpus_dir | data/corpus |
+| corpus_page_meta_sha256 | 9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff |
 | corpus_pages_sha256 | edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc |
 | embedding_dim | 384 |
 | embedding_model | BAAI/bge-small-en-v1.5 |
 | embedding_prefix | true |
+| embedding_revision | 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a |
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-09-22T01:40:31+00:00 |
+| ingested_at | 2026-10-21T22:44:02+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -70,7 +72,7 @@ Generated 2026-09-22T01:40:45+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-31-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
@@ -80,7 +82,7 @@ Generated 2026-09-22T01:40:45+00:00. 75 claims; 66 with a sentence-only evidence
 | python | 3.12.3 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
-| PyMySQL | 1.2.0 |
+| PyMySQL | 1.2.3 |
 | numpy | 2.5.3 |
 | torch | 2.14.0 |
 | sentence-transformers | 6.0.1 |
@@ -127,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.80 | 1.26 | 0.87 | 0.57 | 1.52 |
-| 3 | 375 | 0.82 | 1.27 | 0.88 | 0.58 | 1.78 |
-| 5 | 375 | 0.85 | 1.31 | 0.92 | 0.60 | 1.81 |
-| 10 | 375 | 1.00 | 1.56 | 1.06 | 0.72 | 2.09 |
-| 20 | 375 | 1.33 | 2.02 | 1.42 | 1.08 | 2.87 |
+| 1 | 375 | 0.55 | 0.98 | 0.59 | 0.35 | 1.36 |
+| 3 | 375 | 0.55 | 0.97 | 0.59 | 0.34 | 1.66 |
+| 5 | 375 | 0.58 | 1.01 | 0.62 | 0.37 | 2.04 |
+| 10 | 375 | 0.71 | 1.28 | 0.76 | 0.46 | 2.01 |
+| 20 | 375 | 1.05 | 1.78 | 1.11 | 0.80 | 2.50 |
 
 ## Query embedding latency (ms)
 
@@ -139,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.67 | 4.76 | 4.67 | 4.56 | 5.20 |
+| 375 | 4.58 | 4.75 | 4.60 | 4.46 | 5.65 |
 
 ## Claims with the worst rank of their gold page
 
@@ -161,6 +163,6 @@ Rank within the first 20 chunks; "not in top k" means no chunk of a gold page wa
 ## Notes
 
 - article_recall = article_hits / n_claims; evidence_recall = evidence_hits / n_evidence_claims (claims with a sentence-only evidence set whose units all resolved); unit_coverage = mean over the same claims of the best share of a set's units covered.
-- Ranking: the first k hits of the LIMIT max_k search of each claim, in the order search() returned them.
+- Ranking: the metrics at k use the hits of the LIMIT k search of each claim (first timed pass), in the order search() returned them; the per-claim ranks use the LIMIT max_k search.
 - sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.
 - embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call.
