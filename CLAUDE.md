@@ -16,6 +16,9 @@ recall/latency harness, the experiment protocol (`scripts/run_experiments.py`, `
 with the title prefix, index M=16, `mhnsw_ef_search` 100 per query, strategy `inline` for filtered
 queries. The corpus is the 100 pages / 75 claims described below; the decisions of 2026-09-16/17 stand.
 
+- **Status (2026-10-21):**
+  - The brief asks for articles "from dumps.wikimedia.org or the MediaWiki API" and for "a small ground-truth set — questions whose correct source article you already know" (see "The MariaDB brief"). Whether FEVEROUS may serve as the ground truth is an open question to the organizers; the owner drafted the email on 2026-10-21.
+  - Meanwhile "Phase 0" runs on the 100-page corpus: check the vector scores, and add category and edit-date filters from the MediaWiki API (each page's December 2020 revision). Then add a transaction demo, rerun the experiments, and rewrite the README. The organizers give a preliminary grade by running the evaluation prompt.
 - **Owner's decision (2026-09-22):** the results in `results/` and the README are drafts. The claim set of the current corpus is a development set; the benchmark claims are picked in the next phase, and the README is rewritten with those results.
 - **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus (the
   inline filtered statement's cost grows with the table and is the number to watch), then run and
@@ -29,11 +32,20 @@ queries. The corpus is the 100 pages / 75 claims described below; the decisions 
 
 ## The MariaDB brief
 
-- MariaDB 11.8 LTS ships a native `VECTOR` type with HNSW indexing and SIMD acceleration; the index lives inside the transactional database.
-- Take Wikipedia articles, chunk the text, embed the chunks, and store the vectors next to the article metadata with a `VECTOR INDEX`. Query with `VEC_DISTANCE_COSINE`.
-- Constrain the semantic search with SQL in the same statement - only articles in a category, longer than a length, edited since a date, linked from another article - and join the results back to relational tables.
-- Document with reasoning: chunk size and overlap, the embedding model and why, the index parameters.
-- Build a ground-truth set so that "it works well" becomes a number: recall and latency.
+Area 4, verbatim from the page (checked 2026-10-21; the page was last modified 2026-09-30). An earlier summary here left out the dumps.wikimedia.org / MediaWiki API wording, although September session logs show it was on the page then too.
+
+> The project. Build retrieval over Wikipedia. Take a set of articles from dumps.wikimedia.org or the MediaWiki API — one category, one subject area, or a few hundred articles you find interesting — chunk the text, embed the chunks, and store the vectors next to the article metadata with a VECTOR INDEX over them. Query with VEC_DISTANCE_COSINE.
+> Then do the thing a dedicated vector database cannot: constrain the semantic search with ordinary SQL in the same statement — only articles in this category, longer than this, edited since that date, linked from that other article — and join the results back to your relational tables, transactionally consistent with the vectors.
+> Note. The decisions worth documenting are chunk size and overlap, the embedding model and why you chose it, and the index parameters. Build a small ground-truth set — questions whose correct source article you already know — so that "it works well" becomes a number.
+
+Area criteria, verbatim, with the grading criterion each counts toward:
+- a `VECTOR` column with an index over a real Wikipedia corpus, queried with `VEC_DISTANCE_COSINE` (depth)
+- semantic search and ordinary SQL predicates in the same statement, joined back to relational tables (depth)
+- recall and latency against a ground-truth set you built, not adjectives (execution)
+- chunk size, embedding model and index parameters stated, with the reasoning (execution)
+- an ingest that runs from the README and a query interface a reader can try (usability)
+- what the database-native approach gave you that a separate vector store would not (documentation)
+
 - Vector docs: https://mariadb.com/docs/server/reference/sql-structure/vectors (`VECTOR` from 11.7.1; `VECTOR INDEX` takes `M` and `DISTANCE` = euclidean or cosine). Check syntax against these docs for the installed version.
 
 ## Grading (four areas, 0-10 each, equal weight)
@@ -45,16 +57,22 @@ queries. The corpus is the 100 pages / 75 claims described below; the decisions 
 | Execution | Recall and latency against our ground-truth set; chunk size, embedding model and index parameters stated with reasoning |
 | Usability | An ingest that runs from the README, and a query interface a reader can try |
 
-The brief's evaluation prompt, at the end of the brief page, also scores code quality. Each of these costs a point: hardcoded credentials, SQL built by string interpolation, debug mode left on, empty test files presented as tests, a schema that disagrees with the code. Setup as one documented command scores higher. Run that prompt on the repository before submitting.
+The brief's evaluation prompt is at the end of the brief page (prompt "last updated 2026-09-04"; checked 2026-10-21). Run it on the repository before submitting; the organizers use it for grading.
+- It also scores code quality. Each of these costs a point: hardcoded credentials, SQL built by string interpolation, debug mode left on, empty test files presented as tests, a schema that disagrees with the code.
+- Setup as one documented command scores higher.
+- Documentation levels: 5-6 needs what the project is and what it found, the data model, and install, run and reproduce (requirements, MariaDB setup, loading the data, version). 7-8 adds screenshots, charts or tables that show the result. 9-10 adds how it was made (architecture or method), the schema design reasoned about, and the team behind it.
+- MariaDB depth: 9-10 means "taken past what the area asked for - into its limits, its failure modes, or its interaction with the rest of the server". The grader reads the area's linked MariaDB docs (Vectors) to judge how much of the feature was used.
 
 ## Submission rules
 
+"What to hand in", from the brief page (checked 2026-10-21):
 - Public GitHub repository, code on `main`, `README.md` at the root.
-- The first line of `README.md` names the area and links back to the brief (wording from the brief page, checked 2026-09-17):
+- The first line of `README.md` names the area and links back to the brief:
   `A project for area 4, "Vector search and RAG, natively" for the [MariaDB student database projects, 2026-09](https://mariadb.org/bachelor_hackathon_2026-09/).`
-- Include schema documentation, setup instructions and how to reproduce the results.
-- State the MariaDB version developed against (preview releases are fine).
+- MariaDB throughout. State the version developed against (preview releases are fine).
 - Data is either in the repository or fetched by a documented, repeatable step.
+- The README documents what the project is and what you found; the data model (the schema and the reasoning behind it); how to run or reproduce it, including requirements, MariaDB setup and loading the data; how it was made (the architecture if you built something, the method if you measured something) with the screenshots, charts or tables that show it; and the team behind it.
+- The write-up's key results belong in the README itself. Full reports (`results/SUMMARY.md`, `docs/DESIGN.md`) are linked from it.
 
 ## Plan
 
@@ -117,7 +135,12 @@ Not chosen:
 
 ### Wikipedia pages
 
-- **`feverous-wiki-pages-db.zip`:** 10.4 GB, containing one SQLite file, `feverous_wikiv1.db`, of 53.5 GB (a December 2020 version of Wikipedia, full articles). Not downloaded and not needed in the current phase.
+- **`feverous-wiki-pages-db.zip`:** 10.4 GB, containing one SQLite file, `feverous_wikiv1.db`, of 53.5 GB (a December 2020 version of Wikipedia, full articles).
+  - Unpacked on 2026-10-21 onto the Windows partition: `/mnt/windows/Users/yllir/Desktop/Projects/WikiLense/wikilense-linux/data/feverous/feverous_wikiv1.db`. Owner's decision: it stays there and is not copied to Linux (see "Working rules").
+  - Schema `wiki (id PRIMARY KEY, data json)`; `data` is the same page object as in the shards. Open it read-only (`sqlite3.connect("file:...?mode=ro", uri=True)`).
+  - Ids and text are stored NFD (decomposed). The first 2,000 pages of `wiki_000` equal the shard pages after NFC-normalising both. Look titles up in NFD and normalise what comes back to NFC.
+  - Random 100-page sample, plus three pages read by hand (2026-10-21): no category, edit-date or revision data anywhere. The pages end before "See also" content, references and the category box. All 100 pages have links, and 85.7% of the 2,550 link targets are pages in the DB.
+  - Category and edit date can come from the MediaWiki API: the revision live at the end of December 2020 matches the FEVEROUS text (Albert Einstein: 466 of 484 sentence probes, against 260 for today's page). Its timestamp is the edit date, and its `[[Category:...]]` lines are the categories. Pages edited during December 2020 need a text match to pick the revision, and moved pages need the move log.
 - **`feverous-wiki-pages.zip`:** 9.9 GB, holding the pages as 544 JSONL shards (`FeverousWikiv1/wiki_NNN.jsonl`, 6.7–44.4 MB compressed each, 49.3 GB unpacked in total).
   - The shard numbers run from 000 to 610 with gaps, so take names from `--list`.
   - `scripts/fetch_wiki_shard.py` downloads a single shard with HTTP range requests, without downloading the whole archive, and checks its CRC.
@@ -127,7 +150,7 @@ Not chosen:
   - No other keys: no category, edit-date or revision fields.
   - No paragraph unit (1 of 514,984 sentences contains a newline), so chunks are built from consecutive sentences.
   - Hyperlinks are kept inline as `[[Target_title|shown text]]` (e.g. `[[Aare_(given_name)|Aare (given name)]]`): 755,380 links on 9,989 pages. Of these, 446,271 are in sentences, 141,596 in tables and 167,513 in lists. A link table has to read all three.
-- The paper (Sec 7.7) says a date stamp was kept for each scraped page, but it is not in the shard's page objects.
+- The paper (Sec 7.7) says the pages were scraped from Wikipedia with Scrapy and a date stamp was kept for each page, but the stamp is in neither the shards nor the DB.
 - Reader classes in the official repo: `FeverousDB` (`src/feverous/database/feverous_db.py`) and `WikiPage` (`src/feverous/utils/wiki_page.py`).
 
 ## Open decisions
@@ -138,7 +161,8 @@ Current phase (provisional values are allowed, see "Current phase"):
 - How the README ingest gets the page subset: fetch the needed shard(s) with `scripts/fetch_wiki_shard.py` (`wiki_000` is a 44.4 MB download) and extract the pages, or commit the extracted subset (the 54 evidence pages are about 4.0 MB) to the repository.
 
 Next phase:
-- Source of category and edit-date metadata for the SQL filters.
+- Source of category and edit-date metadata for the SQL filters: the MediaWiki API, each page's December 2020 revision (Phase 0, 2026-10-21).
+- Whether FEVEROUS may be the ground truth, or a hand-built question set is required: waiting for the organizers' reply.
 - The final claim set and corpus size.
 
 ## Existing files
@@ -163,6 +187,12 @@ Next phase:
 ## Working rules
 
 - Development happens on Ubuntu. Keep data and the MariaDB data directory on the Ubuntu (ext4) partition.
+  - Exception (owner's decision, 2026-10-21): the 53.5 GB `feverous_wikiv1.db` stays on the Windows partition and is not copied to Linux.
+  - `/etc/fstab` mounts that partition at boot at `/mnt/windows` (ntfs-3g, `nofail`; it mounts read-only by itself if Windows is hibernated).
+- Wikipedia API (Wikimedia Robot Policy, edited 2026-03-16; checked 2026-10-21): it is free.
+  - Unauthenticated Action API: one request at a time and below 5 requests per second. With a logged-in account: 3 at a time and 10 per second.
+  - Send a User-Agent with the repository URL as contact. Never put the owner's email in it.
+  - Send `Accept-Encoding: gzip`, respect `Retry-After` on HTTP 429, use `maxlag`, and wait 5 s after any request that took over 1 s.
 - Machine: i9-13900H, 16 GB RAM, RTX 4060 Laptop GPU with 8 GB.
 - MariaDB must be 11.7.1 or newer for `VECTOR` (the brief targets 11.8 LTS).
   - Ubuntu's own `mariadb-server` package is 10.6 on 22.04 and 10.11 on 24.04, neither of which has `VECTOR`; it is 11.8 on 25.10 and 26.04 (packages.ubuntu.com, checked 2026-09-17).
