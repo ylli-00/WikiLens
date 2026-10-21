@@ -1,7 +1,7 @@
 {
   "name": "uncommitted_recall",
   "group": "uncommitted",
-  "created_at": "2026-10-21T22:46:34+00:00",
+  "created_at": "2026-10-21T23:33:10+00:00",
   "k": 10,
   "efs": [
     20,
@@ -30,47 +30,47 @@
           "queries": 75,
           "rows_left_after_rollback": 0,
           "insert_seconds": {
-            "uncommitted": 1.454,
-            "committed": 1.346
+            "uncommitted": 1.448,
+            "committed": 1.413
           },
           "uncommitted": {
             "20": {
-              "mean_overlap": 0.972,
-              "min_overlap": 0.5,
-              "p50_ms": 0.129,
-              "p95_ms": 0.274
+              "mean_overlap": 0.9733,
+              "min_overlap": 0.6,
+              "p50_ms": 0.145,
+              "p95_ms": 0.22
             },
             "100": {
-              "mean_overlap": 0.972,
-              "min_overlap": 0.5,
-              "p50_ms": 0.162,
-              "p95_ms": 0.171
+              "mean_overlap": 0.9733,
+              "min_overlap": 0.6,
+              "p50_ms": 0.72,
+              "p95_ms": 0.955
             },
             "400": {
-              "mean_overlap": 0.972,
-              "min_overlap": 0.5,
-              "p50_ms": 0.228,
-              "p95_ms": 0.234
+              "mean_overlap": 0.9733,
+              "min_overlap": 0.6,
+              "p50_ms": 0.826,
+              "p95_ms": 1.119
             }
           },
           "committed": {
             "20": {
-              "mean_overlap": 0.9933,
-              "min_overlap": 0.5,
-              "p50_ms": 0.474,
-              "p95_ms": 1.509
+              "mean_overlap": 0.9867,
+              "min_overlap": 0.7,
+              "p50_ms": 0.678,
+              "p95_ms": 1.039
             },
             "100": {
               "mean_overlap": 1.0,
               "min_overlap": 1.0,
-              "p50_ms": 0.221,
-              "p95_ms": 0.284
+              "p50_ms": 1.209,
+              "p95_ms": 1.436
             },
             "400": {
               "mean_overlap": 1.0,
               "min_overlap": 1.0,
-              "p50_ms": 0.629,
-              "p95_ms": 1.13
+              "p50_ms": 1.23,
+              "p95_ms": 1.766
             }
           }
         },
@@ -79,96 +79,96 @@
           "queries": 75,
           "rows_left_after_rollback": 0,
           "insert_seconds": {
-            "uncommitted": 1.458,
-            "committed": 1.328
+            "uncommitted": 1.414,
+            "committed": 1.342
           },
           "uncommitted": {
             "20": {
+              "mean_overlap": 0.98,
+              "min_overlap": 0.5,
+              "p50_ms": 0.229,
+              "p95_ms": 0.283
+            },
+            "100": {
+              "mean_overlap": 0.98,
+              "min_overlap": 0.5,
+              "p50_ms": 0.278,
+              "p95_ms": 0.421
+            },
+            "400": {
+              "mean_overlap": 0.98,
+              "min_overlap": 0.5,
+              "p50_ms": 0.787,
+              "p95_ms": 1.189
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.9867,
+              "min_overlap": 0.5,
+              "p50_ms": 0.609,
+              "p95_ms": 0.88
+            },
+            "100": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 0.624,
+              "p95_ms": 0.92
+            },
+            "400": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 0.702,
+              "p95_ms": 1.011
+            }
+          }
+        },
+        {
+          "rows": 4598,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 1.424,
+            "committed": 1.366
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.9627,
+              "min_overlap": 0.3,
+              "p50_ms": 0.946,
+              "p95_ms": 1.243
+            },
+            "100": {
               "mean_overlap": 0.9653,
-              "min_overlap": 0.6,
-              "p50_ms": 0.137,
-              "p95_ms": 0.383
-            },
-            "100": {
-              "mean_overlap": 0.9693,
-              "min_overlap": 0.6,
-              "p50_ms": 0.176,
-              "p95_ms": 0.192
+              "min_overlap": 0.4,
+              "p50_ms": 1.038,
+              "p95_ms": 1.237
             },
             "400": {
-              "mean_overlap": 0.9693,
-              "min_overlap": 0.6,
-              "p50_ms": 0.243,
-              "p95_ms": 0.266
+              "mean_overlap": 0.9653,
+              "min_overlap": 0.4,
+              "p50_ms": 0.982,
+              "p95_ms": 1.491
             }
           },
           "committed": {
             "20": {
-              "mean_overlap": 0.9907,
-              "min_overlap": 0.6,
-              "p50_ms": 0.508,
-              "p95_ms": 1.09
+              "mean_overlap": 0.9973,
+              "min_overlap": 0.8,
+              "p50_ms": 0.792,
+              "p95_ms": 1.173
             },
             "100": {
               "mean_overlap": 1.0,
               "min_overlap": 1.0,
-              "p50_ms": 0.246,
-              "p95_ms": 0.613
+              "p50_ms": 1.089,
+              "p95_ms": 1.445
             },
             "400": {
               "mean_overlap": 1.0,
               "min_overlap": 1.0,
-              "p50_ms": 0.87,
-              "p95_ms": 1.373
-            }
-          }
-        },
-        {
-          "rows": 4598,
-          "queries": 75,
-          "rows_left_after_rollback": 0,
-          "insert_seconds": {
-            "uncommitted": 1.4,
-            "committed": 1.349
-          },
-          "uncommitted": {
-            "20": {
-              "mean_overlap": 0.968,
-              "min_overlap": 0.5,
-              "p50_ms": 0.131,
-              "p95_ms": 0.399
-            },
-            "100": {
-              "mean_overlap": 0.9707,
-              "min_overlap": 0.7,
-              "p50_ms": 0.165,
-              "p95_ms": 0.176
-            },
-            "400": {
-              "mean_overlap": 0.9707,
-              "min_overlap": 0.7,
-              "p50_ms": 0.235,
-              "p95_ms": 0.242
-            }
-          },
-          "committed": {
-            "20": {
-              "mean_overlap": 0.9773,
-              "min_overlap": 0.5,
-              "p50_ms": 0.784,
-              "p95_ms": 1.641
-            },
-            "100": {
-              "mean_overlap": 0.9987,
-              "min_overlap": 0.9,
-              "p50_ms": 1.646,
-              "p95_ms": 2.41
-            },
-            "400": {
-              "mean_overlap": 1.0,
-              "min_overlap": 1.0,
-              "p50_ms": 1.231,
-              "p95_ms": 2.233
+              "p50_ms": 1.165,
+              "p95_ms": 1.666
             }
           }
         }
@@ -182,47 +182,47 @@
           "queries": 75,
           "rows_left_after_rollback": 0,
           "insert_seconds": {
-            "uncommitted": 0.503,
-            "committed": 0.431
+            "uncommitted": 0.51,
+            "committed": 0.434
           },
           "uncommitted": {
             "20": {
-              "mean_overlap": 0.62,
-              "min_overlap": 0.3,
-              "p50_ms": 0.128,
-              "p95_ms": 0.374
+              "mean_overlap": 0.6,
+              "min_overlap": 0.2,
+              "p50_ms": 0.126,
+              "p95_ms": 0.144
             },
             "100": {
-              "mean_overlap": 0.6427,
-              "min_overlap": 0.3,
-              "p50_ms": 0.16,
-              "p95_ms": 0.19
+              "mean_overlap": 0.632,
+              "min_overlap": 0.4,
+              "p50_ms": 0.163,
+              "p95_ms": 0.175
             },
             "400": {
-              "mean_overlap": 0.6427,
-              "min_overlap": 0.3,
-              "p50_ms": 0.22,
-              "p95_ms": 0.226
+              "mean_overlap": 0.632,
+              "min_overlap": 0.4,
+              "p50_ms": 0.227,
+              "p95_ms": 0.385
             }
           },
           "committed": {
             "20": {
-              "mean_overlap": 0.7973,
+              "mean_overlap": 0.7707,
               "min_overlap": 0.4,
-              "p50_ms": 0.212,
-              "p95_ms": 0.633
+              "p50_ms": 0.133,
+              "p95_ms": 0.157
             },
             "100": {
-              "mean_overlap": 0.984,
-              "min_overlap": 0.9,
-              "p50_ms": 0.268,
-              "p95_ms": 0.314
-            },
-            "400": {
               "mean_overlap": 0.9933,
               "min_overlap": 0.9,
-              "p50_ms": 0.288,
-              "p95_ms": 0.295
+              "p50_ms": 0.191,
+              "p95_ms": 0.217
+            },
+            "400": {
+              "mean_overlap": 0.996,
+              "min_overlap": 0.9,
+              "p50_ms": 0.304,
+              "p95_ms": 0.69
             }
           }
         },
@@ -231,47 +231,47 @@
           "queries": 75,
           "rows_left_after_rollback": 0,
           "insert_seconds": {
-            "uncommitted": 0.497,
-            "committed": 0.439
+            "uncommitted": 0.523,
+            "committed": 0.446
           },
           "uncommitted": {
             "20": {
-              "mean_overlap": 0.616,
-              "min_overlap": 0.3,
-              "p50_ms": 0.139,
-              "p95_ms": 0.279
+              "mean_overlap": 0.56,
+              "min_overlap": 0.2,
+              "p50_ms": 0.123,
+              "p95_ms": 0.132
             },
             "100": {
-              "mean_overlap": 0.648,
+              "mean_overlap": 0.6053,
               "min_overlap": 0.3,
-              "p50_ms": 0.166,
-              "p95_ms": 0.211
+              "p50_ms": 0.22,
+              "p95_ms": 0.339
             },
             "400": {
-              "mean_overlap": 0.648,
+              "mean_overlap": 0.6053,
               "min_overlap": 0.3,
-              "p50_ms": 0.229,
-              "p95_ms": 0.28
+              "p50_ms": 0.466,
+              "p95_ms": 0.576
             }
           },
           "committed": {
             "20": {
               "mean_overlap": 0.784,
-              "min_overlap": 0.4,
-              "p50_ms": 0.131,
-              "p95_ms": 0.472
+              "min_overlap": 0.5,
+              "p50_ms": 0.182,
+              "p95_ms": 0.199
             },
             "100": {
-              "mean_overlap": 0.988,
+              "mean_overlap": 0.9893,
               "min_overlap": 0.9,
-              "p50_ms": 0.191,
-              "p95_ms": 0.201
+              "p50_ms": 0.257,
+              "p95_ms": 0.287
             },
             "400": {
-              "mean_overlap": 0.996,
+              "mean_overlap": 0.9947,
               "min_overlap": 0.9,
-              "p50_ms": 0.287,
-              "p95_ms": 0.296
+              "p50_ms": 0.377,
+              "p95_ms": 0.471
             }
           }
         },
@@ -280,47 +280,47 @@
           "queries": 75,
           "rows_left_after_rollback": 0,
           "insert_seconds": {
-            "uncommitted": 0.486,
-            "committed": 0.429
+            "uncommitted": 0.472,
+            "committed": 0.437
           },
           "uncommitted": {
             "20": {
-              "mean_overlap": 0.624,
-              "min_overlap": 0.2,
-              "p50_ms": 0.191,
-              "p95_ms": 0.29
+              "mean_overlap": 0.5893,
+              "min_overlap": 0.3,
+              "p50_ms": 0.295,
+              "p95_ms": 0.693
             },
             "100": {
-              "mean_overlap": 0.6627,
+              "mean_overlap": 0.6307,
               "min_overlap": 0.3,
-              "p50_ms": 0.231,
-              "p95_ms": 0.258
+              "p50_ms": 0.294,
+              "p95_ms": 0.329
             },
             "400": {
-              "mean_overlap": 0.6627,
+              "mean_overlap": 0.6307,
               "min_overlap": 0.3,
-              "p50_ms": 0.291,
-              "p95_ms": 0.318
+              "p50_ms": 0.276,
+              "p95_ms": 0.571
             }
           },
           "committed": {
             "20": {
-              "mean_overlap": 0.7653,
+              "mean_overlap": 0.8053,
               "min_overlap": 0.4,
               "p50_ms": 0.13,
-              "p95_ms": 0.764
+              "p95_ms": 0.138
             },
             "100": {
-              "mean_overlap": 0.9827,
+              "mean_overlap": 0.9933,
               "min_overlap": 0.8,
-              "p50_ms": 0.189,
-              "p95_ms": 0.207
+              "p50_ms": 0.194,
+              "p95_ms": 0.209
             },
             "400": {
-              "mean_overlap": 0.9893,
+              "mean_overlap": 0.9987,
               "min_overlap": 0.9,
-              "p50_ms": 0.286,
-              "p95_ms": 0.335
+              "p50_ms": 0.35,
+              "p95_ms": 0.803
             }
           }
         }

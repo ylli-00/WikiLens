@@ -77,11 +77,12 @@ CREATE TABLE IF NOT EXISTS sentence (
 -- WIKILENSE_CHUNK_MAX_WORDS words, never across a section boundary) with the embedding of
 -- "title > section path: text" stored in a VECTOR(384) column. The HNSW vector index
 -- (M=16, cosine distance) serves ORDER BY VEC_DISTANCE_COSINE(embedding, ?) LIMIT n.
--- M=16 (server default 6), from results/SUMMARY.md section 3 (same vectors, 8,658 chunks): at
--- ef_search 20 M=6 finds the gold page for 69/75 claims at k=10 and full evidence for 55/66 at
--- k=20, M=16 72/75 and 61/66, the exact ranking 74/75 and 63/66; with ef_search 100 (the
--- application default) M=16 returns the exact hit list for 71/75 claims at sub-millisecond
--- latency. Build 2.9 s against 1.1 s for M=6; graph 17 MB against 16 MB.
+-- M=16 (server default 6) was chosen with the M sweep of results/SUMMARY.md section 3 (the same
+-- vectors, 8,658 chunks). At ef_search 20 it finds more gold pages and full evidence sets than M=6,
+-- and with ef_search 100 (the application default) it returns the exact ranking's hit list for
+-- most claims at sub-millisecond latency. It builds in about 3 s against 1 s for M=6, and the graph
+-- is 17 MB against 16 MB. The counts move by a few claims with every graph build; SUMMARY.md has
+-- the current ones.
 -- The FULLTEXT index on text serves MATCH(text) AGAINST (?) for the hybrid ``rrf`` search
 -- strategy (vector top-N and keyword top-N fused by reciprocal rank fusion in one statement).
 CREATE TABLE IF NOT EXISTS chunk (

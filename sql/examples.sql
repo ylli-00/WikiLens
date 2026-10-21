@@ -11,7 +11,7 @@ ORDER BY distance
 LIMIT 5;
 
 -- 2. Predicates and joins in the same statement: pages longer than 5,000 words, sections whose
---    heading contains "History". EXPLAIN shows chunk with key = embedding (the vector index) and
+--    heading contains "History". On the ingested corpus EXPLAIN shows chunk with key = embedding (the vector index) and
 --    page / section joined by primary key.
 SELECT chunk.chunk_id, page.title, section.path,
        VEC_DISTANCE_COSINE(chunk.embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance
@@ -97,7 +97,7 @@ FROM chunk ORDER BY distance LIMIT 3;
 -- 9. The brief's four predicates in one statement: only pages in the category "Member states of
 --    the United Nations", longer than 1,000 words, last edited (in the revision the corpus holds)
 --    since 1 December 2020, and linked from the page "Asia"; joined back to page and section.
---    EXPLAIN shows chunk read through the vector index (type index, key embedding) with the two
+--    On the ingested corpus EXPLAIN shows chunk read through the vector index (type index, key embedding) with the two
 --    filter tables materialised (<derivedN>). The DISTINCT keeps them materialised: merged into
 --    the join they make MariaDB scan chunk in full. Which filters keep the index is measured in
 --    results/planner_choices.md.

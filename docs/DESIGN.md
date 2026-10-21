@@ -589,13 +589,14 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
   a transaction and searched before COMMIT; the transaction is rolled back, the table filled
   again, committed and searched again, with three fresh builds.
   - With the 4,598 FINAL chunk embeddings and the 75 claims as queries, the overlap with the exact
-    top 10 is 0.968 / 0.971 / 0.971 before COMMIT at `mhnsw_ef_search` 20 / 100 / 400, and
-    0.987 / 1.000 / 1.000 after (protocol rerun of 2026-10-22; the first run gave
-    0.974-0.976 and 0.991-1.000). At ef 100 the worst query finds 5 of 10 before COMMIT and 9
-    after.
-  - On 1,000 random vectors it is 0.620 / 0.651 / 0.651 before and 0.782 / 0.985 / 0.993 after.
-  - The uncommitted search is also faster (p50 0.13 to 0.24 ms against 0.59 to 0.91 ms on the
-    chunks), which suggests it explores less of the graph; this was not verified in the server.
+    top 10 is 0.972 / 0.973 / 0.973 before COMMIT at `mhnsw_ef_search` 20 / 100 / 400, and
+    0.990 / 1.000 / 1.000 after. Two earlier runs gave 0.968-0.976 before and 0.987-1.000 after.
+    At ef 100 the worst query finds 4 of 10 before COMMIT and 10 after.
+  - On 1,000 random vectors it is 0.583 / 0.623 / 0.623 before and 0.787 / 0.992 / 0.996 after.
+  - Since 2026-10-22 each state gets an untimed warm-up pass before the timed ones. With it, the
+    latency differs little (p50 0.44 to 0.86 ms before COMMIT against 0.69 to 1.03 ms after, on
+    the chunks). The first runs, without warm-up, showed a threefold gap: a cold-cache effect that
+    a grader pointed out.
   - ROLLBACK leaves 0 rows in every build. Why the index finds fewer true neighbours before
     COMMIT is not known.
   - Practical rule: write and search in separate transactions, or commit before searching.

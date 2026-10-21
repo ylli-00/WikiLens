@@ -1,6 +1,6 @@
 # WikiLense experiments: summary
 
-Generated 2026-10-21T23:14:37+00:00 by `scripts/run_experiments.py summary`. Every number below is read from the JSON files in `results/` written by the same script (`write_results` of the evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims over the 100-page corpus; article recall counts the claims with a gold page among the pages of the top-k chunks (of 75), evidence recall the claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a sentence-only evidence set), unit coverage the mean share of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one `search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine distance, its M as stated per section. Two ingest configurations are used: OLD = 120 words, overlap 1, M=6, prefix on (phases 1 and 2) and FINAL = 240 words, overlap 1, M=16, prefix on (the chosen defaults); hatnote units ("Main article: ...") are in no chunk in either. "Identical to exact" counts the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the inline statement without filters, which does not depend on the HNSW graph).
+Generated 2026-10-21T23:33:10+00:00 by `scripts/run_experiments.py summary`. Every number below is read from the JSON files in `results/` written by the same script (`write_results` of the evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims over the 100-page corpus; article recall counts the claims with a gold page among the pages of the top-k chunks (of 75), evidence recall the claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a sentence-only evidence set), unit coverage the mean share of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one `search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine distance, its M as stated per section. Two ingest configurations are used: OLD = 120 words, overlap 1, M=6, prefix on (phases 1 and 2) and FINAL = 240 words, overlap 1, M=16, prefix on (the chosen defaults); hatnote units ("Main article: ...") are in no chunk in either. "Identical to exact" counts the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the inline statement without filters, which does not depend on the HNSW graph).
 
 ## Machine and versions
 
@@ -176,18 +176,18 @@ Reading: the last ingest (4598 chunks, 1316 hatnote units excluded, 21.14 s of w
 
 | data | state | ef | mean overlap@10 (builds) | worst query | p50 ms |
 |---|---|---|---|---|---|
-| chunks | uncommitted | 20 | 0.968 (0.965..0.972) | 0.5 | 0.13 |
-| chunks | uncommitted | 100 | 0.971 (0.969..0.972) | 0.5 | 0.17 |
-| chunks | uncommitted | 400 | 0.971 (0.969..0.972) | 0.5 | 0.24 |
-| chunks | committed | 20 | 0.987 (0.977..0.993) | 0.5 | 0.59 |
-| chunks | committed | 100 | 1.000 (0.999..1.000) | 0.9 | 0.70 |
-| chunks | committed | 400 | 1.000 (1.000..1.000) | 1.0 | 0.91 |
-| random | uncommitted | 20 | 0.620 (0.616..0.624) | 0.2 | 0.15 |
-| random | uncommitted | 100 | 0.651 (0.643..0.663) | 0.3 | 0.19 |
-| random | uncommitted | 400 | 0.651 (0.643..0.663) | 0.3 | 0.25 |
-| random | committed | 20 | 0.782 (0.765..0.797) | 0.4 | 0.16 |
-| random | committed | 100 | 0.985 (0.983..0.988) | 0.8 | 0.22 |
-| random | committed | 400 | 0.993 (0.989..0.996) | 0.9 | 0.29 |
+| chunks | uncommitted | 20 | 0.972 (0.963..0.980) | 0.3 | 0.44 |
+| chunks | uncommitted | 100 | 0.973 (0.965..0.980) | 0.4 | 0.68 |
+| chunks | uncommitted | 400 | 0.973 (0.965..0.980) | 0.4 | 0.86 |
+| chunks | committed | 20 | 0.990 (0.987..0.997) | 0.5 | 0.69 |
+| chunks | committed | 100 | 1.000 (1.000..1.000) | 1.0 | 0.97 |
+| chunks | committed | 400 | 1.000 (1.000..1.000) | 1.0 | 1.03 |
+| random | uncommitted | 20 | 0.583 (0.560..0.600) | 0.2 | 0.18 |
+| random | uncommitted | 100 | 0.623 (0.605..0.632) | 0.3 | 0.23 |
+| random | uncommitted | 400 | 0.623 (0.605..0.632) | 0.3 | 0.32 |
+| random | committed | 20 | 0.787 (0.771..0.805) | 0.4 | 0.15 |
+| random | committed | 100 | 0.992 (0.989..0.993) | 0.8 | 0.21 |
+| random | committed | 400 | 0.996 (0.995..0.999) | 0.9 | 0.34 |
 
 Reading: the same vectors, the same index definition and the same statement; only the transaction state differs. Compare the overlap of each `uncommitted` row with its `committed` row (`uncommitted_recall.md` has the per-build insert times and the row count after ROLLBACK).
 

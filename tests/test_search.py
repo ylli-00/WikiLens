@@ -808,3 +808,65 @@ def test_every_statement_of_the_sql_examples_runs_on_the_schema(meta_corpus) -> 
             cur.execute(statement)
             cur.fetchall()
     assert _ids(search(meta_corpus, QUERY, k=3)) == [1, 2, 3]  # chunk 2's vector is back
+
+
+@pytest.mark.db
+def test_the_statement_shapes_that_keep_or_lose_the_vector_index(corpus) -> None:
+    """The planner rules the README states, pinned with EXPLAIN on the synthetic corpus: only
+    ``ORDER BY VEC_DISTANCE_COSINE(column, constant) LIMIT n`` reads chunk through the vector
+    index; a second ORDER BY key (a tie-break), a distance wrapped in an expression, a WHERE
+    threshold without ORDER BY ... LIMIT, and a link filter written as ``IN (subquery)`` (a
+    semi-join) all make MariaDB scan chunk instead, while the same filter as a DISTINCT derived
+    table keeps the index. A query vector of another dimension gives NULL distances, silently."""
+    q = dbmod.vec_param(QUERY)
+    linked = (
+        "(SELECT DISTINCT link.to_page_id AS page_id FROM link JOIN page AS src "
+        "ON src.page_id = link.from_page_id WHERE src.title = %s AND link.to_page_id IS NOT NULL)"
+    )
+    shapes = {
+        "index": ("SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT 3",
+                  (q,)),
+        "tie-break": (
+            "SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s), chunk_id LIMIT 3",
+            (q,),
+        ),
+        "expression": (
+            "SELECT chunk_id FROM chunk ORDER BY 1 - VEC_DISTANCE_COSINE(embedding, %s) DESC LIMIT 3",
+            (q,),
+        ),
+        "threshold": (
+            "SELECT chunk_id FROM chunk WHERE VEC_DISTANCE_COSINE(embedding, %s) < 0.5",
+            (q,),
+        ),
+        "semi-join": (
+            (
+                "SELECT chunk.chunk_id FROM chunk STRAIGHT_JOIN page "
+                "ON page.page_id = chunk.page_id WHERE chunk.page_id IN "
+                "(SELECT link.to_page_id FROM link JOIN page AS src "
+                "ON src.page_id = link.from_page_id WHERE src.title = %s) "
+                "ORDER BY VEC_DISTANCE_COSINE(chunk.embedding, %s) LIMIT 3"
+            ),
+            ("Alpha", q),
+        ),
+        "derived": (
+            (
+                "SELECT chunk.chunk_id FROM chunk STRAIGHT_JOIN page "
+                "ON page.page_id = chunk.page_id STRAIGHT_JOIN " + linked + " AS linked "
+                "ON linked.page_id = chunk.page_id "
+                "ORDER BY VEC_DISTANCE_COSINE(chunk.embedding, %s) LIMIT 3"
+            ),
+            ("Alpha", q),
+        ),
+    }
+    def chunk_row(name: str) -> dict[str, Any]:
+        sql, params = shapes[name]
+        return next(r for r in dbmod.explain(corpus, sql, params) if r["table"] == "chunk")
+
+    for name in ("index", "derived"):
+        assert chunk_row(name)["key"] == "embedding" and chunk_row(name)["type"] == "index", name
+    for name in ("tie-break", "expression", "threshold", "semi-join"):
+        assert chunk_row(name)["key"] != "embedding" and chunk_row(name)["type"] == "ALL", name
+    with corpus.cursor() as cur:
+        cur.execute("SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk LIMIT 2",
+                    (dbmod.vec_param(np.ones(10, dtype=np.float32)),))
+        assert cur.fetchall() == ((None,), (None,))

@@ -1531,7 +1531,9 @@ def measure_uncommitted(
     conn: pymysql.Connection, vectors: np.ndarray, queries: np.ndarray
 ) -> dict[str, Any]:
     """One build: fill a fresh ``uncommitted_probe`` in a transaction, search it before COMMIT,
-    roll back, fill it again, COMMIT and search again. Returns both measurements."""
+    roll back, fill it again, COMMIT and search again. Each state gets one untimed warm-up pass
+    before the timed ones, so the first ef measured does not pay for cold caches. Returns both
+    measurements."""
     unit = vectors.astype(np.float64)
     unit /= np.linalg.norm(unit, axis=1, keepdims=True)
     exact = []
@@ -1544,6 +1546,7 @@ def measure_uncommitted(
     start = time.perf_counter()
     _fill_probe(conn, vectors)
     insert_uncommitted = time.perf_counter() - start
+    _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS[:1])  # untimed warm-up pass
     before = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS)
     conn.rollback()
     with conn.cursor() as cur:
@@ -1553,6 +1556,7 @@ def measure_uncommitted(
     _fill_probe(conn, vectors)
     conn.commit()
     insert_committed = time.perf_counter() - start
+    _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS[:1])  # untimed warm-up pass
     after = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS)
     return {
         "rows": len(vectors), "queries": len(queries),

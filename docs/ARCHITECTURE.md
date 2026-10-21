@@ -61,8 +61,8 @@ committed `data/corpus/page_meta.jsonl`.
 **Ingest.** `wikilense ingest` reads `data/corpus/`, splits every page into sections and text
 units (sentences and list items), groups consecutive units into chunks of at most 240 words,
 embeds each chunk, and writes eleven tables (the page metadata goes into `page.revision_id`,
-`page.last_edited`, `category` and `page_category`). It takes about 26 s on the RTX 4060, 22 s of
-it embedding (measured 2026-10-22).
+`page.last_edited`, `category` and `page_category`). It takes about 21 s on the RTX 4060, 17 s of
+it embedding (results/SUMMARY.md section 8).
 
 **Search.** `search.search()` embeds nothing itself: it takes the query's vector and runs one
 statement that ranks chunks by cosine distance, with any filters in the same statement. The CLI
@@ -405,7 +405,7 @@ docker compose ps             # is MariaDB up?
 make down                     # stop MariaDB (the data volume is kept)
 
 # ingest
-.venv/bin/wikilense ingest    # drop, recreate and fill the tables (about 26 s on the GPU)
+.venv/bin/wikilense ingest    # drop, recreate and fill the tables (about 21 s on the GPU)
 
 # query
 .venv/bin/wikilense query "Aare river in Switzerland" --k 3

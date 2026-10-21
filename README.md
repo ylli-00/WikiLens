@@ -60,11 +60,11 @@ the 120-word ingest (8,658 chunks), and the chunk-size sweep uses one ingest per
     it, MariaDB merges the table into the join and scans in full.
 - **Searching rows your own transaction has not committed finds fewer true neighbours.**
   - On our chunk embeddings at `mhnsw_ef_search=100`, the k-NN search over rows inserted in the
-    open transaction finds 0.971 of the exact top 10, against 1.000 after `COMMIT`.
-  - On random vectors it is 0.651 against 0.985.
+    open transaction finds 0.973 of the exact top 10, against 1.000 after `COMMIT`.
+  - On random vectors it is 0.623 against 0.992.
   - A larger `mhnsw_ef_search` does not close the gap.
   - `ROLLBACK` removes every row and index entry.
-- **Tuning the index matters more than the hardware.**
+- **The index parameters are the largest lever we measured.**
   - On the 120-word ingest, the server defaults (`M=6`, `mhnsw_ef_search=20`) find the gold page
     for 68 of 75 claims at k=10, where the exact ranking of the same vectors finds 74.
   - With `M=16`, the same vectors give 74 already at `ef_search=20`.
@@ -105,7 +105,8 @@ make setup
    categories and edit dates, embeds the chunks and loads everything.
    - The embedding model, about 134 MB, downloads to `~/.cache/huggingface` on first use.
    - The run takes 21 s on an RTX 4060 laptop GPU, of which 17 s is embedding.
-   - On a CPU the embedding runs at about 78 passages per second, so expect about a minute.
+   - On a CPU, a phase-1 measurement gave about 78 passages per second for 100-word texts
+     (docs/DESIGN.md). The stored chunks are longer, so expect one to two minutes.
 
 The ingest ends with the seconds per stage and a report you can compare against this one (the
 1,316 hatnote units kept out of chunks are recorded in `ingest_meta`):
@@ -284,9 +285,8 @@ every statement of the file against the schema.
   - For the 93 pages edited during December 2020, the revision whose wikitext contains the most of
     the page's FEVEROUS sentences is chosen; on a tie, the later one. Three renamed pages are
     followed through the move log.
-  - All 100 pages were found, and 94.5% of the sentence probes occur in the chosen revisions. On
-    today's "Albert Einstein" page only 260 of 484 probes match, against 466 in the December 2020
-    revision.
+  - All 100 pages were found, and 94.5% of the sentence probes occur in the chosen revisions
+    (`probes_matched` per page in the file).
   - The result: 1,005 categories, 1,123 page-category pairs, edit dates from 2019-12-23 to
     2020-12-31. [data/corpus/PAGE_META.md](data/corpus/PAGE_META.md) has the summary.
   - The script follows the Wikimedia Robot Policy: one request at a time, at most four per second,
@@ -429,7 +429,9 @@ page position (`--sentences`).
 Everything here was measured on this corpus with `EXPLAIN`, `ANALYZE` and the harness.
 [tests/test_db.py](tests/test_db.py) and [tests/test_search.py](tests/test_search.py) assert the
 facts that hold on synthetic data: `key: embedding`, `r_rows` = `k`, both indexes for `rrf`, the
-session scope of `ef_search`, the transactions, and the plan of the category filter.
+session scope of `ef_search`, the transactions, and the plan of the category filter. They also pin
+the statement shapes that lose the index, listed below, and the `NULL` distances of a
+wrong-dimension vector.
 
 - **What drives the index.** Only `ORDER BY VEC_DISTANCE_COSINE(column, constant) LIMIT n`, sorted
   ascending; the alias form `ORDER BY distance` is identical. These all drop the index, so ties
@@ -441,13 +443,14 @@ session scope of `ef_search`, the transactions, and the plan of the category fil
   - `VEC_DISTANCE_COSINE` equals NumPy's `1 - cos` for every row, within 1e-5.
   - A scan that ignores the index (`IGNORE INDEX (embedding)`) returns NumPy's exact top 10 in
     order.
-  - The HNSW index at `ef_search=200` finds all of them.
+  - In our runs the HNSW index at `ef_search=200` found all of them. The test requires at least
+    95% on average, because every graph build is a different approximation.
 - **Two cost regimes.**
   - **The bare query** (`none`, `overfetch`) is the HNSW search: 0.45 to 0.64 ms on 4,598 chunks.
     It reads exactly `LIMIT` rows, and `mhnsw_ef_search` sets its accuracy.
   - **With a join in the statement** (`inline`), `EXPLAIN` still says `type: index, key:
     embedding`, but the server ranks exactly over the index: 2.24 ms here. Its hit lists do not
-    depend on `ef_search` (identical at 20 and 100 for 75 of 75 claims), and on the synthetic test
+    depend on `ef_search` (identical at 20 and 100 for 75 of 75 claims on the 120-word ingest), and on the synthetic test
     corpus they equal the known exact order. It then walks until `k` rows pass the predicates.
 - **Which filters keep the index** (`results/planner_choices.md`: every claim, the inline statement,
   k=10).
@@ -474,9 +477,9 @@ session scope of `ef_search`, the transactions, and the plan of the category fil
   | `inline` | 0 | 3.34 ms (4.74 ms p95) |
 - **Join order matters.**
   - With a plain `JOIN`, the optimizer started from `page` on stale statistics right after a bulk
-    insert and lost the vector index. The statements use `STRAIGHT_JOIN` with `chunk` first, and
+    insert and lost the vector index (observed in phase 2, docs/DESIGN.md). The statements use `STRAIGHT_JOIN` with `chunk` first, and
     the ingest runs `ANALYZE TABLE`.
-  - An `IN (subquery)` filter becomes a semi-join that starts from `link` and loses the index too.
+  - An `IN (subquery)` filter becomes a semi-join and loses the index too (a test pins this).
   - A derived table without `DISTINCT` is merged into the outer join, and `chunk` is scanned in
     full. We found this with the category filter, even on the 12-chunk test data. A `SELECT
     DISTINCT` derived table stays materialised and keeps the index; a test pins that plan.
@@ -484,12 +487,13 @@ session scope of `ef_search`, the transactions, and the plan of the category fil
   - The test: a scratch table with the chunk table's vector column and index is filled inside one
     transaction and searched before and after `COMMIT`. There are three fresh builds each, and the
     overlap is measured against NumPy's exact top 10.
-  - With our 4,598 chunk embeddings and the 75 claims, the search finds 0.968 to 0.971 of the
-    exact top 10 before `COMMIT` at `mhnsw_ef_search` 20, 100 and 400, and 0.987 to 1.000 after.
-  - At ef 100 the worst single query finds 5 of its 10 neighbours before `COMMIT` and 9 after.
-  - On 1,000 random vectors it is 0.620 to 0.651 before and 0.782 to 0.993 after.
-  - The uncommitted search is also faster: 0.13 to 0.24 ms p50 against 0.59 to 0.91 ms on the
-    chunks. That suggests it explores less of the graph; we did not verify this in the server.
+  - With our 4,598 chunk embeddings and the 75 claims, the search finds 0.972 to 0.973 of the
+    exact top 10 before `COMMIT` at `mhnsw_ef_search` 20, 100 and 400, and 0.990 to 1.000 after.
+  - At ef 100 the worst single query finds 4 of its 10 neighbours before `COMMIT` and all 10 after.
+  - On 1,000 random vectors it is 0.583 to 0.623 before and 0.787 to 0.996 after.
+  - Each state gets an untimed warm-up pass, and then the latency differs little: 0.44 to 0.86 ms
+    p50 before `COMMIT` against 0.69 to 1.03 ms after, on the chunks. An earlier run without the
+    warm-up showed a threefold gap, which was a cold-cache effect.
   - `ROLLBACK` leaves no row behind. Write and search in separate transactions, or commit first.
 
   ![Overlap with the exact top 10 before and after COMMIT](docs/img/uncommitted_recall.svg)
@@ -523,7 +527,7 @@ session scope of `ef_search`, the transactions, and the plan of the category fil
     vectors agreed on 12 of 75 hit lists.
   - Within one server process the results are deterministic, and the cache size does not change
     them (75 of 75 identical at 16 MB and 512 MB).
-  - A `docker compose restart` changed 1 of 75 hit lists on the `M=6` index and none on `M=16` at
+  - A container restart (`docker restart`) changed 1 of 75 hit lists on the `M=6` index and none on `M=16` at
     `ef_search=100`, without changing recall.
 
 ## Parameters and why
@@ -577,7 +581,7 @@ Query embedding: 4.6 ms p50 on the GPU.
 | `final_ef_20` | index, ef_search 20 | 74/75 | 65/66 | 0.45 / 0.70 ms, hit lists = exact for 65/75 |
 | `final_rrf` | vector + full text, RRF | 74/75 | 64/66 | 9.11 / 12.84 ms |
 | `final_oracle_titles` | inline, gold page as `titles` filter | 75/75 | 66/66 | 2.45 / 8.59 ms; evidence in the first chunk for 42/66, within 5 for 59/66 |
-| `final_ef_100_after_restart` | index, ef_search 100, after `docker compose restart` | 74/75 | 65/66 | hit lists identical to before for 75/75 |
+| `final_ef_100_after_restart` | index, ef_search 100, after a container restart (`docker restart`) | 74/75 | 65/66 | hit lists identical to before for 75/75 |
 
 **Reading the numbers.**
 - **The one claim whose gold page never appears** is claim 87976, a NOT ENOUGH INFO claim about a
@@ -616,16 +620,19 @@ Query embedding: 4.6 ms p50 on the GPU.
 - **Predicates, joins and the vector search in one statement.** "Chunks about X, in a category,
   longer than N words, edited since D, linked from Y" is one SQL statement that the optimizer
   plans, and `EXPLAIN` shows the plan.
-  - A separate vector store answers the vector part and leaves the rest to application code with
-    post-filtering. That is exactly the `overfetch` strategy we measured: cheaper, but short of `k`
-    rows under selective filters.
+  - A separate vector store can filter on the metadata stored with each vector, and many can
+    pre-filter on it. But that metadata is a copy the application keeps in sync, and a filter that
+    needs another table, such as the link graph or the category table, is not available there.
+    When it is applied after the search, it is the `overfetch` strategy we measured: cheaper, but
+    short of `k` rows under selective filters. We did not measure a dedicated vector store.
   - Here the optimizer can also choose the other way round, scanning the few qualifying rows and
-    sorting them exactly, when a filter is selective enough. A post-filtering store cannot do that.
+    sorting them exactly, when a filter is selective enough.
 - **Metadata is just more tables.** Categories and edit dates were added as two tables and two
-  columns, filled in the same ingest transaction as the vectors and joined like anything else. No
+  columns, loaded by the same ingest as the vectors and joined like anything else. No
   vector-store "metadata payload" has to be kept in sync.
-- **The ground truth is a join.** Evidence recall is `chunk_sentence JOIN claim_evidence`, so the
-  evaluation is SQL over the same tables, not a second pipeline that re-matches text.
+- **The ground truth lives in the same database.** At ingest, `claim_evidence` resolves every gold
+  element to its `sentence_id`. The evaluation then matches those ids against the `chunk_sentence`
+  rows of the hit chunks, so no text is re-matched outside the database.
 - **One transaction, one backup, one set of foreign keys.** Vectors are rows. They roll back with
   their transaction, disappear with their page, and are covered by the same dump. There is no
   synchronisation job between a store and the metadata it describes. We measured the one caveat:
