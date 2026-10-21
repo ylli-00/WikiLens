@@ -1,0 +1,240 @@
+{
+  "name": "planner_choices",
+  "group": "planner",
+  "created_at": "2026-10-21T22:33:41+00:00",
+  "k": 10,
+  "ef_search": 100,
+  "repeats": 3,
+  "n_chunks": 4598,
+  "configuration": {
+    "chunk_max_words": 240,
+    "chunk_overlap_units": 1,
+    "index_m": 16,
+    "use_prefix": true
+  },
+  "mariadb_version": "11.8.9-MariaDB-ubu2404",
+  "chunk_index": {
+    "name": "embedding",
+    "m": 16,
+    "distance": "cosine"
+  },
+  "cases": {
+    "none": {
+      "filters": {},
+      "passing_chunks": 4598,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 10.0,
+      "r_rows_max": 10.0,
+      "sql_ms_p50": 2.283,
+      "sql_ms_p95": 2.97,
+      "short_results": 0
+    },
+    "min_words_1000": {
+      "filters": {
+        "min_words": 1000
+      },
+      "passing_chunks": 4544,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 10.0,
+      "r_rows_max": 19.0,
+      "sql_ms_p50": 2.21,
+      "sql_ms_p95": 3.638,
+      "short_results": 0
+    },
+    "min_words_5000": {
+      "filters": {
+        "min_words": 5000
+      },
+      "passing_chunks": 3891,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 17.0,
+      "r_rows_max": 75.0,
+      "sql_ms_p50": 2.261,
+      "sql_ms_p95": 2.907,
+      "short_results": 0
+    },
+    "max_words_2000": {
+      "filters": {
+        "max_words": 2000
+      },
+      "passing_chunks": 89,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 601.0,
+      "r_rows_max": 1661.0,
+      "sql_ms_p50": 2.9,
+      "sql_ms_p95": 4.17,
+      "short_results": 0
+    },
+    "max_words_500": {
+      "filters": {
+        "max_words": 500
+      },
+      "passing_chunks": 25,
+      "queries": 75,
+      "index_plans": 0,
+      "chunk_access": {
+        "type": "ALL",
+        "key": null,
+        "extra": "Using temporary; Using filesort"
+      },
+      "r_rows_p50": 4598.0,
+      "r_rows_max": 4598.0,
+      "sql_ms_p50": 5.188,
+      "sql_ms_p95": 7.056,
+      "short_results": 0
+    },
+    "heading_history": {
+      "filters": {
+        "heading_like": "%History%"
+      },
+      "passing_chunks": 117,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 315.0,
+      "r_rows_max": 1015.0,
+      "sql_ms_p50": 2.994,
+      "sql_ms_p95": 4.127,
+      "short_results": 0
+    },
+    "linked_from": {
+      "filters": {
+        "linked_from": "Asia"
+      },
+      "passing_chunks": 661,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 121.0,
+      "r_rows_max": 492.0,
+      "sql_ms_p50": 3.084,
+      "sql_ms_p95": 4.029,
+      "short_results": 0
+    },
+    "category": {
+      "filters": {
+        "category": "Member states of the United Nations"
+      },
+      "passing_chunks": 695,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 108.0,
+      "r_rows_max": 420.0,
+      "sql_ms_p50": 2.799,
+      "sql_ms_p95": 3.371,
+      "short_results": 0
+    },
+    "edited_since_2020_12_01": {
+      "filters": {
+        "edited_since": "2020-12-01"
+      },
+      "passing_chunks": 4525,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 10.0,
+      "r_rows_max": 25.0,
+      "sql_ms_p50": 2.407,
+      "sql_ms_p95": 3.406,
+      "short_results": 0
+    },
+    "edited_before_2020_12_15": {
+      "filters": {
+        "edited_before": "2020-12-15"
+      },
+      "passing_chunks": 778,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 67.0,
+      "r_rows_max": 491.0,
+      "sql_ms_p50": 2.524,
+      "sql_ms_p95": 3.544,
+      "short_results": 0
+    },
+    "edited_before_2020_06_01": {
+      "filters": {
+        "edited_before": "2020-06-01"
+      },
+      "passing_chunks": 4,
+      "queries": 75,
+      "index_plans": 0,
+      "chunk_access": {
+        "type": "ALL",
+        "key": null,
+        "extra": "Using temporary; Using filesort"
+      },
+      "r_rows_p50": 4598.0,
+      "r_rows_max": 4598.0,
+      "sql_ms_p50": 3.102,
+      "sql_ms_p95": 3.991,
+      "short_results": 0
+    },
+    "four_filters": {
+      "filters": {
+        "min_words": 1000,
+        "linked_from": "Asia",
+        "category": "Member states of the United Nations",
+        "edited_since": "2020-12-01"
+      },
+      "passing_chunks": 377,
+      "queries": 75,
+      "index_plans": 75,
+      "chunk_access": {
+        "type": "index",
+        "key": "embedding",
+        "extra": ""
+      },
+      "r_rows_p50": 184.0,
+      "r_rows_max": 888.0,
+      "sql_ms_p50": 3.143,
+      "sql_ms_p95": 4.243,
+      "short_results": 0
+    }
+  }
+}

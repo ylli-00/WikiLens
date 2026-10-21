@@ -66,6 +66,17 @@ Groups (``all`` runs them in this order; each can be rerun on its own):
               -> final_restart_comparison.json/.md
   restore     fresh ingest of FINAL (what ``wikilense ingest`` produces), the cache checked at
               512 MB and ingest_meta verified -> restore_state.json/.md
+  uncommitted FINAL in place: a scratch table ``uncommitted_probe`` with the same VECTOR(384)
+              column and M=16 cosine index is filled inside a transaction and searched before
+              and after COMMIT (k 10, ef 20 / 100 / 400, overlap with NumPy's exact top 10),
+              with the FINAL chunk embeddings and the claim embeddings as queries, and with
+              random vectors, three fresh builds each; the scratch table is dropped at the end
+              -> uncommitted_recall.json/.md
+  planner     FINAL in place: for each filter of PLANNER_CASES (length, heading, link, category,
+              edit date, all four at once) and every claim, whether the inline statement's plan
+              reads chunk through the vector index (EXPLAIN type/key), the chunk rows read
+              (ANALYZE r_rows), the SQL time (3 repeats) and how many chunks pass the filter
+              -> planner_choices.json/.md
   summary     results/SUMMARY.md from the JSON files (no database access)
   all         every group above, in that order
 
@@ -93,7 +104,7 @@ import sys
 import time
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -126,7 +137,7 @@ from wikilense.evaluate import (
     write_results,
 )
 from wikilense.ingest import INDEX_DISTANCE, run_ingest
-from wikilense.search import Filters, search
+from wikilense.search import Filters, explain_search, search
 from wikilense.wikitext import HATNOTE_RE
 
 log = logging.getLogger("experiments")
@@ -316,6 +327,54 @@ FINAL_AFTER = {FINAL_HEADLINE: "final_ef_100_after_restart", FINAL_EF_20: "final
 FINAL_RUNS = (FINAL_HEADLINE, FINAL_EF_20, FINAL_EXACT, FINAL_RRF, FINAL_ORACLE, *FINAL_AFTER.values())
 INGEST_RUNS = "ingest_runs"
 RESTORE_STATE = "restore_state"
+UNCOMMITTED = "uncommitted_recall"
+
+# The uncommitted group's scratch table: the chunk table's vector column and index (the
+# literals of sql/schema.sql: VECTOR(384), M=16, cosine) and nothing else. Created and dropped
+# by that group only; every statement is a fixed literal.
+UNCOMMITTED_DROP_SQL = "DROP TABLE IF EXISTS uncommitted_probe"
+UNCOMMITTED_CREATE_SQL = (
+    "CREATE TABLE uncommitted_probe (probe_id INT UNSIGNED NOT NULL PRIMARY KEY, "
+    "embedding VECTOR(384) NOT NULL, VECTOR INDEX (embedding) M=16 DISTANCE=cosine) "
+    "ENGINE=InnoDB"
+)
+UNCOMMITTED_INSERT_SQL = "INSERT INTO uncommitted_probe (probe_id, embedding) VALUES (%s, %s)"
+UNCOMMITTED_KNN_SQL = (
+    "SELECT probe_id FROM uncommitted_probe ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT %s"
+)
+CHUNK_VECTORS_SQL = "SELECT embedding FROM chunk ORDER BY chunk_id"
+CLAIM_TEXTS_SQL = "SELECT text FROM claim ORDER BY claim_id"
+UNCOMMITTED_EFS: tuple[int, ...] = (EF_LOW, EF_CHOSEN, 400)
+UNCOMMITTED_K = 10
+UNCOMMITTED_BUILDS = 3
+UNCOMMITTED_RANDOM_ROWS = 1000
+UNCOMMITTED_RANDOM_SEED = 1
+UNCOMMITTED_BATCH = 500
+
+PLANNER = "planner_choices"
+PLANNER_K = 10
+PLANNER_REPEATS = 3
+#: The page and the category of the link and category cases, fixed so that every run measures
+#: the same filters: "Asia" links to 10 other corpus pages (only London links to more, 11), and
+#: "Member states of the United Nations" is the category with the most corpus pages (10,
+#: data/corpus/PAGE_META.md). All four filters together keep 5 pages.
+PLANNER_LINKED_FROM = "Asia"
+PLANNER_CATEGORY = "Member states of the United Nations"
+PLANNER_CASES: tuple[tuple[str, Filters], ...] = (
+    ("none", Filters()),
+    ("min_words_1000", Filters(min_words=1000)),
+    ("min_words_5000", Filters(min_words=5000)),
+    ("max_words_2000", Filters(max_words=2000)),
+    ("max_words_500", Filters(max_words=500)),
+    ("heading_history", Filters(heading_like=HEADING_FILTER)),
+    ("linked_from", Filters(linked_from=PLANNER_LINKED_FROM)),
+    ("category", Filters(category=PLANNER_CATEGORY)),
+    ("edited_since_2020_12_01", Filters(edited_since=date(2020, 12, 1))),
+    ("edited_before_2020_12_15", Filters(edited_before=date(2020, 12, 15))),
+    ("edited_before_2020_06_01", Filters(edited_before=date(2020, 6, 1))),
+    ("four_filters", Filters(category=PLANNER_CATEGORY, min_words=MIN_WORDS_FILTER,
+                             edited_since=date(2020, 12, 1), linked_from=PLANNER_LINKED_FROM)),
+)
 
 
 class ExperimentError(RuntimeError):
@@ -1427,6 +1486,288 @@ def group_restore(ctx: Context) -> None:
 # ---------------------------------------------------------------------------------------------
 
 
+def _probe_overlaps(
+    conn: pymysql.Connection, queries: np.ndarray, exact: list[set[int]], efs: Sequence[int]
+) -> dict[str, dict[str, float]]:
+    """Search ``uncommitted_probe`` for every query at each ef; return per ef the mean and the
+    minimum overlap of the k ids with the exact top k, and the p50 / p95 statement time (ms)."""
+    out: dict[str, dict[str, float]] = {}
+    for ef in efs:
+        db.set_session_var(conn, "mhnsw_ef_search", ef)
+        overlaps: list[float] = []
+        times: list[float] = []
+        for query, truth in zip(queries, exact):
+            with conn.cursor() as cur:
+                start = time.perf_counter()
+                cur.execute(UNCOMMITTED_KNN_SQL, (db.vec_param(query), UNCOMMITTED_K))
+                found = {int(row[0]) for row in cur.fetchall()}
+                times.append((time.perf_counter() - start) * 1000)
+            overlaps.append(len(found & truth) / UNCOMMITTED_K)
+        out[str(ef)] = {
+            "mean_overlap": round(float(np.mean(overlaps)), 4),
+            "min_overlap": round(float(min(overlaps)), 4),
+            "p50_ms": round(float(np.percentile(times, 50)), 3),
+            "p95_ms": round(float(np.percentile(times, 95)), 3),
+        }
+    return out
+
+
+def _fill_probe(conn: pymysql.Connection, vectors: np.ndarray) -> None:
+    """Insert ``vectors`` as probe ids 1..n in batches, inside the open transaction."""
+    rows = [(i + 1, db.vec_param(v)) for i, v in enumerate(vectors)]
+    with conn.cursor() as cur:
+        for start in range(0, len(rows), UNCOMMITTED_BATCH):
+            cur.executemany(UNCOMMITTED_INSERT_SQL, rows[start : start + UNCOMMITTED_BATCH])
+
+
+def measure_uncommitted(
+    conn: pymysql.Connection, vectors: np.ndarray, queries: np.ndarray
+) -> dict[str, Any]:
+    """One build: fill a fresh ``uncommitted_probe`` in a transaction, search it before COMMIT,
+    roll back, fill it again, COMMIT and search again. Returns both measurements."""
+    unit = vectors.astype(np.float64)
+    unit /= np.linalg.norm(unit, axis=1, keepdims=True)
+    exact = []
+    for query in queries:
+        q = query.astype(np.float64) / np.linalg.norm(query)
+        exact.append({int(i) + 1 for i in np.argsort(1.0 - unit @ q)[:UNCOMMITTED_K]})
+    with conn.cursor() as cur:
+        cur.execute(UNCOMMITTED_DROP_SQL)
+        cur.execute(UNCOMMITTED_CREATE_SQL)  # DDL commits: the transaction starts after it
+    start = time.perf_counter()
+    _fill_probe(conn, vectors)
+    insert_uncommitted = time.perf_counter() - start
+    before = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS)
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM uncommitted_probe")
+        left = int(cur.fetchone()[0])
+    start = time.perf_counter()
+    _fill_probe(conn, vectors)
+    conn.commit()
+    insert_committed = time.perf_counter() - start
+    after = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS)
+    return {
+        "rows": len(vectors), "queries": len(queries),
+        "rows_left_after_rollback": left,
+        "insert_seconds": {"uncommitted": round(insert_uncommitted, 3),
+                           "committed": round(insert_committed, 3)},
+        "uncommitted": before, "committed": after,
+    }  # fmt: skip
+
+
+def group_uncommitted(ctx: Context) -> None:
+    ensure_configuration(ctx, FINAL, label="uncommitted_final")
+    conn = ctx.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(CHUNK_VECTORS_SQL)
+            chunk_vectors = np.stack([db.vec_from_bytes(row[0]) for row in cur.fetchall()])
+            cur.execute(CLAIM_TEXTS_SQL)
+            claim_texts = [str(row[0]) for row in cur.fetchall()]
+        claim_vectors = np.asarray(ctx.embedder.embed_queries(claim_texts), dtype=np.float32)
+        rng = np.random.default_rng(UNCOMMITTED_RANDOM_SEED)
+        random_vectors = rng.standard_normal((UNCOMMITTED_RANDOM_ROWS, db.VECTOR_DIM)).astype(np.float32)
+        random_queries = rng.standard_normal((len(claim_texts), db.VECTOR_DIM)).astype(np.float32)
+        datasets = {
+            "chunks": (chunk_vectors, claim_vectors,
+                       (f"the {len(chunk_vectors)} FINAL chunk embeddings, queried with the "
+                        f"{len(claim_texts)} claim embeddings")),
+            "random": (random_vectors, random_queries,
+                       (f"{UNCOMMITTED_RANDOM_ROWS} random normal vectors (seed "
+                        f"{UNCOMMITTED_RANDOM_SEED}), as many random queries")),
+        }  # fmt: skip
+        results: dict[str, Any] = {}
+        for name, (vectors, queries, label) in datasets.items():
+            builds = []
+            for build in range(1, UNCOMMITTED_BUILDS + 1):
+                log.info("uncommitted: %s, build %d of %d", name, build, UNCOMMITTED_BUILDS)
+                builds.append(measure_uncommitted(conn, vectors, queries))
+            results[name] = {"label": label, "builds": builds}
+    finally:
+        try:
+            if conn.open:
+                conn.rollback()
+                with conn.cursor() as cur:
+                    cur.execute(UNCOMMITTED_DROP_SQL)
+                conn.commit()
+        finally:
+            conn.close()
+    meta, index = ctx.database_state()
+    data = {
+        "name": UNCOMMITTED, "group": "uncommitted", "created_at": utc_now(),
+        "k": UNCOMMITTED_K, "efs": list(UNCOMMITTED_EFS), "builds": UNCOMMITTED_BUILDS,
+        "configuration": asdict(FINAL), "mariadb_version": meta.get("mariadb_version"),
+        "chunk_index": index, "datasets": results,
+    }  # fmt: skip
+    write_json(ctx.out_dir / f"{UNCOMMITTED}.json", data)
+    (ctx.out_dir / f"{UNCOMMITTED}.md").write_text(uncommitted_markdown(data), encoding="utf-8")
+    log.info("wrote %s", ctx.out_dir / f"{UNCOMMITTED}.json")
+
+
+def uncommitted_rows(data: dict[str, Any]) -> list[list[Any]]:
+    """One row per dataset, state and ef: overlap mean (min..max over builds), worst query, p50."""
+    rows: list[list[Any]] = []
+    for name, dataset in data["datasets"].items():
+        for state in ("uncommitted", "committed"):
+            for ef in data["efs"]:
+                cells = [b[state][str(ef)] for b in dataset["builds"]]
+                means = [c["mean_overlap"] for c in cells]
+                rows.append([
+                    name, state, ef,
+                    f"{np.mean(means):.3f} ({min(means):.3f}..{max(means):.3f})",
+                    f"{min(c['min_overlap'] for c in cells):.1f}",
+                    f"{np.mean([c['p50_ms'] for c in cells]):.2f}",
+                ])  # fmt: skip
+    return rows
+
+
+def uncommitted_markdown(data: dict[str, Any]) -> str:
+    """The per-run Markdown file of the uncommitted group."""
+    lines = [
+        f"# {data['name']}",
+        "",
+        (
+            f"Created {data['created_at']} by `scripts/run_experiments.py uncommitted` on MariaDB "
+            f"{data['mariadb_version']}. A scratch table with the chunk table's vector column and "
+            "index (VECTOR(384), M=16, cosine) is filled inside one transaction and searched with "
+            f"`ORDER BY VEC_DISTANCE_COSINE(embedding, ?) LIMIT {data['k']}` before COMMIT; the "
+            "transaction is rolled back, the table filled again, committed and searched again. "
+            f"Overlap is the share of the exact top {data['k']} (NumPy, all rows) among the ids "
+            f"the index returns; mean over the queries, then mean (min..max) over {data['builds']} "
+            "fresh builds. p50 is the statement time in ms, averaged over the builds."
+        ),
+        "",
+    ]
+    for name, dataset in data["datasets"].items():
+        lines.append(f"- `{name}`: {dataset['label']}.")
+    lines += [
+        "",
+        md_table(("data", "state", "ef", "mean overlap@10 (builds)", "worst query", "p50 ms"),
+                 uncommitted_rows(data)),
+        "",
+    ]
+    for name, dataset in data["datasets"].items():
+        left = sorted({b["rows_left_after_rollback"] for b in dataset["builds"]})
+        inserts = [b["insert_seconds"] for b in dataset["builds"]]
+        lines.append(
+            f"- `{name}`: rows left after ROLLBACK {left}; insert seconds uncommitted / committed "
+            + ", ".join(f"{i['uncommitted']} / {i['committed']}" for i in inserts) + "."
+        )
+    return "\n".join(lines) + "\n"
+
+
+
+def planner_case(
+    conn: pymysql.Connection, queries: np.ndarray, filters: Filters, n_chunks: int
+) -> dict[str, Any]:
+    """Plan, rows read and time of the inline statement for every query under ``filters``."""
+    passing = len(search(conn, queries[0], k=n_chunks, filters=filters, strategy="inline",
+                         ef_search=EF_CHOSEN))
+    index_plans, r_rows, times, short = 0, [], [], 0
+    first_plan = None
+    for query in queries:
+        db.set_session_var(conn, "mhnsw_ef_search", EF_CHOSEN)
+        plan = explain_search(conn, query, k=PLANNER_K, filters=filters)
+        chunk_row = next(row for row in plan if row["table"] == "chunk")
+        first_plan = first_plan or chunk_row
+        uses_index = chunk_row["key"] == VECTOR_INDEX_NAME and chunk_row["type"] == "index"
+        index_plans += int(uses_index)
+        analyzed = explain_search(conn, query, k=PLANNER_K, filters=filters, analyze=True)
+        r_rows.append(float(next(row for row in analyzed if row["table"] == "chunk")["r_rows"]))
+        for _ in range(PLANNER_REPEATS):
+            start = time.perf_counter()
+            hits = search(conn, query, k=PLANNER_K, filters=filters, strategy="inline",
+                          ef_search=EF_CHOSEN)
+            times.append((time.perf_counter() - start) * 1000)
+        short += int(len(hits) < min(PLANNER_K, passing))
+    return {
+        "passing_chunks": passing,
+        "queries": len(queries),
+        "index_plans": index_plans,
+        "chunk_access": {"type": first_plan["type"], "key": first_plan["key"],
+                         "extra": first_plan.get("Extra")},
+        "r_rows_p50": float(np.median(r_rows)), "r_rows_max": float(max(r_rows)),
+        "sql_ms_p50": round(float(np.percentile(times, 50)), 3),
+        "sql_ms_p95": round(float(np.percentile(times, 95)), 3),
+        "short_results": short,
+    }  # fmt: skip
+
+
+def group_planner(ctx: Context) -> None:
+    ensure_configuration(ctx, FINAL, label="planner_final")
+    conn = ctx.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(CLAIM_TEXTS_SQL)
+            claim_texts = [str(row[0]) for row in cur.fetchall()]
+            cur.execute(CHUNK_COUNT_SQL)
+            n_chunks = int(cur.fetchone()[0])
+        queries = np.asarray(ctx.embedder.embed_queries(claim_texts), dtype=np.float32)
+        cases = {}
+        for name, filters in PLANNER_CASES:
+            log.info("planner: %s", name)
+            cases[name] = {"filters": {k: (str(v) if isinstance(v, date) else v)
+                                       for k, v in asdict(filters).items() if v is not None},
+                           **planner_case(conn, queries, filters, n_chunks)}
+    finally:
+        conn.close()
+    meta, index = ctx.database_state()
+    data = {
+        "name": PLANNER, "group": "planner", "created_at": utc_now(), "k": PLANNER_K,
+        "ef_search": EF_CHOSEN, "repeats": PLANNER_REPEATS, "n_chunks": n_chunks,
+        "configuration": asdict(FINAL), "mariadb_version": meta.get("mariadb_version"),
+        "chunk_index": index, "cases": cases,
+    }  # fmt: skip
+    write_json(ctx.out_dir / f"{PLANNER}.json", data)
+    (ctx.out_dir / f"{PLANNER}.md").write_text(planner_markdown(data), encoding="utf-8")
+    log.info("wrote %s", ctx.out_dir / f"{PLANNER}.json")
+
+
+def planner_rows(data: dict[str, Any]) -> list[list[Any]]:
+    """One row per filter case."""
+    rows = []
+    for name, case in data["cases"].items():
+        rows.append([
+            name, case["passing_chunks"], f"{case['index_plans']}/{case['queries']}",
+            f"{case['chunk_access']['type']} / {case['chunk_access']['key']}",
+            f"{case['r_rows_p50']:.0f} (max {case['r_rows_max']:.0f})",
+            f"{case['sql_ms_p50']:.2f} / {case['sql_ms_p95']:.2f}", case["short_results"],
+        ])  # fmt: skip
+    return rows
+
+
+PLANNER_HEADERS = ("filter", "chunks passing", "plans using the vector index",
+                   "chunk access (type / key)", "chunk rows read, p50", "SQL ms p50 / p95",
+                   "short results")
+
+
+def planner_markdown(data: dict[str, Any]) -> str:
+    """The per-run Markdown file of the planner group."""
+    lines = [
+        f"# {data['name']}",
+        "",
+        (
+            f"Created {data['created_at']} by `scripts/run_experiments.py planner` on MariaDB "
+            f"{data['mariadb_version']}, {data['n_chunks']} chunks. For every filter below and "
+            "every claim embedding, the inline statement (`search(..., strategy=\"inline\")`, "
+            f"k {data['k']}, ef_search {data['ef_search']}) is explained (EXPLAIN: does the "
+            "chunk row read through the vector index, type `index`, key `embedding`?), analysed "
+            "(ANALYZE: chunk rows actually read) and timed "
+            f"({data['repeats']} repeats). \"chunks passing\" counts the chunks the filter keeps; "
+            "\"short results\" the queries that got fewer than min(k, passing) hits."
+        ),
+        "",
+        md_table(PLANNER_HEADERS, planner_rows(data)),
+        "",
+        "Filters:",
+        "",
+    ]
+    for name, case in data["cases"].items():
+        lines.append(f"- `{name}`: {json.dumps(case['filters'], ensure_ascii=False)}")
+    return "\n".join(lines) + "\n"
+
+
 class Results:
     """Reads the result JSON files of one directory; a missing file gives None / "not found"."""
 
@@ -1581,6 +1922,8 @@ def summary_markdown(out_dir: Path) -> str:
     parts += summary_filters(r)
     parts += summary_final(r)
     parts += summary_restore(r)
+    parts += summary_uncommitted(r)
+    parts += summary_planner(r)
     parts += summary_defaults(r)
     return "\n".join(parts) + "\n"
 
@@ -2135,6 +2478,38 @@ def summary_restore(r: Results) -> list[str]:
     return parts
 
 
+def summary_uncommitted(r: Results) -> list[str]:
+    data = r.get(UNCOMMITTED)
+    parts = ["## 9. Searching rows the transaction has not committed yet", ""]
+    if data is None:
+        parts += [f"`{UNCOMMITTED}.json` not found.", ""]
+        return parts
+    parts += [
+        md_table(("data", "state", "ef", "mean overlap@10 (builds)", "worst query", "p50 ms"),
+                 uncommitted_rows(data)),
+        "",
+        (
+            "Reading: the same vectors, the same index definition and the same statement; only "
+            "the transaction state differs. Compare the overlap of each `uncommitted` row with "
+            f"its `committed` row (`{UNCOMMITTED}.md` has the per-build insert times and the "
+            "row count after ROLLBACK)."
+        ),
+        "",
+    ]
+    return parts
+
+
+def summary_planner(r: Results) -> list[str]:
+    data = r.get(PLANNER)
+    parts = ["## 10. When the optimizer keeps the vector index under a filter (inline statement)", ""]
+    if data is None:
+        parts += [f"`{PLANNER}.json` not found.", ""]
+        return parts
+    parts += [md_table(PLANNER_HEADERS, planner_rows(data)), "",
+              f"Details and the exact filter values: `{PLANNER}.md`.", ""]
+    return parts
+
+
 def summary_defaults(r: Results) -> list[str]:
     parts = ["## Chosen defaults and evidence", ""]
     need = (*[f"m{m}_ef_{ef}" for m in INDEX_M_VALUES for ef in INDEX_M_EFS], EXACT_OLD,
@@ -2278,6 +2653,8 @@ GROUPS = {
     "filters": group_filters,
     "final": group_final,
     "restore": group_restore,
+    "uncommitted": group_uncommitted,
+    "planner": group_planner,
     "summary": group_summary,
 }
 PROTOCOL_ORDER = tuple(GROUPS)

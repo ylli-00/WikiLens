@@ -197,3 +197,41 @@ def test_device_phrase_and_repeats_option(rexp: Any, tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         rexp.main(["summary", "--repeats", "0", "--out", str(tmp_path)])
     assert list(tmp_path.iterdir()) == []
+
+
+def test_uncommitted_probe_sql_mirrors_the_schema_and_is_fixed(rexp: Any) -> None:
+    """The scratch table copies chunk.embedding's type and index from sql/schema.sql, and every
+    statement of the group is a fixed literal (values are parameters)."""
+    schema = (rexp.REPO_ROOT / "sql" / "schema.sql").read_text(encoding="utf-8")
+    assert f"VECTOR({rexp.db.VECTOR_DIM})" in rexp.UNCOMMITTED_CREATE_SQL
+    assert f"embedding  VECTOR({rexp.db.VECTOR_DIM}) NOT NULL" in schema
+    index = f"VECTOR INDEX (embedding) M={rexp.db.VECTOR_INDEX_M} DISTANCE=cosine"
+    assert index in rexp.UNCOMMITTED_CREATE_SQL and index in schema
+    for statement in (rexp.UNCOMMITTED_CREATE_SQL, rexp.UNCOMMITTED_DROP_SQL,
+                      rexp.UNCOMMITTED_INSERT_SQL, rexp.UNCOMMITTED_KNN_SQL):
+        assert "{" not in statement and "uncommitted_probe" in statement
+    assert rexp.UNCOMMITTED_KNN_SQL.count("%s") == 2
+    assert "uncommitted" in rexp.GROUPS and rexp.PROTOCOL_ORDER[-1] == "summary"
+
+
+def test_uncommitted_rows_and_markdown_average_the_builds(rexp: Any) -> None:
+    def cell(overlap: float, worst: float, p50: float) -> dict[str, float]:
+        return {"mean_overlap": overlap, "min_overlap": worst, "p50_ms": p50, "p95_ms": p50}
+
+    builds = [
+        {"rows": 3, "queries": 2, "rows_left_after_rollback": 0,
+         "insert_seconds": {"uncommitted": 0.5, "committed": 0.4},
+         "uncommitted": {"20": cell(0.6, 0.3, 0.2)}, "committed": {"20": cell(1.0, 1.0, 0.5)}},
+        {"rows": 3, "queries": 2, "rows_left_after_rollback": 0,
+         "insert_seconds": {"uncommitted": 0.6, "committed": 0.4},
+         "uncommitted": {"20": cell(0.8, 0.5, 0.4)}, "committed": {"20": cell(0.9, 0.8, 0.7)}},
+    ]  # fmt: skip
+    data = {"name": rexp.UNCOMMITTED, "created_at": "now", "mariadb_version": "11.8.9", "k": 10,
+            "builds": 2, "efs": [20], "datasets": {"chunks": {"label": "x", "builds": builds}}}
+    assert rexp.uncommitted_rows(data) == [
+        ["chunks", "uncommitted", 20, "0.700 (0.600..0.800)", "0.3", "0.30"],
+        ["chunks", "committed", 20, "0.950 (0.900..1.000)", "0.8", "0.60"],
+    ]
+    text = rexp.uncommitted_markdown(data)
+    assert "| chunks | uncommitted | 20 | 0.700 (0.600..0.800) | 0.3 | 0.30 |" in text
+    assert "rows left after ROLLBACK [0]" in text and "0.5 / 0.4, 0.6 / 0.4" in text

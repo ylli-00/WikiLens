@@ -1,0 +1,330 @@
+{
+  "name": "uncommitted_recall",
+  "group": "uncommitted",
+  "created_at": "2026-10-21T22:26:41+00:00",
+  "k": 10,
+  "efs": [
+    20,
+    100,
+    400
+  ],
+  "builds": 3,
+  "configuration": {
+    "chunk_max_words": 240,
+    "chunk_overlap_units": 1,
+    "index_m": 16,
+    "use_prefix": true
+  },
+  "mariadb_version": "11.8.9-MariaDB-ubu2404",
+  "chunk_index": {
+    "name": "embedding",
+    "m": 16,
+    "distance": "cosine"
+  },
+  "datasets": {
+    "chunks": {
+      "label": "the 4598 FINAL chunk embeddings, queried with the 75 claim embeddings",
+      "builds": [
+        {
+          "rows": 4598,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 1.402,
+            "committed": 1.334
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.976,
+              "min_overlap": 0.6,
+              "p50_ms": 0.241,
+              "p95_ms": 0.529
+            },
+            "100": {
+              "mean_overlap": 0.976,
+              "min_overlap": 0.6,
+              "p50_ms": 0.178,
+              "p95_ms": 0.296
+            },
+            "400": {
+              "mean_overlap": 0.976,
+              "min_overlap": 0.6,
+              "p50_ms": 0.228,
+              "p95_ms": 0.235
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.9907,
+              "min_overlap": 0.5,
+              "p50_ms": 0.261,
+              "p95_ms": 1.497
+            },
+            "100": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 0.206,
+              "p95_ms": 0.275
+            },
+            "400": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 0.498,
+              "p95_ms": 0.589
+            }
+          }
+        },
+        {
+          "rows": 4598,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 1.446,
+            "committed": 1.325
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.9747,
+              "min_overlap": 0.6,
+              "p50_ms": 0.132,
+              "p95_ms": 0.578
+            },
+            "100": {
+              "mean_overlap": 0.9747,
+              "min_overlap": 0.6,
+              "p50_ms": 0.16,
+              "p95_ms": 0.173
+            },
+            "400": {
+              "mean_overlap": 0.9747,
+              "min_overlap": 0.6,
+              "p50_ms": 0.23,
+              "p95_ms": 0.242
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.9907,
+              "min_overlap": 0.6,
+              "p50_ms": 0.959,
+              "p95_ms": 1.549
+            },
+            "100": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 1.131,
+              "p95_ms": 1.396
+            },
+            "400": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 1.178,
+              "p95_ms": 2.102
+            }
+          }
+        },
+        {
+          "rows": 4598,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 1.464,
+            "committed": 1.336
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.9707,
+              "min_overlap": 0.5,
+              "p50_ms": 0.137,
+              "p95_ms": 0.532
+            },
+            "100": {
+              "mean_overlap": 0.9747,
+              "min_overlap": 0.7,
+              "p50_ms": 0.233,
+              "p95_ms": 0.395
+            },
+            "400": {
+              "mean_overlap": 0.9787,
+              "min_overlap": 0.7,
+              "p50_ms": 0.283,
+              "p95_ms": 0.515
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.9907,
+              "min_overlap": 0.5,
+              "p50_ms": 0.258,
+              "p95_ms": 1.119
+            },
+            "100": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 0.21,
+              "p95_ms": 0.259
+            },
+            "400": {
+              "mean_overlap": 1.0,
+              "min_overlap": 1.0,
+              "p50_ms": 0.467,
+              "p95_ms": 0.652
+            }
+          }
+        }
+      ]
+    },
+    "random": {
+      "label": "1000 random normal vectors (seed 1), as many random queries",
+      "builds": [
+        {
+          "rows": 1000,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 0.506,
+            "committed": 0.429
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.6267,
+              "min_overlap": 0.3,
+              "p50_ms": 0.172,
+              "p95_ms": 0.407
+            },
+            "100": {
+              "mean_overlap": 0.6613,
+              "min_overlap": 0.3,
+              "p50_ms": 0.213,
+              "p95_ms": 0.296
+            },
+            "400": {
+              "mean_overlap": 0.6613,
+              "min_overlap": 0.3,
+              "p50_ms": 0.266,
+              "p95_ms": 0.391
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.7733,
+              "min_overlap": 0.4,
+              "p50_ms": 0.18,
+              "p95_ms": 0.313
+            },
+            "100": {
+              "mean_overlap": 0.9907,
+              "min_overlap": 0.9,
+              "p50_ms": 0.256,
+              "p95_ms": 0.275
+            },
+            "400": {
+              "mean_overlap": 0.996,
+              "min_overlap": 0.9,
+              "p50_ms": 0.362,
+              "p95_ms": 0.467
+            }
+          }
+        },
+        {
+          "rows": 1000,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 0.522,
+            "committed": 0.437
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.6307,
+              "min_overlap": 0.2,
+              "p50_ms": 0.451,
+              "p95_ms": 0.637
+            },
+            "100": {
+              "mean_overlap": 0.6627,
+              "min_overlap": 0.3,
+              "p50_ms": 0.304,
+              "p95_ms": 0.505
+            },
+            "400": {
+              "mean_overlap": 0.6627,
+              "min_overlap": 0.3,
+              "p50_ms": 0.474,
+              "p95_ms": 0.565
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.7867,
+              "min_overlap": 0.4,
+              "p50_ms": 0.207,
+              "p95_ms": 0.617
+            },
+            "100": {
+              "mean_overlap": 0.992,
+              "min_overlap": 0.9,
+              "p50_ms": 0.191,
+              "p95_ms": 0.249
+            },
+            "400": {
+              "mean_overlap": 0.9987,
+              "min_overlap": 0.9,
+              "p50_ms": 0.425,
+              "p95_ms": 0.584
+            }
+          }
+        },
+        {
+          "rows": 1000,
+          "queries": 75,
+          "rows_left_after_rollback": 0,
+          "insert_seconds": {
+            "uncommitted": 0.526,
+            "committed": 0.441
+          },
+          "uncommitted": {
+            "20": {
+              "mean_overlap": 0.628,
+              "min_overlap": 0.3,
+              "p50_ms": 0.132,
+              "p95_ms": 0.449
+            },
+            "100": {
+              "mean_overlap": 0.6547,
+              "min_overlap": 0.3,
+              "p50_ms": 0.179,
+              "p95_ms": 0.241
+            },
+            "400": {
+              "mean_overlap": 0.6547,
+              "min_overlap": 0.3,
+              "p50_ms": 0.486,
+              "p95_ms": 0.789
+            }
+          },
+          "committed": {
+            "20": {
+              "mean_overlap": 0.7773,
+              "min_overlap": 0.4,
+              "p50_ms": 0.132,
+              "p95_ms": 0.377
+            },
+            "100": {
+              "mean_overlap": 0.9893,
+              "min_overlap": 0.9,
+              "p50_ms": 0.237,
+              "p95_ms": 0.378
+            },
+            "400": {
+              "mean_overlap": 0.996,
+              "min_overlap": 0.9,
+              "p50_ms": 0.432,
+              "p95_ms": 0.603
+            }
+          }
+        }
+      ]
+    }
+  }
+}
