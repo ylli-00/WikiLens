@@ -74,6 +74,7 @@ OPENAPI_URL = "/openapi.json"
 CHUNK_COUNT_SQL = "SELECT COUNT(*) FROM chunk"
 ER_NO_SUCH_TABLE = 1146  # MariaDB: "Table ... doesn't exist"
 ER_FT_MATCHING_KEY_NOT_FOUND = 1191  # MariaDB: "Can't find FULLTEXT index matching the column list"
+ER_BAD_FIELD_ERROR = 1054  # MariaDB: "Unknown column ..." (a database ingested with an older schema)
 
 #: The strategy that runs without filters; a filter given with it is a 422.
 STRATEGY_NO_FILTERS = "none"
@@ -632,8 +633,8 @@ def api_search(
             if exc.args and exc.args[0] == ER_NO_SUCH_TABLE:
                 raise HTTPException(
                     status_code=503,
-                    detail="the database has no schema: run 'wikilense init-db' and "
-                    "'wikilense ingest'",
+                    detail="the database has no schema or an older one: run 'wikilense "
+                    "ingest'",
                 ) from exc
             raise
         except pymysql.err.OperationalError as exc:
@@ -643,6 +644,14 @@ def api_search(
                     status_code=503,
                     detail="the chunk table has no FULLTEXT index (ingested with an older "
                     "schema): re-run 'wikilense ingest' before using strategy rrf",
+                ) from exc
+            # 1054 has no PyMySQL mapping either: a column of a newer schema is missing
+            # (page.last_edited before the page metadata), so the ingest is older than the code
+            if exc.args and exc.args[0] == ER_BAD_FIELD_ERROR:
+                raise HTTPException(
+                    status_code=503,
+                    detail="the database was ingested with an older schema: re-run "
+                    "'wikilense ingest'",
                 ) from exc
             raise
     finally:

@@ -1,6 +1,6 @@
 # WikiLense experiments: summary
 
-Generated 2026-10-21T22:46:47+00:00 by `scripts/run_experiments.py summary`. Every number below is read from the JSON files in `results/` written by the same script (`write_results` of the evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims over the 100-page corpus; article recall counts the claims with a gold page among the pages of the top-k chunks (of 75), evidence recall the claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a sentence-only evidence set), unit coverage the mean share of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one `search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine distance, its M as stated per section. Two ingest configurations are used: OLD = 120 words, overlap 1, M=6, prefix on (phases 1 and 2) and FINAL = 240 words, overlap 1, M=16, prefix on (the chosen defaults); hatnote units ("Main article: ...") are in no chunk in either. "Identical to exact" counts the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the inline statement without filters, which does not depend on the HNSW graph).
+Generated 2026-10-21T23:14:37+00:00 by `scripts/run_experiments.py summary`. Every number below is read from the JSON files in `results/` written by the same script (`write_results` of the evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims over the 100-page corpus; article recall counts the claims with a gold page among the pages of the top-k chunks (of 75), evidence recall the claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a sentence-only evidence set), unit coverage the mean share of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one `search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine distance, its M as stated per section. Two ingest configurations are used: OLD = 120 words, overlap 1, M=6, prefix on (phases 1 and 2) and FINAL = 240 words, overlap 1, M=16, prefix on (the chosen defaults); hatnote units ("Main article: ...") are in no chunk in either. "Identical to exact" counts the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the inline statement without filters, which does not depend on the HNSW graph).
 
 ## Machine and versions
 
@@ -195,18 +195,18 @@ Reading: the same vectors, the same index definition and the same statement; onl
 
 | filter | chunks passing | plans using the vector index | chunk access (type / key) | chunk rows read, p50 | SQL ms p50 / p95 | short results |
 |---|---|---|---|---|---|---|
-| none | 4598 | 75/75 | index / embedding | 10 (max 10) | 2.37 / 4.65 | 0 |
-| min_words_1000 | 4544 | 75/75 | index / embedding | 10 (max 19) | 2.24 / 3.26 | 0 |
-| min_words_5000 | 3891 | 75/75 | index / embedding | 17 (max 75) | 2.24 / 2.44 | 0 |
-| max_words_2000 | 89 | 75/75 | index / embedding | 601 (max 1663) | 3.37 / 5.06 | 0 |
-| max_words_500 | 25 | 0/75 | ALL / None | 4598 (max 4598) | 5.28 / 8.95 | 0 |
-| heading_history | 117 | 75/75 | index / embedding | 315 (max 1014) | 3.14 / 4.60 | 0 |
-| linked_from | 661 | 75/75 | index / embedding | 121 (max 492) | 3.63 / 5.63 | 0 |
-| category | 695 | 75/75 | index / embedding | 108 (max 420) | 2.51 / 3.18 | 0 |
-| edited_since_2020_12_01 | 4525 | 75/75 | index / embedding | 10 (max 25) | 2.22 / 2.83 | 0 |
-| edited_before_2020_12_15 | 778 | 75/75 | index / embedding | 67 (max 491) | 2.58 / 3.64 | 0 |
-| edited_before_2020_06_01 | 4 | 0/75 | ALL / None | 4598 (max 4598) | 3.34 / 3.59 | 0 |
-| four_filters | 377 | 75/75 | index / embedding | 184 (max 888) | 3.52 / 4.68 | 0 |
+| none | 4598 | 75/75 | index / embedding | 10 (max 10) | 2.11 / 2.91 | 0 |
+| min_words_1000 | 4544 | 75/75 | index / embedding | 10 (max 19) | 2.16 / 2.50 | 0 |
+| min_words_5000 | 3891 | 75/75 | index / embedding | 17 (max 75) | 2.05 / 2.33 | 0 |
+| max_words_2000 | 89 | 75/75 | index / embedding | 601 (max 1663) | 2.84 / 3.93 | 0 |
+| max_words_500 | 25 | 0/75 | ALL / None | 4598 (max 4598) | 5.17 / 6.30 | 0 |
+| heading_history | 117 | 75/75 | index / embedding | 315 (max 1014) | 2.99 / 4.02 | 0 |
+| linked_from | 661 | 75/75 | index / embedding | 121 (max 492) | 2.90 / 3.71 | 0 |
+| category | 695 | 75/75 | index / embedding | 108 (max 420) | 2.93 / 3.85 | 0 |
+| edited_since_2020_12_01 | 4525 | 75/75 | index / embedding | 10 (max 25) | 2.24 / 2.50 | 0 |
+| edited_before_2020_12_15 | 778 | 75/75 | index / embedding | 67 (max 491) | 2.89 / 4.09 | 0 |
+| edited_before_2020_06_01 | 4 | 0/75 | ALL / None | 4598 (max 4598) | 3.08 / 4.02 | 0 |
+| four_filters | 377 | 75/75 | index / embedding | 184 (max 888) | 3.22 / 4.29 | 0 |
 
 Details and the exact filter values: `planner_choices.md`.
 

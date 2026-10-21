@@ -235,3 +235,13 @@ def test_uncommitted_rows_and_markdown_average_the_builds(rexp: Any) -> None:
     text = rexp.uncommitted_markdown(data)
     assert "| chunks | uncommitted | 20 | 0.700 (0.600..0.800) | 0.3 | 0.30 |" in text
     assert "rows left after ROLLBACK [0]" in text and "0.5 / 0.4, 0.6 / 0.4" in text
+
+
+def test_the_configuration_includes_the_page_metadata_digest(rexp: Any) -> None:
+    """An ingest made before the page metadata (or without it) is not the configuration."""
+    expected = rexp.FINAL.ingest_meta_expected()
+    meta_path = rexp.DEFAULT_CORPUS_DIR / rexp.PAGE_META_FILE
+    assert expected["corpus_page_meta_sha256"] == rexp.sha256_of_file(meta_path)
+    stale = {**expected, "corpus_page_meta_sha256": "none"}
+    index = {"name": "embedding", "m": rexp.FINAL.index_m, "distance": "cosine"}
+    assert "ingest_meta.corpus_page_meta_sha256" in rexp.FINAL.differences(stale, index)

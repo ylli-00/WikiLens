@@ -125,6 +125,7 @@ from wikilense.config import (
     Settings,
     load_settings,
 )
+from wikilense.corpus import DEFAULT_CORPUS_DIR, PAGE_META_FILE
 from wikilense.embedding import Embedder
 from wikilense.evaluate import (
     DEFAULT_RESULTS_DIR,
@@ -136,7 +137,7 @@ from wikilense.evaluate import (
     read_ingest_meta,
     write_results,
 )
-from wikilense.ingest import INDEX_DISTANCE, run_ingest
+from wikilense.ingest import INDEX_DISTANCE, run_ingest, sha256_of_file
 from wikilense.search import Filters, explain_search, search
 from wikilense.wikitext import HATNOTE_RE
 
@@ -209,8 +210,14 @@ class Configuration:
         return {**asdict(self), "label": self.label}
 
     def ingest_meta_expected(self) -> dict[str, str]:
-        """Return the ``ingest_meta`` values an ingest of this configuration writes."""
+        """Return the ``ingest_meta`` values an ingest of this configuration writes.
+
+        The harness always ingests ``DEFAULT_CORPUS_DIR``, so the page metadata digest is that
+        file's (``none`` without it, as the ingest records): an ingest made before the metadata
+        existed, or without it, does not count as this configuration."""
+        meta_path = DEFAULT_CORPUS_DIR / PAGE_META_FILE
         return {
+            "corpus_page_meta_sha256": sha256_of_file(meta_path) if meta_path.is_file() else "none",
             "chunk_max_words": str(self.chunk_max_words),
             "chunk_overlap_units": str(self.chunk_overlap_units),
             "embedding_prefix": "true" if self.use_prefix else "false",
@@ -1677,8 +1684,8 @@ def planner_case(
         r_rows.append(float(next(row for row in analyzed if row["table"] == "chunk")["r_rows"]))
         for _ in range(PLANNER_REPEATS):
             start = time.perf_counter()
-            hits = search(conn, query, k=PLANNER_K, filters=filters, strategy="inline",
-                          ef_search=EF_CHOSEN)
+            # ef_search is already the session's (set above): the timing is the statement only
+            hits = search(conn, query, k=PLANNER_K, filters=filters, strategy="inline")
             times.append((time.perf_counter() - start) * 1000)
         short += int(len(hits) < min(PLANNER_K, passing))
     return {

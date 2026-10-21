@@ -49,7 +49,7 @@ the 120-word ingest (8,658 chunks), and the chunk-size sweep uses one ingest per
   edited since 1 December 2020, linked from *Asia*" is one SQL statement.
   - `EXPLAIN` shows the vector index as its first access path, and the category and link filters
     as materialised derived tables.
-  - Over the 75 claims it runs in 3.5 ms at the median and never returns fewer than k rows.
+  - Over the 75 claims it runs in 3.2 ms at the median and never returns fewer than k rows.
 - **The optimizer decides, per filter, whether the vector index survives.**
   - Nine of the eleven filters we measured keep it, as does the unfiltered statement. The rows
     read grow with the filter's selectivity: 10 rows unfiltered, 601 when only 89 of 4,598 chunks
@@ -118,7 +118,7 @@ The ingest ends with the seconds per stage and a report you can compare against 
 ```
 
 Then:
-- `make test`: 345 tests, about 20 s.
+- `make test`: 351 tests, about 20 s.
 - `make eval`: the headline table below, about 15 s.
 - `make serve`: the web page at http://127.0.0.1:8000.
 - `make experiments`: the whole protocol, about 10 minutes.
@@ -277,7 +277,8 @@ every statement of the file against the schema.
     scraped Wikipedia, not today's page. Its timestamp is the "last edited" date of the text we
     have, and its `[[Category:...]]` links are the categories.
   - For the 93 pages edited during December 2020, the revision whose wikitext contains the most of
-    the page's FEVEROUS sentences is chosen. Three renamed pages are followed through the move log.
+    the page's FEVEROUS sentences is chosen; on a tie, the later one. Three renamed pages are
+    followed through the move log.
   - All 100 pages were found, and 94.5% of the sentence probes occur in the chosen revisions. On
     today's "Albert Einstein" page only 260 of 484 probes match, against 466 in the December 2020
     revision.
@@ -451,8 +452,9 @@ session scope of `ef_search`, the transactions, and the plan of the category fil
     link filter, 315 under the History heading, 601 under `max_words 2000` (89 chunks pass).
   - The two most selective range filters on indexed `page` columns make it scan all 4,598 chunks,
     compute every distance and sort: `max_words 500` (25 chunks pass) and `edited_before
-    2020-06-01` (4 pass). That plan is exact, at 5.3 and 3.3 ms, and its cost grows with the table.
-  - No case returned fewer than `k` rows.
+    2020-06-01` (4 pass). That plan is exact, at 5.2 and 3.1 ms, and its cost grows with the table.
+  - No query returned fewer than min(k, passing) rows: under `edited_before 2020-06-01` only 4
+    chunks pass, and each query returns those 4.
 
   ![Chunk rows read under each filter](docs/img/planner_rows.svg)
 
@@ -529,7 +531,7 @@ session scope of `ef_search`, the transactions, and the plan of the category fil
 | Hatnotes | "Main article: ...", "See also: ...", "For other uses ..." are stored as sentences but kept out of chunks | 1,316 of 33,637 units; before the change they formed short chunks that ranked high under section filters (found in the phase-4 review; not recorded in `results/`) |
 | Index `M` | 16 (server default 6) | on the same vectors at `ef_search=20`: article recall@10 67/74/73 of 75 and evidence recall@20 54/64/62 of 66 for M 6/16/32, against 74 and 63 exact; at `ef_search=100` M=16 returns the exact hit list for 69 of 75 claims (M=32: 73); build 2.9 s (M=6 1.1 s, M=32 9.1 s), graph 17 MB (section 3) |
 | `mhnsw_ef_search` | 100 per query (server default 20) | on the final ingest hit lists identical to the exact ranking for 74 of 75 claims against 65 at 20, for 0.51 ms instead of 0.45 ms at k=10 (section 7) |
-| Strategy with filters | `inline`; `overfetch` when latency matters more than a full result | inline always fills `k`, at 2.2 to 3.6 ms p50 while it walks the index and 5.3 ms when the optimizer scans instead; overfetch 10 costs 0.7 to 1.0 ms but comes back short under selective filters (sections 6 and 10) |
+| Strategy with filters | `inline`; `overfetch` when latency matters more than a full result | inline always fills `k`, at 2.1 to 3.3 ms p50 while it walks the index and 5.2 ms when the optimizer scans instead; overfetch 10 costs 0.7 to 1.0 ms but comes back short under selective filters (sections 6 and 10) |
 | Index cache | 512 MB (`--mhnsw-max-cache-size`) | capacity only: the size changed no hit list; the graph of the 120-word ingest is 16 MB with `M=6` and 17 MB with `M=16`, at or above the default limit |
 
 ## Evaluation
@@ -672,7 +674,7 @@ results/            every experiment (JSON + Markdown) and SUMMARY.md
 docs/DESIGN.md      the design contract, every deviation forced by the data, the measured outcomes
 docs/ARCHITECTURE.md  a beginner's guide to the code: the pipeline, every file, one query end to end
 docs/img/           the charts of this README (scripts/make_charts.py)
-tests/              345 tests: pure tests, `db` tests against wikilense_test, `slow` tests that load the model
+tests/              351 tests: pure tests, `db` tests against wikilense_test, `slow` tests that load the model
 analysis/feverous/  the FEVEROUS analysis that chose the benchmark (earlier phase)
 ```
 

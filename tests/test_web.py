@@ -302,6 +302,8 @@ class ClosingConnection:
          "no FULLTEXT index"),
         (pymysql.err.ProgrammingError(1146, "Table 'wikilense.chunk' doesn't exist"),
          "has no schema"),
+        (pymysql.err.OperationalError(1054, "Unknown column 'page.last_edited' in 'WHERE'"),
+         "older schema"),
     ],
 )
 def test_api_search_reports_a_missing_index_or_schema_as_503(

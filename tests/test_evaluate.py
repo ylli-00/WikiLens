@@ -805,3 +805,18 @@ def test_evaluate_refuses_an_empty_database(
 ) -> None:
     with pytest.raises(ValueError, match="claim table is empty"):
         evaluate(db_conn, embedder, ks=(1,), repeats=1)
+
+
+def test_date_filters_are_recorded_as_iso_text_and_the_result_is_written(tmp_path: Path) -> None:
+    from datetime import date as _date
+
+    from wikilense.evaluate import filters_parameter
+
+    assert filters_parameter(None) is None and filters_parameter(Filters()) is None
+    recorded = filters_parameter(Filters(edited_since=_date(2020, 12, 1), category="Rivers"))
+    assert recorded["edited_since"] == "2020-12-01" and recorded["category"] == "Rivers"
+    assert recorded["edited_before"] is None
+    result = _sample_result()
+    result.parameters["filters"] = recorded
+    json_path, _ = write_results(result, out_dir=tmp_path, name="dated")
+    assert json.loads(json_path.read_text(encoding="utf-8"))["parameters"]["filters"] == recorded

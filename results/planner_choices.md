@@ -1,21 +1,21 @@
 # planner_choices
 
-Created 2026-10-21T22:46:47+00:00 by `scripts/run_experiments.py planner` on MariaDB 11.8.9-MariaDB-ubu2404, 4598 chunks. For every filter below and every claim embedding, the inline statement (`search(..., strategy="inline")`, k 10, ef_search 100) is explained (EXPLAIN: does the chunk row read through the vector index, type `index`, key `embedding`?), analysed (ANALYZE: chunk rows actually read) and timed (3 repeats). "chunks passing" counts the chunks the filter keeps; "short results" the queries that got fewer than min(k, passing) hits.
+Created 2026-10-21T23:14:37+00:00 by `scripts/run_experiments.py planner` on MariaDB 11.8.9-MariaDB-ubu2404, 4598 chunks. For every filter below and every claim embedding, the inline statement (`search(..., strategy="inline")`, k 10, ef_search 100) is explained (EXPLAIN: does the chunk row read through the vector index, type `index`, key `embedding`?), analysed (ANALYZE: chunk rows actually read) and timed (3 repeats). "chunks passing" counts the chunks the filter keeps; "short results" the queries that got fewer than min(k, passing) hits.
 
 | filter | chunks passing | plans using the vector index | chunk access (type / key) | chunk rows read, p50 | SQL ms p50 / p95 | short results |
 |---|---|---|---|---|---|---|
-| none | 4598 | 75/75 | index / embedding | 10 (max 10) | 2.37 / 4.65 | 0 |
-| min_words_1000 | 4544 | 75/75 | index / embedding | 10 (max 19) | 2.24 / 3.26 | 0 |
-| min_words_5000 | 3891 | 75/75 | index / embedding | 17 (max 75) | 2.24 / 2.44 | 0 |
-| max_words_2000 | 89 | 75/75 | index / embedding | 601 (max 1663) | 3.37 / 5.06 | 0 |
-| max_words_500 | 25 | 0/75 | ALL / None | 4598 (max 4598) | 5.28 / 8.95 | 0 |
-| heading_history | 117 | 75/75 | index / embedding | 315 (max 1014) | 3.14 / 4.60 | 0 |
-| linked_from | 661 | 75/75 | index / embedding | 121 (max 492) | 3.63 / 5.63 | 0 |
-| category | 695 | 75/75 | index / embedding | 108 (max 420) | 2.51 / 3.18 | 0 |
-| edited_since_2020_12_01 | 4525 | 75/75 | index / embedding | 10 (max 25) | 2.22 / 2.83 | 0 |
-| edited_before_2020_12_15 | 778 | 75/75 | index / embedding | 67 (max 491) | 2.58 / 3.64 | 0 |
-| edited_before_2020_06_01 | 4 | 0/75 | ALL / None | 4598 (max 4598) | 3.34 / 3.59 | 0 |
-| four_filters | 377 | 75/75 | index / embedding | 184 (max 888) | 3.52 / 4.68 | 0 |
+| none | 4598 | 75/75 | index / embedding | 10 (max 10) | 2.11 / 2.91 | 0 |
+| min_words_1000 | 4544 | 75/75 | index / embedding | 10 (max 19) | 2.16 / 2.50 | 0 |
+| min_words_5000 | 3891 | 75/75 | index / embedding | 17 (max 75) | 2.05 / 2.33 | 0 |
+| max_words_2000 | 89 | 75/75 | index / embedding | 601 (max 1663) | 2.84 / 3.93 | 0 |
+| max_words_500 | 25 | 0/75 | ALL / None | 4598 (max 4598) | 5.17 / 6.30 | 0 |
+| heading_history | 117 | 75/75 | index / embedding | 315 (max 1014) | 2.99 / 4.02 | 0 |
+| linked_from | 661 | 75/75 | index / embedding | 121 (max 492) | 2.90 / 3.71 | 0 |
+| category | 695 | 75/75 | index / embedding | 108 (max 420) | 2.93 / 3.85 | 0 |
+| edited_since_2020_12_01 | 4525 | 75/75 | index / embedding | 10 (max 25) | 2.24 / 2.50 | 0 |
+| edited_before_2020_12_15 | 778 | 75/75 | index / embedding | 67 (max 491) | 2.89 / 4.09 | 0 |
+| edited_before_2020_06_01 | 4 | 0/75 | ALL / None | 4598 (max 4598) | 3.08 / 4.02 | 0 |
+| four_filters | 377 | 75/75 | index / embedding | 184 (max 888) | 3.22 / 4.29 | 0 |
 
 Filters:
 

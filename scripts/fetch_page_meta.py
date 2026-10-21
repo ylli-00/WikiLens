@@ -19,6 +19,12 @@ How the revision is chosen (``method`` in each record):
   each, links reduced to their shown text) is chosen; a tie goes to the later revision.
 - ``missing``: no revision of the title, nor of a title it was moved to after 2020, existed at
   the end of 2020. revision_id and last_edited are null and categories is empty.
+- ``unverified``: a revision was found but its wikitext contains none of the page's FEVEROUS
+  sentence probes (a redirect, hidden text, another page under the same title). Its metadata is
+  not trusted: the fields are null as for ``missing``.
+
+When several candidates contain equally many probes, the later revision is taken: the scrape day
+is unknown, and a later revision with the same text is as likely to be the one FEVEROUS saw.
 
 A page renamed after 2020 is followed through the move log; ``wiki_title`` then names the title
 the revision was found under. ``probes_matched`` / ``probes`` record how many of the page's
@@ -53,6 +59,9 @@ import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))  # runnable as python3 scripts/... without the editable install
 
 from wikilense import __version__
 from wikilense.corpus import DEFAULT_CORPUS_DIR, PAGE_META_FILE, iter_pages, nfc
@@ -200,11 +209,18 @@ def december_revisions(api, title):
 
 
 def moved_to(api, title):
-    """Return the title that ``title`` was moved to after 2020 (the first such move), or None."""
-    data = api.get(
-        action="query", list="logevents", letype="move", letitle=title, ledir="newer",
-        lestart=DECEMBER_END, lelimit="10", leprop="title|details|timestamp",
-    )  # fmt: skip
+    """Return the title that ``title`` was moved to after 2020 (the first such move), or None.
+
+    A title the log API rejects as invalid has no move either (the page is then ``missing``)."""
+    try:
+        data = api.get(
+            action="query", list="logevents", letype="move", letitle=title, ledir="newer",
+            lestart=DECEMBER_END, lelimit="10", leprop="title|details|timestamp",
+        )  # fmt: skip
+    except ApiError as exc:
+        if "invalidtitle" in str(exc):
+            return None
+        raise
     for event in data.get("query", {}).get("logevents", []):
         target = (event.get("params") or {}).get("target_title")
         if target:
@@ -285,13 +301,17 @@ def fetch_page(api, page):
         method = "best_text_match"
     else:
         method = "last_before_end"
+    hits = matched(probe_list, revision["text"])
+    if probe_list and hits == 0:
+        record.update(wiki_title=wiki_title, method="unverified", december_edits=len(december))
+        return record
     record.update(
         wiki_title=wiki_title,
         method=method,
         revision_id=revision["revid"],
         last_edited=revision["timestamp"],
         december_edits=len(december),
-        probes_matched=matched(probe_list, revision["text"]),
+        probes_matched=hits,
         categories=categories(revision["text"]),
     )
     return record
@@ -327,6 +347,7 @@ def summary(records, n_requests, fetched_at):
         ("method last_before_end (no edit in December 2020)", methods["last_before_end"]),
         ("method best_text_match (edited in December 2020)", methods["best_text_match"]),
         ("method missing (no revision at the end of 2020)", methods["missing"]),
+        ("method unverified (the revision holds none of the page's sentences)", methods["unverified"]),
         ("found under a title it was moved to after 2020", moved),
         ("pages with at least one category", with_categories),
         ("page-category pairs", pairs),
@@ -380,6 +401,9 @@ def main(argv=None):
                         f"summary {SUMMARY_FILE} is written next to the default file only)")
     parser.add_argument("--limit", type=int, help="fetch only the first N pages (a trial run)")
     args = parser.parse_args(argv)
+    if args.limit is not None and args.out is None:
+        parser.error("--limit is a trial run: give --out as well, so that the committed "
+                     f"{PAGE_META_FILE} is not replaced by a partial file")
     corpus_dir = Path(args.corpus_dir)
     default_out = corpus_dir / PAGE_META_FILE
     out = Path(args.out) if args.out else default_out

@@ -1,7 +1,7 @@
 {
   "name": "planner_choices",
   "group": "planner",
-  "created_at": "2026-10-21T22:46:47+00:00",
+  "created_at": "2026-10-21T23:14:37+00:00",
   "k": 10,
   "ef_search": 100,
   "repeats": 3,
@@ -31,8 +31,8 @@
       },
       "r_rows_p50": 10.0,
       "r_rows_max": 10.0,
-      "sql_ms_p50": 2.365,
-      "sql_ms_p95": 4.654,
+      "sql_ms_p50": 2.108,
+      "sql_ms_p95": 2.906,
       "short_results": 0
     },
     "min_words_1000": {
@@ -49,8 +49,8 @@
       },
       "r_rows_p50": 10.0,
       "r_rows_max": 19.0,
-      "sql_ms_p50": 2.236,
-      "sql_ms_p95": 3.259,
+      "sql_ms_p50": 2.158,
+      "sql_ms_p95": 2.5,
       "short_results": 0
     },
     "min_words_5000": {
@@ -67,8 +67,8 @@
       },
       "r_rows_p50": 17.0,
       "r_rows_max": 75.0,
-      "sql_ms_p50": 2.239,
-      "sql_ms_p95": 2.441,
+      "sql_ms_p50": 2.047,
+      "sql_ms_p95": 2.327,
       "short_results": 0
     },
     "max_words_2000": {
@@ -85,8 +85,8 @@
       },
       "r_rows_p50": 601.0,
       "r_rows_max": 1663.0,
-      "sql_ms_p50": 3.367,
-      "sql_ms_p95": 5.063,
+      "sql_ms_p50": 2.841,
+      "sql_ms_p95": 3.932,
       "short_results": 0
     },
     "max_words_500": {
@@ -103,8 +103,8 @@
       },
       "r_rows_p50": 4598.0,
       "r_rows_max": 4598.0,
-      "sql_ms_p50": 5.275,
-      "sql_ms_p95": 8.948,
+      "sql_ms_p50": 5.169,
+      "sql_ms_p95": 6.304,
       "short_results": 0
     },
     "heading_history": {
@@ -121,8 +121,8 @@
       },
       "r_rows_p50": 315.0,
       "r_rows_max": 1014.0,
-      "sql_ms_p50": 3.139,
-      "sql_ms_p95": 4.599,
+      "sql_ms_p50": 2.988,
+      "sql_ms_p95": 4.023,
       "short_results": 0
     },
     "linked_from": {
@@ -139,8 +139,8 @@
       },
       "r_rows_p50": 121.0,
       "r_rows_max": 492.0,
-      "sql_ms_p50": 3.626,
-      "sql_ms_p95": 5.628,
+      "sql_ms_p50": 2.895,
+      "sql_ms_p95": 3.705,
       "short_results": 0
     },
     "category": {
@@ -157,8 +157,8 @@
       },
       "r_rows_p50": 108.0,
       "r_rows_max": 420.0,
-      "sql_ms_p50": 2.511,
-      "sql_ms_p95": 3.176,
+      "sql_ms_p50": 2.932,
+      "sql_ms_p95": 3.855,
       "short_results": 0
     },
     "edited_since_2020_12_01": {
@@ -175,8 +175,8 @@
       },
       "r_rows_p50": 10.0,
       "r_rows_max": 25.0,
-      "sql_ms_p50": 2.221,
-      "sql_ms_p95": 2.825,
+      "sql_ms_p50": 2.241,
+      "sql_ms_p95": 2.504,
       "short_results": 0
     },
     "edited_before_2020_12_15": {
@@ -193,8 +193,8 @@
       },
       "r_rows_p50": 67.0,
       "r_rows_max": 491.0,
-      "sql_ms_p50": 2.576,
-      "sql_ms_p95": 3.641,
+      "sql_ms_p50": 2.89,
+      "sql_ms_p95": 4.086,
       "short_results": 0
     },
     "edited_before_2020_06_01": {
@@ -211,8 +211,8 @@
       },
       "r_rows_p50": 4598.0,
       "r_rows_max": 4598.0,
-      "sql_ms_p50": 3.342,
-      "sql_ms_p95": 3.588,
+      "sql_ms_p50": 3.084,
+      "sql_ms_p95": 4.022,
       "short_results": 0
     },
     "four_filters": {
@@ -232,8 +232,8 @@
       },
       "r_rows_p50": 184.0,
       "r_rows_max": 888.0,
-      "sql_ms_p50": 3.525,
-      "sql_ms_p95": 4.685,
+      "sql_ms_p50": 3.22,
+      "sql_ms_p95": 4.291,
       "short_results": 0
     }
   }

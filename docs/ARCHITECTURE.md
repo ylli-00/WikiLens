@@ -146,7 +146,7 @@ to understand the file.
 | `embedding.py` | `Embedder`: loads the sentence-transformers model lazily (on the GPU when there is one), pinned to the revision `results/` were measured with; `embed_queries` prepends the BGE query instruction, `embed_passages` does not. | model cache `~/.cache/huggingface` | `config`; sentence-transformers, torch | `Embedder.embed_queries` |
 | `db.py` | The MariaDB layer: `connect`, running `sql/schema.sql` (`apply_schema`, with its own SQL splitter), `insert_rows` with an allowlist of table and column names (`SCHEMA_COLUMNS`), `vec_param` (the bytes bound for a `VECTOR`), the one allowed session variable, `EXPLAIN`, and reading the index's M from `SHOW CREATE TABLE`. | the database; reads `sql/schema.sql` | `config`; PyMySQL | `insert_sql` |
 | `ingest.py` | The pipeline behind `wikilense ingest`: checks settings and model, then seven steps (schema, pages, chunks with embeddings, link resolution, `ANALYZE TABLE`, claims and evidence, `ingest_meta`), each committed when it completes. | reads `data/corpus/`; writes all eleven tables | `db`, `corpus`, `wikitext`, `chunking`, `embedding` | `_Ingest.run` |
-| `search.py` | The queries: the four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles), every SQL statement as a named constant or fragment, `ef_search` set per call and restored, and the joins back to sentences and page summaries. | the database (read only) | `db`, `config` | `search_statement` |
+| `search.py` | The queries: the four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment, `ef_search` set per call and restored, and the joins back to sentences and page summaries. | the database (read only) | `db`, `config` | `search_statement` |
 | `evaluate.py` | The recall and latency harness: ground truth from `claim_evidence`, the pure metric functions, one untimed and `repeats` timed passes over every claim and k, and the JSON and Markdown writer. | reads the database; writes `<out>/<name>.json/.md` | `db`, `search` | `evaluate` |
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`), argument checking, one-line errors and the documented exit codes (0, 1, 2, 130), and the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
 | `web.py` | A FastAPI app: `GET /` is one self-contained HTML page (its script writes data with `textContent` only), `GET /api/search` returns hits, the SQL, its `EXPLAIN` and timings; one database connection per request; `/docs` is the interactive API page. | the database (read only) | `db`, `search`, `embedding`; FastAPI | `api_search` |
@@ -155,8 +155,8 @@ to understand the file.
 
 | File | What it is for |
 |---|---|
-| `schema.sql` | The data model: nine `CREATE TABLE IF NOT EXISTS` statements with comments, including `embedding VECTOR(384)`, `VECTOR INDEX (embedding) M=16 DISTANCE=cosine` and `FULLTEXT KEY ft_chunk_text (text)`. The only place the schema is defined; `db.apply_schema` runs it, and a test checks it against `db.SCHEMA_COLUMNS` column for column. |
-| `examples.sql` | Seven query shapes for the `mariadb` client alone, no Python: the bare index query, predicates and joins, the link filter, over-fetch, the RRF hybrid, the join back to sentences, and the vector as text. The query vector is the stored embedding of chunk 1. |
+| `schema.sql` | The data model: eleven `CREATE TABLE IF NOT EXISTS` statements with comments, including `embedding VECTOR(384)`, `VECTOR INDEX (embedding) M=16 DISTANCE=cosine` and `FULLTEXT KEY ft_chunk_text (text)`. The only place the schema is defined; `db.apply_schema` runs it, and a test checks it against `db.SCHEMA_COLUMNS` column for column. |
+| `examples.sql` | Ten statements for the `mariadb` client alone, no Python: the bare index query, predicates and joins, the link filter, over-fetch, the RRF hybrid, the join back to sentences, the vector as text, the vectors inside a transaction (an UPDATE seen at once and undone by ROLLBACK), the brief's four predicates in one statement with its EXPLAIN, and a page's revision, edit date and categories. The query vector is the stored embedding of chunk 1; a test runs every statement against the schema. |
 | `docker-init/01-test-database.sh` | Run once by the MariaDB container when its data volume is created: makes the `<name>_test` database for the test suite and grants it to the application user. |
 
 ### `scripts/`
@@ -340,13 +340,13 @@ Why the important choices were made:
 
 ## 7. Testing and CI
 
-There are 345 tests of three kinds, told apart by pytest markers.
+There are 351 tests of three kinds, told apart by pytest markers.
 
-- **Pure tests** (229): no server and no model; parsing, chunking, SQL assembly, metrics,
+- **Pure tests** (271): no server and no model; parsing, chunking, SQL assembly, metrics,
   argument checking, and the CLI and web page with fake databases and embedders. They run in
   seconds anywhere, including a fresh clone without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- **`db` tests** (63): need MariaDB. They use only the test database (`wikilense_test`, reset
+- **`db` tests** (74): need MariaDB. They use only the test database (`wikilense_test`, reset
   before each test) and are skipped with the reason when the server does not answer:
   `.venv/bin/python -m pytest -m db`.
 - **`slow` tests** (6): load the real embedding model (downloaded on first use):
@@ -369,11 +369,11 @@ repository 36 of 40 on 2026-09-22, with no blocking issue.
 | Criterion or item of area 4 | Where the project covers it |
 |---|---|
 | A `VECTOR` column with an index over a real Wikipedia corpus, queried with `VEC_DISTANCE_COSINE` (MariaDB depth) | `sql/schema.sql` (`chunk.embedding`, `VECTOR INDEX ... M=16 DISTANCE=cosine`), `search.KNN_SQL`, the FEVEROUS pages in `data/corpus/` |
-| Semantic search and SQL predicates in the same statement, joined to relational tables (depth) | `search.py` strategy `inline` and `Filters` (length, heading, path, links, titles), `sql/examples.sql` statements 2 and 3, section 5 above |
-| Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
+| Semantic search and SQL predicates in the same statement, joined to relational tables (depth) | `search.py` strategy `inline` and `Filters` (length, heading, path, links, titles, category, edit date), `sql/examples.sql` statements 2, 3 and 9 (the brief's four predicates in one statement), `results/planner_choices.md`, section 5 above |
+| Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability, which filters keep the vector index, the search over uncommitted rows), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
 | Recall and latency against a ground truth you built (execution) | `evaluate.py`, `claim` / `claim_evidence`, `results/SUMMARY.md` |
 | Chunk size, model and index parameters with reasons (execution) | DESIGN.md "Phase 3 outcomes", README "Parameters and why", the comments in `sql/schema.sql` and `config.py` |
-| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 345 tests, parameters only in SQL, CI |
+| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 351 tests, parameters only in SQL, CI |
 | An ingest that runs from the README and a query interface (usability) | `make setup`, `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql` |
 | What the database-native approach gave (documentation) | README "What the database-native approach gave" |
 
@@ -387,12 +387,13 @@ What remains for a top score, from the rubric and the grader's remaining suggest
 
 - [ ] Choose the benchmark claims (the 75 claims are a development set).
 - [ ] Scale the corpus beyond 100 pages.
-- [ ] Rerun `make experiments` on the final code and corpus. This also refreshes the four result
-  files computed before the metrics moved to the `LIMIT k` query (DESIGN.md "Review pass").
+- [x] Rerun `make experiments` on the current code (done 2026-10-22; the four result files
+  computed before the metrics moved to the `LIMIT k` query were regenerated). Rerun again on the
+  final claim set and corpus.
 - [ ] Measure query cost against table size (the `inline` statement ranks exactly over the index,
   so its cost grows with the table: the number to watch).
 - [ ] Possibly compare a second embedding model.
-- [ ] Add charts and a screenshot of the web page.
+- [x] Add charts (`docs/img/`, 2026-10-22). A screenshot of the web page is still missing.
 - [ ] Rewrite the README with the final results.
 
 ## 9. Command cheat sheet

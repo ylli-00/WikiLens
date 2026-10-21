@@ -56,7 +56,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from importlib import metadata
 from pathlib import Path
 from typing import Any, Protocol
@@ -714,6 +714,17 @@ def _run_searches(
     return hits_first, sql_ms, sorted(unstable), prefix_mismatches
 
 
+def filters_parameter(filters: Filters | None) -> dict[str, Any] | None:
+    """Return ``filters`` as recorded in ``EvalResult.parameters``: a JSON-ready dict with the
+    dates of ``edited_since`` / ``edited_before`` as ISO text, or None for no or empty filters."""
+    if filters is None or filters.is_empty():
+        return None
+    return {
+        name: (value.isoformat() if isinstance(value, date) else value)
+        for name, value in asdict(filters).items()
+    }
+
+
 def evaluate(
     conn: pymysql.Connection,
     embedder: QueryEmbedderLike,
@@ -861,7 +872,7 @@ def evaluate(
         "repeats": repeats,
         "strategy": strategy,
         "overfetch": overfetch if strategy in OVERFETCH_STRATEGIES else None,
-        "filters": asdict(filters) if filters is not None and not filters.is_empty() else None,
+        "filters": filters_parameter(filters),
         "claim_filters": getattr(claim_filters, "__name__", None) if claim_filters else None,
         "ef_search": ef_requested,
         "ef_search_source": ef_source,

@@ -286,3 +286,38 @@ def test_main_writes_the_records_and_the_summary(
     assert len(other.read_text(encoding="utf-8").splitlines()) == 1
     assert not (tmp_path / fpm.SUMMARY_FILE).exists()
     assert "| pages | 1 |" in capsys.readouterr().out
+
+
+def test_a_revision_without_any_of_the_sentences_is_unverified(fpm: Any) -> None:
+    api = FakeApi({"River": [_rev(1, "2020-10-01T00:00:00Z", "#REDIRECT [[Elsewhere]] [[Category:R]]")]})
+    record = fpm.fetch_page(api, PAGE)
+    assert record["method"] == "unverified"
+    assert (record["revision_id"], record["last_edited"], record["categories"]) == (None, None, [])
+    assert "| method unverified" in fpm.summary([record], 2, "today")
+
+
+def test_an_invalid_title_has_no_move_and_other_api_errors_stop(fpm: Any) -> None:
+    class InvalidTitle(FakeApi):
+        def get(self, **params: str) -> dict:
+            if params.get("list") == "logevents":
+                raise fpm.ApiError("API error invalidtitle: Bad title")
+            return super().get(**params)
+
+    assert fpm.fetch_page(InvalidTitle({}), PAGE)["method"] == "missing"
+
+    class Broken(FakeApi):
+        def get(self, **params: str) -> dict:
+            raise fpm.ApiError("API error internal_api_error: boom")
+
+    with pytest.raises(fpm.ApiError, match="internal_api_error"):
+        fpm.fetch_page(Broken({}), PAGE)
+
+
+def test_limit_without_out_is_refused_so_the_committed_file_stays(
+    fpm: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "pages.jsonl").write_text(json.dumps(PAGE) + "\n", encoding="utf-8")
+    with pytest.raises(SystemExit) as raised:
+        fpm.main(["--corpus-dir", str(tmp_path), "--limit", "1"])
+    assert raised.value.code == 2 and "give --out as well" in capsys.readouterr().err
+    assert not (tmp_path / "page_meta.jsonl").exists()

@@ -263,8 +263,9 @@ Corrections to the rules above, forced by the data, and the numbers behind the p
 `run_ingest(settings, corpus_dir=DEFAULT_CORPUS_DIR, reset=True, embedder=None, batch_size=64,
 use_prefix=True, progress=True) -> IngestReport` with the counts `n_pages, n_sections,
 n_sentences, n_units_empty, n_units_hatnote, n_chunks, n_links, n_links_resolved,
-n_links_skipped, n_claims, n_evidence, n_evidence_page_resolved, n_evidence_sentence_resolved`
-and `seconds` per stage (`schema, parse, embed, load, resolve, analyze, total`).
+n_links_skipped, n_claims, n_evidence, n_evidence_page_resolved, n_evidence_sentence_resolved,
+n_pages_with_meta, n_categories, n_page_categories` (the last three since 2026-10-22) and
+`seconds` per stage (`schema, parse, embed, load, resolve, analyze, total`).
 
 Before the database is touched: refuse the test database (`settings.test_db_name`), a
 `settings.vector_dim` other than the schema's literal, `chunk_max_words < 1` and
@@ -279,10 +280,14 @@ connection is still open) and closes the connection:
 2. Parse every page (`parse_page`, `chunk_page`); insert `page`, `section` (lead included),
    `sentence` (every unit, empty ones and hatnotes too), `link` (`to_title` over 255 characters
    skipped and counted). Keep chunks in memory with their `embedding_text` (prefix on by default).
+   Since 2026-10-22, with `page.revision_id` / `last_edited` and the `category` /
+   `page_category` rows from `page_meta.jsonl` when the corpus directory has it (NULL and empty,
+   with a warning, otherwise; a malformed file is an `IngestError`).
 3. Embed all chunk texts in batches (`embed_passages`), then insert `chunk` rows with
    `vec_param` bytes and `chunk_sentence` rows through `insert_rows`.
 4. Resolve `link.to_page_id` with one `UPDATE link JOIN page ON page.title = link.to_title`.
-5. `ANALYZE TABLE` for `chunk`, `page`, `section` and `link`, so the optimizer plans the search
+5. `ANALYZE TABLE` for `chunk`, `page`, `section`, `link`, `category` and `page_category`, so the
+   optimizer plans the search
    statements from fresh statistics (Phase 2 outcomes: stale statistics once lost the index).
 6. Insert `claim` and `claim_evidence` (`parse_element_id`; `page_id` by title, `sentence_id` by
    (`page_id`, `element_key`); cells and captions keep `sentence_id` NULL).
@@ -290,7 +295,8 @@ connection is still open) and closes the connection:
    `chunk_overlap_units`, `index_m` and `index_distance` (read from `SHOW CREATE TABLE chunk`,
    so they describe the index that is in place), `hatnote_pattern`, `n_units_hatnote`,
    `analyze_tables`, `analyze_seconds`, `corpus_dir`, `corpus_pages_sha256`,
-   `corpus_claims_sha256`, `mariadb_version`, `wikilense_version`, `ingested_at` (UTC ISO 8601).
+   `corpus_claims_sha256`, `corpus_page_meta_sha256` (`none` without the file),
+   `mariadb_version`, `wikilense_version`, `ingested_at` (UTC ISO 8601).
 
 ## Search (`search.py`), contract for phase 2
 
@@ -350,6 +356,7 @@ connection is still open) and closes the connection:
 `wikilense init-db [--reset]`, `wikilense ingest [--corpus-dir] [--no-reset] [--batch-size]
 [--no-prefix]`, `wikilense query "text" [--k 5] [--min-words N] [--max-words N] [--heading
 PATTERN] [--path PATTERN] [--linked-from TITLE] [--links-to TITLE] [--title TITLE ...]
+[--category NAME] [--edited-since YYYY-MM-DD] [--edited-before YYYY-MM-DD]
 [--strategy inline|overfetch|none|rrf] [--overfetch N] [--ef-search N|0|server] [--sentences]
 [--explain] [--json]`, `wikilense eval [--k 1,3,5,10,20] [--repeats 5] [--strategy ...]
 [--overfetch N] [--ef-search N|0|server] [--out results] [--name NAME]`, `wikilense serve [--host
@@ -509,7 +516,8 @@ A code review changed behaviour that later runs will see (commits after 92f1838;
 `strategy_overfetch10_history`, `strategy_overfetch50_history`, `final_rrf` and `rrf_120_m6` need
 the experiments rerun (a read-only recomputation of `final_rrf` on the current database changes
 only evidence recall@1, 35 to 34 of 66). Every other file, the `none` and `inline` ones and the
-two overfetch runs under `min_words`, had 0 prefix mismatches and does not change.
+two overfetch runs under `min_words`, had 0 prefix mismatches and does not change. The protocol
+rerun of 2026-10-22 regenerated every file, these four included, on the current code.
 The rest changes no number: `wikilense eval --ef-search 0` keeps the server value as documented,
 `WIKILENSE_INDEX_M` is gone (M is the schema's; `ingest_meta` records the live index), the model is
 pinned to revision 5c38ec7c405e, the ingest checks settings and model before dropping anything,
@@ -532,7 +540,10 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
   - Pages without an edit during December 2020 have one candidate, the revision live at
     2020-12-31T23:59:59Z (7 pages).
   - For pages edited during December (93), the candidate is chosen by the most FEVEROUS sentence
-    probes (first six words, links reduced) found in its wikitext.
+    probes (first six words, links reduced) found in its wikitext. When several candidates hold
+    equally many probes, the later one is taken, which assumes nothing about the scrape day beyond
+    "December"; the file does not record how often that happened. A revision that holds none of
+    the probes would be recorded as `unverified` with null metadata (none of the 100 is).
   - Three titles were moved after 2020 and are followed through the move log. All 100 pages were
     found, and 94.5% of the probes occur in the chosen revisions.
   - Example: on today's "Albert Einstein" page only 260 of 484 probes are found, against 466 in
@@ -566,13 +577,15 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
     the median under `max_words 2000`, where 89 of 4,598 chunks pass.
   - The two most selective range predicates on indexed `page` columns make it scan all 4,598
     chunks and sort instead: `max_words 500` (25 chunks pass) and `edited_before 2020-06-01` (4
-    pass). That gives the exact result at 5.2 / 3.1 ms p50, against 2.2 to 3.1 ms for the index
+    pass). That gives the exact result at 5.2 / 3.1 ms p50, against 2.1 to 3.2 ms for the index
     plans.
-  - No case returned fewer than k hits. The four filters together (377 chunks pass) keep the index
-    and read 184 rows at the median, in 3.5 ms (protocol rerun).
+  - No query returned fewer than min(k, passing) hits: under `edited_before 2020-06-01` only 4
+    chunks pass, and each query returns those 4. The four filters together (377 chunks pass) keep
+    the index and read 184 rows at the median, in 3.2 ms.
 - **Searching rows the transaction has not committed** (`results/uncommitted_recall.md`, group
   `uncommitted`). A scratch table with the chunk table's vector column and index is filled inside
-  a transaction and searched before and after COMMIT, with three fresh builds each.
+  a transaction and searched before COMMIT; the transaction is rolled back, the table filled
+  again, committed and searched again, with three fresh builds.
   - With the 4,598 FINAL chunk embeddings and the 75 claims as queries, the overlap with the exact
     top 10 is 0.968 / 0.971 / 0.971 before COMMIT at `mhnsw_ef_search` 20 / 100 / 400, and
     0.987 / 1.000 / 1.000 after (protocol rerun of 2026-10-22; the first run gave
@@ -581,7 +594,8 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
   - On 1,000 random vectors it is 0.620 / 0.651 / 0.651 before and 0.782 / 0.985 / 0.993 after.
   - The uncommitted search is also faster (p50 0.13 to 0.24 ms against 0.59 to 0.91 ms on the
     chunks), which suggests it explores less of the graph; this was not verified in the server.
-  - ROLLBACK leaves no row. The cause is not known.
+  - ROLLBACK leaves 0 rows in every build. Why the index finds fewer true neighbours before
+    COMMIT is not known.
   - Practical rule: write and search in separate transactions, or commit before searching.
   - `tests/test_db.py` commits before its NumPy cross-check for this reason.
 - **Vector arithmetic checked.** On 300 random, unnormalised vectors, `VEC_DISTANCE_COSINE`
