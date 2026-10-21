@@ -28,12 +28,33 @@ which [scripts/run_experiments.py](scripts/run_experiments.py) writes. The headl
 runs use the 240-word ingest (4,598 chunks). The `M`, `ef_search`, stability and prefix sweeps use
 the 120-word ingest (8,658 chunks), and the chunk-size sweep uses one ingest per size.
 
-**Contents:** [What we found](#what-we-found) · [Quick start](#quick-start) · [Try it](#try-it) ·
+**Contents:** [Five-minute tour](#five-minute-tour) · [What we found](#what-we-found) · [Quick start](#quick-start) · [Try it](#try-it) ·
 [The data](#the-data) · [The data model](#the-data-model) · [The SQL](#the-sql) ·
 [How MariaDB uses the vector index](#how-mariadb-1189-uses-the-vector-index-measured) ·
 [Parameters and why](#parameters-and-why) · [Evaluation](#evaluation) ·
 [What the database-native approach gave](#what-the-database-native-approach-gave) ·
 [Limitations](#limitations-and-next-phase) · [Repository](#repository) · [Team](#team)
+
+## Five-minute tour
+
+1. **Set it up:** `make setup` starts MariaDB 11.8 in Docker, installs the package and ingests the
+   committed corpus ([Quick start](#quick-start)).
+2. **See the vector index at work:**
+   `wikilense query "Which river rises and ends entirely within Switzerland?" --k 3 --explain`.
+   `EXPLAIN` shows `chunk` read through `key: embedding`.
+3. **Add the brief's four predicates to the same statement:** `--category "Member states of the
+   United Nations" --min-words 1000 --edited-since 2020-12-01 --linked-from Asia`. Then read the
+   SQL it prints ([Try it](#try-it)).
+4. **Try the same thing without Python:** `mariadb ... < sql/examples.sql` runs ten statements:
+   - the bare k-NN query and the filtered one;
+   - the RRF hybrid with `FULLTEXT`;
+   - a transaction that shows the index following `ROLLBACK`;
+   - the four predicates with their `EXPLAIN`.
+5. **Learn where the vector index stops helping.** These [measured rules](#how-mariadb-1189-uses-the-vector-index-measured)
+   are what this repository adds to the MariaDB documentation:
+   - which statement shapes keep the index;
+   - when a filter makes the optimizer scan instead;
+   - why a search over uncommitted rows finds fewer neighbours.
 
 ## What we found
 
@@ -101,6 +122,9 @@ make setup
      install is required.
    - On a machine without a GPU, run `make setup CPU=1` instead. It installs the pinned CPU build
      from `requirements-cpu.lock`, as CI does.
+   - `make setup` installs the version ranges of `requirements-dev.txt`. For the exact environment
+     `results/` was measured in, install `requirements.lock` (the GPU build) instead:
+     `.venv/bin/pip install -r requirements.lock -e .`.
 4. `.venv/bin/wikilense ingest`: creates the tables, parses the 100 committed pages, loads their
    categories and edit dates, embeds the chunks and loads everything.
    - The embedding model, about 134 MB, downloads to `~/.cache/huggingface` on first use.
