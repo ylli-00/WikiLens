@@ -624,6 +624,49 @@ def test_vector_index_follows_the_transaction(db_conn, settings) -> None:
 
 
 @pytest.mark.db
+def test_cosine_distances_match_numpy_and_the_index_finds_the_exact_neighbours(db_conn) -> None:
+    """On 300 random vectors (not normalised: cosine must not depend on the length)
+    VEC_DISTANCE_COSINE equals NumPy's 1 - cos for every row, an exact scan that ignores the
+    vector index returns NumPy's 10 nearest, and the HNSW index at ef_search 200 finds them.
+
+    The rows are committed before the search: on MariaDB 11.8.9 a k-NN search over rows that
+    the same transaction inserted and has not committed yet finds fewer true neighbours
+    (measured by ``scripts/run_experiments.py uncommitted``), so it would test that instead."""
+    rng = np.random.default_rng(7)
+    vectors = rng.standard_normal((300, DIM)).astype(np.float32)
+    _insert_page(db_conn, 1, "Random")
+    dbmod.insert_rows(
+        db_conn,
+        "chunk",
+        ("chunk_id", "page_id", "section_id", "ordinal", "text", "n_words", "embedding"),
+        [(i + 1, 1, 1, i, f"chunk {i + 1}", 2, dbmod.vec_param(v)) for i, v in enumerate(vectors)],
+    )
+    db_conn.commit()
+    unit = vectors.astype(np.float64)
+    unit /= np.linalg.norm(unit, axis=1, keepdims=True)
+    dbmod.set_session_var(db_conn, "mhnsw_ef_search", 200)
+    overlaps = []
+    for query in rng.standard_normal((20, DIM)).astype(np.float32):
+        q = query.astype(np.float64) / np.linalg.norm(query)
+        expected = 1.0 - unit @ q
+        with db_conn.cursor() as cur:
+            cur.execute(
+                "SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk ORDER BY chunk_id",
+                (dbmod.vec_param(query),),
+            )
+            np.testing.assert_allclose([d for (d,) in cur.fetchall()], expected, atol=1e-5)
+            exact = [int(i) + 1 for i in np.argsort(expected)[:10]]
+            cur.execute(
+                "SELECT chunk_id FROM chunk IGNORE INDEX (embedding) "
+                "ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT 10",
+                (dbmod.vec_param(query),),
+            )
+            assert [cid for (cid,) in cur.fetchall()] == exact
+        overlaps.append(len({cid for cid, _ in _knn(db_conn, query, 10)} & set(exact)) / 10)
+    assert np.mean(overlaps) >= 0.95, overlaps
+
+
+@pytest.mark.db
 def test_insert_rows_rejects_unknown_table_and_column(db_conn) -> None:
     with pytest.raises(ValueError, match="unknown table"):
         dbmod.insert_rows(db_conn, "pages", ("title",), [("x",)])
