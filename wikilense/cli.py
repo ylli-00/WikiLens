@@ -41,6 +41,7 @@ import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict
+from datetime import date
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -99,6 +100,9 @@ FILTER_OPTIONS: tuple[tuple[str, str], ...] = (
     ("linked_from", "--linked-from"),
     ("links_to", "--links-to"),
     ("titles", "--title"),
+    ("category", "--category"),
+    ("edited_since", "--edited-since"),
+    ("edited_before", "--edited-before"),
 )
 
 TEXT_WIDTH = 100
@@ -149,6 +153,15 @@ def non_negative_int(text: str) -> int:
     if value < 0:
         raise argparse.ArgumentTypeError(f"expected an integer >= 0, got {value}")
     return value
+
+
+def date_arg(text: str) -> date:
+    """Return ``text`` (``YYYY-MM-DD``) as a ``datetime.date``; raises
+    ``argparse.ArgumentTypeError`` otherwise."""
+    try:
+        return date.fromisoformat(text.strip())
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a date YYYY-MM-DD, got {text!r}") from None
 
 
 def ef_search_arg(text: str) -> int:
@@ -336,6 +349,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="TITLE",
         help="keep only chunks of the page TITLE (exact title); repeat for several pages",
+    )
+    p_query.add_argument(
+        "--category",
+        metavar="NAME",
+        help="keep only chunks of pages in the Wikipedia category NAME (exact name, without "
+        "'Category:'; the categories of the page's December 2020 revision)",
+    )
+    p_query.add_argument(
+        "--edited-since",
+        type=date_arg,
+        metavar="YYYY-MM-DD",
+        help="keep only chunks of pages whose stored revision was edited on or after this day "
+        "(UTC; page.last_edited >= DATE)",
+    )
+    p_query.add_argument(
+        "--edited-before",
+        type=date_arg,
+        metavar="YYYY-MM-DD",
+        help="keep only chunks of pages whose stored revision was edited before this day "
+        "(UTC; page.last_edited < DATE)",
     )
     p_query.add_argument(
         "--strategy",
@@ -582,6 +615,9 @@ def _filters_from_args(args: argparse.Namespace) -> Filters:
             linked_from=args.linked_from,
             links_to=args.links_to,
             titles=args.titles,
+            category=args.category,
+            edited_since=args.edited_since,
+            edited_before=args.edited_before,
         )
     except (TypeError, ValueError) as exc:
         raise CliError(str(exc), exit_code=EXIT_USAGE) from exc
@@ -825,6 +861,10 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         f"  claims {report.n_claims}, evidence ids {report.n_evidence} "
         f"(page resolved {report.n_evidence_page_resolved}, "
         f"sentence resolved {report.n_evidence_sentence_resolved})"
+    )
+    print(
+        f"  page metadata {report.n_pages_with_meta} of {report.n_pages} pages, "
+        f"categories {report.n_categories} (page_category {report.n_page_categories})"
     )
     return EXIT_OK
 

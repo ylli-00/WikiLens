@@ -129,15 +129,17 @@ All tables InnoDB, `utf8mb4`. Title columns use `utf8mb4_bin` so that matching i
 
 | Table | Columns (PK first) | Notes |
 |---|---|---|
-| `page` | `page_id`, `title` UNIQUE, `n_sentences`, `n_items`, `n_words`, `n_chars`, `n_sections`, `n_tables`, `n_lists` | index on `n_words` for length filters |
+| `page` | `page_id`, `title` UNIQUE, `n_sentences`, `n_items`, `n_words`, `n_chars`, `n_sections`, `n_tables`, `n_lists`, `revision_id` NULL, `last_edited` NULL | index on `n_words` for length filters; `revision_id` / `last_edited` (UTC) name the December 2020 Wikipedia revision the text comes from (since 2026-10-22, `data/corpus/page_meta.jsonl`), index on `last_edited` for the edit-date filters |
 | `section` | `section_id`, `page_id` FK, `ordinal`, `heading`, `level`, `path` | UNIQUE (`page_id`, `ordinal`); index on `heading` |
 | `sentence` | `sentence_id`, `page_id` FK, `section_id` FK, `element_key`, `ordinal`, `text` | UNIQUE (`page_id`, `element_key`); one row per text unit (sentence or list item) |
 | `chunk` | `chunk_id`, `page_id` FK, `section_id` FK, `ordinal`, `text`, `n_words`, `embedding VECTOR(384) NOT NULL` | UNIQUE (`page_id`, `ordinal`); `VECTOR INDEX (embedding) M=16 DISTANCE=cosine` (M=6 in phases 1 and 2; 16 chosen with the M sweep, `results/SUMMARY.md` section 3); `FULLTEXT KEY ft_chunk_text (text)` for the `rrf` strategy (since phase 5) |
 | `chunk_sentence` | (`chunk_id`, `sentence_id`) | the chunk-to-sentence map; index on `sentence_id` |
 | `link` | `link_id`, `from_page_id` FK, `to_title`, `to_page_id` NULL FK, `source_element` | `to_page_id` resolved when the target is in the corpus; indexes on `from_page_id`, `to_page_id`, `to_title` |
+| `category` | `category_id`, `name` UNIQUE (`utf8mb4_bin`) | Wikipedia category names, no "Category:" prefix (since 2026-10-22) |
+| `page_category` | (`page_id`, `category_id`) both FK | the many-to-many map; index (`category_id`, `page_id`) for the category filter |
 | `claim` | `claim_id` (FEVEROUS id), `split`, `text`, `label`, `challenge` | |
 | `claim_evidence` | (`claim_id`, `evidence_set`, `position`), `element_id`, `page_title`, `element_type`, `page_id` NULL, `sentence_id` NULL | resolved ids when the page / text unit is in the corpus; indexes on `page_id`, `sentence_id` |
-| `ingest_meta` | `key`, `value` | embedding model, dim, chunk parameters, index M, corpus sha256, ingested_at |
+| `ingest_meta` | `key`, `value` | embedding model, dim, chunk parameters, index M, corpus sha256 (pages, claims, page_meta or `none`), ingested_at |
 
 Vector dimension 384 is written literally in the DDL and checked against `Embedder.dim` at
 ingest; a mismatch is an error with a clear message.
@@ -295,8 +297,11 @@ connection is still open) and closes the connection:
 - `Hit(chunk_id, page_id, title, section_path, chunk_ordinal, n_words, distance, text,
   score=None)`; `score` is the fused score of `rrf`, `distance` always the cosine distance.
 - `Filters(min_words=None, max_words=None, heading_like=None, path_like=None, linked_from=None,
-  links_to=None, titles=None)`; every field optional; `heading_like` and `path_like` are SQL LIKE
-  patterns supplied by the caller (parameters, never interpolated).
+  links_to=None, titles=None, category=None, edited_since=None, edited_before=None)`; every field
+  optional; `heading_like` and `path_like` are SQL LIKE patterns supplied by the caller
+  (parameters, never interpolated). `category` (exact name) joins a DISTINCT derived table of
+  `page_category`; `edited_since` / `edited_before` (a `date` or `datetime`, read as UTC) compare
+  `page.last_edited` (since 2026-10-22, see "Page metadata and the brief's four filters").
 - `search(conn, qvec, k=10, filters=None, strategy="inline", overfetch=10, ef_search=None,
   query_text=None) -> list[Hit]` with strategies (`search.STRATEGIES`): `inline` (predicates and
   joins in the one statement that carries `ORDER BY VEC_DISTANCE_COSINE(...) LIMIT k`),
@@ -510,3 +515,74 @@ The rest changes no number: `wikilense eval --ef-search 0` keeps the server valu
 pinned to revision 5c38ec7c405e, the ingest checks settings and model before dropping anything,
 the rrf full-text list breaks ties by `chunk_id` (hit lists unchanged for 375 of 375 claim / k
 pairs), and `scripts/run_experiments.py` builds no SQL from strings.
+
+## Page metadata and the brief's four filters (2026-10-22)
+
+The brief's example predicates are "only articles in this category, longer than this, edited since
+that date, linked from that other article". Length (`page.n_words`) and links (`link`) came with the
+FEVEROUS pages; categories and edit dates did not. The pages carry no category, revision or date
+field, and they stop before the category box and the "last edited" footer. A random 100-page sample
+of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
+
+- **Source.** `scripts/fetch_page_meta.py` asks the MediaWiki Action API, for every corpus page, for
+  the revision whose text the corpus holds.
+  - FEVEROUS scraped Wikipedia in December 2020 and kept a per-page date stamp, but did not release
+    it (paper, Sec 7.7). Taking today's "last edited" date or today's categories would pair 2026
+    metadata with 2020 text.
+  - Pages without an edit during December 2020 have one candidate, the revision live at
+    2020-12-31T23:59:59Z (7 pages).
+  - For pages edited during December (93), the candidate is chosen by the most FEVEROUS sentence
+    probes (first six words, links reduced) found in its wikitext.
+  - Three titles were moved after 2020 and are followed through the move log. All 100 pages were
+    found, and 94.5% of the probes occur in the chosen revisions.
+  - Example: on today's "Albert Einstein" page only 260 of 484 probes are found, against 466 in
+    the December 2020 revision.
+  - The categories are the `[[Category:...]]` links of that revision: 1,005 distinct names, 1,123
+    page-category pairs, 72 names shared by two or more pages. Categories added by templates are
+    not in the wikitext; they are mostly hidden maintenance categories.
+  - Wikimedia Robot Policy: one request at a time and at most four per second, a User-Agent with the
+    repository URL, gzip, `maxlag`, `Retry-After`, and a pause after slow requests. The 100 pages
+    took 309 requests. The output, `data/corpus/page_meta.jsonl` and `PAGE_META.md`, is committed.
+    A re-run finds the same revisions unless a page is deleted.
+- **Schema.**
+  - `page.revision_id` and `page.last_edited` (UTC, indexed), NULL when the file has no record.
+  - `category(category_id, name UNIQUE utf8mb4_bin)`.
+  - `page_category(page_id, category_id)`, with an index on (`category_id`, `page_id`).
+  - The ingest reads the file when it is present and records its SHA-256, or `none`, in
+    `ingest_meta`.
+- **Filters.** `Filters.category` adds `STRAIGHT_JOIN (SELECT DISTINCT page_category.page_id ...
+  WHERE category.name = %s) AS in_category`. `edited_since` / `edited_before` add
+  `page.last_edited >= %s` / `< %s`. Aware datetimes are converted to UTC; naive ones and dates
+  are read as UTC. CLI: `--category`, `--edited-since`, `--edited-before`; the API and the form
+  use the same names.
+- **Plan rule found on the way.** Without the DISTINCT, MariaDB 11.8.9 merges the category derived
+  table into the outer join and reads `chunk` in full (EXPLAIN type `ALL`), even on the 12-chunk
+  test data. With it, the table is materialised (`<derived2>`) and the vector index drives the
+  scan, like the link filters. `tests/test_search.py` pins this plan.
+- **When the optimizer keeps the vector index under a filter** (`results/planner_choices.md`,
+  group `planner`): 75 claims, inline statement, k 10, ef 100.
+  - Ten of the twelve filter cases plan `chunk` through the index for every claim. The rows read
+    grow as the filter gets more selective: 10 rows unfiltered; 601 at the median under
+    `max_words 2000`, where 89 of 4,598 chunks pass.
+  - The two most selective range predicates on indexed `page` columns make it scan all 4,598
+    chunks and sort instead: `max_words 500` (25 chunks pass) and `edited_before 2020-06-01` (4
+    pass). That gives the exact result at 5.2 / 3.1 ms p50, against 2.2 to 3.1 ms for the index
+    plans.
+  - No case returned fewer than k hits. The four filters together (377 chunks pass) keep the index
+    and read 184 rows at the median, in 3.1 ms.
+- **Searching rows the transaction has not committed** (`results/uncommitted_recall.md`, group
+  `uncommitted`). A scratch table with the chunk table's vector column and index is filled inside
+  a transaction and searched before and after COMMIT, with three fresh builds each.
+  - With the 4,598 FINAL chunk embeddings and the 75 claims as queries, the overlap with the exact
+    top 10 is 0.974 / 0.975 / 0.976 before COMMIT at `mhnsw_ef_search` 20 / 100 / 400, and
+    0.991 / 1.000 / 1.000 after. The worst query finds 5 of 10 before COMMIT.
+  - On 1,000 random vectors it is 0.63 / 0.66 / 0.66 before and 0.78 / 0.99 / 1.00 after.
+  - The uncommitted search is also faster (p50 about 0.2 ms against 0.5 ms on the chunks), which
+    suggests it explores less of the graph; this was not verified in the server.
+  - ROLLBACK leaves no row. The cause is not known.
+  - Practical rule: write and search in separate transactions, or commit before searching.
+  - `tests/test_db.py` commits before its NumPy cross-check for this reason.
+- **Vector arithmetic checked.** On 300 random, unnormalised vectors, `VEC_DISTANCE_COSINE`
+  equals NumPy's `1 - cos` for every row (within 1e-5). A scan that ignores the index returns
+  NumPy's exact top 10 in order, and the HNSW index at ef 200 finds all of them
+  (`tests/test_db.py`).

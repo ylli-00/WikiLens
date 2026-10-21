@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict, fields, replace
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -385,6 +386,8 @@ def test_query_options_map_to_filters_and_search_arguments(
         "query", "x", "--k", "3", "--min-words", "5000", "--max-words", "9000",
         "--heading", "%History%", "--path", "Geography%", "--linked-from", "Aare",
         "--links-to", "Bern", "--title", "Aare", "--title", "Bern, Switzerland",
+        "--category", "Rivers of Switzerland", "--edited-since", "2020-01-01",
+        "--edited-before", " 2021-06-30 ",
         "--strategy", "overfetch", "--overfetch", "4", "--ef-search", "40",
     ]  # fmt: skip
     assert cli.main(argv) == 0
@@ -396,6 +399,9 @@ def test_query_options_map_to_filters_and_search_arguments(
         linked_from="Aare",
         links_to="Bern",
         titles=["Aare", "Bern, Switzerland"],  # --title repeats, one exact title each
+        category="Rivers of Switzerland",
+        edited_since=date(2020, 1, 1),
+        edited_before=date(2021, 6, 30),
     )
     assert fake_search["k"] == 3
     assert fake_search["strategy"] == "overfetch"
@@ -713,6 +719,8 @@ def test_missing_settings_is_exit_1(
         ["query", "x", "--ef-search", "-1"],
         ["query", "x", "--ef-search", "many"],
         ["query", "x", "--overfetch", "0"],
+        ["query", "x", "--edited-since", "2020-13-01"],
+        ["query", "x", "--edited-before", "yesterday"],
         ["query", "x", "--bogus"],
         ["init-db", "--bogus"],
         ["ingest", "--batch-size", "0"],
@@ -748,6 +756,16 @@ def test_query_rejects_min_words_above_max_words_as_usage_error(
     assert fake_db.connections == []  # rejected before any connection
 
 
+def test_query_rejects_edited_since_not_before_edited_before_as_usage_error(
+    capsys: pytest.CaptureFixture[str], fake_db: FakeDatabase
+) -> None:
+    argv = ["query", "x", "--edited-since", "2021-01-01", "--edited-before", "2021-01-01"]
+    assert cli.main(argv) == 2
+    err = capsys.readouterr().err
+    assert "not earlier than" in err and err.count("\n") == 1
+    assert fake_db.connections == []  # rejected before any connection
+
+
 @pytest.mark.parametrize(
     "flags",
     [
@@ -758,6 +776,9 @@ def test_query_rejects_min_words_above_max_words_as_usage_error(
         ["--linked-from", "Aare"],
         ["--links-to", "Bern"],
         ["--title", "Aare"],
+        ["--category", "Rivers"],
+        ["--edited-since", "2020-01-01"],
+        ["--edited-before", "2020-01-01"],
         ["--min-words", "100", "--heading", "%History%"],
     ],
 )
@@ -891,6 +912,9 @@ def test_ingest_maps_options_to_run_ingest_and_prints_the_report(
             n_evidence=4,
             n_evidence_page_resolved=4,
             n_evidence_sentence_resolved=3,
+            n_pages_with_meta=2,
+            n_categories=5,
+            n_page_categories=6,
             seconds={
                 "schema": 0.1,
                 "parse": 0.5,
@@ -914,6 +938,7 @@ def test_ingest_maps_options_to_run_ingest_and_prints_the_report(
     assert "pages 3, sections 7, sentences 50 (empty 1), chunks 12" in out
     assert "links 20 (resolved 5, skipped 0)" in out
     assert "claims 2, evidence ids 4 (page resolved 4, sentence resolved 3)" in out
+    assert "page metadata 2 of 3 pages, categories 5 (page_category 6)" in out
 
     argv = ["ingest", "--corpus-dir", str(tmp_path), "--no-reset", "--batch-size", "16", "--no-prefix"]
     assert cli.main(argv) == 0

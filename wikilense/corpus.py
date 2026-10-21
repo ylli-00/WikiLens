@@ -19,9 +19,13 @@ import re
 import unicodedata
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 DEFAULT_CORPUS_DIR = Path(__file__).resolve().parents[1] / "data" / "corpus"
+
+PAGE_META_FILE = "page_meta.jsonl"
+"""The page metadata file next to ``pages.jsonl``, written by ``scripts/fetch_page_meta.py``."""
 
 # ``<page title>_<type>_<numbers>``, anchored at the end so that a title containing an underscore
 # still parses. The page group is non-greedy: with a greedy group ``X_header_cell_0_1_1`` would
@@ -81,6 +85,80 @@ def iter_claims(path: str | Path, split: str | None = None) -> Iterator[dict]:
             elif "split" not in record:
                 raise ValueError(f"claim {record.get('id')!r} in {path} has no 'split' key")
             yield record
+
+
+@dataclass(frozen=True)
+class PageMeta:
+    """The Wikipedia metadata of one corpus page, one record of ``page_meta.jsonl``.
+
+    ``revision_id`` and ``last_edited`` (an aware datetime in UTC) identify the revision whose
+    text the corpus holds; ``categories`` are that revision's category names (no "Category:"
+    prefix, NFC, in file order, without duplicates). They are None and empty when the revision
+    was not found.
+    """
+
+    title: str
+    revision_id: int | None
+    last_edited: datetime | None
+    categories: tuple[str, ...]
+
+
+def parse_wiki_timestamp(value: str) -> datetime:
+    """Return the aware UTC datetime of a MediaWiki timestamp such as ``2020-11-17T02:44:45Z``.
+
+    Raises ``ValueError`` for anything else.
+    """
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise ValueError(f"not a MediaWiki UTC timestamp: {value!r}")
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z")
+
+
+def load_page_meta(path: str | Path) -> dict[str, PageMeta]:
+    """Return ``{nfc_title: PageMeta}`` read from ``page_meta.jsonl``.
+
+    Every non-blank line is a JSON object with at least ``title`` (a non-empty str),
+    ``revision_id`` (a positive int or null), ``last_edited`` (a MediaWiki timestamp or null) and
+    ``categories`` (a list of non-empty str). Other keys (``wiki_title``, ``method``, ...)
+    record how the revision was found and are not read here. Raises ``ValueError`` naming the
+    line for a malformed record or a duplicate title.
+    """
+    result: dict[str, PageMeta] = {}
+    with open(path, encoding="utf-8") as handle:
+        for number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            where = f"{path}, line {number}"
+            try:
+                record = json.loads(line)
+                title = record["title"]
+                revision_id = record["revision_id"]
+                last_edited = record["last_edited"]
+                categories = record["categories"]
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{where}: not JSON: {exc}") from exc
+            except (KeyError, TypeError) as exc:
+                raise ValueError(f"{where}: a record needs title, revision_id, last_edited and "
+                                 f"categories (missing {exc})") from exc
+            if not isinstance(title, str) or not title:
+                raise ValueError(f"{where}: title must be a non-empty string")
+            if revision_id is not None and (
+                isinstance(revision_id, bool) or not isinstance(revision_id, int) or revision_id < 1
+            ):
+                raise ValueError(f"{where}: revision_id must be a positive int or null")
+            if not isinstance(categories, list) or not all(
+                isinstance(name, str) and name for name in categories
+            ):
+                raise ValueError(f"{where}: categories must be a list of non-empty strings")
+            try:
+                edited = None if last_edited is None else parse_wiki_timestamp(last_edited)
+            except ValueError as exc:
+                raise ValueError(f"{where}: {exc}") from exc
+            key = nfc(title)
+            if key in result:
+                raise ValueError(f"{where}: duplicate title {key!r}")
+            names = tuple(dict.fromkeys(nfc(name) for name in categories))
+            result[key] = PageMeta(key, revision_id, edited, names)
+    return result
 
 
 def claim_pages(record: dict) -> set[str]:

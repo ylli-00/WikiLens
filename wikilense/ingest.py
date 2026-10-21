@@ -12,8 +12,12 @@ each one when it completes:
 2. Every page is parsed (``wikitext.parse_page``, ``chunking.chunk_page``) and its ``page``,
    ``section`` (lead included), ``sentence`` (every text unit: whitespace-only ones and hatnotes
    such as "Main article: X" too, so that evidence ids resolve) and ``link`` rows are written; a
-   link target longer than ``MAX_TITLE_LENGTH`` characters is skipped and counted. Chunks stay in
-   memory with the text that will be embedded (``chunking.embedding_text`` when ``use_prefix``).
+   link target longer than ``MAX_TITLE_LENGTH`` characters is skipped and counted. When the
+   corpus directory holds ``page_meta.jsonl`` (``scripts/fetch_page_meta.py``), each page gets its
+   Wikipedia ``revision_id`` and ``last_edited`` and its ``category`` / ``page_category`` rows;
+   without the file those columns stay NULL and the category tables empty (a warning says so).
+   Chunks stay in memory with the text that will be embedded (``chunking.embedding_text`` when
+   ``use_prefix``).
 3. The chunk texts are embedded with ``embed_passages`` (the model was loaded and its
    dimension checked against ``settings.vector_dim``, the literal in ``sql/schema.sql``, before
    step 1) and the ``chunk`` rows (``db.vec_param`` bytes) and the ``chunk_sentence`` map are
@@ -22,7 +26,8 @@ each one when it completes:
    False, see ``wikitext.HATNOTE_RE``) belong to no chunk and are counted as ``n_units_empty``
    and ``n_units_hatnote``.
 4. ``link.to_page_id`` is resolved with one ``UPDATE link JOIN page``.
-5. ``ANALYZE TABLE`` runs for ``chunk``, ``page``, ``section`` and ``link`` (``ANALYZE_TABLES``),
+5. ``ANALYZE TABLE`` runs for every table the search statements join or filter on
+   (``ANALYZE_TABLES``),
    so that the optimizer plans the search statements from fresh InnoDB statistics rather than
    from the stale ones left by the bulk insert (a plain JOIN once started from ``page`` and lost
    the vector index that way, docs/DESIGN.md). The seconds are reported (stage ``analyze``) and
@@ -33,7 +38,8 @@ each one when it completes:
 7. ``ingest_meta`` records the model and its revision, the chunk parameters, the index ``M`` and ``DISTANCE`` as
    ``SHOW CREATE TABLE chunk`` reports them (``db.vector_index_info``), the hatnote rule and count,
    the ANALYZE tables and seconds, the corpus directory (relative to the repository root when
-   inside it, so the value does not leak a home directory), the SHA-256 of both corpus files,
+   inside it, so the value does not leak a home directory), the SHA-256 of the corpus files
+   (``none`` for a missing ``page_meta.jsonl``),
    the server version and the time.
 
 Every INSERT goes through ``db.insert_rows`` in batches of at most ``INSERT_BATCH_ROWS`` rows.
@@ -61,7 +67,15 @@ from tqdm import tqdm
 from wikilense import __version__, db
 from wikilense.chunking import chunk_page, embedding_text
 from wikilense.config import REPO_ROOT, Settings
-from wikilense.corpus import DEFAULT_CORPUS_DIR, iter_claims, iter_pages, parse_element_id
+from wikilense.corpus import (
+    DEFAULT_CORPUS_DIR,
+    PAGE_META_FILE,
+    PageMeta,
+    iter_claims,
+    iter_pages,
+    load_page_meta,
+    parse_element_id,
+)
 from wikilense.wikitext import HATNOTE_RE, parse_page
 
 logger = logging.getLogger(__name__)
@@ -81,7 +95,7 @@ dimension check (before the schema step) + embed_passages; load = every INSERT (
 resolve = the link UPDATE and the evidence id lookups; analyze = the ANALYZE TABLE statements;
 total = the whole run."""
 
-ANALYZE_TABLES: tuple[str, ...] = ("chunk", "page", "section", "link")
+ANALYZE_TABLES: tuple[str, ...] = ("chunk", "page", "section", "link", "category", "page_category")
 """Tables whose InnoDB statistics are refreshed with ``ANALYZE TABLE`` after the chunks are
 loaded: the tables the search statements join and filter on."""
 
@@ -101,6 +115,7 @@ META_KEYS: tuple[str, ...] = (
     "corpus_dir",
     "corpus_pages_sha256",
     "corpus_claims_sha256",
+    "corpus_page_meta_sha256",
     "mariadb_version",
     "wikilense_version",
     "ingested_at",
@@ -126,6 +141,7 @@ _ID_COLUMNS: dict[str, str] = {
     "section": "section_id",
     "sentence": "sentence_id",
     "chunk": "chunk_id",
+    "category": "category_id",
 }
 _NEXT_ID_SQL: dict[str, str] = {
     table: f"SELECT COALESCE(MAX(`{column}`), 0) + 1 FROM `{table}`"
@@ -141,6 +157,8 @@ _INSERT_COLUMNS: dict[str, tuple[str, ...]] = {
     "chunk": db.SCHEMA_COLUMNS["chunk"],
     "chunk_sentence": db.SCHEMA_COLUMNS["chunk_sentence"],
     "link": ("from_page_id", "to_title", "to_page_id", "source_element"),
+    "category": db.SCHEMA_COLUMNS["category"],
+    "page_category": db.SCHEMA_COLUMNS["page_category"],
     "claim": db.SCHEMA_COLUMNS["claim"],
     "claim_evidence": db.SCHEMA_COLUMNS["claim_evidence"],
     "ingest_meta": db.SCHEMA_COLUMNS["ingest_meta"],
@@ -176,7 +194,9 @@ class IngestReport:
     ``n_links_skipped`` the targets over ``MAX_TITLE_LENGTH`` characters that were not written;
     ``n_links_resolved`` the rows whose target is a corpus page. ``n_evidence`` counts every
     element id of every evidence set; the two ``*_resolved`` counts the rows with a ``page_id``
-    and with a ``sentence_id``. ``seconds`` has the keys of ``STAGES``.
+    and with a ``sentence_id``. ``n_pages_with_meta`` counts the pages that ``page_meta.jsonl``
+    describes, ``n_categories`` the distinct categories and ``n_page_categories`` the
+    ``page_category`` rows. ``seconds`` has the keys of ``STAGES``.
     """
 
     n_pages: int = 0
@@ -192,10 +212,13 @@ class IngestReport:
     n_evidence: int = 0
     n_evidence_page_resolved: int = 0
     n_evidence_sentence_resolved: int = 0
+    n_pages_with_meta: int = 0
+    n_categories: int = 0
+    n_page_categories: int = 0
     seconds: dict[str, float] = field(default_factory=lambda: dict.fromkeys(STAGES, 0.0))
 
     def counts(self) -> dict[str, int]:
-        """Return the thirteen counts as a dict (everything except ``seconds``)."""
+        """Return the counts as a dict (every field except ``seconds``)."""
         return {
             name: value
             for name, value in self.__dict__.items()
@@ -335,6 +358,7 @@ class _Ingest:
         conn: pymysql.Connection,
         pages_path: Path,
         claims_path: Path,
+        meta_path: Path,
         reset: bool,
         embedder: EmbedderLike | None,
         batch_size: int,
@@ -345,6 +369,7 @@ class _Ingest:
         self.conn = conn
         self.pages_path = pages_path
         self.claims_path = claims_path
+        self.meta_path = meta_path
         self.reset = reset
         self.embedder = embedder
         self.batch_size = batch_size
@@ -355,6 +380,8 @@ class _Ingest:
         self.loader = _Loader(conn)
         self.page_ids: dict[str, int] = {}  # NFC title -> page_id
         self.sentence_ids: dict[tuple[int, str], int] = {}  # (page_id, element_key) -> id
+        self.page_meta: dict[str, PageMeta] = {}  # NFC title -> page_meta.jsonl record
+        self.category_ids: dict[str, int] = {}  # category name -> category_id
         self.chunks: list[_PendingChunk] = []
         self.model_name = settings.embedding_model
         self.next_id: dict[str, int] = {}
@@ -434,8 +461,10 @@ class _Ingest:
     # step 2 ------------------------------------------------------------------------------------
 
     def _load_pages(self) -> None:
-        """Parse every page and write page, section, sentence and link rows; keep the chunks."""
+        """Parse every page and write page, section, sentence, link and category rows; keep the
+        chunks."""
         report = self.report
+        self._read_page_meta()
         total = _count_lines(self.pages_path)
         pages = tqdm(
             iter_pages(self.pages_path),
@@ -462,6 +491,7 @@ class _Ingest:
                 self.next_id["page"] += 1
                 self.page_ids[parsed.title] = page_id
                 stats = parsed.stats
+                meta = self.page_meta.get(parsed.title)
                 self.loader.add(
                     "page",
                     (
@@ -474,8 +504,13 @@ class _Ingest:
                         stats["n_sections"],
                         stats["n_tables"],
                         stats["n_lists"],
+                        meta.revision_id if meta else None,
+                        # DATETIME holds UTC without a zone: bind the naive UTC value
+                        meta.last_edited.replace(tzinfo=None) if meta and meta.last_edited else None,
                     ),
                 )
+                if meta is not None:
+                    self._add_categories(page_id, meta.categories)
                 section_base = self.next_id["section"]
                 self.next_id["section"] += len(parsed.sections)
                 for section in parsed.sections:
@@ -543,6 +578,22 @@ class _Ingest:
             self.loader.flush()
             self.conn.commit()
         report.n_chunks = len(self.chunks)
+        report.n_categories = len(self.category_ids)
+        unmatched = sorted(set(self.page_meta) - set(self.page_ids))
+        if unmatched:
+            logger.warning(
+                "%d %s record(s) name no corpus page and were ignored, e.g. %r",
+                len(unmatched),
+                PAGE_META_FILE,
+                unmatched[0],
+            )
+        logger.info(
+            "metadata: %d of %d pages described, %d categories, %d page_category rows",
+            report.n_pages_with_meta,
+            report.n_pages,
+            report.n_categories,
+            report.n_page_categories,
+        )
         logger.info(
             "pages: %d pages, %d sections, %d sentences (%d empty, %d hatnotes), %d links "
             "(%d skipped), %d chunks; parse %.2f s, load %.2f s",
@@ -557,6 +608,37 @@ class _Ingest:
             self.timer.seconds["parse"],
             self.timer.seconds["load"],
         )
+
+    def _read_page_meta(self) -> None:
+        """Read ``page_meta.jsonl`` into ``self.page_meta``; a missing file only logs a warning.
+
+        Raises ``IngestError`` for a malformed file (``corpus.load_page_meta``).
+        """
+        if not self.meta_path.is_file():
+            logger.warning(
+                "no %s in %s: page.revision_id and page.last_edited stay NULL and the category "
+                "tables stay empty (scripts/fetch_page_meta.py writes the file)",
+                PAGE_META_FILE,
+                self.meta_path.parent,
+            )
+            return
+        try:
+            self.page_meta = load_page_meta(self.meta_path)
+        except ValueError as exc:
+            raise IngestError(str(exc)) from exc
+
+    def _add_categories(self, page_id: int, names: Sequence[str]) -> None:
+        """Queue a ``category`` row for each name not seen yet and a ``page_category`` row each."""
+        self.report.n_pages_with_meta += 1
+        for name in names:
+            category_id = self.category_ids.get(name)
+            if category_id is None:
+                category_id = self.next_id["category"]
+                self.next_id["category"] += 1
+                self.category_ids[name] = category_id
+                self.loader.add("category", (category_id, name))
+            self.loader.add("page_category", (page_id, category_id))
+            self.report.n_page_categories += 1
 
     # step 3 ------------------------------------------------------------------------------------
 
@@ -732,6 +814,9 @@ class _Ingest:
                 "corpus_dir": corpus_dir_label(self.pages_path.parent),
                 "corpus_pages_sha256": sha256_of_file(self.pages_path),
                 "corpus_claims_sha256": sha256_of_file(self.claims_path),
+                "corpus_page_meta_sha256": (
+                    sha256_of_file(self.meta_path) if self.meta_path.is_file() else "none"
+                ),
                 "mariadb_version": _server_version(self.conn),
                 "wikilense_version": __version__,
                 "ingested_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -808,6 +893,7 @@ def run_ingest(
             conn,
             pages_path,
             claims_path,
+            pages_path.parent / PAGE_META_FILE,
             reset=reset,
             embedder=embedder,
             batch_size=batch_size,

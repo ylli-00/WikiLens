@@ -29,12 +29,15 @@ flowchart TD
     F["data/feverous/<br/>FEVEROUS claims (train, dev)<br/>+ Wikipedia shard wiki_000.jsonl<br/>(downloaded, not in git)"]
     B["scripts/build_corpus.py<br/>picks 75 claims and 100 pages"]
     C["data/corpus/<br/>pages.jsonl, claims.jsonl, MANIFEST.md<br/>(committed)"]
+    W["scripts/fetch_page_meta.py<br/>MediaWiki API: each page's Dec 2020<br/>revision, edit date, categories"]
+    P["data/corpus/page_meta.jsonl<br/>+ PAGE_META.md (committed)"]
     I["wikilense ingest (ingest.py)<br/>parse (wikitext.py) → chunk (chunking.py)<br/>→ embed (embedding.py) → load (db.py)"]
-    M[("MariaDB 11.8<br/>page, section, sentence, chunk (VECTOR),<br/>chunk_sentence, link, claim,<br/>claim_evidence, ingest_meta")]
+    M[("MariaDB 11.8<br/>page, section, sentence, chunk (VECTOR),<br/>chunk_sentence, link, category,<br/>page_category, claim, claim_evidence,<br/>ingest_meta")]
     S["search (search.py)<br/>wikilense query · wikilense serve"]
     E["evaluate (evaluate.py)<br/>wikilense eval · scripts/run_experiments.py"]
     R["results/<br/>JSON + Markdown per run, SUMMARY.md"]
     F --> B --> C --> I --> M
+    C --> W --> P --> I
     M --> S
     M --> E --> R
     S -.->|the same search() function| E
@@ -49,10 +52,17 @@ in that shard, their 54 evidence pages, and 46 "filler" pages that those pages l
 distractors). It writes `data/corpus/`, which is committed and rebuilt byte for byte by the
 script.
 
+**Page metadata.** The FEVEROUS pages carry no category and no edit date.
+`scripts/fetch_page_meta.py` finds, for each page, the Wikipedia revision whose text the corpus
+holds (the one live in December 2020, matched by its text when the page was edited that month).
+It asks the MediaWiki API politely and writes that revision's id, timestamp and categories to the
+committed `data/corpus/page_meta.jsonl`.
+
 **Ingest.** `wikilense ingest` reads `data/corpus/`, splits every page into sections and text
 units (sentences and list items), groups consecutive units into chunks of at most 240 words,
-embeds each chunk, and writes nine tables. It takes about 26 s on the RTX 4060 (22 s of it
-embedding), measured tonight.
+embeds each chunk, and writes eleven tables (the page metadata goes into `page.revision_id`,
+`page.last_edited`, `category` and `page_category`). It takes about 26 s on the RTX 4060, 22 s of
+it embedding (measured 2026-10-22).
 
 **Search.** `search.search()` embeds nothing itself: it takes the query's vector and runs one
 statement that ranks chunks by cosine distance, with any filters in the same statement. The CLI
@@ -135,7 +145,7 @@ to understand the file.
 | `chunking.py` | Groups a page's text units into chunks of at most `max_words` words, never across a section, one unit of overlap; `embedding_text` adds the `title > section path:` prefix that is embedded. | - | `config`, `wikitext` | `chunk_units` |
 | `embedding.py` | `Embedder`: loads the sentence-transformers model lazily (on the GPU when there is one), pinned to the revision `results/` were measured with; `embed_queries` prepends the BGE query instruction, `embed_passages` does not. | model cache `~/.cache/huggingface` | `config`; sentence-transformers, torch | `Embedder.embed_queries` |
 | `db.py` | The MariaDB layer: `connect`, running `sql/schema.sql` (`apply_schema`, with its own SQL splitter), `insert_rows` with an allowlist of table and column names (`SCHEMA_COLUMNS`), `vec_param` (the bytes bound for a `VECTOR`), the one allowed session variable, `EXPLAIN`, and reading the index's M from `SHOW CREATE TABLE`. | the database; reads `sql/schema.sql` | `config`; PyMySQL | `insert_sql` |
-| `ingest.py` | The pipeline behind `wikilense ingest`: checks settings and model, then seven steps (schema, pages, chunks with embeddings, link resolution, `ANALYZE TABLE`, claims and evidence, `ingest_meta`), each committed when it completes. | reads `data/corpus/`; writes all nine tables | `db`, `corpus`, `wikitext`, `chunking`, `embedding` | `_Ingest.run` |
+| `ingest.py` | The pipeline behind `wikilense ingest`: checks settings and model, then seven steps (schema, pages, chunks with embeddings, link resolution, `ANALYZE TABLE`, claims and evidence, `ingest_meta`), each committed when it completes. | reads `data/corpus/`; writes all eleven tables | `db`, `corpus`, `wikitext`, `chunking`, `embedding` | `_Ingest.run` |
 | `search.py` | The queries: the four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles), every SQL statement as a named constant or fragment, `ef_search` set per call and restored, and the joins back to sentences and page summaries. | the database (read only) | `db`, `config` | `search_statement` |
 | `evaluate.py` | The recall and latency harness: ground truth from `claim_evidence`, the pure metric functions, one untimed and `repeats` timed passes over every claim and k, and the JSON and Markdown writer. | reads the database; writes `<out>/<name>.json/.md` | `db`, `search` | `evaluate` |
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`), argument checking, one-line errors and the documented exit codes (0, 1, 2, 130), and the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
@@ -155,7 +165,9 @@ to understand the file.
 |---|---|---|---|
 | `fetch_wiki_shard.py` | Downloads one FEVEROUS Wikipedia shard with HTTP range requests (reads the zip's directory at its end, then only that member), checks the CRC and writes it. Standard library only. | writes `data/feverous/wiki_pages/` | `central_directory` |
 | `build_corpus.py` | Applies `corpus.select_corpus` to the shard and claim files and writes `data/corpus/` with a manifest of counts and SHA-256 digests. | reads `data/feverous/`; writes `data/corpus/` | `main` |
-| `run_experiments.py` | The experiment protocol behind `results/`: groups (`stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `summary`) that ingest a named configuration, rebuild the index for another M, restart the container, and evaluate; `summary` rebuilds `results/SUMMARY.md` from the JSON files. Root-level SQL goes through `docker exec` with the password in the environment only. | the main database, docker; writes `results/` | `run_eval` |
+| `fetch_page_meta.py` | For every corpus page, finds the Wikipedia revision whose text the corpus holds (live at the end of December 2020; chosen by sentence matching when the page was edited that month; renamed pages followed through the move log). Writes its id, timestamp and `[[Category:...]]` names. One request at a time, a User-Agent with the repository URL, `maxlag`, `Retry-After`. Standard library only. | reads `data/corpus/pages.jsonl`; writes `data/corpus/page_meta.jsonl`, `PAGE_META.md` | `fetch_page` |
+| `run_experiments.py` | The experiment protocol behind `results/`. Groups (`stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `summary`) ingest a named configuration, rebuild the index for another M, restart the container, and evaluate. `uncommitted` searches a scratch vector table before and after COMMIT; `planner` records which filters keep the vector index; `summary` rebuilds `results/SUMMARY.md` from the JSON files. Root-level SQL goes through `docker exec` with the password in the environment only. | the main database, docker; writes `results/` | `run_eval` |
+| `make_charts.py` | Draws the README charts (recall at k, the uncommitted search, rows read per filter) as SVG with a dark variant, from the JSON in `results/`. Standard library only. | reads `results/`; writes `docs/img/` | `main` |
 
 ### `tests/`
 
@@ -169,7 +181,8 @@ to understand the file.
 | `test_search.py` | Twelve chunks whose distances to the query are known exactly: every strategy with every filter, parameter order, `EXPLAIN`, RRF scores computed by hand, `ef_search` restored even when the statement fails. |
 | `test_evaluate.py` | The metrics on hand-made hit lists, and whole evaluations with known rankings (pure, with fakes, and against the test database). |
 | `test_cli.py`, `test_web.py` | Every command and the API: options reaching `search()`, output formats, error messages and exit codes, HTTP status codes, escaping. |
-| `test_experiments.py`, `test_fetch_wiki_shard.py` | The script parts that need no server: hit-list comparison, configuration check, fixed SQL, the password route to `docker exec`; download error handling. |
+| `test_experiments.py`, `test_fetch_wiki_shard.py` | The script parts that need no server: hit-list comparison, configuration check, fixed SQL, the password route to `docker exec`, the uncommitted group's report; download error handling. |
+| `test_fetch_page_meta.py`, `test_make_charts.py` | The metadata fetch without the network: request spacing, retries, the User-Agent, category extraction, the revision choice and moved pages; every chart renders valid, labelled SVG. |
 
 ### Top-level files
 
@@ -266,7 +279,7 @@ wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
 
 ## 6. The database
 
-Nine tables, all InnoDB with `utf8mb4` text. The arrows read "one to many".
+Eleven tables, all InnoDB with `utf8mb4` text. The arrows read "one to many".
 
 ```mermaid
 erDiagram
@@ -278,6 +291,8 @@ erDiagram
     chunk ||--o{ chunk_sentence : "contains"
     sentence ||--o{ chunk_sentence : "is in"
     page ||--o{ link : "links from"
+    page ||--o{ page_category : "is in"
+    category ||--o{ page_category : "contains"
     page |o--o{ link : "links to (NULL outside the corpus)"
     claim ||--o{ claim_evidence : "cites"
     page |o--o{ claim_evidence : "resolves to"
@@ -289,15 +304,17 @@ its revision, chunk settings, index M, corpus digests, time).
 
 | Table | Rows now | One row per |
 |---|---|---|
-| `page` | 100 | Wikipedia page, with its size statistics (`n_words` is indexed for length filters) |
+| `page` | 100 | Wikipedia page, with its size statistics (`n_words` is indexed for length filters) and its December 2020 `revision_id` and `last_edited` (indexed for the edit-date filters) |
 | `section` | 3,173 | section, the lead included; `path` is the headings joined by ` > ` |
 | `sentence` | 33,637 | text unit (sentence or list item), in page order, empty ones and hatnotes too |
 | `chunk` | 4,598 | chunk, with its text and its `embedding VECTOR(384)` |
 | `chunk_sentence` | 33,783 | (chunk, sentence) pair |
 | `link` | 40,542 | wiki link occurrence (373 point at a corpus page) |
+| `category` | 1,005 | Wikipedia category name (exact, `utf8mb4_bin`) |
+| `page_category` | 1,123 | (page, category) pair |
 | `claim` | 75 | FEVEROUS claim |
 | `claim_evidence` | 114 | element id of a claim's gold evidence set (87 resolve to a sentence, 27 are table cells) |
-| `ingest_meta` | 18 | setting of the ingest |
+| `ingest_meta` | 19 | setting of the ingest |
 
 Why the important choices were made:
 
@@ -323,7 +340,7 @@ Why the important choices were made:
 
 ## 7. Testing and CI
 
-There are 298 tests of three kinds, told apart by pytest markers.
+There are 345 tests of three kinds, told apart by pytest markers.
 
 - **Pure tests** (229): no server and no model; parsing, chunking, SQL assembly, metrics,
   argument checking, and the CLI and web page with fake databases and embedders. They run in
@@ -356,7 +373,7 @@ repository 36 of 40 on 2026-09-22, with no blocking issue.
 | Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
 | Recall and latency against a ground truth you built (execution) | `evaluate.py`, `claim` / `claim_evidence`, `results/SUMMARY.md` |
 | Chunk size, model and index parameters with reasons (execution) | DESIGN.md "Phase 3 outcomes", README "Parameters and why", the comments in `sql/schema.sql` and `config.py` |
-| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 298 tests, parameters only in SQL, CI |
+| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 345 tests, parameters only in SQL, CI |
 | An ingest that runs from the README and a query interface (usability) | `make setup`, `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql` |
 | What the database-native approach gave (documentation) | README "What the database-native approach gave" |
 
@@ -394,6 +411,8 @@ make down                     # stop MariaDB (the data volume is kept)
 .venv/bin/wikilense query "When was Kabul founded?" --heading '%History%' --explain
 .venv/bin/wikilense query "When was Kabul founded?" --path 'History%' --title Kabul
 .venv/bin/wikilense query "river" --linked-from Aare --min-words 1000
+.venv/bin/wikilense query "independence from the Soviet Union" --category "Member states of the United Nations" \
+    --min-words 1000 --edited-since 2020-12-01 --linked-from Asia --explain   # the brief's four filters
 .venv/bin/wikilense query "Aare glacier" --strategy rrf --sentences
 .venv/bin/wikilense query "Aare" --json          # JSON on stdout, timing on stderr
 
@@ -401,7 +420,7 @@ make down                     # stop MariaDB (the data volume is kept)
 make serve                    # http://127.0.0.1:8000/ and http://127.0.0.1:8000/docs
 
 # tests and lint
-make test                     # all 298 (one session at a time)
+make test                     # all of them (one session at a time)
 .venv/bin/python -m pytest -m "not db and not slow"   # no server, no model
 make lint
 
@@ -414,4 +433,9 @@ make eval                     # writes results/baseline.json and .md
 make experiments
 .venv/bin/python scripts/run_experiments.py summary   # rebuild results/SUMMARY.md only
 .venv/bin/python scripts/run_experiments.py restore   # put the default ingest back
+.venv/bin/python scripts/run_experiments.py uncommitted planner   # the two newest groups, ~40 s
+.venv/bin/python scripts/make_charts.py              # redraw docs/img/*.svg from results/
+
+# page metadata (only to refetch it; the file is committed)
+.venv/bin/python scripts/fetch_page_meta.py          # ~300 polite API requests, a few minutes
 ```

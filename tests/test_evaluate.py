@@ -787,6 +787,7 @@ def test_evaluate_with_a_global_filter_and_overfetch(
     assert result.parameters["filters"] == {
         "min_words": 1000, "max_words": None, "heading_like": None, "path_like": None,
         "linked_from": None, "links_to": None, "titles": None,
+        "category": None, "edited_since": None, "edited_before": None,
     }
     assert result.parameters["overfetch"] == 3
     by_id = {c.claim_id: c for c in result.claims}

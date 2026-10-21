@@ -204,7 +204,7 @@ def test_schema_file_matches_the_fixed_table_list() -> None:
 
 
 #: A column line inside CREATE TABLE: name (optionally in backticks), then its type.
-_COLUMN_LINE = re.compile(r"^\s+`?(\w+)`?\s+(?:INT|TINYINT|SMALLINT|VARCHAR|TEXT|ENUM|VECTOR)\b")
+_COLUMN_LINE = re.compile(r"^\s+`?(\w+)`?\s+(?:INT|TINYINT|SMALLINT|BIGINT|VARCHAR|TEXT|ENUM|DATETIME|VECTOR)\b")
 
 
 #: A line inside CREATE TABLE that declares a key, an index or a constraint, not a column.
@@ -399,6 +399,7 @@ def test_fixed_column_list_matches_the_database(db_conn) -> None:
             ("utf8mb4_bin",),
         )
         assert cur.fetchall() == (
+            ("category", "name", "utf8mb4_bin"),
             ("claim_evidence", "page_title", "utf8mb4_bin"),
             ("link", "to_title", "utf8mb4_bin"),
             ("page", "title", "utf8mb4_bin"),

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import replace
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import numpy as np
@@ -56,6 +57,11 @@ QUERY = _angled(0.0, 1)  # e_0
 
 def _expected_distance(chunk_id: int) -> float:
     return float(1 - np.cos(0.1 * chunk_id))
+
+
+def _db_time(*parts: int) -> datetime:
+    """Return the naive datetime a ``DATETIME`` column holds for this UTC moment."""
+    return datetime(*parts, tzinfo=timezone.utc).replace(tzinfo=None)
 
 
 def _ids(hits: list[Hit]) -> list[int]:
@@ -146,6 +152,28 @@ def corpus(db_conn: pymysql.Connection) -> pymysql.Connection:
     return db_conn
 
 
+@pytest.fixture
+def meta_corpus(corpus: pymysql.Connection) -> pymysql.Connection:
+    """The synthetic corpus plus page metadata, committed: Alpha last edited 2019-05-01 00:00 UTC
+    in categories Places and Cities, Beta 2020-12-15 12:00 UTC in Places and Rivers, Gamma
+    without a revision date in Mountains."""
+    with corpus.cursor() as cur:
+        cur.execute("UPDATE page SET last_edited = %s WHERE page_id = %s", (_db_time(2019, 5, 1), ALPHA))
+        cur.execute(
+            "UPDATE page SET last_edited = %s WHERE page_id = %s", (_db_time(2020, 12, 15, 12), BETA)
+        )
+    dbmod.insert_rows(
+        corpus, "category", ("category_id", "name"),
+        [(1, "Places"), (2, "Cities"), (3, "Rivers"), (4, "Mountains")],
+    )
+    dbmod.insert_rows(
+        corpus, "page_category", ("page_id", "category_id"),
+        [(ALPHA, 1), (ALPHA, 2), (BETA, 1), (BETA, 3), (GAMMA, 4)],
+    )
+    corpus.commit()
+    return corpus
+
+
 # ---------------------------------------------------------------------------------------------
 # pure tests: statements and validation
 # ---------------------------------------------------------------------------------------------
@@ -205,6 +233,28 @@ def test_search_statement_shapes_and_parameters() -> None:
     assert search_statement(QUERY, filters=Filters(titles=[])) == ("", ())
     sql_one, params_one = search_statement(QUERY, filters=Filters(titles=["Only"]))
     assert "page.title IN (%s)" in sql_one and params_one[1] == "Only"
+
+
+def test_category_and_edit_date_filters_are_validated_and_bound_as_parameters() -> None:
+    with pytest.raises(TypeError, match="Filters.category"):
+        Filters(category=3)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="Filters.edited_since"):
+        Filters(edited_since="2020-01-01")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="not earlier than"):
+        Filters(edited_since=date(2020, 1, 1), edited_before=date(2020, 1, 1))
+    with pytest.raises(ValueError, match="not earlier than"):  # 12:00 at UTC+2 is 10:00 UTC
+        Filters(edited_since=datetime(2020, 1, 1, 11, tzinfo=timezone.utc),
+                edited_before=datetime(2020, 1, 1, 12, tzinfo=timezone(timedelta(hours=2))))
+    filters = Filters(category="Rivers", edited_since=date(2020, 1, 1),
+                      edited_before=datetime(2021, 1, 1, 14, tzinfo=timezone(timedelta(hours=2))))
+    sql, params = search_statement(QUERY, k=5, filters=filters)
+    assert "STRAIGHT_JOIN " + searchmod.CATEGORY_JOIN in sql
+    assert searchmod.FILTER_EDITED_SINCE in sql and searchmod.FILTER_EDITED_BEFORE in sql
+    assert "Rivers" not in sql and "2020" not in sql  # every value is a parameter
+    # the join parameter first, then the WHERE ones; bounds become naive UTC for DATETIME
+    assert params[1:4] == ("Rivers", _db_time(2020, 1, 1), _db_time(2021, 1, 1, 12))
+    sql, _ = search_statement(QUERY, k=5, filters=filters, strategy="overfetch")
+    assert "JOIN " + searchmod.CATEGORY_JOIN in sql and "STRAIGHT_JOIN" not in sql
 
 
 def test_search_statement_rejects_bad_arguments() -> None:
@@ -462,6 +512,72 @@ def test_titles_filter_with_zero_one_and_three_titles(corpus, strategy: str) -> 
 
 
 @pytest.mark.db
+@pytest.mark.parametrize("strategy", ["inline", "overfetch"])
+def test_category_filter(meta_corpus, strategy: str) -> None:
+    kw = {"strategy": strategy, "overfetch": N_CHUNKS}
+    in_category = lambda name: _ids(
+        search(meta_corpus, QUERY, k=N_CHUNKS, filters=Filters(category=name), **kw)
+    )
+    assert in_category("Places") == CHUNKS_OF[ALPHA] + CHUNKS_OF[BETA]
+    assert in_category("Rivers") == CHUNKS_OF[BETA]
+    assert in_category("Mountains") == CHUNKS_OF[GAMMA]
+    assert in_category("places") == []  # category.name is utf8mb4_bin: exact case
+    assert in_category("Nope") == []
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("strategy", ["inline", "overfetch"])
+def test_edited_since_and_before_filters(meta_corpus, strategy: str) -> None:
+    kw = {"strategy": strategy, "overfetch": N_CHUNKS}
+    run = lambda **f: _ids(search(meta_corpus, QUERY, k=N_CHUNKS, filters=Filters(**f), **kw))
+    assert run(edited_since=date(2020, 1, 1)) == CHUNKS_OF[BETA]
+    assert run(edited_before=date(2020, 1, 1)) == CHUNKS_OF[ALPHA]
+    # since is inclusive and Gamma, without a revision date, passes neither bound
+    assert run(edited_since=date(2019, 5, 1)) == CHUNKS_OF[ALPHA] + CHUNKS_OF[BETA]
+    # before is exclusive: Beta's 2020-12-15 12:00 is not before 2020-12-15 (midnight)... but is
+    # before 2020-12-16
+    assert run(edited_since=date(2019, 5, 1), edited_before=date(2020, 12, 15)) == CHUNKS_OF[ALPHA]
+    assert run(edited_before=date(2020, 12, 16)) == CHUNKS_OF[ALPHA] + CHUNKS_OF[BETA]
+    # an aware bound is converted to UTC: 13:30 at UTC+2 is 11:30 UTC, before Beta's 12:00
+    plus2 = timezone(timedelta(hours=2))
+    assert run(edited_since=datetime(2020, 12, 15, 13, 30, tzinfo=plus2)) == CHUNKS_OF[BETA]
+    assert run(edited_since=datetime(2020, 12, 15, 14, 30, tzinfo=plus2)) == []
+
+
+@pytest.mark.db
+def test_the_four_filters_of_the_brief_in_one_statement(meta_corpus) -> None:
+    """"Only articles in this category, longer than this, edited since that date, linked from
+    that other article": one inline statement; only Beta passes all four (Places, 5000 words,
+    edited 2020-12-15, linked from Alpha).
+
+    Which plan runs is the optimizer's choice: a category or link filter alone keeps the vector
+    index (asserted here), but a range predicate on an indexed page column that it estimates as
+    selective (here n_words and last_edited on a 3-page table; on the real corpus
+    ``max_words=500``) makes it read every chunk and sort by the exact distance instead. The
+    hits are the same either way, so only the category plan is pinned."""
+    filters = Filters(category="Places", min_words=1000, edited_since=date(2020, 1, 1),
+                      linked_from="Alpha")
+    hits = search(meta_corpus, QUERY, k=3, filters=filters)
+    assert _ids(hits) == [5, 6, 7] and {h.title for h in hits} == {"Beta"}
+    sql, _ = search_statement(QUERY, k=3, filters=filters)
+    for fragment in (searchmod.CATEGORY_JOIN, searchmod.LINKED_FROM_JOIN,
+                     searchmod.FILTER_MIN_WORDS, searchmod.FILTER_EDITED_SINCE):
+        assert fragment in sql
+    assert explain_search(meta_corpus, QUERY, k=3, filters=filters)[0]["table"] == "chunk"
+    plan = explain_search(meta_corpus, QUERY, k=3, filters=Filters(category="Places"))
+    assert plan[0]["table"] == "chunk" and plan[0]["key"] == "embedding", plan
+    assert plan[0]["type"] == "index", plan
+    assert any(row["table"] == "<derived2>" for row in plan), plan  # materialised, not merged
+    # dropping any one filter lets another page in
+    assert _pages(search(meta_corpus, QUERY, k=N_CHUNKS, filters=replace(filters, category=None))) \
+        == {BETA}
+    assert _pages(search(meta_corpus, QUERY, k=N_CHUNKS, filters=replace(filters, min_words=None,
+                                                                         linked_from=None))) == {BETA}
+    assert _pages(search(meta_corpus, QUERY, k=N_CHUNKS,
+                         filters=Filters(category="Places", edited_before=date(2020, 1, 1)))) == {ALPHA}
+
+
+@pytest.mark.db
 def test_combined_filters_and_strategy_none_ignores_them(corpus) -> None:
     filters = Filters(min_words=150, heading_like="%history%", links_to="Alpha")
     assert _ids(search(corpus, QUERY, k=N_CHUNKS, filters=filters)) == [11, 12]
@@ -677,3 +793,18 @@ def test_injection_shaped_inputs_are_data(corpus) -> None:
     with corpus.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM page")
         assert cur.fetchone()[0] == 3
+
+
+@pytest.mark.db
+def test_every_statement_of_the_sql_examples_runs_on_the_schema(meta_corpus) -> None:
+    """Readers run sql/examples.sql with the mariadb client, so every statement must execute on
+    the current schema (on the synthetic corpus most of them return no rows); the transaction
+    example rolls its UPDATE back."""
+    script = (dbmod.SCHEMA_PATH.parent / "examples.sql").read_text(encoding="utf-8")
+    statements = dbmod.split_sql(script)
+    assert len(statements) >= 15
+    for statement in statements:
+        with meta_corpus.cursor() as cur:
+            cur.execute(statement)
+            cur.fetchall()
+    assert _ids(search(meta_corpus, QUERY, k=3)) == [1, 2, 3]  # chunk 2's vector is back

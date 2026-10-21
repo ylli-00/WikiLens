@@ -14,6 +14,11 @@
 
 -- page: one row per Wikipedia page in the corpus, with the size statistics that the length
 -- filters use (n_words is indexed for "only pages longer than N words").
+-- revision_id and last_edited come from data/corpus/page_meta.jsonl (scripts/fetch_page_meta.py):
+-- the Wikipedia revision whose text the corpus holds (the one live in December 2020, when
+-- FEVEROUS scraped the page) and that revision's timestamp in UTC, i.e. when the page was last
+-- edited as the corpus knows it. Both are NULL when the file has no record for the page.
+-- last_edited is indexed for "only pages edited since that date".
 CREATE TABLE IF NOT EXISTS page (
     page_id     INT UNSIGNED NOT NULL AUTO_INCREMENT,
     title       VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
@@ -24,9 +29,12 @@ CREATE TABLE IF NOT EXISTS page (
     n_sections  INT UNSIGNED NOT NULL,
     n_tables    INT UNSIGNED NOT NULL,
     n_lists     INT UNSIGNED NOT NULL,
+    revision_id BIGINT UNSIGNED NULL,
+    last_edited DATETIME NULL,
     PRIMARY KEY (page_id),
     UNIQUE KEY uq_page_title (title),
-    KEY ix_page_n_words (n_words)
+    KEY ix_page_n_words (n_words),
+    KEY ix_page_last_edited (last_edited)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- section: the section tree of a page, flattened in page order. Ordinal 0 is the lead
@@ -127,6 +135,30 @@ CREATE TABLE IF NOT EXISTS link (
         REFERENCES page (page_id) ON DELETE CASCADE,
     CONSTRAINT fk_link_to_page FOREIGN KEY (to_page_id)
         REFERENCES page (page_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- category: one row per Wikipedia category name (without the "Category:" prefix), taken from
+-- the [[Category:...]] lines of each page's December 2020 revision (data/corpus/page_meta.jsonl).
+-- name is utf8mb4_bin, so a category matches exactly, like a title.
+CREATE TABLE IF NOT EXISTS category (
+    category_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+    PRIMARY KEY (category_id),
+    UNIQUE KEY uq_category_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- page_category: the categories of each page (many to many). The primary key serves "the
+-- categories of page P"; ix_page_category_category serves "the pages in category C", which the
+-- category filter of the search statements joins after the vector index scan.
+CREATE TABLE IF NOT EXISTS page_category (
+    page_id     INT UNSIGNED NOT NULL,
+    category_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (page_id, category_id),
+    KEY ix_page_category_category (category_id, page_id),
+    CONSTRAINT fk_page_category_page FOREIGN KEY (page_id)
+        REFERENCES page (page_id) ON DELETE CASCADE,
+    CONSTRAINT fk_page_category_category FOREIGN KEY (category_id)
+        REFERENCES category (category_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- claim: a FEVEROUS claim used as a query. claim_id is the FEVEROUS id; split, label and the

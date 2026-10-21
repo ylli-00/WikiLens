@@ -17,6 +17,7 @@ path run without it.
 from __future__ import annotations
 
 from dataclasses import fields
+from datetime import datetime, timezone
 from typing import Any, get_args
 
 import numpy as np
@@ -64,6 +65,11 @@ def _angled(angle: float, axis: int) -> np.ndarray:
     return v
 
 
+def _db_time(*parts: int) -> datetime:
+    """Return the naive datetime a ``DATETIME`` column holds for this UTC moment."""
+    return datetime(*parts, tzinfo=timezone.utc).replace(tzinfo=None)
+
+
 def _expected_distance(chunk_id: int) -> float:
     return float(1 - np.cos(0.1 * chunk_id))
 
@@ -80,9 +86,9 @@ def corpus(db_conn: pymysql.Connection) -> pymysql.Connection:
         "page",
         dbmod.SCHEMA_COLUMNS["page"],
         [
-            (ALPHA, "Alpha", 4, 0, 100, 600, 1, 0, 0),
-            (BETA, "Beta", 4, 0, 5000, 30000, 1, 0, 0),
-            (GAMMA, "Gamma", 4, 0, 250, 1500, 1, 0, 0),
+            (ALPHA, "Alpha", 4, 0, 100, 600, 1, 0, 0, None, None),
+            (BETA, "Beta", 4, 0, 5000, 30000, 1, 0, 0, 102, _db_time(2020, 12, 15, 12)),
+            (GAMMA, "Gamma", 4, 0, 250, 1500, 1, 0, 0, None, None),
         ],
     )
     dbmod.insert_rows(
@@ -130,6 +136,8 @@ def corpus(db_conn: pymysql.Connection) -> pymysql.Connection:
         ("from_page_id", "to_title", "to_page_id", "source_element"),
         [(ALPHA, "Beta", BETA, "sentence_0"), (BETA, "Gamma", GAMMA, "sentence_0")],
     )
+    dbmod.insert_rows(db_conn, "category", ("category_id", "name"), [(1, "Rivers")])
+    dbmod.insert_rows(db_conn, "page_category", ("page_id", "category_id"), [(BETA, 1)])
     db_conn.commit()
     return db_conn
 
@@ -433,6 +441,27 @@ def test_api_search_rrf_hits_carry_a_score_and_use_the_full_text_index(
 def test_api_search_default_k_is_five(client: TestClient) -> None:
     body = client.get("/api/search", params={"q": "x"}).json()
     assert _ids(body) == [1, 2, 3, 4, 5]
+
+
+@pytest.mark.db
+def test_api_search_category_and_edit_date_filters(client: TestClient) -> None:
+    """Only Beta has a category (Rivers) and a revision date (2020-12-15 12:00 UTC)."""
+    body = client.get("/api/search", params={"q": "x", "k": 3, "category": "Rivers"}).json()
+    assert _ids(body) == [5, 6, 7] and "category.name = %s" in body["sql"]
+    assert "Rivers" not in body["sql"]
+    body = client.get("/api/search", params={"q": "x", "k": 3, "edited_since": "2020-12-15"}).json()
+    assert _ids(body) == [5, 6, 7] and "page.last_edited >= %s" in body["sql"]
+    body = client.get("/api/search", params={"q": "x", "k": 3, "edited_before": "2020-12-15"}).json()
+    assert body["hits"] == [] and "page.last_edited < %s" in body["sql"]  # no other page is dated
+    body = client.get("/api/search", params={"q": "x", "k": 3, "category": ""}).json()
+    assert _ids(body) == [1, 2, 3]  # a blank form field is no filter
+    resp = client.get("/api/search", params={"q": "x", "edited_since": "2020-13-01"})
+    assert resp.status_code == 422
+    resp = client.get(
+        "/api/search",
+        params={"q": "x", "edited_since": "2021-01-01", "edited_before": "2020-01-01"},
+    )
+    assert resp.status_code == 422 and "not earlier than" in resp.json()["detail"]
 
 
 @pytest.mark.db

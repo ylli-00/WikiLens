@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from contextlib import closing
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -160,6 +161,20 @@ CLAIMS: list[dict] = [
 # Counted by hand from PAGES and CLAIMS (chunks with CHUNK_MAX_WORDS=12, overlap 1: Alpha City
 # 6, Beta River 2, Gamma Mountain 2, the hatnote and the whitespace-only unit in none; links:
 # Alpha City 6 written + 1 skipped, Beta River 3).
+# page_meta.jsonl of the synthetic corpus: Alpha City and Beta River are described (Beta
+# River lists one category twice, which counts once), Gamma Mountain is not, and one record
+# names a page outside the corpus (ignored with a warning). Three distinct categories.
+PAGE_META: list[dict] = [
+    {"title": "Alpha City", "wiki_title": "Alpha City", "method": "last_before_end",
+     "revision_id": 101, "last_edited": "2020-11-02T10:00:00Z",
+     "categories": ["Cities", "Places in Alpha"]},
+    {"title": "Beta River", "wiki_title": "Beta River", "method": "best_text_match",
+     "revision_id": 102, "last_edited": "2020-12-15T08:30:00Z",
+     "categories": ["Rivers", "Places in Alpha", "Rivers"]},
+    {"title": "Not In Corpus", "wiki_title": "Not In Corpus", "method": "last_before_end",
+     "revision_id": 103, "last_edited": "2019-01-01T00:00:00Z", "categories": ["Elsewhere"]},
+]
+
 EXPECTED_COUNTS: dict[str, int] = {
     "n_pages": 3,
     "n_sections": 8,  # 3 + 2 + 3, lead sections included
@@ -174,6 +189,9 @@ EXPECTED_COUNTS: dict[str, int] = {
     "n_evidence": 10,
     "n_evidence_page_resolved": 9,  # all but Missing Page
     "n_evidence_sentence_resolved": 6,  # sentence_1, item_0_1, sentence_2, item_0_0, 5 and 6
+    "n_pages_with_meta": 2,  # Alpha City and Beta River
+    "n_categories": 3,  # Cities, Places in Alpha, Rivers
+    "n_page_categories": 4,  # 2 + 2
 }
 
 EXPECTED_LINKS: list[tuple[str, str, str, bool]] = [
@@ -228,14 +246,24 @@ class FakeEmbedder:
         return out
 
 
-def _write_corpus(directory: Path, pages: list[dict], claims: list[dict]) -> Path:
-    """Write pages.jsonl and claims.jsonl into ``directory`` and return it."""
+def _write_corpus(
+    directory: Path, pages: list[dict], claims: list[dict], page_meta: list[dict] | None = None
+) -> Path:
+    """Write pages.jsonl, claims.jsonl and (when given) page_meta.jsonl into ``directory``."""
     directory.mkdir(parents=True, exist_ok=True)
     with open(directory / "pages.jsonl", "w", encoding="utf-8") as handle:
         handle.writelines(json.dumps(page, ensure_ascii=False) + "\n" for page in pages)
     with open(directory / "claims.jsonl", "w", encoding="utf-8") as handle:
         handle.writelines(json.dumps(claim, ensure_ascii=False) + "\n" for claim in claims)
+    if page_meta is not None:
+        with open(directory / "page_meta.jsonl", "w", encoding="utf-8") as handle:
+            handle.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in page_meta)
     return directory
+
+
+def _db_time(*parts: int) -> datetime:
+    """Return the naive datetime a ``DATETIME`` column holds for this UTC moment."""
+    return datetime(*parts, tzinfo=timezone.utc).replace(tzinfo=None)
 
 
 def _rows(conn: pymysql.Connection, sql: str, params: tuple = ()) -> list[tuple]:
@@ -282,8 +310,8 @@ def ingest_settings(settings: Settings) -> Settings:
 
 @pytest.fixture
 def corpus_dir(tmp_path: Path) -> Path:
-    """The synthetic corpus written to a temporary directory."""
-    return _write_corpus(tmp_path / "corpus", PAGES, CLAIMS)
+    """The synthetic corpus, with its page_meta.jsonl, written to a temporary directory."""
+    return _write_corpus(tmp_path / "corpus", PAGES, CLAIMS, PAGE_META)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -396,11 +424,16 @@ def test_an_analyze_error_row_is_an_ingest_error(tmp_path: Path) -> None:
 
     settings = Settings(db_password="x", db_name="a", test_db_name="b")
     ok = AnalyzeConnection([("a.chunk", "analyze", "status", "OK")])
-    run = ingestmod._Ingest(settings, ok, tmp_path, tmp_path, True, FakeEmbedder(), 64, True, False)
+    meta = tmp_path / "page_meta.jsonl"
+    run = ingestmod._Ingest(
+        settings, ok, tmp_path, tmp_path, meta, True, FakeEmbedder(), 64, True, False
+    )
     run._analyze_tables()
     assert ok.executed == [f"ANALYZE TABLE `{t}`" for t in ANALYZE_TABLES] and ok.commits == 1
     bad = AnalyzeConnection([("a.chunk", "analyze", "Error", "Table 'a.chunk' is marked as crashed")])
-    run = ingestmod._Ingest(settings, bad, tmp_path, tmp_path, True, FakeEmbedder(), 64, True, False)
+    run = ingestmod._Ingest(
+        settings, bad, tmp_path, tmp_path, meta, True, FakeEmbedder(), 64, True, False
+    )
     with pytest.raises(IngestError, match="ANALYZE TABLE chunk failed: Table 'a.chunk' is marked"):
         run._analyze_tables()
 
@@ -417,7 +450,7 @@ def test_report_counts_and_stages() -> None:
     assert set(report.counts()) == set(EXPECTED_COUNTS)
     assert set(report.seconds) == set(STAGES)
     assert {"parse", "embed", "load", "resolve", "analyze"} <= set(STAGES)
-    assert ANALYZE_TABLES == ("chunk", "page", "section", "link")
+    assert ANALYZE_TABLES == ("chunk", "page", "section", "link", "category", "page_category")
 
 
 def test_corpus_dir_label_is_relative_inside_the_repository(tmp_path: Path) -> None:
@@ -464,9 +497,26 @@ def test_run_ingest_on_the_synthetic_corpus(ingest_settings: Settings, corpus_di
 
 
 def _check_tables(conn: pymysql.Connection) -> None:
-    """Row counts of the nine tables against the hand counts."""
+    """Row counts of the eleven tables against the hand counts, and the page metadata."""
     counts = _table_counts(conn)
     assert counts["page"] == 3
+    assert counts["category"] == EXPECTED_COUNTS["n_categories"]
+    assert counts["page_category"] == EXPECTED_COUNTS["n_page_categories"]
+    assert _rows(conn, "SELECT title, revision_id, last_edited FROM page ORDER BY page_id") == [
+        ("Alpha City", 101, _db_time(2020, 11, 2, 10, 0)),
+        ("Beta River", 102, _db_time(2020, 12, 15, 8, 30)),
+        ("Gamma Mountain", None, None),
+    ]
+    assert _rows(
+        conn,
+        "SELECT p.title, c.name FROM page_category pc JOIN page p USING (page_id) "
+        "JOIN category c USING (category_id) ORDER BY p.page_id, c.category_id",
+    ) == [
+        ("Alpha City", "Cities"),
+        ("Alpha City", "Places in Alpha"),
+        ("Beta River", "Places in Alpha"),
+        ("Beta River", "Rivers"),
+    ]
     assert counts["section"] == EXPECTED_COUNTS["n_sections"]
     assert counts["sentence"] == EXPECTED_COUNTS["n_sentences"]
     assert counts["chunk"] == EXPECTED_COUNTS["n_chunks"]
@@ -588,12 +638,12 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path, report: IngestReport
     assert meta["index_distance"] == "cosine"
     assert meta["hatnote_pattern"] == HATNOTE_RE.pattern
     assert meta["n_units_hatnote"] == "1"
-    assert meta["analyze_tables"] == "chunk,page,section,link"
+    assert meta["analyze_tables"] == "chunk,page,section,link,category,page_category"
     assert float(meta["analyze_seconds"]) == pytest.approx(report.seconds["analyze"], abs=0.001)
     assert float(meta["analyze_seconds"]) > 0.0
     # the temporary corpus lies outside the repository, so the path stays absolute
     assert meta["corpus_dir"] == str(corpus_dir.resolve())
-    for name in ("pages", "claims"):
+    for name in ("pages", "claims", "page_meta"):
         digest = hashlib.sha256((corpus_dir / f"{name}.jsonl").read_bytes()).hexdigest()
         assert meta[f"corpus_{name}_sha256"] == digest
     assert meta["mariadb_version"].startswith("11.")
@@ -603,7 +653,8 @@ def _check_meta(conn: pymysql.Connection, corpus_dir: Path, report: IngestReport
 
 
 def _check_statistics(conn: pymysql.Connection) -> None:
-    """ANALYZE TABLE ran: the primary-key cardinality of every analysed table is its row count.
+    """ANALYZE TABLE ran: the cardinality of every analysed table's whole primary key (its last
+    column; page_category's key has two) is its row count.
 
     InnoDB's persistent statistics are exact for tables this small (every leaf page is sampled),
     and they are only refreshed by ANALYZE TABLE or by the background recalculation, which is
@@ -613,10 +664,51 @@ def _check_statistics(conn: pymysql.Connection) -> None:
         cardinality = _scalar(
             conn,
             "SELECT CARDINALITY FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() "
-            "AND TABLE_NAME = %s AND INDEX_NAME = 'PRIMARY' AND SEQ_IN_INDEX = 1",
+            "AND TABLE_NAME = %s AND INDEX_NAME = 'PRIMARY' ORDER BY SEQ_IN_INDEX DESC LIMIT 1",
             (table,),
         )
         assert cardinality == _table_counts(conn)[table], table
+
+
+@pytest.mark.db
+def test_without_page_meta_the_metadata_stays_empty_with_a_warning(
+    ingest_settings: Settings, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    corpus = _write_corpus(tmp_path / "plain", PAGES, CLAIMS)
+    with caplog.at_level(logging.WARNING, logger="wikilense.ingest"):
+        report = run_ingest(ingest_settings, corpus_dir=corpus, embedder=FakeEmbedder(),
+                            progress=False)
+    assert (report.n_pages_with_meta, report.n_categories, report.n_page_categories) == (0, 0, 0)
+    assert "no page_meta.jsonl" in caplog.text
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        assert _scalar(conn, "SELECT COUNT(*) FROM page WHERE revision_id IS NULL "
+                             "AND last_edited IS NULL") == 3
+        counts = _table_counts(conn)
+        meta = dict(_rows(conn, "SELECT `key`, `value` FROM ingest_meta"))
+    assert counts["category"] == counts["page_category"] == 0
+    assert meta["corpus_page_meta_sha256"] == "none"
+
+
+@pytest.mark.db
+def test_a_page_meta_record_for_no_corpus_page_is_ignored_with_a_warning(
+    ingest_settings: Settings, corpus_dir: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="wikilense.ingest"):
+        run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(), progress=False)
+    assert "1 page_meta.jsonl record(s) name no corpus page" in caplog.text
+    assert "'Not In Corpus'" in caplog.text
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        assert _scalar(conn, "SELECT COUNT(*) FROM category WHERE name = %s", ("Elsewhere",)) == 0
+
+
+@pytest.mark.db
+def test_a_malformed_page_meta_file_is_an_ingest_error(
+    ingest_settings: Settings, tmp_path: Path
+) -> None:
+    bad = [dict(PAGE_META[0], last_edited="2020-11-02 10:00:00")]
+    corpus = _write_corpus(tmp_path / "bad", PAGES, CLAIMS, bad)
+    with pytest.raises(IngestError, match="line 1: not a MediaWiki UTC timestamp"):
+        run_ingest(ingest_settings, corpus_dir=corpus, embedder=FakeEmbedder(), progress=False)
 
 
 @pytest.mark.db

@@ -79,3 +79,66 @@ ORDER BY s.ordinal;
 -- 7. The vector as text, and the server's vector settings.
 SELECT chunk_id, LENGTH(embedding) AS bytes, LEFT(VEC_ToText(embedding), 60) AS first_values FROM chunk WHERE chunk_id = 1;
 SHOW VARIABLES LIKE 'mhnsw%';
+
+-- 8. The vectors are rows of the transaction. Inside one, chunk 2 gets chunk 1's vector: the same
+--    session's search sees chunk 2 at distance 0 at once; ROLLBACK puts the old vector back, and
+--    the index with it (chunk 2 returns to 0.1467). Another session sees neither change until
+--    COMMIT (tests/test_db.py, test_vector_index_follows_the_transaction). The derived table
+--    "one" lets the UPDATE read the table it writes.
+START TRANSACTION;
+UPDATE chunk SET embedding = (SELECT e FROM (SELECT embedding AS e FROM chunk WHERE chunk_id = 1) AS one)
+WHERE chunk_id = 2;
+SELECT chunk_id, VEC_DISTANCE_COSINE(embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance
+FROM chunk ORDER BY distance LIMIT 3;
+ROLLBACK;
+SELECT chunk_id, VEC_DISTANCE_COSINE(embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance
+FROM chunk ORDER BY distance LIMIT 3;
+
+-- 9. The brief's four predicates in one statement: only pages in the category "Member states of
+--    the United Nations", longer than 1,000 words, last edited (in the revision the corpus holds)
+--    since 1 December 2020, and linked from the page "Asia"; joined back to page and section.
+--    EXPLAIN shows chunk read through the vector index (type index, key embedding) with the two
+--    filter tables materialised (<derivedN>). The DISTINCT keeps them materialised: merged into
+--    the join they make MariaDB scan chunk in full. Which filters keep the index is measured in
+--    results/planner_choices.md.
+SELECT chunk.chunk_id, page.title, section.path, page.last_edited,
+       VEC_DISTANCE_COSINE(chunk.embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance
+FROM chunk
+  STRAIGHT_JOIN page ON page.page_id = chunk.page_id
+  STRAIGHT_JOIN section ON section.section_id = chunk.section_id
+  STRAIGHT_JOIN (SELECT DISTINCT link.to_page_id AS page_id
+                 FROM link JOIN page AS src ON src.page_id = link.from_page_id
+                 WHERE src.title = 'Asia' AND link.to_page_id IS NOT NULL) AS linked
+                ON linked.page_id = chunk.page_id
+  STRAIGHT_JOIN (SELECT DISTINCT page_category.page_id
+                 FROM page_category JOIN category ON category.category_id = page_category.category_id
+                 WHERE category.name = 'Member states of the United Nations') AS in_category
+                ON in_category.page_id = chunk.page_id
+WHERE page.n_words >= 1000 AND page.last_edited >= '2020-12-01'
+ORDER BY VEC_DISTANCE_COSINE(chunk.embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1))
+LIMIT 5;
+
+EXPLAIN
+SELECT chunk.chunk_id, page.title, section.path, page.last_edited,
+       VEC_DISTANCE_COSINE(chunk.embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance
+FROM chunk
+  STRAIGHT_JOIN page ON page.page_id = chunk.page_id
+  STRAIGHT_JOIN section ON section.section_id = chunk.section_id
+  STRAIGHT_JOIN (SELECT DISTINCT link.to_page_id AS page_id
+                 FROM link JOIN page AS src ON src.page_id = link.from_page_id
+                 WHERE src.title = 'Asia' AND link.to_page_id IS NOT NULL) AS linked
+                ON linked.page_id = chunk.page_id
+  STRAIGHT_JOIN (SELECT DISTINCT page_category.page_id
+                 FROM page_category JOIN category ON category.category_id = page_category.category_id
+                 WHERE category.name = 'Member states of the United Nations') AS in_category
+                ON in_category.page_id = chunk.page_id
+WHERE page.n_words >= 1000 AND page.last_edited >= '2020-12-01'
+ORDER BY VEC_DISTANCE_COSINE(chunk.embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1))
+LIMIT 5;
+
+-- 10. The page metadata is plain relational data: the revision, edit date and categories of a
+--     page (data/corpus/page_meta.jsonl, fetched by scripts/fetch_page_meta.py).
+SELECT page.title, page.revision_id, page.last_edited, category.name AS category
+FROM page JOIN page_category USING (page_id) JOIN category USING (category_id)
+WHERE page.title = 'Aare'
+ORDER BY category.name;

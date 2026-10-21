@@ -45,6 +45,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
+from datetime import date, datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -217,6 +218,24 @@ LINKS_TO_JOIN = (
     "WHERE dst.title = %s) AS linking "
     "ON linking.page_id = chunk.page_id"
 )
+#: Pages in the category with the given exact name, joined like the link filters (a
+#: ``chunk.page_id IN (SELECT ...)`` would become a semi-join that loses the vector index).
+#: ``page_category`` holds one row per (page, category), so the rows are already distinct; the
+#: DISTINCT is there for the plan: without it MariaDB merges the derived table into the outer
+#: join and, measured on 11.8.9, scans ``chunk`` in full (EXPLAIN type ``ALL``) instead of
+#: walking the vector index. With it the derived table is materialised and joined after the
+#: index scan, as for the link filters. Parameter: the category name, no "Category:" prefix.
+CATEGORY_JOIN = (
+    "(SELECT DISTINCT page_category.page_id FROM page_category "
+    "JOIN category ON category.category_id = page_category.category_id "
+    "WHERE category.name = %s) AS in_category "
+    "ON in_category.page_id = chunk.page_id"
+)
+#: Pages whose stored revision was edited at or after / before a moment. ``page.last_edited`` is
+#: the UTC timestamp of the Wikipedia revision the corpus holds; a page without one (NULL)
+#: passes neither filter. Parameter: a date or datetime, read as UTC.
+FILTER_EDITED_SINCE = "page.last_edited >= %s"
+FILTER_EDITED_BEFORE = "page.last_edited < %s"
 
 # ---------------------------------------------------------------------------------------------
 # SQL: joining hits back to sentences, and page summaries
@@ -278,7 +297,12 @@ class Filters:
     server's case- and accent-insensitive collation, ``section.path`` likewise; ``page.title``
     is ``utf8mb4_bin``, so ``linked_from``, ``links_to`` and ``titles`` match exactly.
     ``titles`` restricts hits to the listed page titles; an empty list matches no page.
-    Raises TypeError or ValueError, naming the field, for a value of the wrong type or range.
+    ``category`` keeps pages in the Wikipedia category with that exact name (``category.name``
+    is ``utf8mb4_bin``; no "Category:" prefix). ``edited_since`` and ``edited_before`` (a
+    ``date`` or ``datetime``, read as UTC) keep pages whose stored revision was edited at or
+    after, and before, that moment (``page.last_edited``); pages without a revision date pass
+    neither. Raises TypeError or ValueError, naming the field, for a value of the wrong type or
+    range, and when ``edited_since`` is not earlier than ``edited_before``.
     """
 
     min_words: int | None = None
@@ -288,6 +312,9 @@ class Filters:
     linked_from: str | None = None
     links_to: str | None = None
     titles: Sequence[str] | None = None
+    category: str | None = None
+    edited_since: date | None = None
+    edited_before: date | None = None
 
     def __post_init__(self) -> None:
         for name in ("min_words", "max_words"):
@@ -306,10 +333,25 @@ class Filters:
             raise ValueError(
                 f"Filters.min_words ({self.min_words}) is greater than max_words ({self.max_words})"
             )
-        for name in ("heading_like", "path_like", "linked_from", "links_to"):
+        for name in ("heading_like", "path_like", "linked_from", "links_to", "category"):
             value = getattr(self, name)
             if value is not None and not isinstance(value, str):
                 raise TypeError(f"Filters.{name} must be a str, got {type(value).__name__}")
+        for name in ("edited_since", "edited_before"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, date):
+                raise TypeError(
+                    f"Filters.{name} must be a date or datetime, got {type(value).__name__}"
+                )
+        if (
+            self.edited_since is not None
+            and self.edited_before is not None
+            and _utc(self.edited_since) >= _utc(self.edited_before)
+        ):
+            raise ValueError(
+                f"Filters.edited_since ({self.edited_since}) is not earlier than edited_before "
+                f"({self.edited_before}): no page can pass both"
+            )
         if self.titles is not None:
             if isinstance(self.titles, (str, bytes)):
                 raise TypeError("Filters.titles must be a sequence of titles, not a single str")
@@ -358,6 +400,21 @@ class PageSummary:
 # ---------------------------------------------------------------------------------------------
 
 
+def _utc(value: date) -> datetime:
+    """Return ``value`` as an aware UTC datetime: a date is its midnight UTC and a naive
+    datetime is read as UTC (``page.last_edited`` holds UTC)."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+
+
+def _db_datetime(value: date) -> datetime:
+    """Return the naive UTC datetime to bind against the ``DATETIME`` column ``last_edited``."""
+    return _utc(value).replace(tzinfo=None)
+
+
 def _placeholders(n: int) -> str:
     """Return ``n`` comma-separated ``%s`` placeholders (``n`` >= 1)."""
     if n < 1:
@@ -384,12 +441,21 @@ def _filter_fragments(
     if filters.links_to is not None:
         joins.append(join_keyword + " " + LINKS_TO_JOIN)
         join_params.append(filters.links_to)
+    if filters.category is not None:
+        joins.append(join_keyword + " " + CATEGORY_JOIN)
+        join_params.append(filters.category)
     if filters.min_words is not None:
         wheres.append(FILTER_MIN_WORDS)
         where_params.append(filters.min_words)
     if filters.max_words is not None:
         wheres.append(FILTER_MAX_WORDS)
         where_params.append(filters.max_words)
+    if filters.edited_since is not None:
+        wheres.append(FILTER_EDITED_SINCE)
+        where_params.append(_db_datetime(filters.edited_since))
+    if filters.edited_before is not None:
+        wheres.append(FILTER_EDITED_BEFORE)
+        where_params.append(_db_datetime(filters.edited_before))
     if filters.heading_like is not None:
         wheres.append(FILTER_HEADING_LIKE)
         where_params.append(filters.heading_like)

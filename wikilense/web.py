@@ -9,8 +9,9 @@ warm-up: then the first request carries the load in ``embed``). A database conne
 opened per request and closed in a ``finally`` clause.
 
 ``/api/search`` takes every field of ``search.Filters`` (``min_words``, ``max_words``,
-``heading``, ``path``, ``linked_from``, ``links_to`` and ``titles``, the last one repeated
-once per title; :data:`API_FILTER_FIELDS` maps the names), the strategy (the choices are
+``heading``, ``path``, ``linked_from``, ``links_to``, ``titles`` (repeated once per title),
+``category``, ``edited_since`` and ``edited_before`` (``YYYY-MM-DD``, UTC);
+:data:`API_FILTER_FIELDS` maps the names), the strategy (the choices are
 ``search.STRATEGIES``, as the ``Literal`` :data:`Strategy`), ``overfetch``, ``ef_search`` and
 ``sentences``; the accepted names are :data:`API_PARAMETER_NAMES`, read from the endpoint's
 signature, and any other query parameter is rejected with 400 (FastAPI would ignore it, and a
@@ -46,6 +47,7 @@ import inspect
 import time
 from collections.abc import Sequence
 from dataclasses import asdict
+from datetime import date
 from typing import Annotated, Any, Literal, Protocol
 
 import numpy as np
@@ -89,6 +91,9 @@ API_FILTER_FIELDS: tuple[tuple[str, str], ...] = (
     ("linked_from", "linked_from"),
     ("links_to", "links_to"),
     ("titles", "titles"),
+    ("category", "category"),
+    ("edited_since", "edited_since"),
+    ("edited_before", "edited_before"),
 )
 
 #: One line per known strategy for the page's select box; an unknown one shows its name.
@@ -200,6 +205,12 @@ keeps only chunks whose page or section passes; filters combine with AND.</p>
     <input name="links_to" placeholder="exact page title"></label>
   <label class="wide" title="Keep only chunks of these pages (exact titles, one per line; sent as one titles parameter per line).">Only these pages
     <textarea name="titles" rows="2" placeholder="Aare&#10;Bern"></textarea></label>
+  <label title="Keep only chunks of pages in this Wikipedia category (exact name, without 'Category:').">Category
+    <input name="category" placeholder="Rivers of Switzerland"></label>
+  <label title="Keep only chunks of pages whose stored revision was edited on or after this day (UTC).">Edited since
+    <input name="edited_since" type="date"></label>
+  <label title="Keep only chunks of pages whose stored revision was edited before this day (UTC).">Edited before
+    <input name="edited_before" type="date"></label>
   <label title="How the filters are applied; see the option text.">Strategy
     <select name="strategy">
 __STRATEGY_OPTIONS__
@@ -461,6 +472,27 @@ def api_search(
             "parameter once per title (titles=Aare&titles=Bern)"
         ),
     ] = None,
+    category: Annotated[
+        str | None,
+        Query(
+            description="keep only chunks of pages in the Wikipedia category with this exact "
+            "name, without 'Category:' (the categories of the page's December 2020 revision)"
+        ),
+    ] = None,
+    edited_since: Annotated[
+        date | None,
+        Query(
+            description="keep only chunks of pages whose stored revision was edited on or after "
+            "this day, YYYY-MM-DD in UTC (page.last_edited >= day)"
+        ),
+    ] = None,
+    edited_before: Annotated[
+        date | None,
+        Query(
+            description="keep only chunks of pages whose stored revision was edited before this "
+            "day, YYYY-MM-DD in UTC (page.last_edited < day)"
+        ),
+    ] = None,
     strategy: Annotated[
         Strategy,
         Query(
@@ -514,6 +546,9 @@ def api_search(
             linked_from=linked_from or None,
             links_to=links_to or None,
             titles=given_titles or None,
+            category=category or None,
+            edited_since=edited_since,
+            edited_before=edited_before,
         )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

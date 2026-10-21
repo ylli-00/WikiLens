@@ -4,18 +4,22 @@ import hashlib
 import importlib.util
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from wikilense.corpus import (
+    PageMeta,
     claim_pages,
     iter_claims,
     iter_pages,
     link_targets,
     load_corpus,
+    load_page_meta,
     nfc,
     parse_element_id,
+    parse_wiki_timestamp,
     select_corpus,
 )
 
@@ -328,3 +332,76 @@ def test_manifest_counts_match_corpus_files():
         assert f"- {title} (" in manifest
     for title in set(titles) - evidence:
         assert re.search(rf"^\d+\. {re.escape(title)} \(", manifest, re.MULTILINE)
+
+
+# ---------------------------------------------------------------------------------------------
+# page_meta.jsonl
+# ---------------------------------------------------------------------------------------------
+
+
+def _meta_file(tmp_path: Path, records: list) -> Path:
+    path = tmp_path / "page_meta.jsonl"
+    path.write_text(
+        "".join((r if isinstance(r, str) else json.dumps(r, ensure_ascii=False)) + "\n"
+                for r in records),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_load_page_meta_reads_records_as_utc_nfc_and_without_duplicate_categories(
+    tmp_path: Path,
+) -> None:
+    decomposed = "Ame\u0301lie"  # NFD: the title and the category are normalised to NFC
+    path = _meta_file(tmp_path, [
+        {"title": decomposed, "revision_id": 7, "last_edited": "2020-11-17T02:44:45Z",
+         "categories": ["Films", decomposed, "Films"], "method": "last_before_end"},
+        "",
+        {"title": "Gone", "revision_id": None, "last_edited": None, "categories": []},
+    ])
+    meta = load_page_meta(path)
+    assert list(meta) == [nfc(decomposed), "Gone"]
+    assert meta[nfc(decomposed)] == PageMeta(
+        title=nfc(decomposed), revision_id=7,
+        last_edited=datetime(2020, 11, 17, 2, 44, 45, tzinfo=timezone.utc),
+        categories=("Films", nfc(decomposed)),
+    )
+    assert meta["Gone"] == PageMeta("Gone", None, None, ())
+
+
+@pytest.mark.parametrize(
+    ("record", "message"),
+    [
+        ("{not json", "not JSON"),
+        ({"title": "A", "revision_id": 1, "last_edited": None}, "missing 'categories'"),
+        ({"title": "", "revision_id": 1, "last_edited": None, "categories": []}, "title"),
+        ({"title": "A", "revision_id": 0, "last_edited": None, "categories": []}, "revision_id"),
+        ({"title": "A", "revision_id": True, "last_edited": None, "categories": []}, "revision_id"),
+        ({"title": "A", "revision_id": 1, "last_edited": None, "categories": "X"}, "categories"),
+        ({"title": "A", "revision_id": 1, "last_edited": None, "categories": [""]}, "categories"),
+        ({"title": "A", "revision_id": 1, "last_edited": "2020-11-17 02:44:45",
+          "categories": []}, "MediaWiki UTC timestamp"),
+    ],
+)
+def test_load_page_meta_rejects_a_malformed_record_naming_the_line(
+    tmp_path: Path, record: object, message: str
+) -> None:
+    good = {"title": "First", "revision_id": 1, "last_edited": None, "categories": []}
+    path = _meta_file(tmp_path, [good, record])
+    with pytest.raises(ValueError, match=f"line 2: .*{re.escape(message)}"):
+        load_page_meta(path)
+
+
+def test_load_page_meta_rejects_a_duplicate_title(tmp_path: Path) -> None:
+    record = {"title": "A", "revision_id": 1, "last_edited": None, "categories": []}
+    with pytest.raises(ValueError, match="line 2: duplicate title 'A'"):
+        load_page_meta(_meta_file(tmp_path, [record, record]))
+
+
+def test_parse_wiki_timestamp_needs_the_utc_z_form() -> None:
+    assert parse_wiki_timestamp("2020-12-31T23:59:59Z") == datetime(
+        2020, 12, 31, 23, 59, 59, tzinfo=timezone.utc
+    )
+    for bad in ("2020-12-31T23:59:59", "2020-12-31T23:59:59+01:00", "", 5):
+        with pytest.raises(ValueError):
+            parse_wiki_timestamp(bad)  # type: ignore[arg-type]
