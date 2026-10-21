@@ -79,6 +79,13 @@ the 120-word ingest (8,658 chunks), and the chunk-size sweep uses one ingest per
     chunks and sort instead. The result is exact, but the cost grows with the table.
   - A category filter keeps the index only when its derived table is `SELECT DISTINCT`: without
     it, MariaDB merges the table into the join and scans in full.
+- **The exact joined statement slows down as the table grows; the HNSW search barely does.**
+  - The test added 20,000 random FEVEROUS Wikipedia pages to the corpus as distractors, for 89,650
+    chunks (19 times as many).
+  - The HNSW search went from 0.83 to 1.23 ms at the median, and the exact joined statement from
+    2.52 to 19.17 ms.
+  - Article recall@10 fell from 74 to 71 of 75 claims for both, and the HNSW hit lists still equal
+    the exact ones for 72 of 75 claims.
 - **Searching rows your own transaction has not committed finds fewer true neighbours.**
   - On our chunk embeddings at `mhnsw_ef_search=100`, the k-NN search over rows inserted in the
     open transaction finds 0.973 of the exact top 10, against 1.000 after `COMMIT`.
@@ -490,6 +497,25 @@ wrong-dimension vector.
 
   ![Chunk rows read under each filter](docs/img/planner_rows.svg)
 
+- **Scale** (`results/scale.md`). The 100 pages, then the same pages with 5,000 and 20,000 random
+  pages of the full FEVEROUS Wikipedia added as distractors. The settings, the claims and their
+  gold pages are unchanged; k=10, `ef_search` 100, 3 timed runs per claim after one untimed run.
+
+  | Pages | Chunks | HNSW graph | Article@10, HNSW / exact | HNSW ms p50 | Exact ms p50 | History filter: inline ms p50, overfetch 10 short |
+  |---|---|---|---|---|---|---|
+  | 100 | 4,598 | 14 MB | 74/75 / 74/75 | 0.83 | 2.52 | 3.30, 69/75 |
+  | 5,100 | 26,700 | 42 MB | 74/75 / 74/75 | 1.05 | 10.27 | 11.54, 68/75 |
+  | 20,100 | 89,650 | 113 MB | 71/75 / 71/75 | 1.23 | 19.17 | 21.30, 65/75 |
+
+  - The bare HNSW search grows little (1.5 times for 19 times the chunks).
+  - The exact joined statement, and the inline form of a filtered query, grow with the table
+    (7.6 times).
+  - At every size, `inline` filled all `k` rows under the History filter, while `overfetch 10`
+    stayed near 1 to 2 ms and came back short for most queries.
+  - The HNSW hit lists equal the exact ones for 75, 73 and 72 of 75 claims.
+
+  ![Query time as the chunk table grows](docs/img/scale_cost.svg)
+
 - **Bounded versus complete.** `overfetch` stays near the bare cost but returns fewer than `k` rows
   when the filter is selective. Under `heading LIKE '%History%'` (117 of 4,598 chunks pass), at
   k=10:
@@ -624,8 +650,8 @@ Query embedding: 4.6 ms p50 on the GPU.
 - `wikilense eval --name mine` after `wikilense ingest` writes `results/mine.json` and `.md` with
   the headline table for the current ingest. The counts match the table above up to the HNSW
   build: a fresh graph differs in a few chunk lists, not in recall.
-- `scripts/run_experiments.py all` reruns every group in `results/SUMMARY.md` (about 10 minutes
-  with a GPU):
+- `scripts/run_experiments.py all` reruns the groups in `results/SUMMARY.md` (about 10 minutes
+  with a GPU); `scale` runs only when named:
   - stability across cache sizes and a restart;
   - the `ef_search` sweep;
   - the `M` sweep with rebuild times;
@@ -634,7 +660,9 @@ Query embedding: 4.6 ms p50 on the GPU.
   - the filter strategies;
   - the final configuration;
   - the search before `COMMIT`;
-  - the optimizer's choice per filter.
+  - the optimizer's choice per filter;
+  - the scale test with distractor pages. It needs the full FEVEROUS Wikipedia (`feverous_wikiv1.db`,
+    53.5 GB, path in `WIKILENSE_FEVEROUS_DB`).
 - Every results file records the ingest parameters, the effective `ef_search`, the cache size, the
   index `M` and the chunk count it was measured on.
 - `scripts/make_charts.py` redraws the charts above from the JSON files.
@@ -664,8 +692,8 @@ Query embedding: 4.6 ms p50 on the GPU.
 - **Two rankings, one engine.** The `FULLTEXT` index and the vector index live on the same table and
   are fused with window functions and CTEs, without a second system.
 - **Honest costs.**
-  - The joined form is exact and about four times the bare index query on this corpus, and it
-    grows with the table.
+  - The joined form is exact and about four times the bare index query on this corpus. It grows
+    with the table: about 16 times the bare query at 89,650 chunks (`results/scale.md`).
   - The bare form is approximate and needs `M` and `ef_search` tuned, which we did with
     measurements rather than adjectives.
 
@@ -678,9 +706,10 @@ Query embedding: 4.6 ms p50 on the GPU.
   - the LLM fact-checker comparison: no retrieval, retrieved chunks, gold evidence.
 - **Tables and captions are not indexed.** 27 of the 114 evidence ids point at table cells and
   cannot be matched. Lists are indexed.
-- **Scale.** At 100 pages the exact ranking costs 2.2 ms. When the corpus is scaled, the number to
-  watch is the `inline` cost, which grows with the table and with the filter's selectivity,
-  against the bare index query, which does not.
+- **Scale.** We measured up to 89,650 chunks. The `inline` (exact, joined) cost grows with the
+  table (19 ms p50 there), while the bare index query stays near 1 ms. On a much larger corpus a
+  filtered query has to choose between that growing cost and the short results of the bounded
+  `overfetch` form.
 - **Categories** are the explicit `[[Category:...]]` links of each page's December 2020 revision.
   Categories that templates add at render time (mostly hidden maintenance categories) are not
   included.

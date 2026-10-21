@@ -77,8 +77,17 @@ Groups (``all`` runs them in this order; each can be rerun on its own):
               reads chunk through the vector index (EXPLAIN type/key), the chunk rows read
               (ANALYZE r_rows), the SQL time (3 repeats) and how many chunks pass the filter
               -> planner_choices.json/.md
+  scale       FINAL settings on growing corpora: the 100 committed pages plus 0, 5,000 and
+              20,000 random pages of the full FEVEROUS Wikipedia (``feverous_wikiv1.db``, path in
+              WIKILENSE_FEVEROUS_DB; the seeded samples are nested) as distractors. Per size, over
+              the claims at k 10 and ef 100: article recall@10 and SQL time of the HNSW search
+              (strategy none) and of the exact inline statement, how many hit lists are equal,
+              and the inline and overfetch-10 statements under the History heading filter (time,
+              short results). Restores the FINAL ingest of data/corpus at the end
+              -> scale.json/.md
   summary     results/SUMMARY.md from the JSON files (no database access)
-  all         every group above, in that order
+  all         every group above except scale (it needs the 53.5 GB FEVEROUS Wikipedia), in
+              that order
 
 Every ingest and every index rebuild is appended to results/ingest_runs.json/.md.
 
@@ -99,9 +108,13 @@ import json
 import logging
 import os
 import re
+import shutil
+import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timezone
@@ -125,7 +138,7 @@ from wikilense.config import (
     Settings,
     load_settings,
 )
-from wikilense.corpus import DEFAULT_CORPUS_DIR, PAGE_META_FILE
+from wikilense.corpus import DEFAULT_CORPUS_DIR, PAGE_META_FILE, iter_pages, nfc
 from wikilense.embedding import Embedder
 from wikilense.evaluate import (
     DEFAULT_RESULTS_DIR,
@@ -357,6 +370,20 @@ UNCOMMITTED_BUILDS = 3
 UNCOMMITTED_RANDOM_ROWS = 1000
 UNCOMMITTED_RANDOM_SEED = 1
 UNCOMMITTED_BATCH = 500
+
+SCALE = "scale"
+#: Extra pages drawn at random from the full FEVEROUS Wikipedia as distractors (0 = the corpus).
+SCALE_EXTRA_PAGES: tuple[int, ...] = (0, 5_000, 20_000)
+SCALE_SEED = 20201231
+SCALE_K = 10
+SCALE_REPEATS = 3
+FEVEROUS_DB_VARIABLE = "WIKILENSE_FEVEROUS_DB"
+DEFAULT_FEVEROUS_DB = REPO_ROOT / "data" / "feverous" / "feverous_wikiv1.db"
+#: SQLite statements on feverous_wikiv1.db (table wiki(id PRIMARY KEY, data json), stored NFD).
+FEVEROUS_MAX_ROWID_SQL = "SELECT MAX(rowid) FROM wiki"
+FEVEROUS_PAGE_SQL = "SELECT data FROM wiki WHERE rowid = ?"
+CLAIM_IDS_TEXTS_SQL = "SELECT claim_id, text FROM claim ORDER BY claim_id"
+GOLD_TITLES_SQL = "SELECT claim_id, page_title FROM claim_evidence"
 
 PLANNER = "planner_choices"
 PLANNER_K = 10
@@ -1669,6 +1696,191 @@ def uncommitted_markdown(data: dict[str, Any]) -> str:
 
 
 
+def build_scaled_corpus(directory: Path, n_extra: int, feverous_db: Path) -> dict[str, Any]:
+    """Write a corpus directory: the committed pages, then ``n_extra`` random pages of the full
+    FEVEROUS Wikipedia (rowids drawn with SCALE_SEED, so a smaller sample is a prefix of a larger
+    one; pages already in the corpus and repeats are skipped; text normalised to NFC), with the
+    committed claims.jsonl and page_meta.jsonl. Returns the counts."""
+    directory.mkdir(parents=True, exist_ok=True)
+    base = list(iter_pages(DEFAULT_CORPUS_DIR / "pages.jsonl"))
+    seen = {nfc(page["title"]) for page in base}
+    extra: list[dict[str, Any]] = []
+    draws = 0
+    if n_extra:
+        rng = np.random.default_rng(SCALE_SEED)
+        source = sqlite3.connect(f"file:{feverous_db}?mode=ro", uri=True)
+        try:
+            max_rowid = int(source.execute(FEVEROUS_MAX_ROWID_SQL).fetchone()[0])
+            while len(extra) < n_extra:
+                draws += 1
+                row = source.execute(FEVEROUS_PAGE_SQL, (int(rng.integers(1, max_rowid + 1)),)).fetchone()
+                if row is None:
+                    continue
+                page = json.loads(unicodedata.normalize("NFC", row[0]))
+                if page["title"] in seen:
+                    continue
+                seen.add(page["title"])
+                extra.append(page)
+        finally:
+            source.close()
+    with open(directory / "pages.jsonl", "w", encoding="utf-8") as handle:
+        for page in [*base, *extra]:
+            handle.write(json.dumps(page, ensure_ascii=False) + "\n")
+    for name in ("claims.jsonl", PAGE_META_FILE):
+        shutil.copyfile(DEFAULT_CORPUS_DIR / name, directory / name)
+    return {"base_pages": len(base), "extra_pages": len(extra), "draws": draws}
+
+
+def _timed(conn: pymysql.Connection, query: np.ndarray, **kwargs: Any) -> tuple[list[Any], float]:
+    """Run search() once and return the hits and the milliseconds it took."""
+    start = time.perf_counter()
+    hits = search(conn, query, k=SCALE_K, **kwargs)
+    return hits, (time.perf_counter() - start) * 1000
+
+
+def measure_scale(conn: pymysql.Connection, queries: np.ndarray, claim_ids: list[int],
+                  gold: dict[int, set[str]]) -> dict[str, Any]:
+    """The four statements of the scale group for every claim, ef_search set once per session."""
+    statements = {
+        "hnsw": {"strategy": "none"},
+        "exact": {"strategy": "inline"},
+        "history_inline": {"strategy": "inline", "filters": Filters(heading_like=HEADING_FILTER)},
+        "history_overfetch10": {"strategy": "overfetch", "overfetch": OVERFETCH_DEFAULT,
+                                "filters": Filters(heading_like=HEADING_FILTER)},
+    }
+    db.set_session_var(conn, "mhnsw_ef_search", EF_CHOSEN)
+    hits: dict[str, list[list[Any]]] = {name: [] for name in statements}
+    times: dict[str, list[float]] = {name: [] for name in statements}
+    for query in queries:
+        for name, kwargs in statements.items():
+            first, _ = _timed(conn, query, **kwargs)  # untimed warm-up of this statement
+            hits[name].append(first)
+            for _ in range(SCALE_REPEATS):
+                times[name].append(_timed(conn, query, **kwargs)[1])
+    out: dict[str, Any] = {}
+    for name in statements:
+        out[name] = {
+            "sql_ms_p50": round(float(np.percentile(times[name], 50)), 3),
+            "sql_ms_p95": round(float(np.percentile(times[name], 95)), 3),
+            "short_results": sum(1 for h in hits[name] if len(h) < SCALE_K),
+        }
+        if name in ("hnsw", "exact"):
+            out[name]["article_hits_at_10"] = sum(
+                1 for claim_id, h in zip(claim_ids, hits[name])
+                if {hit.title for hit in h} & gold.get(claim_id, set())
+            )
+    out["identical_hnsw_exact"] = sum(
+        1 for a, b in zip(hits["hnsw"], hits["exact"])
+        if [h.chunk_id for h in a] == [h.chunk_id for h in b]
+    )
+    return out
+
+
+def group_scale(ctx: Context) -> None:
+    feverous_db = Path(os.environ.get(FEVEROUS_DB_VARIABLE, str(DEFAULT_FEVEROUS_DB)))
+    if not feverous_db.is_file():
+        raise ExperimentError(
+            f"the scale group needs the full FEVEROUS Wikipedia, feverous_wikiv1.db (53.5 GB, "
+            f"from feverous-wiki-pages-db.zip on https://fever.ai/dataset/feverous.html): not "
+            f"found at {feverous_db}; set {FEVEROUS_DB_VARIABLE} to its path"
+        )
+    sizes = []
+    try:
+        for n_extra in SCALE_EXTRA_PAGES:
+            with tempfile.TemporaryDirectory(prefix="wikilense_scale_") as tmp:
+                corpus = build_scaled_corpus(Path(tmp), n_extra, feverous_db)
+                log.info("scale: %d + %d pages (%d draws)", corpus["base_pages"],
+                         corpus["extra_pages"], corpus["draws"])
+                report = run_ingest(FINAL.settings(ctx.settings), corpus_dir=tmp,
+                                    embedder=ctx.embedder, use_prefix=FINAL.use_prefix,
+                                    progress=False)
+            conn = ctx.connect()
+            try:
+                snapshot = server_snapshot(conn, ctx.server)
+                with conn.cursor() as cur:
+                    cur.execute(CLAIM_IDS_TEXTS_SQL)
+                    claims = [(int(cid), str(text)) for cid, text in cur.fetchall()]
+                    cur.execute(GOLD_TITLES_SQL)
+                    gold: dict[int, set[str]] = {}
+                    for claim_id, title in cur.fetchall():
+                        gold.setdefault(int(claim_id), set()).add(str(title))
+                queries = np.asarray(ctx.embedder.embed_queries([t for _, t in claims]),
+                                     dtype=np.float32)
+                measured = measure_scale(conn, queries, [c for c, _ in claims], gold)
+            finally:
+                conn.close()
+            sizes.append({
+                "extra_pages": n_extra, "pages": report.n_pages, "chunks": report.n_chunks,
+                "claims": len(claims), "ingest_seconds": round(report.seconds["total"], 2),
+                "embed_seconds": round(report.seconds["embed"], 2),
+                "graph_tablespace_bytes": snapshot["vector_index_tablespace_bytes"],
+                **measured,
+            })  # fmt: skip
+            log.info("scale: %d chunks measured", report.n_chunks)
+    finally:
+        ingest_configuration(ctx, FINAL, label="scale_restore")
+    meta, index = ctx.database_state()
+    data = {
+        "name": SCALE, "group": "scale", "created_at": utc_now(), "k": SCALE_K,
+        "ef_search": EF_CHOSEN, "repeats": SCALE_REPEATS, "seed": SCALE_SEED,
+        "configuration": asdict(FINAL), "mariadb_version": meta.get("mariadb_version"),
+        "chunk_index": index, "sizes": sizes,
+    }  # fmt: skip
+    write_json(ctx.out_dir / f"{SCALE}.json", data)
+    (ctx.out_dir / f"{SCALE}.md").write_text(scale_markdown(data), encoding="utf-8")
+    log.info("wrote %s", ctx.out_dir / f"{SCALE}.json")
+
+
+SCALE_HEADERS = ("pages", "chunks", "graph", "HNSW article@10", "exact article@10",
+                 "identical hit lists", "HNSW ms p50 / p95", "exact ms p50 / p95",
+                 "History inline ms p50 / p95", "History overfetch 10: ms p50, short")
+
+
+def scale_rows(data: dict[str, Any]) -> list[list[Any]]:
+    """One row per corpus size."""
+    rows = []
+    for size in data["sizes"]:
+        graph = size["graph_tablespace_bytes"]
+        n = size["claims"]
+        rows.append([
+            f"{size['pages']:,}", f"{size['chunks']:,}",
+            f"{graph / 1e6:.0f} MB" if graph else "not measured",
+            f"{size['hnsw']['article_hits_at_10']}/{n}", f"{size['exact']['article_hits_at_10']}/{n}",
+            f"{size['identical_hnsw_exact']}/{n}",
+            f"{size['hnsw']['sql_ms_p50']:.2f} / {size['hnsw']['sql_ms_p95']:.2f}",
+            f"{size['exact']['sql_ms_p50']:.2f} / {size['exact']['sql_ms_p95']:.2f}",
+            f"{size['history_inline']['sql_ms_p50']:.2f} / {size['history_inline']['sql_ms_p95']:.2f}",
+            f"{size['history_overfetch10']['sql_ms_p50']:.2f}, {size['history_overfetch10']['short_results']}/{n}",
+        ])  # fmt: skip
+    return rows
+
+
+def scale_markdown(data: dict[str, Any]) -> str:
+    """The per-run Markdown file of the scale group."""
+    lines = [
+        f"# {data['name']}",
+        "",
+        (
+            f"Created {data['created_at']} by `scripts/run_experiments.py scale` on MariaDB "
+            f"{data['mariadb_version']}. The 100 committed pages plus random distractor pages of "
+            f"the full FEVEROUS Wikipedia (seed {data['seed']}), ingested with the FINAL settings; "
+            f"the claims and their gold pages are unchanged. Per claim, k {data['k']}, "
+            f"ef_search {data['ef_search']}, one untimed run and {data['repeats']} timed runs of "
+            "each statement: `hnsw` (strategy none, the HNSW search), `exact` (inline without a "
+            "filter, the exact ranking), and the inline and overfetch-10 statements under "
+            "`heading LIKE '%History%'`. \"short\" counts queries with fewer than k hits."
+        ),
+        "",
+        md_table(SCALE_HEADERS, scale_rows(data)),
+        "",
+    ]
+    for size in data["sizes"]:
+        lines.append(f"- {size['pages']:,} pages: ingest {size['ingest_seconds']} s "
+                     f"(embedding {size['embed_seconds']} s); History inline short "
+                     f"{size['history_inline']['short_results']}.")
+    return "\n".join(lines) + "\n"
+
+
 def planner_case(
     conn: pymysql.Connection, queries: np.ndarray, filters: Filters, n_chunks: int
 ) -> dict[str, Any]:
@@ -1935,6 +2147,7 @@ def summary_markdown(out_dir: Path) -> str:
     parts += summary_restore(r)
     parts += summary_uncommitted(r)
     parts += summary_planner(r)
+    parts += summary_scale(r)
     parts += summary_defaults(r)
     return "\n".join(parts) + "\n"
 
@@ -2521,6 +2734,17 @@ def summary_planner(r: Results) -> list[str]:
     return parts
 
 
+def summary_scale(r: Results) -> list[str]:
+    data = r.get(SCALE)
+    parts = ["## 11. Scale: the same claims with more distractor pages", ""]
+    if data is None:
+        parts += [f"`{SCALE}.json` not found.", ""]
+        return parts
+    parts += [md_table(SCALE_HEADERS, scale_rows(data)), "",
+              f"Method and per-size ingest times: `{SCALE}.md`.", ""]
+    return parts
+
+
 def summary_defaults(r: Results) -> list[str]:
     parts = ["## Chosen defaults and evidence", ""]
     need = (*[f"m{m}_ef_{ef}" for m in INDEX_M_VALUES for ef in INDEX_M_EFS], EXACT_OLD,
@@ -2666,9 +2890,13 @@ GROUPS = {
     "restore": group_restore,
     "uncommitted": group_uncommitted,
     "planner": group_planner,
+    "scale": group_scale,
     "summary": group_summary,
 }
-PROTOCOL_ORDER = tuple(GROUPS)
+#: Groups that ``all`` leaves out because they need data outside the repository: ``scale`` reads
+#: the 53.5 GB FEVEROUS Wikipedia. They run when named.
+OPTIONAL_GROUPS = frozenset({"scale"})
+PROTOCOL_ORDER = tuple(group for group in GROUPS if group not in OPTIONAL_GROUPS)
 #: Groups that read only the files in results/ (their failure leaves the database as it was).
 NO_DATABASE_GROUPS = frozenset({"summary"})
 
@@ -2677,9 +2905,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run the WikiLense experiment protocol (see the module docstring).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="groups: " + ", ".join(PROTOCOL_ORDER) + ", all",
+        epilog="groups: " + ", ".join(GROUPS) + ", all (every group except "
+        + ", ".join(sorted(OPTIONAL_GROUPS)) + ")",
     )
-    parser.add_argument("groups", nargs="+", choices=[*PROTOCOL_ORDER, "all"], metavar="GROUP")
+    parser.add_argument("groups", nargs="+", choices=[*GROUPS, "all"], metavar="GROUP")
     parser.add_argument("--out", type=Path, default=DEFAULT_RESULTS_DIR,
                         help="results directory (default results/)")
     parser.add_argument("--repeats", type=positive_int, default=DEFAULT_REPEATS,

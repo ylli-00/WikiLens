@@ -1077,5 +1077,56 @@
     "chunk_index_length": 344064,
     "vector_index_tablespace_bytes": 13631488,
     "index_rebuild": null
+  },
+  {
+    "label": "scale_restore",
+    "kind": "ingest",
+    "configuration": {
+      "chunk_max_words": 240,
+      "chunk_overlap_units": 1,
+      "index_m": 16,
+      "use_prefix": true,
+      "label": "240 words, overlap 1, M=16, prefix on"
+    },
+    "ingested_at": "2026-10-21T23:46:15+00:00",
+    "counts": {
+      "n_pages": 100,
+      "n_sections": 3173,
+      "n_sentences": 33637,
+      "n_units_empty": 372,
+      "n_units_hatnote": 1316,
+      "n_chunks": 4598,
+      "n_links": 40542,
+      "n_links_resolved": 373,
+      "n_links_skipped": 0,
+      "n_claims": 75,
+      "n_evidence": 114,
+      "n_evidence_page_resolved": 114,
+      "n_evidence_sentence_resolved": 87,
+      "n_pages_with_meta": 100,
+      "n_categories": 1005,
+      "n_page_categories": 1123
+    },
+    "seconds": {
+      "schema": 0.14,
+      "parse": 1.01,
+      "embed": 18.24,
+      "load": 3.45,
+      "resolve": 0.0,
+      "analyze": 0.01,
+      "total": 22.92
+    },
+    "n_units_hatnote": 1316,
+    "chunk_words_mean": 156.6,
+    "chunk_words_median": 183.5,
+    "chunk_words_p95": 238.0,
+    "chunk_words_max": 240,
+    "vector_index_name": "embedding",
+    "vector_index_m": 16,
+    "vector_index_distance": "cosine",
+    "chunk_data_length": 14172160,
+    "chunk_index_length": 344064,
+    "vector_index_tablespace_bytes": 13631488,
+    "index_rebuild": null
   }
 ]

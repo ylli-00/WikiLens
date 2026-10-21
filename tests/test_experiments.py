@@ -12,6 +12,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -212,6 +213,8 @@ def test_uncommitted_probe_sql_mirrors_the_schema_and_is_fixed(rexp: Any) -> Non
         assert "{" not in statement and "uncommitted_probe" in statement
     assert rexp.UNCOMMITTED_KNN_SQL.count("%s") == 2
     assert "uncommitted" in rexp.GROUPS and rexp.PROTOCOL_ORDER[-1] == "summary"
+    # the scale group needs data outside the repository, so "all" leaves it out
+    assert "scale" in rexp.GROUPS and "scale" not in rexp.PROTOCOL_ORDER
 
 
 def test_uncommitted_rows_and_markdown_average_the_builds(rexp: Any) -> None:
@@ -245,3 +248,70 @@ def test_the_configuration_includes_the_page_metadata_digest(rexp: Any) -> None:
     stale = {**expected, "corpus_page_meta_sha256": "none"}
     index = {"name": "embedding", "m": rexp.FINAL.index_m, "distance": "cosine"}
     assert "ingest_meta.corpus_page_meta_sha256" in rexp.FINAL.differences(stale, index)
+
+
+def _fake_feverous(path: Path, titles: list[str]) -> Path:
+    """A miniature feverous_wikiv1.db: table wiki(id, data) with NFD text, as the real one."""
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE wiki (id PRIMARY KEY, data json)")
+    for title in titles:
+        page = {"title": title, "order": ["sentence_0"], "sentence_0": f"{title} is a page."}
+        conn.execute("INSERT INTO wiki VALUES (?, ?)",
+                     (unicodedata.normalize("NFD", title),
+                      unicodedata.normalize("NFD", json.dumps(page, ensure_ascii=False))))
+    conn.commit()
+    conn.close()
+    return path
+
+
+def test_scaled_corpora_are_nested_nfc_samples_after_the_committed_pages(
+    rexp: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base = tmp_path / "base"
+    base.mkdir()
+    base_pages = [{"title": "Alpha", "order": []}, {"title": "Beta", "order": []}]
+    (base / "pages.jsonl").write_text("".join(json.dumps(p) + "\n" for p in base_pages))
+    (base / "claims.jsonl").write_text('{"id": 1}\n')
+    (base / rexp.PAGE_META_FILE).write_text('{"title": "Alpha"}\n')
+    monkeypatch.setattr(rexp, "DEFAULT_CORPUS_DIR", base)
+    titles = ["Alpha", *(f"Zürich {i}" for i in range(30))]  # "Alpha" is already in the corpus
+    source = _fake_feverous(tmp_path / "wiki.db", titles)
+
+    def sample(n: int) -> list[dict]:
+        out = tmp_path / f"corpus{n}"
+        info = rexp.build_scaled_corpus(out, n, source)
+        assert info["base_pages"] == 2 and info["extra_pages"] == n
+        assert (out / "claims.jsonl").read_text() == '{"id": 1}\n'
+        assert (out / rexp.PAGE_META_FILE).read_text() == '{"title": "Alpha"}\n'
+        return [json.loads(line) for line in (out / "pages.jsonl").read_text().splitlines()]
+
+    five, ten = sample(5), sample(10)
+    assert [p["title"] for p in five[:2]] == ["Alpha", "Beta"]  # the committed pages first
+    assert five == ten[:7]  # a smaller sample is a prefix of a larger one (same seed)
+    extra = [p["title"] for p in ten[2:]]
+    assert len(set(extra)) == 10 and "Alpha" not in extra  # no repeats, nothing from the corpus
+    assert all(t == unicodedata.normalize("NFC", t) and t.startswith("Zürich") for t in extra)
+    assert sample(0) == base_pages
+
+
+def test_scale_rows_and_markdown(rexp: Any) -> None:
+    def statement(p50: float, short: int = 0, hits: int | None = None) -> dict[str, Any]:
+        d = {"sql_ms_p50": p50, "sql_ms_p95": p50 * 2, "short_results": short}
+        if hits is not None:
+            d["article_hits_at_10"] = hits
+        return d
+
+    size = {"extra_pages": 0, "pages": 100, "chunks": 4598, "claims": 75, "ingest_seconds": 21.0,
+            "embed_seconds": 17.0, "graph_tablespace_bytes": 13_000_000,
+            "hnsw": statement(0.5, hits=74), "exact": statement(2.2, hits=74),
+            "history_inline": statement(3.0), "history_overfetch10": statement(1.0, short=69),
+            "identical_hnsw_exact": 74}
+    data = {"name": rexp.SCALE, "created_at": "now", "mariadb_version": "11.8.9", "seed": 1,
+            "k": 10, "ef_search": 100, "repeats": 3, "sizes": [size]}
+    assert rexp.scale_rows(data) == [[
+        "100", "4,598", "13 MB", "74/75", "74/75", "74/75", "0.50 / 1.00", "2.20 / 4.40",
+        "3.00 / 6.00", "1.00, 69/75",
+    ]]
+    assert "| 100 | 4,598 | 13 MB |" in rexp.scale_markdown(data)

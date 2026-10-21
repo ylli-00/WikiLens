@@ -1,0 +1,119 @@
+{
+  "name": "scale",
+  "group": "scale",
+  "created_at": "2026-10-21T23:46:16+00:00",
+  "k": 10,
+  "ef_search": 100,
+  "repeats": 3,
+  "seed": 20201231,
+  "configuration": {
+    "chunk_max_words": 240,
+    "chunk_overlap_units": 1,
+    "index_m": 16,
+    "use_prefix": true
+  },
+  "mariadb_version": "11.8.9-MariaDB-ubu2404",
+  "chunk_index": {
+    "name": "embedding",
+    "m": 16,
+    "distance": "cosine"
+  },
+  "sizes": [
+    {
+      "extra_pages": 0,
+      "pages": 100,
+      "chunks": 4598,
+      "claims": 75,
+      "ingest_seconds": 25.54,
+      "embed_seconds": 21.13,
+      "graph_tablespace_bytes": 13631488,
+      "hnsw": {
+        "sql_ms_p50": 0.835,
+        "sql_ms_p95": 1.898,
+        "short_results": 0,
+        "article_hits_at_10": 74
+      },
+      "exact": {
+        "sql_ms_p50": 2.516,
+        "sql_ms_p95": 5.157,
+        "short_results": 0,
+        "article_hits_at_10": 74
+      },
+      "history_inline": {
+        "sql_ms_p50": 3.3,
+        "sql_ms_p95": 5.041,
+        "short_results": 0
+      },
+      "history_overfetch10": {
+        "sql_ms_p50": 1.028,
+        "sql_ms_p95": 2.164,
+        "short_results": 69
+      },
+      "identical_hnsw_exact": 75
+    },
+    {
+      "extra_pages": 5000,
+      "pages": 5100,
+      "chunks": 26700,
+      "claims": 75,
+      "ingest_seconds": 101.21,
+      "embed_seconds": 74.21,
+      "graph_tablespace_bytes": 41943040,
+      "hnsw": {
+        "sql_ms_p50": 1.047,
+        "sql_ms_p95": 1.555,
+        "short_results": 0,
+        "article_hits_at_10": 74
+      },
+      "exact": {
+        "sql_ms_p50": 10.267,
+        "sql_ms_p95": 14.18,
+        "short_results": 0,
+        "article_hits_at_10": 74
+      },
+      "history_inline": {
+        "sql_ms_p50": 11.542,
+        "sql_ms_p95": 17.666,
+        "short_results": 0
+      },
+      "history_overfetch10": {
+        "sql_ms_p50": 1.435,
+        "sql_ms_p95": 1.918,
+        "short_results": 68
+      },
+      "identical_hnsw_exact": 73
+    },
+    {
+      "extra_pages": 20000,
+      "pages": 20100,
+      "chunks": 89650,
+      "claims": 75,
+      "ingest_seconds": 328.52,
+      "embed_seconds": 240.12,
+      "graph_tablespace_bytes": 113246208,
+      "hnsw": {
+        "sql_ms_p50": 1.227,
+        "sql_ms_p95": 2.998,
+        "short_results": 0,
+        "article_hits_at_10": 71
+      },
+      "exact": {
+        "sql_ms_p50": 19.168,
+        "sql_ms_p95": 27.937,
+        "short_results": 0,
+        "article_hits_at_10": 71
+      },
+      "history_inline": {
+        "sql_ms_p50": 21.296,
+        "sql_ms_p95": 32.835,
+        "short_results": 0
+      },
+      "history_overfetch10": {
+        "sql_ms_p50": 1.699,
+        "sql_ms_p95": 2.779,
+        "short_results": 65
+      },
+      "identical_hnsw_exact": 72
+    }
+  ]
+}

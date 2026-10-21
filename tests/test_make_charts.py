@@ -48,12 +48,21 @@ PLANNER = {
 }
 
 
+SCALE = {
+    "k": 10, "ef_search": 100,
+    "sizes": [{"chunks": n, "hnsw": {"sql_ms_p50": h}, "exact": {"sql_ms_p50": e},
+               "history_inline": {"sql_ms_p50": f}}
+              for n, h, e, f in ((4598, 0.5, 2.2, 3.0), (26700, 0.7, 9.0, 12.0))],
+}  # fmt: skip
+
+
 @pytest.mark.parametrize(
     ("draw", "data", "title"),
     [
         ("recall_at_k", HEADLINE, "Recall at k"),
         ("uncommitted_recall", UNCOMMITTED, "has not committed"),
         ("planner_rows", PLANNER, "Chunk rows read"),
+        ("scale_cost", SCALE, "chunk table grows"),
     ],
 )
 def test_each_chart_is_valid_svg_with_a_title_and_a_description(
@@ -82,3 +91,7 @@ def test_main_skips_missing_results_and_writes_the_rest(
     assert charts.main(["--results", str(tmp_path), "--out", str(out)]) == 0
     assert sorted(p.name for p in out.iterdir()) == ["recall_at_k.svg"]
     assert "skipped uncommitted_recall.svg" in capsys.readouterr().err
+
+
+def test_scale_axis_tops_are_round(charts: Any) -> None:
+    assert [charts._nice_max(v) for v in (0.7, 3.0, 9.0, 12.0, 47.0)] == [1.0, 5.0, 10.0, 20.0, 50.0]

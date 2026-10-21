@@ -1,6 +1,6 @@
 # WikiLense experiments: summary
 
-Generated 2026-10-21T23:33:10+00:00 by `scripts/run_experiments.py summary`. Every number below is read from the JSON files in `results/` written by the same script (`write_results` of the evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims over the 100-page corpus; article recall counts the claims with a gold page among the pages of the top-k chunks (of 75), evidence recall the claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a sentence-only evidence set), unit coverage the mean share of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one `search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine distance, its M as stated per section. Two ingest configurations are used: OLD = 120 words, overlap 1, M=6, prefix on (phases 1 and 2) and FINAL = 240 words, overlap 1, M=16, prefix on (the chosen defaults); hatnote units ("Main article: ...") are in no chunk in either. "Identical to exact" counts the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the inline statement without filters, which does not depend on the HNSW graph).
+Generated 2026-10-21T23:46:16+00:00 by `scripts/run_experiments.py summary`. Every number below is read from the JSON files in `results/` written by the same script (`write_results` of the evaluation harness); the per-run Markdown files hold the full tables. 75 FEVEROUS claims over the 100-page corpus; article recall counts the claims with a gold page among the pages of the top-k chunks (of 75), evidence recall the claims whose gold sentences are all inside the top-k chunks (of the 66 claims with a sentence-only evidence set), unit coverage the mean share of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one `search()` call in milliseconds, p50 / p95 over 5 repeats x the claims, warm, query embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine distance, its M as stated per section. Two ingest configurations are used: OLD = 120 words, overlap 1, M=6, prefix on (phases 1 and 2) and FINAL = 240 words, overlap 1, M=16, prefix on (the chosen defaults); hatnote units ("Main article: ...") are in no chunk in either. "Identical to exact" counts the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the inline statement without filters, which does not depend on the HNSW graph).
 
 ## Machine and versions
 
@@ -209,6 +209,16 @@ Reading: the same vectors, the same index definition and the same statement; onl
 | four_filters | 377 | 75/75 | index / embedding | 184 (max 888) | 3.22 / 4.29 | 0 |
 
 Details and the exact filter values: `planner_choices.md`.
+
+## 11. Scale: the same claims with more distractor pages
+
+| pages | chunks | graph | HNSW article@10 | exact article@10 | identical hit lists | HNSW ms p50 / p95 | exact ms p50 / p95 | History inline ms p50 / p95 | History overfetch 10: ms p50, short |
+|---|---|---|---|---|---|---|---|---|---|
+| 100 | 4,598 | 14 MB | 74/75 | 74/75 | 75/75 | 0.83 / 1.90 | 2.52 / 5.16 | 3.30 / 5.04 | 1.03, 69/75 |
+| 5,100 | 26,700 | 42 MB | 74/75 | 74/75 | 73/75 | 1.05 / 1.55 | 10.27 / 14.18 | 11.54 / 17.67 | 1.44, 68/75 |
+| 20,100 | 89,650 | 113 MB | 71/75 | 71/75 | 72/75 | 1.23 / 3.00 | 19.17 / 27.94 | 21.30 / 32.84 | 1.70, 65/75 |
+
+Method and per-size ingest times: `scale.md`.
 
 ## Chosen defaults and evidence
 

@@ -166,8 +166,8 @@ to understand the file.
 | `fetch_wiki_shard.py` | Downloads one FEVEROUS Wikipedia shard with HTTP range requests (reads the zip's directory at its end, then only that member), checks the CRC and writes it. Standard library only. | writes `data/feverous/wiki_pages/` | `central_directory` |
 | `build_corpus.py` | Applies `corpus.select_corpus` to the shard and claim files and writes `data/corpus/` with a manifest of counts and SHA-256 digests. | reads `data/feverous/`; writes `data/corpus/` | `main` |
 | `fetch_page_meta.py` | For every corpus page, finds the Wikipedia revision whose text the corpus holds (live at the end of December 2020; chosen by sentence matching when the page was edited that month; renamed pages followed through the move log). Writes its id, timestamp and `[[Category:...]]` names. One request at a time, a User-Agent with the repository URL, `maxlag`, `Retry-After`. Standard library only. | reads `data/corpus/pages.jsonl`; writes `data/corpus/page_meta.jsonl`, `PAGE_META.md` | `fetch_page` |
-| `run_experiments.py` | The experiment protocol behind `results/`. Groups (`stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `summary`) ingest a named configuration, rebuild the index for another M, restart the container, and evaluate. `uncommitted` searches a scratch vector table before and after COMMIT; `planner` records which filters keep the vector index; `summary` rebuilds `results/SUMMARY.md` from the JSON files. Root-level SQL goes through `docker exec` with the password in the environment only. | the main database, docker; writes `results/` | `run_eval` |
-| `make_charts.py` | Draws the README charts (recall at k, the uncommitted search, rows read per filter) as SVG with a dark variant, from the JSON in `results/`. Standard library only. | reads `results/`; writes `docs/img/` | `main` |
+| `run_experiments.py` | The experiment protocol behind `results/`. Groups (`stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `scale`, `summary`) ingest a named configuration, rebuild the index for another M, restart the container, and evaluate. `uncommitted` searches a scratch vector table before and after COMMIT; `planner` records which filters keep the vector index; `scale` adds random pages of the full FEVEROUS Wikipedia as distractors and measures the cost growth; `summary` rebuilds `results/SUMMARY.md` from the JSON files. Root-level SQL goes through `docker exec` with the password in the environment only. | the main database, docker; writes `results/` | `run_eval` |
+| `make_charts.py` | Draws the README charts (recall at k, the uncommitted search, rows read per filter, query time against table size) as SVG with a dark variant, from the JSON in `results/`. Standard library only. | reads `results/`; writes `docs/img/` | `main` |
 
 ### `tests/`
 
@@ -390,8 +390,8 @@ What remains for a top score, from the rubric and the grader's remaining suggest
 - [x] Rerun `make experiments` on the current code (done 2026-10-22; the four result files
   computed before the metrics moved to the `LIMIT k` query were regenerated). Rerun again on the
   final claim set and corpus.
-- [ ] Measure query cost against table size (the `inline` statement ranks exactly over the index,
-  so its cost grows with the table: the number to watch).
+- [x] Measure query cost against table size (`results/scale.md`, 2026-10-22: up to 89,650 chunks,
+  the joined statement 2.5 to 19 ms, the HNSW search 0.8 to 1.2 ms).
 - [ ] Possibly compare a second embedding model.
 - [x] Add charts and a screenshot of the web page (`docs/img/`, 2026-10-22).
 - [ ] Rewrite the README with the final results.
@@ -434,7 +434,8 @@ make eval                     # writes results/baseline.json and .md
 make experiments
 .venv/bin/python scripts/run_experiments.py summary   # rebuild results/SUMMARY.md only
 .venv/bin/python scripts/run_experiments.py restore   # put the default ingest back
-.venv/bin/python scripts/run_experiments.py uncommitted planner   # the two newest groups, ~40 s
+.venv/bin/python scripts/run_experiments.py uncommitted planner   # ~40 s
+WIKILENSE_FEVEROUS_DB=/path/to/feverous_wikiv1.db .venv/bin/python scripts/run_experiments.py scale   # ~9 min
 .venv/bin/python scripts/make_charts.py              # redraw docs/img/*.svg from results/
 
 # page metadata (only to refetch it; the file is committed)

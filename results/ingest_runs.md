@@ -30,3 +30,4 @@ One row per `run_ingest` call or `ALTER TABLE` rebuild, in order. Seconds are th
 | filters_final | ingest | 240 words, overlap 1, M=16, prefix on | 4598 | 1316 | 156.6 | 21.32 | 16.95 | 13631488 | 2026-10-21T22:44:02+00:00 |
 | final | ingest | 240 words, overlap 1, M=16, prefix on | 4598 | 1316 | 156.6 | 21.32 | 16.95 | 13631488 | 2026-10-21T22:45:05+00:00 |
 | restore_defaults | ingest | 240 words, overlap 1, M=16, prefix on | 4598 | 1316 | 156.6 | 21.14 | 16.83 | 13631488 | 2026-10-21T22:46:21+00:00 |
+| scale_restore | ingest | 240 words, overlap 1, M=16, prefix on | 4598 | 1316 | 156.6 | 22.92 | 18.24 | 13631488 | 2026-10-21T23:46:15+00:00 |

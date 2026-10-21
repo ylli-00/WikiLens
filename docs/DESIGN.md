@@ -601,6 +601,17 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
     COMMIT is not known.
   - Practical rule: write and search in separate transactions, or commit before searching.
   - `tests/test_db.py` commits before its NumPy cross-check for this reason.
+- **Scale with distractor pages** (`results/scale.md`, group `scale`, 2026-10-22).
+  - The corpus, then the corpus plus 5,000 and 20,000 random pages of the full FEVEROUS Wikipedia
+    (seeded, nested samples; `WIKILENSE_FEVEROUS_DB`), each ingested with the FINAL settings: 4,598
+    / 26,700 / 89,650 chunks, HNSW graph 14 / 42 / 113 MB.
+  - HNSW search p50 0.83 / 1.05 / 1.23 ms; exact joined statement 2.52 / 10.27 / 19.17 ms; inline
+    under the History filter 3.30 / 11.54 / 21.30 ms (never short); overfetch 10 under it 1.03 /
+    1.44 / 1.70 ms, short for 69 / 68 / 65 of 75 queries.
+  - Article recall@10 74 / 74 / 71 of 75 for both HNSW and exact; HNSW hit lists equal the exact
+    ones for 75 / 73 / 72 claims. The ingest of 20,100 pages took 328.5 s (240.1 s embedding).
+  - So the README's "number to watch" is measured: the joined form's cost grows with the table
+    (7.6 times for 19 times the chunks), the bare HNSW search's barely (1.5 times).
 - **Vector arithmetic checked.** On 300 random, unnormalised vectors, `VEC_DISTANCE_COSINE`
   equals NumPy's `1 - cos` for every row (within 1e-5). A scan that ignores the index returns
   NumPy's exact top 10 in order, and the HNSW index at ef 200 finds all of them

@@ -11,6 +11,8 @@ Three charts, written to docs/img/ (standard library only, no plotting package):
 - ``planner_rows.svg``: chunk rows read (ANALYZE ``r_rows``, median over the claims) by the inline
   statement under each filter, coloured by whether the plan read chunk through the vector index
   (``results/planner_choices.json``).
+- ``scale_cost.svg``: SQL time (p50) of the HNSW search, the exact inline statement and the inline
+  statement under the History filter, against the number of chunks (``results/scale.json``).
 
 A chart whose JSON file is missing is skipped with a message. Every chart carries a title,
 a ``<title>``/``<desc>`` for screen readers and a legend for two series; the README puts the
@@ -33,10 +35,10 @@ WIDTH = 720
 FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 STYLE = """
 svg { --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781; --grid: #e1e0d9;
-      --axis: #c3c2b7; --s1: #2a78d6; --s2: #eb6834; }
+      --axis: #c3c2b7; --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; }
 @media (prefers-color-scheme: dark) {
   svg { --surface: #1a1a19; --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781; --grid: #2c2c2a;
-        --axis: #383835; --s1: #3987e5; --s2: #d95926; }
+        --axis: #383835; --s1: #3987e5; --s2: #d95926; --s3: #199e70; }
 }
 .bg { fill: var(--surface); }
 text { font-family: FONT; fill: var(--ink2); font-size: 12px; }
@@ -46,8 +48,8 @@ text { font-family: FONT; fill: var(--ink2); font-size: 12px; }
 .label { fill: var(--ink); font-size: 12px; }
 .grid { stroke: var(--grid); stroke-width: 1; }
 .axis { stroke: var(--axis); stroke-width: 1; }
-.s1 { fill: var(--s1); } .s2 { fill: var(--s2); }
-.line1 { stroke: var(--s1); } .line2 { stroke: var(--s2); }
+.s1 { fill: var(--s1); } .s2 { fill: var(--s2); } .s3 { fill: var(--s3); }
+.line1 { stroke: var(--s1); } .line2 { stroke: var(--s2); } .line3 { stroke: var(--s3); }
 .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .dot { stroke: var(--surface); stroke-width: 2; }
 """.replace("FONT", FONT)
@@ -259,10 +261,66 @@ def planner_rows(data):
     return svg.render()
 
 
+def _nice_max(value):
+    """The smallest of 1, 2, 2.5 or 5 times a power of ten that is >= ``value`` (axis top)."""
+    magnitude = 10 ** len(str(int(value))) / 10 if value >= 1 else 0.1
+    for step in (1, 2, 2.5, 5, 10):
+        if step * magnitude >= value:
+            return step * magnitude
+    return 10 * magnitude
+
+
+def scale_cost(data):
+    """Lines: SQL p50 of three statements against the chunk count, one x position per size."""
+    sizes = data["sizes"]
+    series = [
+        ("line1", "s1", "HNSW search (strategy none)", [s["hnsw"]["sql_ms_p50"] for s in sizes]),
+        ("line2", "s2", "exact ranking (inline, no filter)", [s["exact"]["sql_ms_p50"] for s in sizes]),
+        ("line3", "s3", "inline under the History filter",
+         [s["history_inline"]["sql_ms_p50"] for s in sizes]),
+    ]
+    svg = Svg(
+        392,
+        "Query time as the chunk table grows",
+        f"SQL p50 at k={data['k']}, ef_search {data['ef_search']}, over the claims; distractor pages "
+        "from the full FEVEROUS Wikipedia (results/scale.json)",
+        "SQL p50 in ms by chunk count: " + "; ".join(
+            f"{name}: " + ", ".join(f"{s['chunks']:,} chunks {v:.2f} ms" for s, v in zip(sizes, values))
+            for _, _, name, values in series),
+    )
+    svg.legend(24, 76, [("s1", "HNSW search"), ("s2", "exact ranking (joined statement)"),
+                        ("s3", "joined, History filter")])
+    left, right, top, bottom = 64, WIDTH - 40, 104, 392 - 60
+    # one linear scale per axis, with round ticks: x is the chunk count (not the size's index,
+    # which would bend the lines), y the milliseconds
+    y_step = _nice_max(max(v for *_, values in series for v in values) / 5)
+    y_top = y_step * 5
+    for i in range(6):
+        tick = y_step * i
+        y = bottom - tick / y_top * (bottom - top)
+        svg.line(left, y, right, y, "axis" if i == 0 else "grid")
+        svg.text(left - 8, y, f"{tick:g} ms" if i else "0", "tick", "end", "middle")
+    x_step = _nice_max(max(s["chunks"] for s in sizes) / 4)
+    x_top = x_step * 4
+    for i in range(5):
+        x = left + i / 4 * (right - left)
+        svg.text(x, bottom + 18, f"{x_step * i:,.0f}" if i else "0", "tick", "middle")
+    svg.text(right, bottom + 34, "chunks in the table", "tick", "end")
+    xs = [left + s["chunks"] / x_top * (right - left) for s in sizes]
+    for line_css, dot_css, _name, values in series:
+        points = [(x, bottom - v / y_top * (bottom - top)) for x, v in zip(xs, values)]
+        svg.add(f'<polyline class="line {line_css}" points="'
+                + " ".join(f"{x:.1f},{y:.1f}" for x, y in points) + '"/>')
+        for x, y in points:
+            svg.add(f'<circle class="dot {dot_css}" cx="{x:.1f}" cy="{y:.1f}" r="5"/>')
+    return svg.render()
+
+
 CHARTS = (
     ("final_ef_100.json", "recall_at_k.svg", recall_at_k),
     ("uncommitted_recall.json", "uncommitted_recall.svg", uncommitted_recall),
     ("planner_choices.json", "planner_rows.svg", planner_rows),
+    ("scale.json", "scale_cost.svg", scale_cost),
 )
 
 
