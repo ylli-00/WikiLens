@@ -561,24 +561,26 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
   scan, like the link filters. `tests/test_search.py` pins this plan.
 - **When the optimizer keeps the vector index under a filter** (`results/planner_choices.md`,
   group `planner`): 75 claims, inline statement, k 10, ef 100.
-  - Ten of the twelve filter cases plan `chunk` through the index for every claim. The rows read
-    grow as the filter gets more selective: 10 rows unfiltered; 601 at the median under
-    `max_words 2000`, where 89 of 4,598 chunks pass.
+  - Nine of the eleven filters, and the unfiltered statement, plan `chunk` through the index for
+    every claim. The rows read grow as the filter gets more selective: 10 rows unfiltered; 601 at
+    the median under `max_words 2000`, where 89 of 4,598 chunks pass.
   - The two most selective range predicates on indexed `page` columns make it scan all 4,598
     chunks and sort instead: `max_words 500` (25 chunks pass) and `edited_before 2020-06-01` (4
     pass). That gives the exact result at 5.2 / 3.1 ms p50, against 2.2 to 3.1 ms for the index
     plans.
   - No case returned fewer than k hits. The four filters together (377 chunks pass) keep the index
-    and read 184 rows at the median, in 3.1 ms.
+    and read 184 rows at the median, in 3.5 ms (protocol rerun).
 - **Searching rows the transaction has not committed** (`results/uncommitted_recall.md`, group
   `uncommitted`). A scratch table with the chunk table's vector column and index is filled inside
   a transaction and searched before and after COMMIT, with three fresh builds each.
   - With the 4,598 FINAL chunk embeddings and the 75 claims as queries, the overlap with the exact
-    top 10 is 0.974 / 0.975 / 0.976 before COMMIT at `mhnsw_ef_search` 20 / 100 / 400, and
-    0.991 / 1.000 / 1.000 after. The worst query finds 5 of 10 before COMMIT.
-  - On 1,000 random vectors it is 0.63 / 0.66 / 0.66 before and 0.78 / 0.99 / 1.00 after.
-  - The uncommitted search is also faster (p50 about 0.2 ms against 0.5 ms on the chunks), which
-    suggests it explores less of the graph; this was not verified in the server.
+    top 10 is 0.968 / 0.971 / 0.971 before COMMIT at `mhnsw_ef_search` 20 / 100 / 400, and
+    0.987 / 1.000 / 1.000 after (protocol rerun of 2026-10-22; the first run gave
+    0.974-0.976 and 0.991-1.000). At ef 100 the worst query finds 5 of 10 before COMMIT and 9
+    after.
+  - On 1,000 random vectors it is 0.620 / 0.651 / 0.651 before and 0.782 / 0.985 / 0.993 after.
+  - The uncommitted search is also faster (p50 0.13 to 0.24 ms against 0.59 to 0.91 ms on the
+    chunks), which suggests it explores less of the graph; this was not verified in the server.
   - ROLLBACK leaves no row. The cause is not known.
   - Practical rule: write and search in separate transactions, or commit before searching.
   - `tests/test_db.py` commits before its NumPy cross-check for this reason.

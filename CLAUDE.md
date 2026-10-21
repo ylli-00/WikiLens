@@ -12,13 +12,14 @@ Everything the brief asks for is built, measured and pushed (github.com/ylli-00/
 corpus selection, parsing, chunking, MariaDB schema with `VECTOR` and a cosine `VECTOR INDEX`,
 ingest, hybrid queries (predicates, joins, an RRF full-text hybrid), CLI and web page, the
 recall/latency harness, the experiment protocol (`scripts/run_experiments.py`, `results/SUMMARY.md`),
-298 tests, CI, README. Chosen defaults with evidence: 240-word chunks, overlap 1, bge-small-en-v1.5
+the tests, CI, README. Chosen defaults with evidence: 240-word chunks, overlap 1, bge-small-en-v1.5
 with the title prefix, index M=16, `mhnsw_ef_search` 100 per query, strategy `inline` for filtered
 queries. The corpus is the 100 pages / 75 claims described below; the decisions of 2026-09-16/17 stand.
 
 - **Status (2026-10-21):**
   - The brief asks for articles "from dumps.wikimedia.org or the MediaWiki API" and for "a small ground-truth set — questions whose correct source article you already know" (see "The MariaDB brief"). Whether FEVEROUS may serve as the ground truth is an open question to the organizers; the owner drafted the email on 2026-10-21.
   - Meanwhile "Phase 0" runs on the 100-page corpus: check the vector scores, and add category and edit-date filters from the MediaWiki API (each page's December 2020 revision). Then add a transaction demo, rerun the experiments, and rewrite the README. The organizers give a preliminary grade by running the evaluation prompt.
+  - Done on 2026-10-22: `data/corpus/page_meta.jsonl` (`scripts/fetch_page_meta.py`), the `category` and `page_category` tables, `page.revision_id` and `page.last_edited`, the filters `--category`, `--edited-since` and `--edited-before`, the experiment groups `uncommitted` and `planner`, and `scripts/make_charts.py`. docs/DESIGN.md, "Page metadata and the brief's four filters", has the measured outcomes.
 - **Owner's decision (2026-09-22):** the results in `results/` and the README are drafts. The claim set of the current corpus is a development set; the benchmark claims are picked in the next phase, and the README is rewritten with those results.
 - **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus (the
   inline filtered statement's cost grows with the table and is the number to watch), then run and
@@ -172,6 +173,8 @@ Next phase:
 - `analysis/feverous/feverous_claims.csv` - one row per claim: id, split, label, challenge, n_sets, min_pages, max_pages, has_sentence_only_set, modality_summary, set_pages, strict_multi_article, lenient_multi_article, has_sentence_only_multi_page_set. Multi-valued fields are `|`-separated.
 - `analysis/feverous/feverous_analysis_output.md`, `analysis/feverous/feverous_stats.json` - script outputs
 - `scripts/fetch_wiki_shard.py` - download one Wikipedia JSONL shard without the full archive (`--list` shows all 544)
+- `scripts/fetch_page_meta.py` - each corpus page's December 2020 revision id, timestamp and categories from the MediaWiki API -> `data/corpus/page_meta.jsonl` and `PAGE_META.md` (committed)
+- `scripts/make_charts.py` - the README charts (`docs/img/*.svg`) from `results/*.json`
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
 
 ## Environment (set up 2026-09-17)

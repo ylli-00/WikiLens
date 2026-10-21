@@ -701,6 +701,8 @@ def test_fk_cascade_from_page_deletes_children(db_conn) -> None:
         ("from_page_id", "to_title", "to_page_id", "source_element"),
         [(1, "Other", 2, "sentence_0"), (2, "Parent", 1, "sentence_0")],
     )
+    dbmod.insert_rows(db_conn, "category", ("category_id", "name"), [(1, "Things")])
+    dbmod.insert_rows(db_conn, "page_category", ("page_id", "category_id"), [(1, 1), (2, 1)])
     dbmod.insert_rows(
         db_conn,
         "claim",
@@ -733,6 +735,12 @@ def test_fk_cascade_from_page_deletes_children(db_conn) -> None:
         == 1
     )
     assert _count(db_conn, "SELECT COUNT(*) FROM page") == 1
+    # category memberships go with the page; the category itself stays for the other page
+    assert _count(db_conn, "SELECT COUNT(*) FROM page_category") == 1
+    assert _count(db_conn, "SELECT COUNT(*) FROM category") == 1
+    with db_conn.cursor() as cur:
+        cur.execute("DELETE FROM category WHERE category_id = %s", (1,))
+    assert _count(db_conn, "SELECT COUNT(*) FROM page_category") == 0
 
 
 @pytest.mark.db
