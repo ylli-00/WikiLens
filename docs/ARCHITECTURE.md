@@ -10,7 +10,7 @@ file under `results/` is named.
 ## 1. What WikiLense does
 
 WikiLense answers a question by finding the passages of Wikipedia that mean the same thing,
-not just the ones that share its words. It does this entirely inside MariaDB 11.8. Every
+whether or not they share its words. It does this entirely inside MariaDB 11.8. Every
 Wikipedia page of the corpus (100 pages) is cut into passages called chunks, each chunk is
 turned into a list of 384 numbers that describes its meaning, and those numbers are stored in a
 MariaDB table next to the page's title, sections and links. A query is turned into numbers the
@@ -43,32 +43,32 @@ flowchart TD
     S -.->|the same search() function| E
 ```
 
-**FEVEROUS files.** The raw downloads live in `data/feverous/` and are not committed (two files
+The raw FEVEROUS downloads live in `data/feverous/` and are not committed (two files
 are over GitHub's 100 MB limit). `scripts/fetch_wiki_shard.py` downloads one Wikipedia shard
 (`wiki_000.jsonl`, 9,996 pages) without the 10 GB archive around it.
 
-**Corpus selection.** `scripts/build_corpus.py` keeps the 75 claims whose evidence lies entirely
+`scripts/build_corpus.py` selects the corpus: the 75 claims whose evidence lies entirely
 in that shard, their 54 evidence pages, and 46 "filler" pages that those pages link to (realistic
 distractors). It writes `data/corpus/`, which is committed and rebuilt byte for byte by the
 script.
 
-**Page metadata.** The FEVEROUS pages carry no category and no edit date.
+The FEVEROUS pages carry no category and no edit date.
 `scripts/fetch_page_meta.py` finds, for each page, the Wikipedia revision whose text the corpus
 holds (the one live in December 2020, matched by its text when the page was edited that month).
 It asks the MediaWiki API politely and writes that revision's id, timestamp and categories to the
 committed `data/corpus/page_meta.jsonl`.
 
-**Ingest.** `wikilense ingest` reads `data/corpus/`, splits every page into sections and text
+`wikilense ingest` reads `data/corpus/`, splits every page into sections and text
 units (sentences and list items), groups consecutive units into chunks of at most 240 words,
 embeds each chunk, and writes eleven tables (the page metadata goes into `page.revision_id`,
 `page.last_edited`, `category` and `page_category`). It takes about 21 s on the RTX 4060, 17 s of
 it embedding (results/SUMMARY.md section 8).
 
-**Search.** `search.search()` embeds nothing itself: it takes the query's vector and runs one
+`search.search()` embeds nothing itself: it takes the query's vector and runs one
 statement that ranks chunks by cosine distance, with any filters in the same statement. The CLI
 (`wikilense query`) and the web page (`wikilense serve`) are two front ends to it.
 
-**Evaluation.** `evaluate.evaluate()` runs every claim through `search()` and checks the hits
+`evaluate.evaluate()` runs every claim through `search()` and checks the hits
 against the claims' gold evidence, which ingest stored in `claim_evidence`. `wikilense eval`
 writes one JSON and one Markdown file; `scripts/run_experiments.py` runs the whole set of
 experiments into `results/` and builds `results/SUMMARY.md` from them.
@@ -93,17 +93,17 @@ lines such as "Main article: X" (hatnotes) and empty units are left out of chunk
 works, but gets slow as the table grows. A *vector index* avoids that. MariaDB's is *HNSW*
 (hierarchical navigable small world): a graph in which every vector is linked to a few similar
 ones, so a search can hop through the graph towards the query instead of reading every row.
-`M` is how many links each vector keeps (16 here, written in `sql/schema.sql`; more links, a
+`M` is how many links each vector keeps (16 here, written in `sql/schema.sql`; more links make a
 bigger and better graph). `mhnsw_ef_search` is how many candidates a search keeps while hopping
-(the application sets 100 per query; the server default is 20); more candidates, closer to the
-exact answer, a little slower.
+(the application sets 100 per query; the server default is 20). More candidates bring the result
+closer to the exact answer and make the search a little slower.
 
 **Exact versus approximate search.** An *exact* search compares the query with every vector and
 is always right. An *approximate* search (the HNSW graph) may miss a close vector, in exchange
-for speed. On this corpus the difference is measured: with M=16 and `mhnsw_ef_search` 100 the
-approximate hit lists equal the exact ones for 74 of 75 claims (`results/SUMMARY.md` section 7).
-A surprise documented in DESIGN.md: once another table is joined in the same statement (strategy
-`inline`), MariaDB ranks exactly over the index, so filtered queries are exact.
+for speed. Measured on this corpus with M=16 and `mhnsw_ef_search` 100, the approximate hit
+lists equal the exact ones for 74 of 75 claims (`results/SUMMARY.md` section 7). Unexpectedly,
+once another table is joined in the same statement (strategy `inline`), MariaDB ranks exactly
+over the index, so filtered queries are exact (DESIGN.md documents this).
 
 **`EXPLAIN`.** Putting `EXPLAIN` in front of a statement makes MariaDB show its plan instead of
 running it: which table it reads first, with which index. When the row for `chunk` says
@@ -116,8 +116,8 @@ combines two ranked lists: each chunk scores `1 / (60 + rank)` in each list it a
 the sums are sorted. Strategy `rrf` fuses the vector ranking with the full-text ranking in one
 statement, so a chunk that is only a good keyword match can still be found.
 
-**recall@k; article recall versus evidence recall.** *recall@k* asks: among the first `k` hits,
-is what we were looking for there? *Article recall* counts a claim when a gold page (a page the
+**recall@k; article recall versus evidence recall.** *recall@k* asks whether what we were looking
+for is among the first `k` hits. *Article recall* counts a claim when a gold page (a page the
 annotators cited) is among the pages of the top-k chunks. *Evidence recall* is stricter: every
 gold sentence of at least one of the claim's evidence sets must be inside the top-k chunks, found
 through the `chunk_sentence` map. It is counted over the 66 claims whose evidence is made of
@@ -131,8 +131,8 @@ separately. Tonight at k=10: SQL p50 0.47 ms, p95 0.96 ms; query embedding p50 4
 
 ## 4. File by file
 
-Every tracked file outside `results/` and `data/`. "Reads first" names the one function to read
-to understand the file.
+The tables below cover every tracked file outside `results/` and `data/`. The "Read first"
+column names the one function to read to understand the file.
 
 ### The package `wikilense/`
 
@@ -211,23 +211,23 @@ The command:
 wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
 ```
 
-1. **Parsing.** `cli.main` builds the parser (`build_parser`) and calls `cmd_query`, which reads
-   the settings with `config.load_settings()` (from `.env`) and turns the options into
+1. `cli.main` builds the parser (`build_parser`) and calls `cmd_query`, which reads the settings
+   with `config.load_settings()` (from `.env`) and turns the options into
    `search.Filters(heading_like="%History%")` in `_filters_from_args`. `%` is the SQL `LIKE`
    wildcard, so the pattern means "a heading that contains *History*".
-2. **`mhnsw_ef_search`.** No `--ef-search` was given, so `search.resolve_ef_search(None, 100)`
-   takes the settings' 100.
-3. **The database first.** `_connect` opens a connection (`db.connect`), and `_require_chunks`
-   runs `SELECT COUNT(*) FROM chunk`, so an empty or missing database fails with one line before
-   the model is loaded.
-4. **The query vector.** `make_embedder` builds the `Embedder`; `_load_model` embeds a warm-up
+2. No `--ef-search` was given, so `search.resolve_ef_search(None, 100)` takes the settings' value
+   of 100 for `mhnsw_ef_search`.
+3. `_connect` opens a connection (`db.connect`), and `_require_chunks` runs
+   `SELECT COUNT(*) FROM chunk`, so an empty or missing database fails with one line before the
+   model is loaded.
+4. For the query vector, `make_embedder` builds the `Embedder`; `_load_model` embeds a warm-up
    text so the model load (about 5 s) is timed on its own; `_embed_query` calls
    `embed_queries([text])`, which prepends "Represent this sentence for searching relevant
    passages: " and returns 384 numbers, and checks there are 384 of them.
-5. **The statement.** `search.search` calls `search_statement`, which validates the arguments
-   (`_check_search_args`, where `db.vec_param` turns the vector into 1,536 bytes) and assembles
-   the `inline` statement from named fragments (`INLINE_SELECT`, `INLINE_FROM`, the heading
-   predicate from `_filter_fragments`, `INLINE_ORDER_LIMIT`). Every value is a `%s` parameter:
+5. `search.search` calls `search_statement`, which validates the arguments (`_check_search_args`,
+   where `db.vec_param` turns the vector into 1,536 bytes) and assembles the `inline` statement
+   from named fragments (`INLINE_SELECT`, `INLINE_FROM`, the heading predicate from
+   `_filter_fragments`, `INLINE_ORDER_LIMIT`). Every value is a `%s` parameter:
 
    ```sql
    SELECT chunk.chunk_id, chunk.page_id, page.title, section.path AS section_path,
@@ -241,10 +241,10 @@ wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
    ```
 
    `STRAIGHT_JOIN` makes MariaDB start from `chunk`, so the vector index drives the search.
-6. **Running it.** `ef_search_session` reads the session's `mhnsw_ef_search`, sets it to 100
-   (`SET SESSION mhnsw_ef_search = %s`), and after the statement puts the old value back in a
-   `finally` clause. The rows become `Hit` objects, sorted by distance and then chunk id.
-7. **`--explain`.** `search.explain_search` runs `EXPLAIN` on the same statement and parameters:
+6. The statement runs inside `ef_search_session`, which reads the session's `mhnsw_ef_search`,
+   sets it to 100 (`SET SESSION mhnsw_ef_search = %s`), and afterwards puts the old value back in
+   a `finally` clause. The rows become `Hit` objects, sorted by distance and then chunk id.
+7. With `--explain`, `search.explain_search` runs `EXPLAIN` on the same statement and parameters:
 
    ```
    table    type    key        rows  Extra
@@ -255,8 +255,8 @@ wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
 
    `chunk` is read through the vector index; `page` and `section` are looked up by primary key
    (`eq_ref`), and the heading test runs on the section row (`Using where`).
-8. **Output.** `format_hits` prints the hits and `format_explain` the SQL and plan on stdout; one
-   timing line goes to stderr:
+8. `format_hits` prints the hits and `format_explain` the SQL and plan on stdout; one timing line
+   goes to stderr:
 
    ```
     1. 0.3105  Afghanistan > History  [chunk_id 928, 192 words]
@@ -270,12 +270,12 @@ wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
    *Prehistory and antiquity*, which contains "history", and `section.heading` compares without
    regard to case. 117 of the 4,598 chunks pass the filter.
 
-   Why is the page *Kabul* not among the hits? Its *History* section has no text of its own: the
-   text sits in subsections such as *Antiquity* and *20th century*, whose headings do not contain
-   "history", so `--heading` never sees them. The section *path* does (`History > Antiquity`):
-   `--path 'History%' --title Kabul` returns *Kabul > History > Antiquity* at distance 0.2361,
-   closer to the query than any hit above. Choosing between `heading` and `path` is choosing
-   between "this section's own heading" and "anywhere under this heading".
+   The page *Kabul* is not among the hits because its *History* section has no text of its own:
+   the text sits in subsections such as *Antiquity* and *20th century*, whose headings do not
+   contain "history", so `--heading` never sees them. The section *path* does
+   (`History > Antiquity`): `--path 'History%' --title Kabul` returns *Kabul > History > Antiquity*
+   at distance 0.2361, closer to the query than any hit above. Use `heading` to match
+   "this section's own heading" and `path` to match "anywhere under this heading".
 
 ## 6. The database
 
@@ -318,48 +318,47 @@ its revision, chunk settings, index M, corpus digests, time).
 
 Why the important choices were made:
 
-- **The vector column next to the metadata.** `chunk.embedding` is an ordinary column of the same
+- The vector column is next to the metadata: `chunk.embedding` is an ordinary column of the same
   row that holds `page_id` and `section_id`, so "nearest chunks under a *History* heading of
   pages longer than 1,000 words" is one statement with joins, and a transaction covers vectors
-  and metadata together. `NOT NULL` because every chunk is embedded; the dimension 384 is the
-  model's, checked by the ingest before it writes anything.
-- **`chunk_sentence`.** Chunks overlap by one sentence, so one sentence can sit in two chunks, and
-  one chunk holds many sentences: a many-to-many relation needs its own table. It is what joins
-  a retrieved chunk to the FEVEROUS gold sentences for evidence recall, and it lets the CLI and
-  the web page list the sentences of each hit (`--sentences`). Empty units and hatnotes are
-  `sentence` rows without a `chunk_sentence` row, so evidence ids that point at them still
-  resolve.
-- **`link`.** Every occurrence of a wiki link is kept with the title it points to (`to_title`),
+  and metadata together. The column is `NOT NULL` because every chunk is embedded; the
+  dimension 384 is the model's, checked by the ingest before it writes anything.
+- Chunks overlap by one sentence, so one sentence can sit in two chunks, and one chunk holds many
+  sentences: a many-to-many relation needs its own table, `chunk_sentence`. It joins a retrieved
+  chunk to the FEVEROUS gold sentences for evidence recall, and it lets the CLI and the web page
+  list the sentences of each hit (`--sentences`). Empty units and hatnotes are `sentence` rows
+  without a `chunk_sentence` row, so evidence ids that point at them still resolve.
+- The `link` table keeps every occurrence of a wiki link with the title it points to (`to_title`),
   because most targets (40,169 of 40,542) are pages outside the corpus. `to_page_id` is filled
   in only when the target is a corpus page and becomes NULL again if that page is deleted
   (`ON DELETE SET NULL`). This makes "pages linked from *Aare*" a join. The search joins a
   `SELECT DISTINCT to_page_id` derived table, because the plainer `IN (subquery)` form made
   MariaDB start from `link` and lose the vector index (measured, DESIGN.md "Phase 2 outcomes").
-- **Titles compare exactly** (`utf8mb4_bin`, as Wikipedia titles are case-sensitive), while
-  headings and paths use the server's case- and accent-insensitive collation on purpose.
+- Titles compare exactly (`utf8mb4_bin`, as Wikipedia titles are case-sensitive), while headings
+  and paths use the server's case- and accent-insensitive collation on purpose.
 
 ## 7. Testing and CI
 
 There are 351 tests of three kinds, told apart by pytest markers.
 
-- **Pure tests** (271): no server and no model; parsing, chunking, SQL assembly, metrics,
-  argument checking, and the CLI and web page with fake databases and embedders. They run in
-  seconds anywhere, including a fresh clone without `.env`:
+- Pure tests (271) need no server and no model. They cover parsing, chunking, SQL assembly,
+  metrics, argument checking, and the CLI and web page with fake databases and embedders, and
+  they run in seconds anywhere, including a fresh clone without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- **`db` tests** (74): need MariaDB. They use only the test database (`wikilense_test`, reset
-  before each test) and are skipped with the reason when the server does not answer:
+- `db` tests (74) need MariaDB. They use only the test database (`wikilense_test`, reset before
+  each test) and are skipped with the reason when the server does not answer:
   `.venv/bin/python -m pytest -m db`.
-- **`slow` tests** (6): load the real embedding model (downloaded on first use):
+- `slow` tests (6) load the real embedding model (downloaded on first use):
   `.venv/bin/python -m pytest -m slow`.
 
 `make test` runs all of them (about 20 s), and `make lint` runs ruff. Run one test session at a
 time, because two sessions would reset the same test database under each other.
 
 CI (`.github/workflows/ci.yml`) runs ruff and the whole suite on every push to `main` and every
-pull request,
-with MariaDB 11.8 as a service container and the CPU build from `requirements-cpu.lock`. It sets
-`WIKILENSE_REQUIRE_DB` and `WIKILENSE_REQUIRE_MODEL`, which make `tests/conftest.py` fail the run
-instead of skipping, so a service that did not come up cannot give a green run.
+pull request, with MariaDB 11.8 as a service container and the CPU build from
+`requirements-cpu.lock`. It sets `WIKILENSE_REQUIRE_DB` and `WIKILENSE_REQUIRE_MODEL`, which make
+`tests/conftest.py` fail the run instead of skipping, so a service that did not come up cannot
+give a green run.
 
 ## 8. How this scores with MariaDB, and what is left to do
 
