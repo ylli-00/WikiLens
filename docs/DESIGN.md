@@ -616,3 +616,70 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
   equals NumPy's `1 - cos` for every row (within 1e-5). A scan that ignores the index returns
   NumPy's exact top 10 in order, and the HNSW index at ef 200 finds all of them
   (`tests/test_db.py`).
+
+## Review pass (2026-11-11), after the organizers' evaluation
+
+The organizers ran the brief's evaluation prompt on `main` on 27 October 2026: 39 of 40
+(documentation 10, MariaDB depth 10, execution 9, usability 10). They asked for three things; this
+section records what was changed for each, what else the pass found, and the decisions taken.
+
+- **A short path to one answer.** The README's first screen is the setup command, one query and
+  the output of a recorded run (`results/fresh_clone_run.md`); `tests/test_docs.py` keeps the
+  block equal to that record. The README went from 722 to about 310 lines. Nothing was deleted:
+  the examples, the setup steps, the data description, the statements with every measured index
+  rule, and the method with every result table are in `docs/EXAMPLES.md`, `SETUP.md`, `DATA.md`,
+  `VECTOR_INDEX.md` and `EVALUATION.md`. The same test checks every relative link and anchor of
+  every Markdown file and the number of tests the README and ARCHITECTURE.md state.
+- **Where the approach loses.** `scripts/compare_separate_index.py` measures MariaDB against a
+  copy of the chunk vectors held in the application's memory (an exact NumPy scan on one thread,
+  with a pre-filter under a filter, alone and followed by the `SELECT` of the hit rows; hnswlib
+  when it is installed). Findings, two runs (`results/separate_index.md`, `_repeat.md`):
+  - without a filter the copy returns the ids in 0.26 / 0.20 ms and MariaDB's HNSW statement takes
+    0.78 / 0.71 ms; with the row fetch the copy takes 0.60 / 0.50 ms;
+  - under the History filter and the brief's four filters, MariaDB's complete (joined) form costs
+    3.20 / 3.56 and 3.46 / 3.45 ms, the pre-filtered copy with the row fetch 0.78 / 1.04 and
+    0.71 / 0.73 ms, equally complete;
+  - the joined statement's hit list equals NumPy's exact ranking for 75 of 75 claims, in order,
+    with no filter and under both filters. This is the first direct check on the real corpus of
+    "the joined statement ranks exactly"; before, the claim rested on the hit lists not changing
+    with `mhnsw_ef_search` and on the synthetic test corpus.
+  - Method notes that apply to any later timing on this laptop: its timings drift (the p50 of one
+    statement moved from 0.54 to 1.03 ms within a minute), so the methods take turns query by
+    query; NumPy's thread pool made the same scan 0.03 ms while spinning and up to 2 ms after a
+    pause, so the scan runs on one thread.
+  - The README's other points in that section are documentation against documentation
+    (MariaDB's reference and its author's posts; Qdrant's reference), each linked. No dedicated
+    vector store was measured.
+- **The GPU-less setup on macOS.** `requirements-cpu.lock` pinned `torch==2.14.0+cpu`, which
+  exists for Linux and Windows only. It now pins `torch==2.14.0` on macOS and `+cpu` elsewhere
+  with environment markers, and colorama for Windows. Checked with pip's resolver (its marker
+  environment set to the target's) and with uv, for Python 3.12 to 3.14: macOS 14 on Apple
+  Silicon, Linux x86_64 and aarch64, Windows amd64 resolve; macOS 13 and Intel Macs do not (no
+  PyTorch 2.14.0 wheel). Not run on a Mac or on Windows. Run for real: `make setup CPU=1` from a
+  fresh clone on Linux with Python 3.14 (4 min 41 s; CPU ingest 225.7 s, 221.6 s of it embedding).
+
+Decisions (the owner had left them open):
+
+- **`requires-python` stays `>=3.10`.** The package's own code needs nothing newer, and the
+  default install (the version ranges) resolves for Python 3.10 to 3.14 on Linux, Windows and
+  macOS 14. Narrowing it to the lock files' 3.12 would refuse setups that work. What is true and
+  now stated: the lock files need Python 3.12 (numpy 2.5.3), and `make setup` says so before pip
+  does. Run for real: Python 3.12 (CI, the author's environment) and 3.14 (fresh clone).
+- **`make setup` keeps installing the version ranges; the lock files stay opt-in.** A lock file
+  as the default would have made the setup fail on Python 3.10 and 3.11, on macOS 13, and (for the
+  GPU lock) everywhere but Linux. The evaluators' successful run used the ranges. The cost is that
+  a new release of a dependency can break the default path; `make setup CPU=1` is the pinned way
+  in, and CI installs it on every push.
+- **`make setup` generates the `.env` passwords** (`scripts/make_env.py`, two random 128-bit hex
+  strings, file mode 0600, never printed, an existing file never touched). The first run used to
+  stop and ask for an edit; now the setup is one command, which is what the README's first screen
+  shows. The failure this can cause, a new `.env` against a data volume created with other
+  passwords, existed before for anyone who typed different passwords; it now ends in one line that
+  names the cause and both ways out (`cli.ACCESS_DENIED_HINT`), checked end to end.
+
+Smaller changes: `make setup` stops with one line when the Python is too old for what it installs
+and rebuilds a venv whose interpreter no longer runs (the author's own venv broke when the
+operating system upgrade of 2026-10-26 removed Python 3.12); `make eval`'s `results/baseline.*` is
+ignored by git; one hit is printed as "1 hit"; `data/corpus/NOTICE.md` states the licence and
+attribution of the committed Wikipedia text and FEVEROUS claims.
+

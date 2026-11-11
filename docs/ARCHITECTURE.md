@@ -168,6 +168,8 @@ column names the one function to read to understand the file.
 | `fetch_page_meta.py` | For every corpus page, finds the Wikipedia revision whose text the corpus holds (live at the end of December 2020; chosen by sentence matching when the page was edited that month; renamed pages followed through the move log). Writes its id, timestamp and `[[Category:...]]` names. One request at a time, a User-Agent with the repository URL, `maxlag`, `Retry-After`. Standard library only. | reads `data/corpus/pages.jsonl`; writes `data/corpus/page_meta.jsonl`, `PAGE_META.md` | `fetch_page` |
 | `run_experiments.py` | The experiment protocol behind `results/`. Groups (`stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `scale`, `summary`) ingest a named configuration, rebuild the index for another M, restart the container, and evaluate. `uncommitted` searches a scratch vector table before and after COMMIT; `planner` records which filters keep the vector index; `scale` adds random pages of the full FEVEROUS Wikipedia as distractors and measures the cost growth; `summary` rebuilds `results/SUMMARY.md` from the JSON files. Root-level SQL goes through `docker exec` with the password in the environment only. | the main database, docker; writes `results/` | `run_eval` |
 | `make_charts.py` | Draws the README charts (recall at k, the uncommitted search, rows read per filter, query time against table size) as SVG with a dark variant, from the JSON in `results/`. Standard library only. | reads `results/`; writes `docs/img/` | `main` |
+| `compare_separate_index.py` | Measures where the database-native search loses: reads the chunk vectors out of MariaDB once and answers every claim with MariaDB's statements, with an exact NumPy scan of that copy (pre-filtered under a filter, alone and followed by the `SELECT` of the hit rows) and, when it is installed, with hnswlib. Every list is compared with NumPy's exact ranking. Read only; hnswlib is in no requirements file. | reads the database; writes `results/separate_index.json/.md` | `run` |
+| `make_env.py` | Writes `.env` from `.env.example` with two random passwords, once; `make setup` runs it when there is no `.env`. Never prints a password, never touches an existing file. Standard library only. | reads `.env.example`; writes `.env` | `create` |
 
 ### `tests/`
 
@@ -183,24 +185,28 @@ column names the one function to read to understand the file.
 | `test_cli.py`, `test_web.py` | Every command and the API: options reaching `search()`, output formats, error messages and exit codes, HTTP status codes, escaping. |
 | `test_experiments.py`, `test_fetch_wiki_shard.py` | The script parts that need no server: hit-list comparison, configuration check, fixed SQL, the password route to `docker exec`, the uncommitted group's report; download error handling. |
 | `test_fetch_page_meta.py`, `test_make_charts.py` | The metadata fetch without the network: request spacing, retries, the User-Agent, category extraction, the revision choice and moved pages; every chart renders valid, labelled SVG. |
+| `test_make_env.py`, `test_compare_separate_index.py` | The generated `.env` (two strong passwords, nothing else changed, never overwritten, nothing printed); the comparison's pure parts (the exact top k with ties, the filters evaluated on the copy, the interleaved timing) and that hnswlib is in no requirements or lock file. |
+| `test_docs.py` | The README's first line, its length, that its first output block is the recorded run, that every relative link and anchor in every Markdown file resolves, and that the stated numbers of tests are the numbers collected. |
 
 ### Top-level files
 
 | File | What it is for |
 |---|---|
-| `README.md` | What the project is, what it found, setup, examples, the data model and the measured results (a draft until the experiments are redone). |
+| `README.md` | One question and its answer on the first screen, then what was found, the data model, how MariaDB uses the vector index, what the approach gave and where it loses, setup and platforms, the method. The long reference material is in `docs/`. |
 | `CLAUDE.md` | The project's rules and decisions, for Claude Code sessions: the brief, grading, benchmark facts, environment. |
 | `LICENSE` | MIT licence. |
-| `Makefile` | `make setup` (`.env`, MariaDB, the venv, the ingest), `make test`, `lint`, `eval`, `serve`, `experiments`, `down`; `make -n <target>` prints the commands. |
+| `Makefile` | `make setup` (a Python version check, `.env` with generated passwords on the first run, MariaDB, the venv, the ingest; `CPU=1` for the pinned CPU-only packages), `make test`, `lint`, `eval`, `serve`, `experiments`, `down`; `make -n <target>` prints the commands. |
 | `docker-compose.yml` | MariaDB 11.8 in a container named `wikilense-mariadb`, bound to `127.0.0.1:3306`, passwords from `.env`, a 512 MB HNSW cache, the init script mounted, a health check. |
-| `.env.example` | The template for `.env`: connection settings and the two passwords to replace; the retrieval settings as comments. `.env` itself is ignored by git. |
+| `.env.example` | The template for `.env`: connection settings and two placeholder passwords, which `scripts/make_env.py` replaces with random ones; the retrieval settings as comments. `.env` itself is ignored by git. |
 | `.gitignore` | Keeps out the venv, caches, `.env` and the raw FEVEROUS downloads. |
 | `pyproject.toml` | The package, its dependencies, the `wikilense` command, pytest markers (`db`, `slow`, `--strict-markers`) and ruff settings. |
 | `requirements.txt`, `requirements-dev.txt` | The dependency ranges (runtime; plus pytest and ruff). |
-| `requirements.lock`, `requirements-cpu.lock` | Exact versions: the GPU build that produced `results/`, and the CPU-only build that CI installs. |
+| `requirements.lock`, `requirements-cpu.lock` | Exact versions: the GPU build that produced `results/` (Linux x86_64), and the CPU-only build that CI installs, with per-platform lines for PyTorch so that it also resolves on macOS and Windows. |
 | `.github/workflows/ci.yml` | On every push to `main` and every pull request: MariaDB 11.8 as a service, the CPU lock, the test database, ruff, and the whole test suite with db and slow tests required to run. |
 | `docs/DESIGN.md` | The design contract and every measured outcome and deviation. |
 | `docs/ARCHITECTURE.md` | This guide. |
+| `docs/EXAMPLES.md`, `docs/SETUP.md`, `docs/DATA.md`, `docs/VECTOR_INDEX.md`, `docs/EVALUATION.md` | The reference pages behind the README: every way to query; setup step by step, platforms and failures; the corpus and its metadata; the statements and every measured index rule; the method, every result table and the reason for each parameter. |
+| `data/corpus/NOTICE.md` | Licence and attribution of the committed Wikipedia text and FEVEROUS claims (CC BY-SA 3.0), which the MIT licence of the code does not cover. |
 | `analysis/feverous/` | An earlier phase: `feverous_analysis.py` measures how many FEVEROUS claims need several pages, writing `feverous_claims.csv`, `feverous_stats.json` and `feverous_analysis_output.md`; `FEVEROUS_ANALYSIS.md` is the report that chose the benchmark. Not used by the package. |
 
 ## 5. One query, end to end
@@ -339,13 +345,13 @@ Why the important choices were made:
 
 ## 7. Testing and CI
 
-There are 351 tests of three kinds, told apart by pytest markers.
+There are 383 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (271) need no server and no model. They cover parsing, chunking, SQL assembly,
+- Pure tests (302) need no server and no model. They cover parsing, chunking, SQL assembly,
   metrics, argument checking, and the CLI and web page with fake databases and embedders, and
   they run in seconds anywhere, including a fresh clone without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- `db` tests (74) need MariaDB. They use only the test database (`wikilense_test`, reset before
+- `db` tests (75) need MariaDB. They use only the test database (`wikilense_test`, reset before
   each test) and are skipped with the reason when the server does not answer:
   `.venv/bin/python -m pytest -m db`.
 - `slow` tests (6) load the real embedding model (downloaded on first use):
@@ -372,7 +378,7 @@ repository 36 of 40 on 2026-09-22, with no blocking issue.
 | Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability, which filters keep the vector index, the search over uncommitted rows), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
 | Recall and latency against a ground truth you built (execution) | `evaluate.py`, `claim` / `claim_evidence`, `results/SUMMARY.md` |
 | Chunk size, model and index parameters with reasons (execution) | DESIGN.md "Phase 3 outcomes", README "Parameters and why", the comments in `sql/schema.sql` and `config.py` |
-| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 351 tests, parameters only in SQL, CI |
+| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 383 tests, parameters only in SQL, CI |
 | An ingest that runs from the README and a query interface (usability) | `make setup`, `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql` |
 | What the database-native approach gave (documentation) | README "What the database-native approach gave" |
 
@@ -398,8 +404,8 @@ What remains for a top score, from the rubric and the grader's remaining suggest
 ## 9. Command cheat sheet
 
 ```
-# setup (first run creates .env and stops: set the two passwords, then run it again)
-make setup                    # GPU machine; `make setup CPU=1` without an NVIDIA GPU
+# setup (the first run writes .env with generated passwords)
+make setup                    # the newest package versions; `make setup CPU=1` for the pinned CPU-only set
 docker compose ps             # is MariaDB up?
 make down                     # stop MariaDB (the data volume is kept)
 

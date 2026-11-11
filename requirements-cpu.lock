@@ -17,7 +17,7 @@
 # Needs Python 3.12 or newer (numpy 2.5.3 needs 3.12, networkx 3.6.1 needs 3.11).
 # Does not resolve on an Intel Mac or on macOS 13: torch 2.14.0 has no wheel for them (the
 # newest torch there is 2.2.2 and 2.11.0).
-# README.md, "Platforms", says what was run, what was only resolved, and what to do elsewhere.
+# docs/SETUP.md, "Platforms", says what was run, what was only resolved, and what to do elsewhere.
 --extra-index-url https://download.pytorch.org/whl/cpu
 annotated-doc==0.0.5
 annotated-types==0.8.0

@@ -14,5 +14,7 @@ dist/
 # Raw FEVEROUS downloads: fetched by scripts, too large for GitHub (see README)
 data/feverous/
 
-# Local outputs
+# Local outputs: temporary files, and what a plain `make eval` writes (results/baseline.*)
 results/*.tmp
+results/baseline.json
+results/baseline.md

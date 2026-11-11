@@ -6,7 +6,33 @@ WikiLense is a project for the MariaDB student database projects 2026-09 (https:
 
 Goal: retrieval over Wikipedia inside MariaDB. Chunk articles, embed the chunks, store them in a `VECTOR` column with a `VECTOR INDEX`, query with `VEC_DISTANCE_COSINE`, and combine the semantic search with ordinary SQL filters and joins in the same statement. The FEVEROUS fact-verification benchmark is the ground truth: its claims are the queries, and its gold evidence measures recall and latency. A later extension tests whether an LLM fact-checker does better with the retrieved passages.
 
-## Current phase: the pipeline works end to end on the 100-page corpus (2026-09-22)
+## Current phase: graded 39/40 by the organizers; the three points they asked for are done (2026-11-11)
+
+- **Evaluation of 27 October 2026 (the organizers ran the brief's evaluation prompt on `main`):
+  39 of 40.** Documentation 10, MariaDB depth 10, execution 9, usability 10.
+  - What they endorsed: recall and latency measured against the FEVEROUS benchmark's gold evidence
+    "rather than self-written questions, which is the stronger ground truth"; the measured account
+    of how MariaDB 11.8.9 uses the index; the explicit argument for doing this inside the database.
+  - **So the question whether FEVEROUS may be the ground truth is settled: it may, and it stays.**
+    Do not replace or supplement it with a hand-written question set, and keep the
+    fact-verification framing in the README.
+  - What they asked for, all done on 2026-11-11 (branch `fable-review-2026-11-11`):
+    1. A short path for a reader who only wants to type one question: the README's first screen is
+       now `make setup`, one query and its real output; the README went from 722 to about 310
+       lines and the reference material moved to `docs/EXAMPLES.md`, `SETUP.md`, `DATA.md`,
+       `VECTOR_INDEX.md` and `EVALUATION.md`.
+    2. Where the approach is worse than a separate vector store: the README section "Where this
+       approach loses", with a measurement (`scripts/compare_separate_index.py`,
+       `results/separate_index.md`) and the documentation of both sides.
+    3. `make setup CPU=1` failed on macOS (`torch==2.14.0+cpu` has no macOS wheel):
+       `requirements-cpu.lock` now has per-platform PyTorch lines. Checked by resolution only;
+       nobody ran it on a Mac (`docs/SETUP.md`, "Platforms").
+  - The core idea is fixed (owner's rule): the 75 claims, the 100-page corpus rule, 240-word
+    chunks, overlap 1, bge-small-en-v1.5 with the title prefix, M=16, `mhnsw_ef_search` 100,
+    strategy `inline`. A bug that changes results is fixed and the affected groups rerun; the
+    settings are not re-chosen.
+
+### Earlier: the pipeline works end to end on the 100-page corpus (2026-09-22)
 
 Everything the brief asks for is built, measured and pushed (github.com/ylli-00/WikiLens):
 corpus selection, parsing, chunking, MariaDB schema with `VECTOR` and a cosine `VECTOR INDEX`,
@@ -17,10 +43,10 @@ with the title prefix, index M=16, `mhnsw_ef_search` 100 per query, strategy `in
 queries. The corpus is the 100 pages / 75 claims described below; the decisions of 2026-09-16/17 stand.
 
 - **Status (2026-10-21):**
-  - The brief asks for articles "from dumps.wikimedia.org or the MediaWiki API" and for "a small ground-truth set — questions whose correct source article you already know" (see "The MariaDB brief"). Whether FEVEROUS may serve as the ground truth is an open question to the organizers; the owner drafted the email on 2026-10-21.
+  - The brief asks for articles "from dumps.wikimedia.org or the MediaWiki API" and for "a small ground-truth set — questions whose correct source article you already know" (see "The MariaDB brief"). Whether FEVEROUS may serve as the ground truth was an open question to the organizers then; the evaluation of 27 October settled it (see above).
   - Meanwhile "Phase 0" runs on the 100-page corpus: check the vector scores, and add category and edit-date filters from the MediaWiki API (each page's December 2020 revision). Then add a transaction demo, rerun the experiments, and rewrite the README. The organizers give a preliminary grade by running the evaluation prompt.
   - Done on 2026-10-22: `data/corpus/page_meta.jsonl` (`scripts/fetch_page_meta.py`), the `category` and `page_category` tables, `page.revision_id` and `page.last_edited`, the filters `--category`, `--edited-since` and `--edited-before`, the experiment groups `uncommitted` and `planner`, and `scripts/make_charts.py`. docs/DESIGN.md, "Page metadata and the brief's four filters", has the measured outcomes.
-- **Owner's decision (2026-09-22):** the results in `results/` and the README are drafts. The claim set of the current corpus is a development set; the benchmark claims are picked in the next phase, and the README is rewritten with those results.
+- **Owner's decision (2026-09-22), superseded by the evaluation:** the results and the README were called drafts and the 75 claims a development set, to be replaced in a next phase. Since 27 October the 75-claim set and the settings are fixed; a larger claim set would be a new project phase, not a correction.
 - **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus (the
   inline filtered statement's cost grows with the table and is the number to watch), then run and
   document the experiments; the LLM fact-checker extension. This includes measuring the share of gold
@@ -58,7 +84,7 @@ Area criteria, verbatim, with the grading criterion each counts toward:
 | Execution | Recall and latency against our ground-truth set; chunk size, embedding model and index parameters stated with reasoning |
 | Usability | An ingest that runs from the README, and a query interface a reader can try |
 
-The brief's evaluation prompt is at the end of the brief page (prompt "last updated 2026-09-04"; checked 2026-10-21). Run it on the repository before submitting; the organizers use it for grading.
+The brief's evaluation prompt is at the end of the brief page (prompt "last updated 2026-09-04"; checked 2026-10-21 and again 2026-11-11: unchanged). Run it on the repository before submitting; the organizers use it for grading.
 - It also scores code quality. Each of these costs a point: hardcoded credentials, SQL built by string interpolation, debug mode left on, empty test files presented as tests, a schema that disagrees with the code.
 - Setup as one documented command scores higher.
 - Documentation levels: 5-6 needs what the project is and what it found, the data model, and install, run and reproduce (requirements, MariaDB setup, loading the data, version). 7-8 adds screenshots, charts or tables that show the result. 9-10 adds how it was made (architecture or method), the schema design reasoned about, and the team behind it.
@@ -110,7 +136,7 @@ Not chosen:
 - JSONL, `train` and `dev` with labels; `test` is unlabelled. The first line is a header (the official reader skips it).
 - Record fields: `id`, `claim`, `label` (SUPPORTS / REFUTES / NOT ENOUGH INFO), `evidence`, `annotator_operations`, `challenge`.
 - `evidence` is a list of up to three alternative evidence sets. Each set has `content` (element ids) and `context` (element id -> title and section-heading elements). Only `content` counts as evidence.
-- Element ids: `[PAGE]_[type]_[numbers]`, type in `sentence`, `cell`, `header_cell`, `table_caption`, `item`. Sentences and table captions carry 1 number, items 2, and cells and header cells 3. The page is the text before the first underscore (`el.split("_")[0]`).
+- Element ids: `[PAGE]_[type]_[numbers]`, type in `sentence`, `cell`, `header_cell`, `table_caption`, `item`. Sentences and table captions carry 1 number, items 2, and cells and header cells 3. A title can contain underscores, so do not split on the first one: parse with `corpus.parse_element_id` (the regex is in docs/DESIGN.md, "Data contracts").
 - In a page object:
   - Sentence ids are keys (`sentence_N`).
   - Cell and header-cell ids sit in `table_N.table[row][col].id` (each cell has `id`, `value`, `is_header`, `row_span`, `column_span`).
@@ -154,38 +180,46 @@ Not chosen:
 - The paper (Sec 7.7) says the pages were scraped from Wikipedia with Scrapy and a date stamp was kept for each page, but the stamp is in neither the shards nor the DB.
 - Reader classes in the official repo: `FeverousDB` (`src/feverous/database/feverous_db.py`) and `WikiPage` (`src/feverous/utils/wiki_page.py`).
 
-## Open decisions
+## Decisions (none open)
 
-Current phase (provisional values are allowed, see "Current phase"):
-- Embedding model, chunk size and overlap, index parameters.
-- Tables: index them as chunks, or use only claims with a sentence-only evidence set (34,479 overall; 65 of the 75 phase-1 claims).
-- How the README ingest gets the page subset: fetch the needed shard(s) with `scripts/fetch_wiki_shard.py` (`wiki_000` is a 44.4 MB download) and extract the pages, or commit the extracted subset (the 54 evidence pages are about 4.0 MB) to the repository.
-
-Next phase:
-- Source of category and edit-date metadata for the SQL filters: the MediaWiki API, each page's December 2020 revision (Phase 0, 2026-10-21).
-- Whether FEVEROUS may be the ground truth, or a hand-built question set is required: waiting for the organizers' reply.
-- The final claim set and corpus size.
+Everything this section used to list as open is decided; docs/DESIGN.md has the reasons.
+- Embedding model, chunk size and overlap, index parameters: bge-small-en-v1.5 with the title
+  prefix, 240 words, overlap 1, M=16, `mhnsw_ef_search` 100 (fixed, see "Current phase").
+- Tables: not indexed; 27 of the 114 evidence ids are table cells, a documented limitation.
+- How the README ingest gets the pages: the extracted subset is committed in `data/corpus/`.
+- Category and edit-date metadata: the MediaWiki API, each page's December 2020 revision
+  (`scripts/fetch_page_meta.py`, committed as `data/corpus/page_meta.jsonl`).
+- FEVEROUS as the ground truth: settled by the evaluation of 27 October 2026.
+- Decided on 2026-11-11 (reasons in docs/DESIGN.md, "Review pass (2026-11-11)"):
+  `requires-python` stays `>=3.10`; `make setup` keeps installing the version ranges by default
+  and the lock files stay opt-in; `make setup` generates the `.env` passwords.
 
 ## Existing files
 
-- `analysis/feverous/FEVEROUS_ANALYSIS.md` - analysis report, including the quality-assurance-subset findings. Its "Step 2", "tier" and "brief" refer to the original analysis request, not the MariaDB brief; Step 2 (the database) is parked, see "Current phase".
+- `analysis/feverous/FEVEROUS_ANALYSIS.md` - analysis report, including the quality-assurance-subset findings. Its "Step 2", "tier" and "brief" refer to the original analysis request, not the MariaDB brief.
 - `analysis/feverous/feverous_analysis.py` - analysis script; from the project root: `python3 analysis/feverous/feverous_analysis.py --out-md analysis/feverous/feverous_analysis_output.md`
 - `analysis/feverous/feverous_claims.csv` - one row per claim: id, split, label, challenge, n_sets, min_pages, max_pages, has_sentence_only_set, modality_summary, set_pages, strict_multi_article, lenient_multi_article, has_sentence_only_multi_page_set. Multi-valued fields are `|`-separated.
 - `analysis/feverous/feverous_analysis_output.md`, `analysis/feverous/feverous_stats.json` - script outputs
 - `scripts/fetch_wiki_shard.py` - download one Wikipedia JSONL shard without the full archive (`--list` shows all 544)
 - `scripts/fetch_page_meta.py` - each corpus page's December 2020 revision id, timestamp and categories from the MediaWiki API -> `data/corpus/page_meta.jsonl` and `PAGE_META.md` (committed)
 - `scripts/make_charts.py` - the README charts (`docs/img/*.svg`) from `results/*.json`
+- `scripts/make_env.py` - writes `.env` with two generated passwords on the first `make setup`
+- `scripts/compare_separate_index.py` - MariaDB against an in-process copy of the vectors (`results/separate_index.md`); hnswlib is optional and must stay out of every requirements and lock file
+- `data/corpus/NOTICE.md` - licence and attribution of the committed Wikipedia text and FEVEROUS claims (CC BY-SA 3.0)
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
 
-## Environment (set up 2026-09-17)
+## Environment (set up 2026-09-17; the operating system changed on 2026-10-26)
 
 - Python 3.12 venv in `.venv` (`python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pip install -e .`). Run tools as `.venv/bin/python -m pytest`, `.venv/bin/ruff check .`, `.venv/bin/wikilense`.
-- `Makefile` (added 2026-09-17): `make setup` (copies `.env` from `.env.example` on the first run and stops so the passwords get set, refuses to go on while they are still the placeholders (`make check-env`), then `docker compose up -d --wait`, the venv, `pip install -r requirements-dev.txt -e .`, `wikilense ingest`), `make test`, `make lint`, `make eval`, `make serve`, `make experiments` (`scripts/run_experiments.py all`), `make down`. Every recipe is echoed; `make -n <target>` shows it. With the docker group only reachable through `sg`: `sg docker -c "make setup"`.
-- Pinned versions: `requirements.lock` is the GPU build of `.venv` (PyPI torch with CUDA libraries, what `results/` were produced with); `requirements-cpu.lock` is the CPU-only build (torch from the PyTorch CPU index, about 2 GB smaller) that `.github/workflows/ci.yml` installs from. Both were made with `pip freeze --exclude-editable`; the header of each file says how and which to use. `requirements.txt` / `requirements-dev.txt` keep the unpinned ranges.
+  - The laptop was upgraded from Ubuntu 24.04 to 26.04 on 2026-10-26. `/usr/bin/python3` is now 3.14 and the system's Python 3.12 is gone, which broke `.venv`. Since 2026-11-11 `.venv/bin/python3` points at a user-level CPython 3.12.16 installed with uv (`~/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/`); the packages are unchanged (`pip freeze` equals `requirements.lock`). If that directory is removed, `make setup` rebuilds the venv with the system Python.
+- `Makefile` (added 2026-09-17, changed 2026-11-11): `make setup` checks the Python version (3.10 for the ranges, 3.12 for a lock file), writes `.env` with two generated passwords when there is none (`scripts/make_env.py`; a hand-made `.env` that still holds the placeholders is refused by `make check-env`), then `docker compose up -d --wait`, the venv (rebuilt when its interpreter no longer works), `pip install -r requirements-dev.txt -e .`, `wikilense ingest`. `make setup CPU=1` installs `requirements-cpu.lock`, `make setup REQS=requirements.lock` the GPU lock. Also `make test`, `make lint`, `make eval` (writes the git-ignored `results/baseline.*`), `make serve`, `make experiments` (`scripts/run_experiments.py all`), `make down`. Every recipe is echoed; `make -n <target>` shows it. With the docker group only reachable through `sg`: `sg docker -c "make setup"`.
+- Pinned versions: `requirements.lock` is the GPU build of `.venv` (PyPI torch with CUDA libraries, what `results/` were produced with; Linux x86_64 only); `requirements-cpu.lock` is the CPU-only build that `.github/workflows/ci.yml` installs from (1.4 GB installed instead of 5.8 GB). Both were made with `pip freeze --exclude-editable`; since 2026-11-11 the CPU file carries environment markers (`torch==2.14.0+cpu` off macOS, `torch==2.14.0` on macOS, colorama on Windows). Both need Python 3.12 or newer. `requirements.txt` / `requirements-dev.txt` keep the unpinned ranges.
+- Timings on this laptop drift by tens of percent within a minute (CPU governor `powersave`): compare numbers inside one run, interleave the things compared, and run a headline measurement twice.
 - torch with CUDA works on the RTX 4060 (`torch.cuda.is_available()` is true); the embedding model downloads to `~/.cache/huggingface`.
 - `docs/DESIGN.md` is the module contract: layout, data formats, parsing and chunking rules, schema, provisional settings and their reasons. Update it when a decision changes.
 - `docs/ARCHITECTURE.md` (2026-09-23) is the beginner's guide to how the code is built: the pipeline, key ideas, every file, one query end to end, the database, tests, and what is left for the grading. Keep it true when a file or a flow changes.
-- Git: initialised on `main` on 2026-09-17, local identity `ylli <yrada@constructor.university>`. The owner creates the public GitHub repository and pushes. The README is written last (owner's decision, 2026-09-17); until then, `docs/DESIGN.md` holds the reasoning.
+- Git: initialised on `main` on 2026-09-17, local identity `ylli <yrada@constructor.university>`. Remote `origin` is github.com/ylli-00/WikiLens. `docs/DESIGN.md` holds the reasoning behind every decision.
+- The README must stay short (the evaluators' request; `tests/test_docs.py` caps it at 330 lines and checks its first line, its first-screen output, every link and anchor, and the stated number of tests). Put reference material in `docs/`.
 
 ## Working rules
 
