@@ -8,6 +8,7 @@
 #   make lint         ruff
 #   make eval         recall and latency of the ingested corpus -> results/
 #   make serve        the web query page on http://127.0.0.1:8000
+#   make examples     the ten statements of sql/examples.sql through the mariadb client (no Python)
 #   make experiments  the whole experiment protocol (scripts/run_experiments.py all)
 #   make down         stop the MariaDB container (the data volume is kept)
 #
@@ -33,7 +34,7 @@ ifneq ($(filter %.lock,$(REQS)),)
 PY_MIN  := 3.12
 endif
 
-.PHONY: setup check-python check-env venv test lint eval serve experiments down
+.PHONY: setup check-python check-env venv test lint eval serve examples experiments down
 
 # --- setup -----------------------------------------------------------------------------------
 
@@ -87,6 +88,12 @@ eval:
 
 serve:
 	$(VENV)/bin/wikilense serve
+
+# sql/examples.sql through the mariadb client that is inside the container: no Python, no model,
+# no client on the host. The image keeps the application user's name and password in its own
+# environment; the password reaches the client as MYSQL_PWD there and is on no command line.
+examples:
+	$(COMPOSE) exec -T mariadb sh -c 'MYSQL_PWD="$$MARIADB_PASSWORD" exec mariadb --table -u"$$MARIADB_USER" "$$MARIADB_DATABASE"' < sql/examples.sql
 
 experiments:
 	$(VENV)/bin/python scripts/run_experiments.py all

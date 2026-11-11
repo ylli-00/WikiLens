@@ -1,0 +1,499 @@
+{
+  "name": "join_order",
+  "created_at": "2026-11-11T04:29:29+00:00",
+  "k": 10,
+  "repeats": 3,
+  "ef_search": 100,
+  "n_queries": 75,
+  "n_chunks": 4598,
+  "index_m": 16,
+  "index_distance": "cosine",
+  "results": [
+    {
+      "filter": "none",
+      "passing_chunks": 4598,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 10.0,
+        "p50_ms": 2.047,
+        "p95_ms": 2.405,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 10.0,
+        "p50_ms": 2.042,
+        "p95_ms": 2.415,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "min_words_1000",
+      "passing_chunks": 4544,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 19.0,
+        "p50_ms": 2.18,
+        "p95_ms": 3.36,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 19.0,
+        "p50_ms": 2.13,
+        "p95_ms": 3.335,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "min_words_5000",
+      "passing_chunks": 3891,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 17.0,
+        "chunk_rows_read_max": 75.0,
+        "p50_ms": 2.919,
+        "p95_ms": 4.623,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 3890.9999999999995,
+        "chunk_rows_read_max": 3890.9999999999995,
+        "p50_ms": 10.441,
+        "p95_ms": 13.375,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "max_words_2000",
+      "passing_chunks": 89,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 601.0,
+        "chunk_rows_read_max": 1662.0,
+        "p50_ms": 3.055,
+        "p95_ms": 4.095,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 88.999999998,
+        "chunk_rows_read_max": 88.999999998,
+        "p50_ms": 0.909,
+        "p95_ms": 1.062,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "max_words_500",
+      "passing_chunks": 25,
+      "as_written": {
+        "plan": "chunk first; chunk ALL no key",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk ALL no key": 75
+        },
+        "chunk_rows_read_p50": 4598.0,
+        "chunk_rows_read_max": 4598.0,
+        "p50_ms": 4.586,
+        "p95_ms": 5.104,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 25.000000002,
+        "chunk_rows_read_max": 25.000000002,
+        "p50_ms": 0.632,
+        "p95_ms": 0.913,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "heading_history",
+      "passing_chunks": 117,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 315.0,
+        "chunk_rows_read_max": 1013.0,
+        "p50_ms": 2.943,
+        "p95_ms": 3.923,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 315.0,
+        "chunk_rows_read_max": 1013.0,
+        "p50_ms": 2.941,
+        "p95_ms": 3.904,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "linked_from",
+      "passing_chunks": 661,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 121.0,
+        "chunk_rows_read_max": 492.0,
+        "p50_ms": 3.122,
+        "p95_ms": 5.012,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "<derived2> first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "<derived2> first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 661.0,
+        "chunk_rows_read_max": 661.0,
+        "p50_ms": 2.582,
+        "p95_ms": 4.29,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "category",
+      "passing_chunks": 695,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 108.0,
+        "chunk_rows_read_max": 420.0,
+        "p50_ms": 3.0,
+        "p95_ms": 5.014,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "<derived2> first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "<derived2> first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 695.0,
+        "chunk_rows_read_max": 695.0,
+        "p50_ms": 2.585,
+        "p95_ms": 3.969,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "edited_since_2020_12_01",
+      "passing_chunks": 4525,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 25.0,
+        "p50_ms": 2.521,
+        "p95_ms": 3.608,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 25.0,
+        "p50_ms": 2.536,
+        "p95_ms": 3.287,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "edited_before_2020_12_15",
+      "passing_chunks": 778,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 67.0,
+        "chunk_rows_read_max": 491.0,
+        "p50_ms": 2.677,
+        "p95_ms": 3.938,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 777.99999992,
+        "chunk_rows_read_max": 777.99999992,
+        "p50_ms": 2.641,
+        "p95_ms": 3.72,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "edited_before_2020_06_01",
+      "passing_chunks": 4,
+      "as_written": {
+        "plan": "chunk first; chunk ALL no key",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk ALL no key": 75
+        },
+        "chunk_rows_read_p50": 4598.0,
+        "chunk_rows_read_max": 4598.0,
+        "p50_ms": 3.149,
+        "p95_ms": 5.817,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 4.0,
+        "chunk_rows_read_max": 4.0,
+        "p50_ms": 0.666,
+        "p95_ms": 1.271,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    },
+    {
+      "filter": "four_filters",
+      "passing_chunks": 377,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "chunk_rows_read_p50": 184.0,
+        "chunk_rows_read_max": 888.0,
+        "p50_ms": 3.423,
+        "p95_ms": 6.303,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 73,
+        "short": 0,
+        "swap_gap_max": 3.8832106481478945e-06
+      },
+      "free": {
+        "plan": "<derived2> first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "<derived2> first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "chunk_rows_read_p50": 377.0,
+        "chunk_rows_read_max": 377.0,
+        "p50_ms": 2.098,
+        "p95_ms": 3.851,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0
+      }
+    }
+  ],
+  "filters": {
+    "none": {},
+    "min_words_1000": {
+      "min_words": 1000
+    },
+    "min_words_5000": {
+      "min_words": 5000
+    },
+    "max_words_2000": {
+      "max_words": 2000
+    },
+    "max_words_500": {
+      "max_words": 500
+    },
+    "heading_history": {
+      "heading_like": "%History%"
+    },
+    "linked_from": {
+      "linked_from": "Asia"
+    },
+    "category": {
+      "category": "Member states of the United Nations"
+    },
+    "edited_since_2020_12_01": {
+      "edited_since": "2020-12-01"
+    },
+    "edited_before_2020_12_15": {
+      "edited_before": "2020-12-15"
+    },
+    "edited_before_2020_06_01": {
+      "edited_before": "2020-06-01"
+    },
+    "four_filters": {
+      "min_words": 1000,
+      "linked_from": "Asia",
+      "category": "Member states of the United Nations",
+      "edited_since": "2020-12-01"
+    }
+  },
+  "ingest_meta": {
+    "analyze_seconds": "0.010",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
+    "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
+    "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "1316",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 14.7,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.16",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  }
+}

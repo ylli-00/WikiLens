@@ -1,7 +1,10 @@
-# MariaDB 11.8 LTS for WikiLense. Usage: cp .env.example .env, edit the passwords, docker compose up -d
+# MariaDB 11.8 LTS for WikiLense. `make setup` writes .env and starts this; by hand: copy
+# .env.example to .env, set the two passwords, docker compose up -d --wait.
 services:
   mariadb:
-    image: mariadb:11.8
+    # The patch release is pinned: every measured behaviour in results/ and docs/VECTOR_INDEX.md,
+    # and the plans that the tests pin, are those of 11.8.9.
+    image: mariadb:11.8.9
     container_name: wikilense-mariadb
     restart: unless-stopped
     environment:

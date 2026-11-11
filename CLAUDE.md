@@ -18,7 +18,7 @@ Goal: retrieval over Wikipedia inside MariaDB. Chunk articles, embed the chunks,
     fact-verification framing in the README.
   - What they asked for, all done on 2026-11-11 (branch `fable-review-2026-11-11`):
     1. A short path for a reader who only wants to type one question: the README's first screen is
-       now `make setup`, one query and its real output; the README went from 722 to about 310
+       now `make setup`, one query and its real output; the README went from 722 to about 330
        lines and the reference material moved to `docs/EXAMPLES.md`, `SETUP.md`, `DATA.md`,
        `VECTOR_INDEX.md` and `EVALUATION.md`.
     2. Where the approach is worse than a separate vector store: the README section "Where this
@@ -205,6 +205,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - `scripts/make_charts.py` - the README charts (`docs/img/*.svg`) from `results/*.json`
 - `scripts/make_env.py` - writes `.env` with two generated passwords on the first `make setup`
 - `scripts/compare_separate_index.py` - MariaDB against an in-process copy of the vectors (`results/separate_index.md`); hnswlib is optional and must stay out of every requirements and lock file
+- `scripts/measure_index_behaviour.py` - three measured behaviours of the vector index: `forms` (`results/statement_forms.md`), `join_order` (`results/join_order.md`), `isolation` (`results/isolation.md`, uses a scratch table in the test database: never run it next to pytest)
 - `data/corpus/NOTICE.md` - licence and attribution of the committed Wikipedia text and FEVEROUS claims (CC BY-SA 3.0)
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
 
@@ -212,7 +213,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 
 - Python 3.12 venv in `.venv` (`python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pip install -e .`). Run tools as `.venv/bin/python -m pytest`, `.venv/bin/ruff check .`, `.venv/bin/wikilense`.
   - The laptop was upgraded from Ubuntu 24.04 to 26.04 on 2026-10-26. `/usr/bin/python3` is now 3.14 and the system's Python 3.12 is gone, which broke `.venv`. Since 2026-11-11 `.venv/bin/python3` points at a user-level CPython 3.12.16 installed with uv (`~/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/`); the packages are unchanged (`pip freeze` equals `requirements.lock`). If that directory is removed, `make setup` rebuilds the venv with the system Python.
-- `Makefile` (added 2026-09-17, changed 2026-11-11): `make setup` checks the Python version (3.10 for the ranges, 3.12 for a lock file), writes `.env` with two generated passwords when there is none (`scripts/make_env.py`; a hand-made `.env` that still holds the placeholders is refused by `make check-env`), then `docker compose up -d --wait`, the venv (rebuilt when its interpreter no longer works), `pip install -r requirements-dev.txt -e .`, `wikilense ingest`. `make setup CPU=1` installs `requirements-cpu.lock`, `make setup REQS=requirements.lock` the GPU lock. Also `make test`, `make lint`, `make eval` (writes the git-ignored `results/baseline.*`), `make serve`, `make experiments` (`scripts/run_experiments.py all`), `make down`. Every recipe is echoed; `make -n <target>` shows it. With the docker group only reachable through `sg`: `sg docker -c "make setup"`.
+- `Makefile` (added 2026-09-17, changed 2026-11-11): `make setup` checks the Python version (3.10 for the ranges, 3.12 for a lock file), writes `.env` with two generated passwords when there is none (`scripts/make_env.py`; a hand-made `.env` that still holds the placeholders is refused by `make check-env`), then `docker compose up -d --wait`, the venv (rebuilt when its interpreter no longer works), `pip install -r requirements-dev.txt -e .`, `wikilense ingest`. `make setup CPU=1` installs `requirements-cpu.lock`, `make setup REQS=requirements.lock` the GPU lock. Also `make test`, `make lint`, `make eval` (writes the git-ignored `results/baseline.*`), `make serve`, `make examples` (`sql/examples.sql` through the container's `mariadb` client), `make experiments` (`scripts/run_experiments.py all`), `make down`. Every recipe is echoed; `make -n <target>` shows it. With the docker group only reachable through `sg`: `sg docker -c "make setup"`.
 - Pinned versions: `requirements.lock` is the GPU build of `.venv` (PyPI torch with CUDA libraries, what `results/` were produced with; Linux x86_64 only); `requirements-cpu.lock` is the CPU-only build that `.github/workflows/ci.yml` installs from (1.4 GB installed instead of 5.8 GB). Both were made with `pip freeze --exclude-editable`; since 2026-11-11 the CPU file carries environment markers (`torch==2.14.0+cpu` off macOS, `torch==2.14.0` on macOS, colorama on Windows). Both need Python 3.12 or newer. `requirements.txt` / `requirements-dev.txt` keep the unpinned ranges.
 - Timings on this laptop drift by tens of percent within a minute (CPU governor `powersave`): compare numbers inside one run, interleave the things compared, and run a headline measurement twice.
 - torch with CUDA works on the RTX 4060 (`torch.cuda.is_available()` is true); the embedding model downloads to `~/.cache/huggingface`.
@@ -234,7 +235,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - MariaDB must be 11.7.1 or newer for `VECTOR` (the brief targets 11.8 LTS).
   - Ubuntu's own `mariadb-server` package is 10.6 on 22.04 and 10.11 on 24.04, neither of which has `VECTOR`; it is 11.8 on 25.10 and 26.04 (packages.ubuntu.com, checked 2026-09-17).
   - Check `SELECT VERSION();` before writing schema code, and state the version in the README.
-  - Install route (owner's decision, 2026-09-17): Docker Compose, `docker compose up -d` from the project root with the official `mariadb:11.8` image (11.8.9 at the time). Passwords live in `.env` (copy `.env.example`). The volume `mariadb-data` is on the ext4 root partition.
+  - Install route (owner's decision, 2026-09-17): Docker Compose, `docker compose up -d` from the project root with the official `mariadb` image, pinned to `mariadb:11.8.9` since 2026-11-11 (the measured index behaviour and the pinned plans are those of 11.8.9; move the pin only together with a rerun of the tests and of `scripts/measure_index_behaviour.py`). Passwords live in `.env` (copy `.env.example`). The volume `mariadb-data` is on the ext4 root partition.
   - Two databases: `wikilense` (the corpus) and `wikilense_test` (the test suite only, created by `sql/docker-init/01-test-database.sh` on first start). Tests must never touch `wikilense`.
 - Keep database credentials in environment variables or an untracked `.env`; never commit them.
 - Compute every statistic from the files and report the actual output. Write "not computed" or "not found" instead of estimating.

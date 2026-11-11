@@ -59,12 +59,15 @@ overview, [docs/EVALUATION.md](docs/EVALUATION.md) the method), measured on the 
 > which flatters recall. And the claims' labels (supported, refuted, not enough information) serve
 > the planned LLM fact-checking extension.
 
+The headline run times the bare index query (`results/final_ef_100.md`: 240-word chunks, `M=16`,
+`mhnsw_ef_search=100`). The joined statement that `wikilense query` runs is exact and takes 2.24 ms.
+
 | k | article recall | evidence recall | SQL p50 | SQL p95 |
 |---|---|---|---|---|
 | 1 | 63/75 (0.84) | 39/66 (0.59) | 0.50 ms | 0.86 ms |
 | 5 | 74/75 (0.99) | 55/66 (0.83) | 0.45 ms | 0.79 ms |
 | 10 | 74/75 (0.99) | 60/66 (0.91) | 0.51 ms | 0.94 ms |
-| 20 | 74/75 (0.99) | 65/66 (0.99) | 0.64 ms | 1.10 ms |
+| 20 | 74/75 (0.99) | 65/66 (0.98) | 0.64 ms | 1.10 ms |
 
 ![Article and evidence recall at k](docs/img/recall_at_k.svg)
 
@@ -77,14 +80,16 @@ overview, [docs/EVALUATION.md](docs/EVALUATION.md) the method), measured on the 
   `EXPLAIN` shows the vector index as the first access path, the statement runs in 3.2 ms at the
   median, and it never returns fewer than `k` rows.
 - **A join makes the search exact, and its cost grows with the table.** With a join in the
-  statement, MariaDB returns exactly the top `k` of a full NumPy ranking for 75 of 75 claims, with
+  statement, MariaDB returns the top `k` chunks of a full NumPy ranking for 75 of 75 claims, with
   and without filters. It costs 2.24 ms here against 0.51 ms for the bare index query. With 20,000
   more pages (89,650 chunks) the joined statement takes 19.17 ms and the bare query 1.23 ms.
 - **The optimizer decides, per filter, whether the vector index survives.** Nine of the eleven
-  filters we measured keep it. The two most selective ones make MariaDB scan all 4,598 chunks and
-  sort instead.
+  filters we measured keep it; the two most selective make MariaDB scan all 4,598 chunks and sort.
 - **Searching rows your own transaction has not committed finds fewer true neighbours:** 0.973 of
   the exact top 10 against 1.000 after `COMMIT`, and 0.623 against 0.992 on random vectors.
+- **One sequence leaves the index stale for everyone.** A REPEATABLE READ transaction that searches
+  again after another connection's commit makes later index searches miss the committed rows, in
+  10 of 10 trials, until the next write ([results/isolation.md](results/isolation.md)).
 - **The index parameters are the largest lever.** On 120-word chunks the server defaults (`M=6`,
   `mhnsw_ef_search=20`) find the gold page for 68 of 75 claims at k=10, where the exact ranking of
   the same vectors finds 74. With `M=16` the same vectors give 74.
@@ -99,7 +104,7 @@ test compares the file, the code's column list and the live server.
 
 | Table | Holds | Why it is shaped this way |
 |---|---|---|
-| `page` | one row per article: title, size counts, `revision_id` and `last_edited` of its December 2020 revision | `n_words` and `last_edited` are indexed, so "longer than N" and "edited since D" are range predicates; `title` is `utf8mb4_bin`, so matching is exact |
+| `page` | one row per article: title, size counts, `revision_id` and `last_edited` of its December 2020 revision | `n_words` and `last_edited` are indexed: a selective length or date filter is read through that index, otherwise it is checked on the page row; `title` is `utf8mb4_bin`, so matching is exact |
 | `section` | the heading tree: ordinal, heading, level, path such as `History > Roman history` | `heading` keeps the server's accent- and case-insensitive collation on purpose, so `LIKE '%history%'` matches `History` |
 | `sentence` | one row per text unit (a sentence or a list item), with its FEVEROUS element key | the unit of gold evidence; every unit is stored, even empty ones, so evidence ids always resolve |
 | `chunk` | the retrieval unit: text, word count, `embedding VECTOR(384) NOT NULL`, the `VECTOR INDEX` and a `FULLTEXT` index | the vector sits in the same row as `page_id` and `section_id`, so one statement can filter, join and rank |
@@ -147,12 +152,16 @@ every table and the method.
   `ORDER BY` key, an `IN (subquery)` filter, which becomes a semi-join, and a derived table without
   `DISTINCT`, which MariaDB merges into the join. So ties are broken in Python, and the link and
   category filters are `SELECT DISTINCT` derived tables.
-- **Two cost regimes.** The bare query is the HNSW search: it reads exactly `LIMIT` rows and
-  `mhnsw_ef_search` sets its accuracy. With a join, `EXPLAIN` still says `key: embedding`, but the
-  result is exact and no longer depends on `mhnsw_ef_search`.
-- **The optimizer drops the index for very selective range filters.** Rows read grow with
-  selectivity: 10 unfiltered, 108 under the category filter, 601 when 89 of 4,598 chunks pass. When
-  25 or 4 chunks pass, MariaDB scans the table and sorts. No query came back short.
+- **Three regimes of one statement** ([results/statement_forms.md](results/statement_forms.md)). The
+  bare query is the HNSW search, and `mhnsw_ef_search` sets its accuracy. A predicate on `chunk`
+  itself keeps that search going until `k` rows pass: never short, but approximate (the exact top 10
+  for 50 of 75 claims when 304 chunks pass) and slow (6.46 ms). With a join, `EXPLAIN` still says
+  `key: embedding`, but the result is exact for 75 of 75 at 2.56 ms, whatever `mhnsw_ef_search` is.
+- **Selective range filters, and the join order we fix.** Rows read grow with selectivity: 10
+  unfiltered, 108 under the category filter, 601 when 89 of 4,598 chunks pass. When 25 or 4 pass,
+  MariaDB scans the table and sorts; no query came back short. Our `STRAIGHT_JOIN` forces that: left
+  free, the optimizer reads only the passing chunks, 0.63 ms instead of 4.59 ms when 25 pass, but
+  10.44 ms instead of 2.92 ms when 3,891 pass ([results/join_order.md](results/join_order.md)).
 
   ![Chunk rows read under each filter](docs/img/planner_rows.svg)
 
@@ -171,7 +180,10 @@ every table and the method.
 
 - **Vectors are rows.** An inserted chunk is searchable in the same transaction and gone after
   `ROLLBACK`; another connection sees it after `COMMIT`; deleting a page cascades to its vectors.
-  The one caveat is the lower recall over uncommitted rows, measured on three fresh builds.
+  A search sees what its isolation level allows, through the index as by a scan. Two caveats:
+  the lower recall over uncommitted rows, and the stale index above. With a `DELETE` in that
+  sequence the index returned no row at all, until `FLUSH TABLES` or the next committed write.
+  Searching at READ COMMITTED or in autocommit mode avoids it.
 - **Results are reproducible up to the graph build.** Two `M=6` builds of the same vectors agreed on
   12 of 75 hit lists. Within one server process the results are deterministic, and the cache size
   changed none of them. A container restart changed 1 of 75 hit lists on `M=6` and none on `M=16`.
@@ -207,12 +219,12 @@ vector store.
    statement's cost also grows with the table: 21.30 ms at 89,650 chunks. We did not measure a copy
    at that size. The copy has its own price: 7 MB of vectors and three relational tables exported,
    stale after the next write, and outside every transaction.
-3. **No filter-aware index.** Our filtered statement is either exact over the whole index or
-   filtered after the search. Qdrant documents "extending the HNSW graph with additional edges
-   based on indexed payload values", which lets it "apply filters as you search in the graph"
+3. **No filter-aware index.** A filtered search here walks the whole index exactly, filters after
+   the search, or skips the vector index and sorts the rows that pass. Qdrant documents "extending
+   the HNSW graph with additional edges based on indexed payload values", which lets it "apply
+   filters as you search in the graph"
    ([Qdrant, Indexing](https://qdrant.tech/documentation/manage-data/indexing/)). That targets the
-   middle case, where our two forms are slow or short. MariaDB's documentation describes no such
-   structure.
+   middle case, where those forms are slow or short. MariaDB documents no such structure.
 4. **One vector index per table, few knobs.** MariaDB documents that "there can be only one vector
    index in the table" ([CREATE TABLE with Vectors](https://mariadb.com/docs/server/reference/sql-structure/vectors/create-table-with-vectors)),
    two distances and no dot product ([Vector Overview](https://mariadb.com/docs/server/reference/sql-structure/vectors/vector-overview)),
@@ -223,8 +235,9 @@ vector store.
    configurable `ef_construct` (the Indexing page above), three kinds of optional quantization
    ([Quantization](https://qdrant.tech/documentation/manage-data/quantization/)) and sharding across
    nodes ([Distributed deployment](https://qdrant.tech/documentation/scaling/distributed_deployment/)).
-5. **Tuning is on you.** The server defaults lose 6 of the 74 gold pages that the exact ranking
-   finds, and the lower recall over uncommitted rows is not in the documentation we read.
+5. **Tuning and care are on you.** The server defaults lose 6 of the 74 gold pages that the exact
+   ranking finds. The lower recall over uncommitted rows and the stale index after an old
+   REPEATABLE READ reader are not in the documentation we read.
 
 ## Setup and platforms
 
@@ -240,8 +253,9 @@ The ingest ends with a report to compare against this one:
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (391 tests, about 20 s), `make eval` (the headline table, about 15 s),
-`make serve`, `make experiments` (the whole protocol, about 10 minutes) and `make down`.
+Then `make test` (401 tests, about 20 s), `make eval` (the headline table, about 15 s),
+`make serve`, `make examples` (the ten statements of `sql/examples.sql`, no Python needed),
+`make experiments` (the whole protocol, about 10 minutes with a GPU) and `make down`.
 
 **Without a GPU** everything works; only the embedding is slower. The ingest took 225.7 s on this
 laptop's CPU against 21 s on its GPU, and a query embedding takes 18 ms against 4.6 ms. The SQL times
@@ -257,8 +271,8 @@ do not change. `make setup CPU=1` installs pinned CPU-only packages: a 1.4 GB en
 | Windows | WSL 2 is Linux; natively the Makefile needs a POSIX shell | the lock file resolves for native Windows |
 
 "Run" means we ran it. "Resolves" means pip's and uv's resolvers find every package for that
-platform's wheel tags; it was not run there, because we have no Mac and no Windows machine.
-[docs/SETUP.md](docs/SETUP.md) has the commands behind each cell.
+platform's wheel tags; it was not run there, because we have no Mac and no Windows machine
+([docs/SETUP.md](docs/SETUP.md) has the commands behind each cell).
 
 ## Method
 
@@ -269,14 +283,15 @@ made of text. Latency is the SQL round trip of one search, warm, 5 repeats per c
 p50 and p95; the query embedding is timed separately. Machine: i9-13900H, RTX 4060 Laptop GPU,
 MariaDB 11.8.9 in Docker, Python 3.12, PyMySQL 1.2.3, sentence-transformers 6.0.1. The headline
 was run again twice on 2026-11-11: recall was identical and the SQL p50 at k=10 was 0.48 and
-0.56 ms. Timings on this laptop move by that much between runs.
+0.56 ms. Each table is one run with its own protocol, so the same bare query reads 0.51 ms in the
+headline, 0.83 ms in the scale test and 0.78 ms in the comparison. Compare inside one table.
 
 | Parameter | Chosen | Why (evidence in [docs/EVALUATION.md](docs/EVALUATION.md)) |
 |---|---|---|
 | Embedding model | `BAAI/bge-small-en-v1.5`, 384 dimensions | small enough for a CPU, built for passage retrieval; no second model was measured |
 | Embedded text | `title > section path: chunk text` | the prefix raises evidence recall@20 from 61 to 63 of 66 on the exact ranking |
 | Chunk size | 240 words, overlap 1 unit, never across a section | at equal retrieved text 60-, 120- and 240-word chunks give the same article recall and evidence recall within 3 claims (54, 57, 55 of 66); 240 stores 4,598 vectors, not 8,658 or 19,065 |
-| Index `M` | 16 (server default 6) | at `ef_search=20`, article recall@10 is 67, 74 and 73 of 75 for M 6, 16 and 32; the exact ranking gives 74 |
+| Index `M` | 16 (server default 6) | at `ef_search=20`, article recall@10 is 67, 74 and 73 of 75 for M 6, 16 and 32; the exact ranking gives 74 (another build of the `M=6` graph gave 68: builds differ) |
 | `mhnsw_ef_search` | 100 per query (server default 20) | hit lists equal the exact ranking for 74 of 75 claims against 65 at 20, for 0.51 ms instead of 0.45 ms |
 | Strategy with filters | `inline` (the joined statement) | always fills `k`; `overfetch` is faster and comes back short |
 
@@ -301,9 +316,10 @@ To reproduce: `make eval` after `make setup` gives the headline table up to the 
 [scripts/](scripts/) builds the corpus, fetches the page metadata and runs the experiments.
 [data/corpus/](data/corpus/) is the committed corpus and [results/](results/) every experiment as
 JSON and Markdown. [docs/](docs/) has EXAMPLES, SETUP, DATA, VECTOR_INDEX, EVALUATION, DESIGN (every
-decision) and ARCHITECTURE (a beginner's guide to the code). [tests/](tests/) holds 391 tests, and
-[CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8` service on
-every push to `main` and every pull request.
+decision) and ARCHITECTURE (a beginner's guide to the code). [analysis/](analysis/) is the earlier
+FEVEROUS analysis that chose the benchmark, and [CLAUDE.md](CLAUDE.md) the working notes for the
+coding assistant. [tests/](tests/) holds 401 tests, and [CI](.github/workflows/ci.yml) runs ruff
+and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 

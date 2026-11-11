@@ -1,0 +1,580 @@
+{
+  "name": "isolation",
+  "created_at": "2026-11-11T07:51:23+00:00",
+  "k": 10,
+  "rows": 1000,
+  "new_rows": 5,
+  "ef_search": 100,
+  "index": "VECTOR INDEX (embedding) M=16 DISTANCE=cosine",
+  "seed": 7,
+  "trials": 10,
+  "control_trials": 5,
+  "mariadb_version": "11.8.9-MariaDB-ubu2404",
+  "default_isolation_level": "REPEATABLE-READ",
+  "innodb_snapshot_isolation": 1,
+  "levels": [
+    {
+      "level": "READ UNCOMMITTED",
+      "writer_blocked": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "writer_uncommitted": {
+        "index": [
+          5,
+          5,
+          4,
+          5,
+          5
+        ],
+        "scan": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      },
+      "writer_committed_reader_open": {
+        "index": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "scan": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      },
+      "reader_next_transaction": {
+        "index": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "scan": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      }
+    },
+    {
+      "level": "READ COMMITTED",
+      "writer_blocked": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "writer_uncommitted": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "writer_committed_reader_open": {
+        "index": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "scan": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      },
+      "reader_next_transaction": {
+        "index": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "scan": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      }
+    },
+    {
+      "level": "REPEATABLE READ",
+      "writer_blocked": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "writer_uncommitted": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "writer_committed_reader_open": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reader_next_transaction": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      }
+    },
+    {
+      "level": "SERIALIZABLE",
+      "writer_blocked": [
+        "Lock wait timeout exceeded; try restarting transaction (error 1205)",
+        "Lock wait timeout exceeded; try restarting transaction (error 1205)",
+        "Lock wait timeout exceeded; try restarting transaction (error 1205)",
+        "Lock wait timeout exceeded; try restarting transaction (error 1205)",
+        "Lock wait timeout exceeded; try restarting transaction (error 1205)"
+      ],
+      "writer_uncommitted": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "writer_committed_reader_open": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reader_next_transaction": {
+        "index": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scan": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "sequences": {
+    "repeatable_read_searches_again_and_ends": [
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      }
+    ],
+    "control_read_committed": [
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      }
+    ],
+    "control_no_second_search": [
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      }
+    ],
+    "control_autocommit": [
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5
+      }
+    ],
+    "control_reader_stays_connected": [
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      },
+      {
+        "index_rows": 10,
+        "index_new": 0,
+        "scan_rows": 10,
+        "scan_new": 5
+      }
+    ]
+  },
+  "recovery": {
+    "by_write": [
+      6,
+      6,
+      6
+    ],
+    "by_flush": [
+      5,
+      5,
+      5
+    ],
+    "flush_skipped": null,
+    "still_stale_for_new_connections": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ],
+    "attempts": 6
+  },
+  "deletes": [
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    },
+    {
+      "reader_snapshot_rows": 10,
+      "reader_snapshot_still_sees_deleted": 3,
+      "new_connection_index_rows": 0,
+      "new_connection_scan_rows": 10,
+      "other_queries_min_rows": 6,
+      "other_queries_with_no_row": 0,
+      "table_rows": 997
+    }
+  ],
+  "delete_rows_after_flush": 10
+}

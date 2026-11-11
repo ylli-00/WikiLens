@@ -39,6 +39,7 @@ scripts/fetch_page_meta.py Revision id, edit date and categories of each page fr
 scripts/run_experiments.py The experiment protocol -> results/
 scripts/make_charts.py     The README charts from results/*.json -> docs/img/
 scripts/compare_separate_index.py  MariaDB against an in-process copy of the vectors -> results/
+scripts/measure_index_behaviour.py  Statement forms, join order, isolation levels -> results/
 scripts/make_env.py        .env with generated passwords (run by `make setup`)
 sql/schema.sql             DDL, the single source of truth; db.apply_schema() executes it
 sql/examples.sql           Ten worked statements for the mariadb client
@@ -657,7 +658,7 @@ section records what was changed for each, what else the pass found, and the dec
 
 - **A short path to one answer.** The README's first screen is the setup command, one query and
   the output of a recorded run (`results/fresh_clone_run.md`); `tests/test_docs.py` keeps the
-  block equal to that record. The README went from 722 to about 310 lines. Nothing was deleted:
+  block equal to that record. The README went from 722 to about 330 lines. Nothing was deleted:
   the examples, the setup steps, the data description, the statements with every measured index
   rule, and the method with every result table are in `docs/EXAMPLES.md`, `SETUP.md`, `DATA.md`,
   `VECTOR_INDEX.md` and `EVALUATION.md`. The same test checks every relative link and anchor of
@@ -708,6 +709,59 @@ Decisions (the owner had left them open):
   shows. The failure this can cause, a new `.env` against a data volume created with other
   passwords, existed before for anyone who typed different passwords; it now ends in one line that
   names the cause and both ways out (`cli.ACCESS_DENIED_HINT`), checked end to end.
+
+- **The MariaDB image is pinned to `mariadb:11.8.9`** in `docker-compose.yml` and in CI (it was
+  `mariadb:11.8`). Every measured behaviour in `results/` and `docs/VECTOR_INDEX.md` and every plan
+  a test pins is that of 11.8.9. A later patch release may change them, and the stale index below
+  looks like a defect that could be fixed. A reader should get the server the numbers describe.
+  The cost: security fixes of later patch releases arrive only when the pin is moved, together
+  with a rerun of the tests and of `scripts/measure_index_behaviour.py`.
+- **`STRAIGHT_JOIN` stays in the filtered statement**, although `results/join_order.md` shows that
+  it is the slower plan under the most selective filters (see below). The settings are fixed since
+  the evaluation, the fixed order never takes the 10.44 ms plan the
+  optimizer picked for one unselective filter, and a rule for when to leave the order free would
+  need its own measurement at scale. The README and `docs/VECTOR_INDEX.md` state the cost.
+- **The stale index was not reported to MariaDB.** It is a behaviour measured on one patch release
+  in one container, described in `results/isolation.md` with the statements to repeat it. Filing
+  it upstream is the owner's step to take, under the owner's name.
+
+Measured after the self-grade (three graders, 36 to 37 of 40 with their own stricter reading; their
+suggestions are in the run's handoff report). `scripts/measure_index_behaviour.py`, three parts:
+
+- **`forms` (`results/statement_forms.md`).** One nearest-neighbour statement in three shapes.
+  Bare: the HNSW search. With a predicate on `chunk` itself: the server keeps taking rows from the
+  index until `k` pass, so no result is short, but the list is the exact filtered top 10 for only
+  50 of 75 claims when 304 chunks pass (68 of 75 when 766 pass), and it takes 6.46 ms. With a join
+  in the statement: exact for 75 of 75, at both `mhnsw_ef_search` values. So a filter column
+  copied onto the vector table would not have bought an exact filtered search; the join does.
+- **`join_order` (`results/join_order.md`).** The filtered statement as written against the same
+  text with plain `JOIN`. Left free, the optimizer starts from the filter's own index or derived
+  table under 8 of the 12 filters and sorts the chunks that pass, without the vector index:
+  0.63 ms instead of 4.59 ms when 25 chunks pass, and
+  10.44 ms instead of 2.92 ms when 3,891 pass. Both forms return the same 10
+  chunks as a scan for every claim and filter. Under the four filters the statement as written
+  returned two near-equal neighbours (distances at most 3.9e-06 apart) in the other order for 2 of
+  75 claims; `search()` sorts by the reported distance, so its lists are not affected.
+- **`isolation` (`results/isolation.md`).** A search through the index sees what a scan sees at
+  each of the four isolation levels while another connection inserts. One sequence breaks that: a
+  REPEATABLE READ transaction searches, another connection commits, the first searches again in
+  its old snapshot and ends. After it, index searches from new connections missed the committed
+  rows in 10 of 10 trials (and returned no row at all after a `DELETE`), until the next committed
+  write or `FLUSH TABLES`. The controls (READ COMMITTED, autocommit, no second search) were clean
+  in 5 of 5, and a second run of the whole experiment gave the same outcome.
+  Where WikiLense stands: its connections have autocommit off and the server default
+  REPEATABLE READ, so each is one transaction. A `wikilense query` and a web request run one
+  search and close. `wikilense eval` and the experiment scripts run many searches in one
+  transaction, so a write to the corpus by another connection during such a run would start the
+  sequence. Only the ingest writes to the corpus, and nothing here runs the two together. We
+  did not change the connections: no measured number depends on it, and an application that
+  writes while it searches should search at READ COMMITTED or in autocommit mode, or end the
+  transaction between searches.
+- `tests/test_search.py` now pins the rows of the table "Checked against the documentation" in
+  `docs/VECTOR_INDEX.md` (the generic `VEC_DISTANCE`, another distance function, `DESC`, no
+  `LIMIT`, a threshold next to `ORDER BY ... LIMIT`, the system variables' defaults and ranges).
+- `make examples` runs `sql/examples.sql` through the `mariadb` client in the container, the path
+  for a reader without Python.
 
 Smaller changes: `make setup` stops with one line when the Python is too old for what it installs
 and rebuilds a venv whose interpreter no longer runs (the author's own venv broke when the

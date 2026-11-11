@@ -81,8 +81,10 @@ What stands behind the table, all looked up on 2026-11-11:
   CPU build, and `torch==2.14.0+cpu` elsewhere.
 - The lock files need Python 3.12: `numpy==2.5.3` has no release for 3.11 and `networkx==3.6.1`
   none for 3.10. They resolve for 3.12, 3.13 and 3.14.
-- The image `mariadb:11.8` is published for linux/amd64 and linux/arm64, so Docker on Apple Silicon
-  gets a native image (https://hub.docker.com/_/mariadb/tags?name=11.8).
+- The image `mariadb:11.8.9` is published for linux/amd64 and linux/arm64, so Docker on Apple
+  Silicon gets a native image (https://hub.docker.com/_/mariadb/tags?name=11.8.9; read with
+  `docker manifest inspect mariadb:11.8.9` on 2026-11-11). `docker-compose.yml` pins the patch
+  release because the measured index behaviour and the plans the tests pin are those of 11.8.9.
 - On a Mac, `python3` may be the 3.9 of the Xcode tools. `make setup` then stops and says so;
   install a newer Python and run, for example, `make setup PYTHON=python3.12`.
 - The Makefile uses `grep -E` with POSIX character classes and plain `sh`, nothing specific to GNU
@@ -119,5 +121,7 @@ reads the metadata only.
 ## Afterwards
 
 `make test` runs the suite, `make eval` writes the headline table to `results/baseline.md` (ignored
-by git), `make serve` starts the web page, `make experiments` reruns the protocol and `make down`
-stops MariaDB and keeps the data. `docker compose down -v` deletes the data volume.
+by git), `make serve` starts the web page, `make examples` runs the ten statements of
+`sql/examples.sql` through the `mariadb` client inside the container (no Python), `make experiments`
+reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
+deletes the data volume.

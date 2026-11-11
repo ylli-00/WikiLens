@@ -31,7 +31,7 @@ measured there, with Python 3.12.16 and the same package versions.
 | 3 | 74/75 (0.99) | 52/66 (0.79) | 0.81 | 0.45 ms | 0.78 ms |
 | 5 | 74/75 (0.99) | 55/66 (0.83) | 0.85 | 0.45 ms | 0.79 ms |
 | 10 | 74/75 (0.99) | 60/66 (0.91) | 0.92 | 0.51 ms | 0.94 ms |
-| 20 | 74/75 (0.99) | 65/66 (0.99) | 0.99 | 0.64 ms | 1.10 ms |
+| 20 | 74/75 (0.99) | 65/66 (0.98) | 0.98 | 0.64 ms | 1.10 ms |
 
 Query embedding: 4.6 ms p50 on the GPU.
 
@@ -102,6 +102,10 @@ what the exact ranking finds there too.
 - `scripts/compare_separate_index.py` reruns the comparison with a copy of the vectors in the
   application's memory (`results/separate_index.md`; the README section "Where this approach
   loses"). It only reads the database.
+- `scripts/measure_index_behaviour.py` reruns three measurements of the index's behaviour
+  ([docs/VECTOR_INDEX.md](VECTOR_INDEX.md)): `forms` (`results/statement_forms.md`) and `join_order`
+  (`results/join_order.md`) read the corpus database; `isolation` (`results/isolation.md`) works on
+  a scratch table in the test database, so do not run it next to the test suite.
 
 ## Parameters and why
 

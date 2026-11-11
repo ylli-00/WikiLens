@@ -909,3 +909,56 @@ def test_the_statement_shapes_that_keep_or_lose_the_vector_index(corpus) -> None
         cur.execute("SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk LIMIT 2",
                     (dbmod.vec_param(np.ones(10, dtype=np.float32)),))
         assert cur.fetchall() == ((None,), (None,))
+
+
+@pytest.mark.db
+def test_what_the_vector_documentation_says_about_the_index_holds_on_this_server(corpus) -> None:
+    """The rows of the table "Checked against the documentation" in docs/VECTOR_INDEX.md: the
+    index serves ORDER BY VEC_DISTANCE_*(column, vector) ascending with a LIMIT; the generic
+    VEC_DISTANCE resolves to the index's function; another distance function, a descending order
+    or a missing LIMIT fall back to a scan; a WHERE on the distance next to ORDER BY ... LIMIT
+    keeps the index; and so does a predicate on the indexed table itself."""
+    q = dbmod.vec_param(QUERY)
+    shapes = {
+        "generic": "SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE(embedding, %s) LIMIT 3",
+        "euclidean": "SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE_EUCLIDEAN(embedding, %s) LIMIT 3",
+        "descending": "SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s) DESC LIMIT 3",
+        "no limit": "SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s)",
+        "threshold and limit": (
+            "SELECT chunk_id FROM chunk WHERE VEC_DISTANCE_COSINE(embedding, %s) < 0.5 "
+            "ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT 3"
+        ),
+        "own predicate": (
+            "SELECT chunk_id FROM chunk WHERE n_words > 0 "
+            "ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT 3"
+        ),
+    }
+
+    def chunk_row(name: str) -> dict[str, Any]:
+        sql = shapes[name]
+        rows = dbmod.explain(corpus, sql, tuple([q] * sql.count("%s")))
+        return next(r for r in rows if r["table"] == "chunk")
+
+    for name in ("generic", "threshold and limit", "own predicate"):
+        assert chunk_row(name)["key"] == "embedding" and chunk_row(name)["type"] == "index", name
+    for name in ("euclidean", "descending", "no limit"):
+        assert chunk_row(name)["key"] != "embedding" and chunk_row(name)["type"] == "ALL", name
+
+
+@pytest.mark.db
+def test_the_vector_system_variables_have_the_documented_defaults_and_ranges(corpus) -> None:
+    """Vector System Variables in the MariaDB documentation: M 3 to 200 (default 6),
+    mhnsw_ef_search 1 to 10000 (default 20), mhnsw_max_cache_size default 16 MB, distance
+    euclidean or cosine (default euclidean). config.MIN_EF_SEARCH / MAX_EF_SEARCH rest on it."""
+    with corpus.cursor() as cur:
+        cur.execute(
+            "SELECT VARIABLE_NAME, DEFAULT_VALUE, NUMERIC_MIN_VALUE, NUMERIC_MAX_VALUE, "
+            "ENUM_VALUE_LIST FROM information_schema.SYSTEM_VARIABLES "
+            "WHERE VARIABLE_NAME LIKE 'MHNSW%' ORDER BY VARIABLE_NAME"
+        )
+        rows = {row[0]: row[1:] for row in cur.fetchall()}
+    assert rows["MHNSW_DEFAULT_M"][:3] == ("6", "3", "200")
+    assert rows["MHNSW_EF_SEARCH"][:3] == ("20", str(searchmod.MIN_EF_SEARCH), str(searchmod.MAX_EF_SEARCH))
+    assert rows["MHNSW_MAX_CACHE_SIZE"][0] == str(16 * 1024 * 1024)
+    assert rows["MHNSW_DEFAULT_DISTANCE"][0] == "euclidean"
+    assert rows["MHNSW_DEFAULT_DISTANCE"][3] == "euclidean,cosine"
