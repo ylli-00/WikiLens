@@ -79,17 +79,16 @@ which is exact and takes 2.24 ms. Strategy `overfetch` filters the index query's
 - **The brief's four predicates run inside the vector search, in one statement:** "only articles
   in this category, longer than this, edited since that date, linked from that other article".
   `EXPLAIN` shows the vector index as the first access path, the statement runs in 3.2 ms at the
-  median, and it never returns fewer than `k` rows.
+  median, and it returned `k` rows for every claim.
 - **A join makes the search exact, and its cost grows with the table.** With a join in the
   statement, MariaDB returns the top `k` chunks of a full NumPy ranking for 75 of 75 claims, with
   and without filters. It costs 2.24 ms here against 0.51 ms for the bare index query. With 20,000
   more pages (89,650 chunks) the joined statement takes 19.17 ms and the bare query 1.23 ms.
 - **With our join order fixed, nine of eleven filters keep the vector index**; the two most
   selective make MariaDB scan and sort every chunk. Left free, the optimizer keeps it for three.
-- **One sequence leaves the index stale for everyone.** A REPEATABLE READ transaction searches,
-  another connection commits, the first searches again and ends. After that, index searches from new
-  connections at every isolation level missed the committed rows, in 10 of 10 trials, until the next
-  write ([results/isolation.md](results/isolation.md)).
+- **One sequence leaves the index stale for everyone.** After a REPEATABLE READ reader searched
+  before and after another connection's commit, index searches at any isolation level missed the
+  committed rows, in 10 of 10 trials, until the next write ([isolation.md](results/isolation.md)).
 - **The index parameters are the largest lever.** On 120-word chunks the server defaults (`M=6`,
   `mhnsw_ef_search=20`) find the gold page for 68 of 75 claims at k=10, where the exact ranking of
   the same vectors finds 74. With `M=16` the same vectors give 74.
@@ -147,10 +146,10 @@ pinned by a test or a results file. [docs/VECTOR_INDEX.md](docs/VECTOR_INDEX.md)
 every table and the method.
 
 - **Two statement shapes lose the index** besides the two the documentation names (a distance
-  wrapped in an expression, a `WHERE` on the distance without `ORDER BY ... LIMIT`): a second `ORDER
-  BY` key, and an `IN (subquery)` filter, which becomes a semi-join. So ties are broken in Python,
-  and the link and category filters are joined as derived tables, with `DISTINCT` because a page can
-  link to another one several times.
+  wrapped in an expression, a `WHERE` on the distance without `ORDER BY ... LIMIT`): a second
+  `ORDER BY` key, and an `IN (subquery)` filter, which becomes a semi-join. So ties are broken in
+  Python, and the link and category filters are joined as derived tables, with `DISTINCT` because a
+  page can link to another one several times.
 - **Three regimes of one statement** ([results/statement_forms.md](results/statement_forms.md)). The
   bare query is the HNSW search, and `mhnsw_ef_search` sets its accuracy. A predicate on `chunk`
   itself keeps that search going until `k` rows pass: not short in our runs, but approximate (the
@@ -177,10 +176,12 @@ every table and the method.
 
 - **Vectors are rows.** An inserted chunk is searchable in the same transaction and gone after
   `ROLLBACK`; another connection sees it after `COMMIT`; deleting a page cascades to its vectors. A
-  search sees what its isolation level allows, through the index as by a scan. Two caveats: the
-  lower recall over uncommitted rows, and the stale index above. With a `DELETE` in that sequence
-  the index returned no row at all, until `FLUSH TABLES` or the next committed write. A reader at
-  READ COMMITTED or in autocommit mode does not cause it; no level protects a later reader.
+  search sees what its isolation level allows, through the index as by a scan. Two caveats. A search
+  over rows its own transaction has not committed finds fewer true neighbours: 0.973 of the exact
+  top 10 against 1.000 after `COMMIT`, and 0.623 against 0.992 on random vectors. And the stale
+  index above: with a `DELETE` in that sequence the index returned no row at all, until the next
+  committed write or `FLUSH TABLES`. A reader at READ COMMITTED or in autocommit mode does not cause
+  it; no level protects a later reader.
 - **Results are reproducible up to the graph build.** Twenty fresh builds at the chosen settings
   each found 74 of 75 gold pages, as the exact ranking does; with the server defaults they found 65
   to 73 ([results/build_variance.md](results/build_variance.md)). Within one server process the
