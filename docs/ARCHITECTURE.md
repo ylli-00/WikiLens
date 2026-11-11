@@ -345,9 +345,9 @@ Why the important choices were made:
 
 ## 7. Testing and CI
 
-There are 383 tests of three kinds, told apart by pytest markers.
+There are 390 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (302) need no server and no model. They cover parsing, chunking, SQL assembly,
+- Pure tests (309) need no server and no model. They cover parsing, chunking, SQL assembly,
   metrics, argument checking, and the CLI and web page with fake databases and embedders, and
   they run in seconds anywhere, including a fresh clone without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
@@ -378,7 +378,7 @@ repository 36 of 40 on 2026-09-22, with no blocking issue.
 | Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability, which filters keep the vector index, the search over uncommitted rows), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
 | Recall and latency against a ground truth you built (execution) | `evaluate.py`, `claim` / `claim_evidence`, `results/SUMMARY.md` |
 | Chunk size, model and index parameters with reasons (execution) | DESIGN.md "Phase 3 outcomes", README "Parameters and why", the comments in `sql/schema.sql` and `config.py` |
-| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 383 tests, parameters only in SQL, CI |
+| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 390 tests, parameters only in SQL, CI |
 | An ingest that runs from the README and a query interface (usability) | `make setup`, `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql` |
 | What the database-native approach gave (documentation) | README "What the database-native approach gave" |
 

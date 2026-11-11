@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draw the README charts from the JSON files in results/ as self-contained SVG files.
 
-Three charts, written to docs/img/ (standard library only, no plotting package):
+Four charts, written to docs/img/ (standard library only, no plotting package):
 
 - ``recall_at_k.svg``: article and evidence recall at k of the headline run
   (``results/final_ef_100.json``), one line each.

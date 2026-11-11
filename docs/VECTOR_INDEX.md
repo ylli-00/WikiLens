@@ -122,9 +122,9 @@ wrong-dimension vector.
 
   | Pages | Chunks | HNSW graph | Article@10, HNSW / exact | HNSW ms p50 | Exact ms p50 | History filter: inline ms p50, overfetch 10 short |
   |---|---|---|---|---|---|---|
-  | 100 | 4,598 | 14 MB | 74/75 / 74/75 | 0.83 | 2.52 | 3.30, 69/75 |
-  | 5,100 | 26,700 | 42 MB | 74/75 / 74/75 | 1.05 | 10.27 | 11.54, 68/75 |
-  | 20,100 | 89,650 | 113 MB | 71/75 / 71/75 | 1.23 | 19.17 | 21.30, 65/75 |
+  | 100 | 4,598 | 13.0 MB | 74/75 / 74/75 | 0.83 | 2.52 | 3.30, 69/75 |
+  | 5,100 | 26,700 | 40.0 MB | 74/75 / 74/75 | 1.05 | 10.27 | 11.54, 68/75 |
+  | 20,100 | 89,650 | 108.0 MB | 71/75 / 71/75 | 1.23 | 19.17 | 21.30, 65/75 |
 
   The bare HNSW search grows little (1.5 times for 19 times the chunks). The exact joined
   statement, and the inline form of a filtered query, grow with the table (7.6 times). At every
@@ -140,9 +140,13 @@ wrong-dimension vector.
 
   | Strategy | Queries short of 10 rows (of 75) | Median time |
   |---|---|---|
-  | `overfetch 10` | 69 (18 of them with no row) | 1.02 ms |
-  | `overfetch 50` | 20 | 2.37 ms |
-  | `inline` | 0 | 3.34 ms (4.74 ms p95) |
+  | `overfetch 10` | 69 (18 of them with no row) | 0.78 ms |
+  | `overfetch 50` | 20 | 2.28 ms |
+  | `inline` | 0 | 3.07 ms (4.06 ms p95) |
+
+  (Measured again on 2026-11-11, `results/strategy_*_history.md`; the counts are those of the
+  October run. Under this filter only 26 of the 75 claims have a gold page with a chunk in a
+  History section at all, and `inline` finds it for 25 of them.)
 - Join order matters:
   - With a plain `JOIN`, the optimizer started from `page` on stale statistics right after a bulk
     insert and lost the vector index (observed in phase 2, docs/DESIGN.md). The statements use

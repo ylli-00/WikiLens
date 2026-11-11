@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_inline_minwords1000
 
-Generated 2026-10-21T22:44:10+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-11-11T03:47:49+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,14 +28,14 @@ Generated 2026-10-21T22:44:10+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | filters |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 7.2 |
+| eval_seconds | 7.5 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
 | vector_index_m | 16 |
 | vector_index_distance | cosine |
 | chunk_data_length | 14172160 |
-| chunk_index_length | 344064 |
+| chunk_index_length | 6111232 |
 | vector_index_tablespace_bytes | 13631488 |
 | chunk_words_mean | 156.6 |
 | chunk_words_median | 183.5 |
@@ -63,7 +63,7 @@ Generated 2026-10-21T22:44:10+00:00. 75 claims; 66 with a sentence-only evidence
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-10-21T22:44:02+00:00 |
+| ingested_at | 2026-10-21T23:46:15+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -72,14 +72,14 @@ Generated 2026-10-21T22:44:10+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-43-generic-x86_64-with-glibc2.43 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
-| memory_gb | 15.2 |
+| memory_gb | 14.7 |
 | embedding_device | cuda |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU |
-| python | 3.12.3 |
+| python | 3.12.16 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
 | PyMySQL | 1.2.3 |
@@ -129,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 2.37 | 2.59 | 2.37 | 1.98 | 4.54 |
-| 3 | 375 | 2.31 | 2.48 | 2.32 | 1.97 | 5.87 |
-| 5 | 375 | 2.35 | 2.50 | 2.35 | 1.97 | 4.01 |
-| 10 | 375 | 2.42 | 2.55 | 2.41 | 2.02 | 4.77 |
-| 20 | 375 | 2.53 | 2.70 | 2.53 | 2.12 | 4.78 |
+| 1 | 375 | 2.40 | 2.78 | 2.45 | 1.99 | 5.35 |
+| 3 | 375 | 2.36 | 2.71 | 2.40 | 2.00 | 4.88 |
+| 5 | 375 | 2.38 | 2.81 | 2.43 | 2.02 | 5.06 |
+| 10 | 375 | 2.44 | 3.00 | 2.50 | 2.07 | 4.87 |
+| 20 | 375 | 2.54 | 2.95 | 2.59 | 2.18 | 4.92 |
 
 ## Query embedding latency (ms)
 
@@ -141,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.59 | 4.75 | 4.61 | 4.47 | 5.66 |
+| 375 | 4.53 | 4.66 | 4.55 | 4.38 | 6.30 |
 
 ## Claims with the worst rank of their gold page
 

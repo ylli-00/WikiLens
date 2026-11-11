@@ -250,6 +250,45 @@ def test_the_configuration_includes_the_page_metadata_digest(rexp: Any) -> None:
     assert "ingest_meta.corpus_page_meta_sha256" in rexp.FINAL.differences(stale, index)
 
 
+def test_the_configuration_includes_the_corpus_itself(rexp: Any) -> None:
+    """The scale group ingests other pages with the default settings: that is not FINAL."""
+    expected = rexp.FINAL.ingest_meta_expected()
+    corpus = rexp.DEFAULT_CORPUS_DIR
+    assert expected["corpus_pages_sha256"] == rexp.sha256_of_file(corpus / "pages.jsonl")
+    assert expected["corpus_claims_sha256"] == rexp.sha256_of_file(corpus / "claims.jsonl")
+    index = {"name": "embedding", "m": rexp.FINAL.index_m, "distance": "cosine"}
+    assert rexp.FINAL.differences(expected, index) == {}
+    scaled = {**expected, "corpus_pages_sha256": "0" * 64}  # the same settings, 20,100 pages
+    assert set(rexp.FINAL.differences(scaled, index)) == {"ingest_meta.corpus_pages_sha256"}
+
+
+def test_the_summary_needs_no_database_settings(
+    rexp: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`summary` reads results/ only, so it runs in a clone without .env (and without Docker)."""
+    def no_settings() -> Any:
+        raise AssertionError("summary must not load the database settings")
+
+    monkeypatch.setattr(rexp, "load_settings", no_settings)
+    assert rexp.main(["summary", "--out", str(tmp_path)]) == 0
+    assert (tmp_path / "SUMMARY.md").read_text(encoding="utf-8").startswith("# WikiLense experiments")
+
+
+def test_scaled_pages_are_normalised_after_parsing_not_before(rexp: Any) -> None:
+    """NFC on the raw JSON would compose the n of a newline escape with a combining mark."""
+    import json
+    import unicodedata
+
+    decomposed = "Andre\u0301"  # e + combining acute accent, as the FEVEROUS database stores it
+    page = {"title": decomposed, "sentence_0": "line one\n\u0303tail", "order": ["sentence_0"]}
+    raw = json.dumps(page, ensure_ascii=False)
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(unicodedata.normalize("NFC", raw))  # what the script did until 2026-11-11
+    parsed = rexp._nfc_strings(json.loads(raw))
+    assert parsed["title"] == "Andr\u00e9" and parsed["order"] == ["sentence_0"]
+    assert parsed["sentence_0"] == unicodedata.normalize("NFC", page["sentence_0"])
+
+
 def _fake_feverous(path: Path, titles: list[str]) -> Path:
     """A miniature feverous_wikiv1.db: table wiki(id, data) with NFD text, as the real one."""
     import sqlite3
@@ -304,14 +343,16 @@ def test_scale_rows_and_markdown(rexp: Any) -> None:
         return d
 
     size = {"extra_pages": 0, "pages": 100, "chunks": 4598, "claims": 75, "ingest_seconds": 21.0,
-            "embed_seconds": 17.0, "graph_tablespace_bytes": 13_000_000,
+            "embed_seconds": 17.0, "graph_tablespace_bytes": 13_631_488,
             "hnsw": statement(0.5, hits=74), "exact": statement(2.2, hits=74),
             "history_inline": statement(3.0), "history_overfetch10": statement(1.0, short=69),
             "identical_hnsw_exact": 74}
     data = {"name": rexp.SCALE, "created_at": "now", "mariadb_version": "11.8.9", "seed": 1,
             "k": 10, "ef_search": 100, "repeats": 3, "sizes": [size]}
     assert rexp.scale_rows(data) == [[
-        "100", "4,598", "13 MB", "74/75", "74/75", "74/75", "0.50 / 1.00", "2.20 / 4.40",
+        "100", "4,598", "13.0 MB", "74/75", "74/75", "74/75", "0.50 / 1.00", "2.20 / 4.40",
         "3.00 / 6.00", "1.00, 69/75",
     ]]
-    assert "| 100 | 4,598 | 13 MB |" in rexp.scale_markdown(data)
+    assert "| 100 | 4,598 | 13.0 MB |" in rexp.scale_markdown(data)
+    # One unit for every size in results/: the binary MB of the cache-size documentation.
+    assert rexp.fmt_bytes_mb(16_777_216) == "16.0 MB" and rexp.fmt_bytes_mb(None) == "not found"

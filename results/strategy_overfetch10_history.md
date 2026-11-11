@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_overfetch10_history
 
-Generated 2026-10-21T22:44:36+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-11-11T03:48:14+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,7 +28,7 @@ Generated 2026-10-21T22:44:36+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | filters |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 4.2 |
+| eval_seconds | 3.6 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -41,7 +41,7 @@ Generated 2026-10-21T22:44:36+00:00. 75 claims; 66 with a sentence-only evidence
 | chunk_words_median | 183.5 |
 | chunk_words_p95 | 238.0 |
 | chunk_words_max | 240 |
-| filter_ground_truth | {"filter": {"heading_like": "%History%"}, "n_chunks": 4598, "n_chunks_passing": 117, "n_pages_passing": 66, "claims_gold_page_excluded": 37, "claims_gold_page_excluded_ids": [3482, 5753, 5848, 6419, 11910, 13207, 14253, 14727, 14909, 17676, 22563, 25324, 28863, 30562, 31383, 40707, 42937, 45793, 46127, 48999, 54047, 56899, 63422, 64595, 65842, 66646, 69572, 76756, 82504, 82761, 85631, 85881, 89819, 90340, 93212, 94092, 95085], "article_recall_ceiling": 38, "n_claims": 75, "evidence_recall_ceiling": 0, "n_evidence_claims": 66} |
+| filter_ground_truth | {"filter": {"heading_like": "%History%"}, "n_chunks": 4598, "n_chunks_passing": 117, "n_pages_passing": 42, "claims_gold_page_excluded": 49, "claims_gold_page_excluded_ids": [3482, 4212, 5753, 5848, 6419, 7971, 11235, 11435, 11910, 13207, 14253, 14727, 14909, 15195, 17676, 22563, 25324, 28863, 30562, 31383, 40707, 40804, 42937, 45793, 46127, 48999, 54047, 56899, 62373, 63422, 64595, 65842, 66646, 69200, 69572, 74482, 76756, 79567, 82504, 82761, 83276, 85631, 85881, 89819, 90340, 93212, 93234, 94092, 95085], "article_recall_ceiling": 26, "n_claims": 75, "evidence_recall_ceiling": 0, "n_evidence_claims": 66} |
 | short_results | {"1": {"queries_short_of_k": 62, "queries_with_no_rows": 62, "rows_min": 0, "rows_mean": 0.17, "short_claim_ids": [854, 2835, 3482, 4212, 5753, 5848, 6419, 7831, 7971, 9154, 11235, 11435, 11439, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 15823, 17676, 19145, 22563, 25324, 28863, 30562, 31383, 40707, 40804, 42937, 43675, 45340, 45793, 46127, 48999, 50355, 56899, 62373, 63422, 64595, 65842, 66646, 67426, 69200, 69299, 69572, 74482, 76756, 79567, 82504, 82761, 83276, 84120, 85631, 85881, 89819, 90340, 93212, 93234, 94092, 95085]}, "3": {"queries_short_of_k": 65, "queries_with_no_rows": 46, "rows_min": 0, "rows_mean": 0.72, "short_claim_ids": [854, 2835, 3482, 4212, 5121, 5753, 5848, 6419, 7831, 7971, 9154, 11235, 11435, 11439, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 17676, 19145, 22563, 25324, 28863, 30562, 31383, 32256, 36003, 40707, 40804, 42937, 43675, 44563, 45793, 46127, 48999, 50355, 54047, 56899, 62373, 63422, 64595, 65842, 66646, 67426, 69200, 69299, 69572, 74482, 76756, 79567, 82504, 82761, 83276, 84120, 85631, 85881, 89819, 90340, 93212, 93234, 94092, 95085]}, "5": {"queries_short_of_k": 67, "queries_with_no_rows": 38, "rows_min": 0, "rows_mean": 1.37, "short_claim_ids": [854, 2835, 3482, 4212, 5121, 5753, 5848, 6419, 7831, 7971, 9154, 11235, 11435, 11439, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 15823, 17676, 19145, 22563, 25324, 26799, 28863, 30562, 31383, 32256, 34024, 36003, 40707, 40804, 42937, 43675, 45793, 46127, 48999, 50355, 54047, 56899, 62373, 63422, 64595, 65842, 66646, 67426, 69200, 69299, 69572, 74482, 76756, 79567, 82504, 82761, 83276, 84120, 85631, 85881, 89819, 90340, 93212, 93234, 94092, 95085]}, "10": {"queries_short_of_k": 69, "queries_with_no_rows": 18, "rows_min": 0, "rows_mean": 2.97, "short_claim_ids": [854, 2835, 3482, 5121, 5753, 5848, 6419, 7831, 7971, 9154, 11235, 11435, 11439, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 15823, 17676, 19145, 22563, 25324, 26799, 28863, 30562, 31383, 32256, 34024, 36003, 40707, 40804, 42937, 43675, 44563, 45340, 45793, 46127, 48999, 50355, 54047, 56899, 61236, 62373, 64595, 65842, 66646, 67426, 69200, 69299, 69572, 74482, 76756, 79299, 79567, 82504, 82761, 83276, 84120, 85631, 85881, 89819, 90340, 93212, 93234, 94092, 95085]}, "20": {"queries_short_of_k": 74, "queries_with_no_rows": 5, "rows_min": 0, "rows_mean": 6.28, "short_claim_ids": [854, 2835, 3482, 4212, 5121, 5753, 5848, 6419, 7831, 7971, 9154, 11235, 11435, 11439, 11910, 13207, 13383, 14253, 14727, 14909, 15195, 15823, 17676, 19145, 22563, 25324, 26799, 28863, 30562, 31383, 32256, 32645, 34024, 36003, 36109, 40707, 40804, 42937, 43675, 44563, 45340, 45793, 46127, 48999, 50355, 54047, 56899, 61236, 62373, 64595, 65842, 66646, 67426, 69200, 69299, 69572, 74482, 76756, 76962, 79299, 79567, 82504, 82761, 83276, 84120, 85631, 85881, 87976, 89819, 90340, 93212, 93234, 94092, 95085]}} |
 
 ## Ingest parameters (ingest_meta)
@@ -63,7 +63,7 @@ Generated 2026-10-21T22:44:36+00:00. 75 claims; 66 with a sentence-only evidence
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-10-21T22:44:02+00:00 |
+| ingested_at | 2026-10-21T23:46:15+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -72,14 +72,14 @@ Generated 2026-10-21T22:44:36+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-43-generic-x86_64-with-glibc2.43 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
-| memory_gb | 15.2 |
+| memory_gb | 14.7 |
 | embedding_device | cuda |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU |
-| python | 3.12.3 |
+| python | 3.12.16 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
 | PyMySQL | 1.2.3 |
@@ -129,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.79 | 1.35 | 0.87 | 0.45 | 4.85 |
-| 3 | 375 | 0.82 | 1.59 | 0.89 | 0.50 | 3.98 |
-| 5 | 375 | 0.85 | 1.50 | 0.92 | 0.54 | 4.00 |
-| 10 | 375 | 1.02 | 2.00 | 1.12 | 0.67 | 5.88 |
-| 20 | 375 | 1.48 | 2.84 | 1.59 | 1.01 | 5.09 |
+| 1 | 375 | 0.56 | 0.89 | 0.59 | 0.31 | 1.41 |
+| 3 | 375 | 0.56 | 0.88 | 0.60 | 0.32 | 1.37 |
+| 5 | 375 | 0.61 | 0.96 | 0.65 | 0.36 | 1.52 |
+| 10 | 375 | 0.78 | 1.24 | 0.83 | 0.50 | 1.92 |
+| 20 | 375 | 1.19 | 1.93 | 1.30 | 0.89 | 3.19 |
 
 ## Query embedding latency (ms)
 
@@ -141,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.60 | 4.80 | 4.66 | 4.47 | 7.94 |
+| 375 | 4.40 | 4.51 | 4.40 | 4.23 | 4.74 |
 
 ## Claims with the worst rank of their gold page
 

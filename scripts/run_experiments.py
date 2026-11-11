@@ -26,11 +26,14 @@ which is analysed, did not show this. All three statements are timed, the size o
 InnoDB tablespace that holds the HNSW graph is recorded, and ``ingest_meta.index_m`` is updated
 so that it keeps describing the index that is in place.
 
-Every result file records, besides the harness's own fields (the effective ``mhnsw_ef_search``,
-the global ``mhnsw_max_cache_size``, the index M and DISTANCE from ``SHOW CREATE TABLE chunk``
-and the chunk count), the configuration of the group, the hatnote count of the ingest
-(``ingest_meta.n_units_hatnote``), the sizes of the chunk table and of the graph tablespace and
-the chunk word statistics (``parameters`` in the JSON, the "Parameters" table in the Markdown).
+Every result file of an evaluation (``run_eval``) records, besides the harness's own fields (the
+effective ``mhnsw_ef_search``, the global ``mhnsw_max_cache_size``, the index M and DISTANCE
+from ``SHOW CREATE TABLE chunk`` and the chunk count), the configuration of the group, the
+hatnote count of the ingest (``ingest_meta.n_units_hatnote``), the sizes of the chunk table and
+of the graph tablespace and the chunk word statistics (``parameters`` in the JSON, the
+"Parameters" table in the Markdown). The ``uncommitted``, ``planner`` and ``scale`` groups do not
+go through ``run_eval``: each writes one JSON file of its own shape, with the settings it used
+(k, ``mhnsw_ef_search``, repeats, the configuration, the server version).
 
 Configurations: ``OLD`` = 120-word chunks, overlap 1, M=6, prefix on (phases 1 and 2);
 ``FINAL`` = 240 words, overlap 1, M=16, prefix on (the defaults of ``wikilense.config`` and
@@ -225,11 +228,17 @@ class Configuration:
     def ingest_meta_expected(self) -> dict[str, str]:
         """Return the ``ingest_meta`` values an ingest of this configuration writes.
 
-        The harness always ingests ``DEFAULT_CORPUS_DIR``, so the page metadata digest is that
-        file's (``none`` without it, as the ingest records): an ingest made before the metadata
-        existed, or without it, does not count as this configuration."""
+        Every group but ``scale`` ingests ``DEFAULT_CORPUS_DIR``, so the three corpus digests
+        are those of its files (the page metadata's is ``none`` without the file, as the ingest
+        records): an ingest of other pages, or one made before the metadata existed, does not
+        count as this configuration."""
         meta_path = DEFAULT_CORPUS_DIR / PAGE_META_FILE
         return {
+            # The corpus itself: the scale group ingests other pages into the same database, and
+            # its restore step could be interrupted. Without these two an ingest of 20,100 pages
+            # with the default settings would pass as this configuration.
+            "corpus_pages_sha256": sha256_of_file(DEFAULT_CORPUS_DIR / "pages.jsonl"),
+            "corpus_claims_sha256": sha256_of_file(DEFAULT_CORPUS_DIR / "claims.jsonl"),
             "corpus_page_meta_sha256": sha256_of_file(meta_path) if meta_path.is_file() else "none",
             "chunk_max_words": str(self.chunk_max_words),
             "chunk_overlap_units": str(self.chunk_overlap_units),
@@ -312,10 +321,19 @@ CHUNKS_HEADING_SQL = (
     "WHERE section.heading LIKE %s"
 )
 PAGES_MIN_WORDS_SQL = "SELECT page_id FROM page WHERE n_words >= %s"
-PAGES_HEADING_SQL = "SELECT DISTINCT page_id FROM section WHERE heading LIKE %s"
+#: The pages and the sentences a heading filter can reach. Both go through ``chunk``, because
+#: the filter keeps chunks: a section whose text is all in its subsections has no chunk of its
+#: own, so its heading matching does not make its page reachable (until 2026-11-11 the pages were
+#: read from ``section`` and the sentences from ``sentence``, which counted 66 pages and a ceiling
+#: of 38 of 75 claims under '%History%' where 42 pages and 26 claims are reachable).
+PAGES_HEADING_SQL = (
+    "SELECT DISTINCT chunk.page_id FROM chunk "
+    "JOIN section ON section.section_id = chunk.section_id WHERE section.heading LIKE %s"
+)
 SENTENCES_HEADING_SQL = (
-    "SELECT s.sentence_id FROM sentence AS s JOIN section ON section.section_id = s.section_id "
-    "WHERE section.heading LIKE %s"
+    "SELECT DISTINCT cs.sentence_id FROM chunk_sentence AS cs "
+    "JOIN chunk ON chunk.chunk_id = cs.chunk_id "
+    "JOIN section ON section.section_id = chunk.section_id WHERE section.heading LIKE %s"
 )
 #: Keeps ingest_meta.index_m equal to the index that is in place after a rebuild.
 UPDATE_META_INDEX_M_SQL = "UPDATE ingest_meta SET `value` = %s WHERE `key` = 'index_m'"
@@ -614,8 +632,8 @@ def hatnote_count(meta: dict[str, str]) -> int | None:
 class Context:
     """Settings, the docker helper, the output directory and the lazily loaded embedder."""
 
-    settings: Settings
-    server: Server
+    settings: Settings | None  # None only for the groups that read results/ and nothing else
+    server: Server | None
     out_dir: Path
     repeats: int
     _embedder: Embedder | None = None
@@ -1613,7 +1631,8 @@ def group_uncommitted(ctx: Context) -> None:
                         f"{len(claim_texts)} claim embeddings")),
             "random": (random_vectors, random_queries,
                        (f"{UNCOMMITTED_RANDOM_ROWS} random normal vectors (seed "
-                        f"{UNCOMMITTED_RANDOM_SEED}), as many random queries")),
+                        f"{UNCOMMITTED_RANDOM_SEED}), queried with {len(claim_texts)} random "
+                        "vectors")),
         }  # fmt: skip
         results: dict[str, Any] = {}
         for name, (vectors, queries, label) in datasets.items():
@@ -1696,6 +1715,23 @@ def uncommitted_markdown(data: dict[str, Any]) -> str:
 
 
 
+def _nfc_strings(node: Any) -> Any:
+    """Return ``node`` with every string, keys included, normalised to Unicode NFC.
+
+    The FEVEROUS database stores its text decomposed (NFD). Normalising after parsing, not
+    before: on the raw JSON text NFC would also compose the letter of an escape such as ``\\n``
+    with a combining mark that follows it, and the page would no longer parse. On 400 pages of
+    the database (rowids 1000 to 1399, 2026-11-11) both orders gave identical pages.
+    """
+    if isinstance(node, str):
+        return unicodedata.normalize("NFC", node)
+    if isinstance(node, list):
+        return [_nfc_strings(item) for item in node]
+    if isinstance(node, dict):
+        return {_nfc_strings(key): _nfc_strings(value) for key, value in node.items()}
+    return node
+
+
 def build_scaled_corpus(directory: Path, n_extra: int, feverous_db: Path) -> dict[str, Any]:
     """Write a corpus directory: the committed pages, then ``n_extra`` random pages of the full
     FEVEROUS Wikipedia (rowids drawn with SCALE_SEED, so a smaller sample is a prefix of a larger
@@ -1716,7 +1752,7 @@ def build_scaled_corpus(directory: Path, n_extra: int, feverous_db: Path) -> dic
                 row = source.execute(FEVEROUS_PAGE_SQL, (int(rng.integers(1, max_rowid + 1)),)).fetchone()
                 if row is None:
                     continue
-                page = json.loads(unicodedata.normalize("NFC", row[0]))
+                page = _nfc_strings(json.loads(row[0]))
                 if page["title"] in seen:
                     continue
                 seen.add(page["title"])
@@ -1844,7 +1880,7 @@ def scale_rows(data: dict[str, Any]) -> list[list[Any]]:
         n = size["claims"]
         rows.append([
             f"{size['pages']:,}", f"{size['chunks']:,}",
-            f"{graph / 1e6:.0f} MB" if graph else "not measured",
+            fmt_bytes_mb(graph) if graph else "not measured",
             f"{size['hnsw']['article_hits_at_10']}/{n}", f"{size['exact']['article_hits_at_10']}/{n}",
             f"{size['identical_hnsw_exact']}/{n}",
             f"{size['hnsw']['sql_ms_p50']:.2f} / {size['hnsw']['sql_ms_p95']:.2f}",
@@ -2086,6 +2122,13 @@ class Results:
 
 
 def fmt_bytes_mb(value: Any) -> str:
+    """Return a byte count as "N.N MB", with 1 MB = 1,048,576 bytes.
+
+    That is how MariaDB's documentation writes ``mhnsw_max_cache_size`` (16777216 is "16 MB"),
+    and InnoDB tablespace files come in whole multiples of it. Every size in results/ uses this
+    function (until 2026-11-11 the scale table divided by 1,000,000 and printed the same graph
+    file as 14 MB that the other sections print as 13.0 MB).
+    """
     if not isinstance(value, (int, float)):
         return "not found"
     return f"{value / 1048576:.1f} MB"
@@ -2121,7 +2164,9 @@ def summary_markdown(out_dir: Path) -> str:
         f"{n_evidence} claims with a sentence-only evidence set), unit coverage the mean share "
         "of a claim's gold units inside the top-k chunks. Latencies are the SQL time of one "
         f"`search()` call in milliseconds, p50 / p95 over {repeats} repeats x the claims, warm, query "
-        "embedding excluded (reported separately). `ef` is `mhnsw_ef_search`, set per session "
+        "embedding excluded (reported separately); sections 9 to 11 time fewer repeats, as "
+        "their own files say. Sizes are in MB of 1,048,576 bytes, as MariaDB's documentation "
+        "writes the 16 MB default of `mhnsw_max_cache_size`. `ef` is `mhnsw_ef_search`, set per session "
         "by the application; the vector index is the HNSW index of `sql/schema.sql` with cosine "
         "distance, its M as stated per section. Two ingest configurations are used: OLD = "
         f"{OLD.label} (phases 1 and 2) and FINAL = {FINAL.label} (the chosen defaults); hatnote "
@@ -2921,10 +2966,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     for noisy in ("httpx", "huggingface_hub", "urllib3"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     groups = list(PROTOCOL_ORDER) if "all" in args.groups else list(dict.fromkeys(args.groups))
-    settings = load_settings()
-    if settings.db_name == settings.test_db_name:
-        raise SystemExit("refusing to run the experiments against the test database")
-    ctx = Context(settings=settings, server=Server(settings), out_dir=args.out, repeats=args.repeats)
+    if all(group in NO_DATABASE_GROUPS for group in groups):
+        # `summary` reads results/ only: it must work in a clone without .env and without Docker.
+        ctx = Context(settings=None, server=None, out_dir=args.out, repeats=args.repeats)
+    else:
+        settings = load_settings()
+        if settings.db_name == settings.test_db_name:
+            raise SystemExit("refusing to run the experiments against the test database")
+        ctx = Context(settings=settings, server=Server(settings), out_dir=args.out,
+                      repeats=args.repeats)
     ctx.out_dir.mkdir(parents=True, exist_ok=True)
     for group in groups:
         started = time.perf_counter()

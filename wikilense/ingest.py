@@ -2,10 +2,12 @@
 
 ``run_ingest`` is the single entry point (docs/DESIGN.md, "Ingest (ingest.py), contract for
 phase 2"). Before anything in the database is touched it refuses the test database
-(``settings.test_db_name``), chunk settings out of range, and an embedding model that cannot be
-loaded or whose dimension is not ``settings.vector_dim``, so a mistake in ``.env`` never costs
-the ingest that is in place. Then it runs seven steps against ``settings.db_name`` and commits
-each one when it completes:
+(``settings.test_db_name``), chunk settings out of range, an embedding model that cannot be
+loaded or whose dimension is not ``settings.vector_dim``, and a malformed ``page_meta.jsonl``, so
+a mistake in ``.env`` or in that file never costs the ingest that is in place. (``pages.jsonl``
+and ``claims.jsonl`` are read while the steps run: a broken line there is found after the
+reset.) Then it runs seven steps against ``settings.db_name`` and commits each one when it
+completes:
 
 1. ``db.apply_schema`` (``reset=True`` drops the tables first; ``reset=False`` is for a schema
    made by ``init-db`` and refuses a database that already holds pages).
@@ -390,6 +392,7 @@ class _Ingest:
         """Check the embedder, execute the seven steps and return the report."""
         start = time.perf_counter()
         self._check_embedder()
+        self._read_page_meta()  # before the reset: a malformed file must not cost the old ingest
         self._apply_schema()
         self._load_pages()
         self._embed_and_load_chunks()
@@ -464,7 +467,6 @@ class _Ingest:
         """Parse every page and write page, section, sentence, link and category rows; keep the
         chunks."""
         report = self.report
-        self._read_page_meta()
         total = _count_lines(self.pages_path)
         pages = tqdm(
             iter_pages(self.pages_path),

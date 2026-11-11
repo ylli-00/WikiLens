@@ -45,14 +45,14 @@
       "use_prefix": true,
       "label": "240 words, overlap 1, M=16, prefix on"
     },
-    "eval_seconds": 7.2,
+    "eval_seconds": 7.5,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
     "vector_index_m": 16,
     "vector_index_distance": "cosine",
     "chunk_data_length": 14172160,
-    "chunk_index_length": 344064,
+    "chunk_index_length": 6111232,
     "vector_index_tablespace_bytes": 13631488,
     "chunk_words_mean": 156.6,
     "chunk_words_median": 183.5,
@@ -137,22 +137,22 @@
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-10-21T22:44:02+00:00",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
-    "memory_gb": 15.2,
+    "memory_gb": 14.7,
     "embedding_device": "cuda",
     "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
   },
   "versions": {
-    "python": "3.12.3",
+    "python": "3.12.16",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
     "PyMySQL": "1.2.3",
@@ -172,11 +172,11 @@
       "unit_coverage": 0.5,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.3664610016567167,
-        "p95_ms": 2.5856031996227102,
-        "mean_ms": 2.3680687279993435,
-        "min_ms": 1.9783750012720702,
-        "max_ms": 4.538278000836726
+        "p50_ms": 2.3994639996089973,
+        "p95_ms": 2.7761250996263698,
+        "mean_ms": 2.445291954677183,
+        "min_ms": 1.991322999856493,
+        "max_ms": 5.350616999749036
       }
     },
     {
@@ -188,11 +188,11 @@
       "unit_coverage": 0.6717171717171717,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.31007499860425,
-        "p95_ms": 2.4848913004461792,
-        "mean_ms": 2.321096287991774,
-        "min_ms": 1.9697930001711939,
-        "max_ms": 5.874307000340195
+        "p50_ms": 2.356758000132686,
+        "p95_ms": 2.7125720997901226,
+        "mean_ms": 2.4024723359616473,
+        "min_ms": 2.004998999836971,
+        "max_ms": 4.88034800036985
       }
     },
     {
@@ -204,11 +204,11 @@
       "unit_coverage": 0.7159090909090909,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.3471559998142766,
-        "p95_ms": 2.5034703001438174,
-        "mean_ms": 2.3451209093182115,
-        "min_ms": 1.9696460003615357,
-        "max_ms": 4.011270000773948
+        "p50_ms": 2.3832820006646216,
+        "p95_ms": 2.8123877998950775,
+        "mean_ms": 2.4322338959779395,
+        "min_ms": 2.0236839991412126,
+        "max_ms": 5.063044000053196
       }
     },
     {
@@ -220,11 +220,11 @@
       "unit_coverage": 0.7651515151515151,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.416055998764932,
-        "p95_ms": 2.5544636006088695,
-        "mean_ms": 2.4130954906577244,
-        "min_ms": 2.0243309991201386,
-        "max_ms": 4.771117999553098
+        "p50_ms": 2.4356240000997786,
+        "p95_ms": 2.997441699517368,
+        "mean_ms": 2.5018312613246962,
+        "min_ms": 2.068881000013789,
+        "max_ms": 4.871068999818817
       }
     },
     {
@@ -236,21 +236,21 @@
       "unit_coverage": 0.8333333333333334,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.5289880013588117,
-        "p95_ms": 2.704336399619933,
-        "mean_ms": 2.5293330426502507,
-        "min_ms": 2.1207989993854426,
-        "max_ms": 4.781933001140715
+        "p50_ms": 2.537078999921505,
+        "p95_ms": 2.9471616994669607,
+        "mean_ms": 2.5889906159985308,
+        "min_ms": 2.175102000364859,
+        "max_ms": 4.9195339997822884
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.589800999383442,
-    "p95_ms": 4.749956999694405,
-    "mean_ms": 4.609086018671708,
-    "min_ms": 4.466518999834079,
-    "max_ms": 5.656424000335392
+    "p50_ms": 4.531841999778408,
+    "p95_ms": 4.663418100153649,
+    "mean_ms": 4.545850461346466,
+    "min_ms": 4.38363000012032,
+    "max_ms": 6.299092000517703
   },
   "claims": [
     {
@@ -2892,5 +2892,5 @@
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-10-21T22:44:10+00:00"
+  "created_at": "2026-11-11T03:47:49+00:00"
 }

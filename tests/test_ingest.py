@@ -702,13 +702,19 @@ def test_a_page_meta_record_for_no_corpus_page_is_ignored_with_a_warning(
 
 
 @pytest.mark.db
-def test_a_malformed_page_meta_file_is_an_ingest_error(
-    ingest_settings: Settings, tmp_path: Path
+def test_a_malformed_page_meta_file_is_an_ingest_error_before_anything_is_dropped(
+    ingest_settings: Settings, corpus_dir: Path, tmp_path: Path
 ) -> None:
+    run_ingest(ingest_settings, corpus_dir=corpus_dir, embedder=FakeEmbedder(), progress=False)
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        before = _table_counts(conn)
     bad = [dict(PAGE_META[0], last_edited="2020-11-02 10:00:00")]
     corpus = _write_corpus(tmp_path / "bad", PAGES, CLAIMS, bad)
     with pytest.raises(IngestError, match="line 1: not a MediaWiki UTC timestamp"):
         run_ingest(ingest_settings, corpus_dir=corpus, embedder=FakeEmbedder(), progress=False)
+    with closing(dbmod.connect(ingest_settings)) as conn:
+        assert _table_counts(conn) == before  # the ingest that was in place is still there
+    assert before["chunk"] > 0
 
 
 @pytest.mark.db

@@ -43,7 +43,7 @@ tie-break is applied in Python, because a second ``ORDER BY`` key after
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, fields
 from datetime import date, datetime, timezone
 from typing import Any
@@ -585,9 +585,12 @@ def ef_search_session(conn: pymysql.Connection, ef_search: int | None) -> Iterat
     """Set ``mhnsw_ef_search`` for the session inside the ``with`` block and restore it after.
 
     ``None`` leaves the session untouched. The previous value is read first and written back
-    in a ``finally`` clause, so it is restored even when the block raises. Yields None.
-    Raises ValueError, before anything is set, unless ``ef_search`` is None or an int from
-    :data:`MIN_EF_SEARCH` to :data:`MAX_EF_SEARCH`.
+    when the block ends, also when it raises. An error from the block is never replaced by one
+    from the restoring statement: after a lost connection, or a Ctrl-C while PyMySQL reads the
+    socket, the connection is closed and ``SET SESSION`` would raise ``InterfaceError(0, '')``,
+    hiding what happened; then the restore is skipped (a closed session has nothing to restore).
+    Yields None. Raises ValueError, before anything is set, unless ``ef_search`` is None or an
+    int from :data:`MIN_EF_SEARCH` to :data:`MAX_EF_SEARCH`.
     """
     if ef_search is None:
         yield
@@ -605,7 +608,12 @@ def ef_search_session(conn: pymysql.Connection, ef_search: int | None) -> Iterat
     db.set_session_var(conn, EF_SEARCH_VARIABLE, ef_search)
     try:
         yield
-    finally:
+    except BaseException:
+        if getattr(conn, "open", True):
+            with suppress(pymysql.err.Error):
+                db.set_session_var(conn, EF_SEARCH_VARIABLE, previous)
+        raise
+    else:
         db.set_session_var(conn, EF_SEARCH_VARIABLE, previous)
 
 

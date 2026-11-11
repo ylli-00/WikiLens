@@ -137,22 +137,22 @@
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-10-21T22:44:02+00:00",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
-    "memory_gb": 15.2,
+    "memory_gb": 14.7,
     "embedding_device": "cuda",
     "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
   },
   "versions": {
-    "python": "3.12.3",
+    "python": "3.12.16",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
     "PyMySQL": "1.2.3",
@@ -172,11 +172,11 @@
       "unit_coverage": 0.5,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 0.8665449986438034,
-        "p95_ms": 1.1616391002462478,
-        "mean_ms": 0.8906354106438812,
-        "min_ms": 0.5761119991802843,
-        "max_ms": 1.8770900005620206
+        "p50_ms": 0.833251000585733,
+        "p95_ms": 1.1473695001768647,
+        "mean_ms": 0.8565740346845511,
+        "min_ms": 0.5081110002720379,
+        "max_ms": 1.9212950001019635
       }
     },
     {
@@ -188,11 +188,11 @@
       "unit_coverage": 0.6717171717171717,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 1.0557719997450477,
-        "p95_ms": 1.3622941994981377,
-        "mean_ms": 1.082407437323127,
-        "min_ms": 0.7465760008926736,
-        "max_ms": 2.2220069986360613
+        "p50_ms": 0.967736999882618,
+        "p95_ms": 1.3363867999942158,
+        "mean_ms": 1.0153014186798828,
+        "min_ms": 0.6513440002891002,
+        "max_ms": 2.384427999459149
       }
     },
     {
@@ -204,11 +204,11 @@
       "unit_coverage": 0.7159090909090909,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 1.2749380002787802,
-        "p95_ms": 1.6636883005048733,
-        "mean_ms": 1.3087130853624938,
-        "min_ms": 0.9387879999849247,
-        "max_ms": 2.904570999817224
+        "p50_ms": 1.1615650000749156,
+        "p95_ms": 1.656918800199492,
+        "mean_ms": 1.2353697200063227,
+        "min_ms": 0.8418739998887759,
+        "max_ms": 3.1598409996149712
       }
     },
     {
@@ -220,11 +220,11 @@
       "unit_coverage": 0.7651515151515151,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 1.8141200016543735,
-        "p95_ms": 2.2434010003053118,
-        "mean_ms": 1.8722783786894677,
-        "min_ms": 1.4866540004732087,
-        "max_ms": 3.946007998820278
+        "p50_ms": 1.71348899948498,
+        "p95_ms": 2.3266418997991427,
+        "mean_ms": 1.7976825546453863,
+        "min_ms": 1.4397009999811416,
+        "max_ms": 4.173731999799202
       }
     },
     {
@@ -236,21 +236,21 @@
       "unit_coverage": 0.8333333333333334,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.803061999657075,
-        "p95_ms": 3.251197800273076,
-        "mean_ms": 2.8902094026804357,
-        "min_ms": 2.5138759992842097,
-        "max_ms": 6.481776001237449
+        "p50_ms": 2.7071240001532715,
+        "p95_ms": 3.558981800051697,
+        "mean_ms": 2.83483126933182,
+        "min_ms": 2.4082140007521957,
+        "max_ms": 6.412570000065898
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.576545999952941,
-    "p95_ms": 4.67759970069892,
-    "mean_ms": 4.583557605345656,
-    "min_ms": 4.474280000067665,
-    "max_ms": 4.988130000128876
+    "p50_ms": 4.408900000271387,
+    "p95_ms": 4.5448507001310645,
+    "mean_ms": 4.418143880005421,
+    "min_ms": 4.252468000231602,
+    "max_ms": 4.736808999950881
   },
   "claims": [
     {
@@ -2892,5 +2892,5 @@
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-10-21T22:44:21+00:00"
+  "created_at": "2026-11-11T03:48:00+00:00"
 }

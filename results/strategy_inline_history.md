@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_inline_history
 
-Generated 2026-10-21T22:44:31+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-11-11T03:48:10+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,7 +28,7 @@ Generated 2026-10-21T22:44:31+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | filters |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 9.2 |
+| eval_seconds | 8.5 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -41,7 +41,7 @@ Generated 2026-10-21T22:44:31+00:00. 75 claims; 66 with a sentence-only evidence
 | chunk_words_median | 183.5 |
 | chunk_words_p95 | 238.0 |
 | chunk_words_max | 240 |
-| filter_ground_truth | {"filter": {"heading_like": "%History%"}, "n_chunks": 4598, "n_chunks_passing": 117, "n_pages_passing": 66, "claims_gold_page_excluded": 37, "claims_gold_page_excluded_ids": [3482, 5753, 5848, 6419, 11910, 13207, 14253, 14727, 14909, 17676, 22563, 25324, 28863, 30562, 31383, 40707, 42937, 45793, 46127, 48999, 54047, 56899, 63422, 64595, 65842, 66646, 69572, 76756, 82504, 82761, 85631, 85881, 89819, 90340, 93212, 94092, 95085], "article_recall_ceiling": 38, "n_claims": 75, "evidence_recall_ceiling": 0, "n_evidence_claims": 66} |
+| filter_ground_truth | {"filter": {"heading_like": "%History%"}, "n_chunks": 4598, "n_chunks_passing": 117, "n_pages_passing": 42, "claims_gold_page_excluded": 49, "claims_gold_page_excluded_ids": [3482, 4212, 5753, 5848, 6419, 7971, 11235, 11435, 11910, 13207, 14253, 14727, 14909, 15195, 17676, 22563, 25324, 28863, 30562, 31383, 40707, 40804, 42937, 45793, 46127, 48999, 54047, 56899, 62373, 63422, 64595, 65842, 66646, 69200, 69572, 74482, 76756, 79567, 82504, 82761, 83276, 85631, 85881, 89819, 90340, 93212, 93234, 94092, 95085], "article_recall_ceiling": 26, "n_claims": 75, "evidence_recall_ceiling": 0, "n_evidence_claims": 66} |
 | short_results | {"1": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 1, "rows_mean": 1.0, "short_claim_ids": []}, "3": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 3, "rows_mean": 3.0, "short_claim_ids": []}, "5": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 5, "rows_mean": 5.0, "short_claim_ids": []}, "10": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 10, "rows_mean": 10.0, "short_claim_ids": []}, "20": {"queries_short_of_k": 0, "queries_with_no_rows": 0, "rows_min": 20, "rows_mean": 20.0, "short_claim_ids": []}} |
 
 ## Ingest parameters (ingest_meta)
@@ -63,7 +63,7 @@ Generated 2026-10-21T22:44:31+00:00. 75 claims; 66 with a sentence-only evidence
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-10-21T22:44:02+00:00 |
+| ingested_at | 2026-10-21T23:46:15+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -72,14 +72,14 @@ Generated 2026-10-21T22:44:31+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-43-generic-x86_64-with-glibc2.43 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
-| memory_gb | 15.2 |
+| memory_gb | 14.7 |
 | embedding_device | cuda |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU |
-| python | 3.12.3 |
+| python | 3.12.16 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
 | PyMySQL | 1.2.3 |
@@ -129,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 2.65 | 3.40 | 2.72 | 2.17 | 5.65 |
-| 3 | 375 | 2.78 | 3.55 | 2.86 | 2.17 | 5.89 |
-| 5 | 375 | 2.96 | 3.86 | 3.05 | 2.20 | 6.38 |
-| 10 | 375 | 3.34 | 4.74 | 3.51 | 2.34 | 8.85 |
-| 20 | 375 | 4.04 | 5.64 | 4.24 | 2.60 | 9.74 |
+| 1 | 375 | 2.50 | 3.08 | 2.56 | 1.98 | 4.70 |
+| 3 | 375 | 2.61 | 3.24 | 2.68 | 2.01 | 5.94 |
+| 5 | 375 | 2.75 | 3.44 | 2.83 | 1.97 | 6.24 |
+| 10 | 375 | 3.07 | 4.06 | 3.19 | 2.24 | 6.59 |
+| 20 | 375 | 3.61 | 4.95 | 3.77 | 2.49 | 8.26 |
 
 ## Query embedding latency (ms)
 
@@ -141,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.56 | 4.66 | 4.59 | 4.45 | 8.25 |
+| 375 | 4.44 | 4.68 | 4.47 | 4.26 | 6.85 |
 
 ## Claims with the worst rank of their gold page
 

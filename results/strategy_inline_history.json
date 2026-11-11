@@ -45,7 +45,7 @@
       "use_prefix": true,
       "label": "240 words, overlap 1, M=16, prefix on"
     },
-    "eval_seconds": 9.2,
+    "eval_seconds": 8.5,
     "n_units_hatnote": 1316,
     "mhnsw_ef_search_global": 20,
     "vector_index_name": "embedding",
@@ -64,18 +64,23 @@
       },
       "n_chunks": 4598,
       "n_chunks_passing": 117,
-      "n_pages_passing": 66,
-      "claims_gold_page_excluded": 37,
+      "n_pages_passing": 42,
+      "claims_gold_page_excluded": 49,
       "claims_gold_page_excluded_ids": [
         3482,
+        4212,
         5753,
         5848,
         6419,
+        7971,
+        11235,
+        11435,
         11910,
         13207,
         14253,
         14727,
         14909,
+        15195,
         17676,
         22563,
         25324,
@@ -83,29 +88,36 @@
         30562,
         31383,
         40707,
+        40804,
         42937,
         45793,
         46127,
         48999,
         54047,
         56899,
+        62373,
         63422,
         64595,
         65842,
         66646,
+        69200,
         69572,
+        74482,
         76756,
+        79567,
         82504,
         82761,
+        83276,
         85631,
         85881,
         89819,
         90340,
         93212,
+        93234,
         94092,
         95085
       ],
-      "article_recall_ceiling": 38,
+      "article_recall_ceiling": 26,
       "n_claims": 75,
       "evidence_recall_ceiling": 0,
       "n_evidence_claims": 66
@@ -164,22 +176,22 @@
     "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
     "index_distance": "cosine",
     "index_m": "16",
-    "ingested_at": "2026-10-21T22:44:02+00:00",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
     "mariadb_version": "11.8.9-MariaDB-ubu2404",
     "n_units_hatnote": "1316",
     "wikilense_version": "0.1.0"
   },
   "machine": {
-    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
     "architecture": "x86_64",
     "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
     "cpu_count": 20,
-    "memory_gb": 15.2,
+    "memory_gb": 14.7,
     "embedding_device": "cuda",
     "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
   },
   "versions": {
-    "python": "3.12.3",
+    "python": "3.12.16",
     "wikilense": "0.1.0",
     "mariadb": "11.8.9-MariaDB-ubu2404",
     "PyMySQL": "1.2.3",
@@ -199,11 +211,11 @@
       "unit_coverage": 0.0,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.649552001457778,
-        "p95_ms": 3.4021100007521454,
-        "mean_ms": 2.722363690622539,
-        "min_ms": 2.1662500003003515,
-        "max_ms": 5.645570001433953
+        "p50_ms": 2.500863000022946,
+        "p95_ms": 3.079069299928961,
+        "mean_ms": 2.5625459760218896,
+        "min_ms": 1.9813080007224926,
+        "max_ms": 4.697573000157718
       }
     },
     {
@@ -215,11 +227,11 @@
       "unit_coverage": 0.0,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.7753619997383794,
-        "p95_ms": 3.547497499857855,
-        "mean_ms": 2.8580389333801577,
-        "min_ms": 2.1699260014429456,
-        "max_ms": 5.8855509996647015
+        "p50_ms": 2.6149160003114957,
+        "p95_ms": 3.242703599607921,
+        "mean_ms": 2.67696394399051,
+        "min_ms": 2.0086770000489196,
+        "max_ms": 5.941594999967492
       }
     },
     {
@@ -231,11 +243,11 @@
       "unit_coverage": 0.0,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 2.955922000182909,
-        "p95_ms": 3.8617905001956387,
-        "mean_ms": 3.0461947759904433,
-        "min_ms": 2.197676998548559,
-        "max_ms": 6.377745999998297
+        "p50_ms": 2.7480460003062035,
+        "p95_ms": 3.4366959001999935,
+        "mean_ms": 2.831476898691714,
+        "min_ms": 1.9659600002341904,
+        "max_ms": 6.240619999516639
       }
     },
     {
@@ -247,11 +259,11 @@
       "unit_coverage": 0.0,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 3.34170999849448,
-        "p95_ms": 4.736385400974541,
-        "mean_ms": 3.509960311993685,
-        "min_ms": 2.338661000976572,
-        "max_ms": 8.846026999890455
+        "p50_ms": 3.0723159998160554,
+        "p95_ms": 4.0554964994043985,
+        "mean_ms": 3.188906306657979,
+        "min_ms": 2.235894000477856,
+        "max_ms": 6.585659999473137
       }
     },
     {
@@ -263,21 +275,21 @@
       "unit_coverage": 0.0,
       "sql_latency": {
         "n": 375,
-        "p50_ms": 4.039486999317887,
-        "p95_ms": 5.639096800041443,
-        "mean_ms": 4.242367797298357,
-        "min_ms": 2.6040960001409985,
-        "max_ms": 9.743163000166533
+        "p50_ms": 3.614801999901829,
+        "p95_ms": 4.953454900169163,
+        "mean_ms": 3.7693866107292706,
+        "min_ms": 2.489964000233158,
+        "max_ms": 8.258873999693606
       }
     }
   ],
   "embedding_latency": {
     "n": 375,
-    "p50_ms": 4.562845999316778,
-    "p95_ms": 4.664953900100954,
-    "mean_ms": 4.589370423952157,
-    "min_ms": 4.446915001608431,
-    "max_ms": 8.25137799984077
+    "p50_ms": 4.436975000317034,
+    "p95_ms": 4.68442910032536,
+    "mean_ms": 4.46796021333527,
+    "min_ms": 4.2603709998729755,
+    "max_ms": 6.846285999927204
   },
   "claims": [
     {
@@ -800,9 +812,9 @@
         3667,
         1144,
         1142,
-        3029,
         1556,
-        4025
+        4025,
+        4254
       ]
     },
     {
@@ -2919,5 +2931,5 @@
     "sql_latency: wall-clock milliseconds of one search() call (LIMIT k) as seen by the Python client, repeats x n_claims samples after one untimed warm-up pass; p50 and p95 use linear interpolation.",
     "embedding_latency: wall-clock milliseconds of one embed_queries([text]) call per claim and repeat after a warm-up call; the searches use vectors from one batched call."
   ],
-  "created_at": "2026-10-21T22:44:31+00:00"
+  "created_at": "2026-11-11T03:48:10+00:00"
 }

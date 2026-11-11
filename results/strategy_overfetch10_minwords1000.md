@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_overfetch10_minwords1000
 
-Generated 2026-10-21T22:44:14+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-11-11T03:47:54+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -28,7 +28,7 @@ Generated 2026-10-21T22:44:14+00:00. 75 claims; 66 with a sentence-only evidence
 | n_sentences | 33637 |
 | experiment_group | filters |
 | configuration | {"chunk_max_words": 240, "chunk_overlap_units": 1, "index_m": 16, "use_prefix": true, "label": "240 words, overlap 1, M=16, prefix on"} |
-| eval_seconds | 3.5 |
+| eval_seconds | 3.7 |
 | n_units_hatnote | 1316 |
 | mhnsw_ef_search_global | 20 |
 | vector_index_name | embedding |
@@ -63,7 +63,7 @@ Generated 2026-10-21T22:44:14+00:00. 75 claims; 66 with a sentence-only evidence
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-10-21T22:44:02+00:00 |
+| ingested_at | 2026-10-21T23:46:15+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -72,14 +72,14 @@ Generated 2026-10-21T22:44:14+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-43-generic-x86_64-with-glibc2.43 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
-| memory_gb | 15.2 |
+| memory_gb | 14.7 |
 | embedding_device | cuda |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU |
-| python | 3.12.3 |
+| python | 3.12.16 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
 | PyMySQL | 1.2.3 |
@@ -129,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.55 | 0.98 | 0.59 | 0.35 | 1.36 |
-| 3 | 375 | 0.55 | 0.97 | 0.59 | 0.34 | 1.66 |
-| 5 | 375 | 0.58 | 1.01 | 0.62 | 0.37 | 2.04 |
-| 10 | 375 | 0.71 | 1.28 | 0.76 | 0.46 | 2.01 |
-| 20 | 375 | 1.05 | 1.78 | 1.11 | 0.80 | 2.50 |
+| 1 | 375 | 0.59 | 1.33 | 0.70 | 0.33 | 1.84 |
+| 3 | 375 | 0.60 | 1.38 | 0.71 | 0.33 | 1.84 |
+| 5 | 375 | 0.63 | 1.44 | 0.75 | 0.34 | 1.92 |
+| 10 | 375 | 0.76 | 1.64 | 0.89 | 0.46 | 2.20 |
+| 20 | 375 | 1.08 | 2.21 | 1.25 | 0.76 | 2.74 |
 
 ## Query embedding latency (ms)
 
@@ -141,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.58 | 4.75 | 4.60 | 4.46 | 5.65 |
+| 375 | 4.43 | 4.59 | 4.44 | 4.25 | 4.97 |
 
 ## Claims with the worst rank of their gold page
 

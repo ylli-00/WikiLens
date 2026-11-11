@@ -604,7 +604,7 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
 - **Scale with distractor pages** (`results/scale.md`, group `scale`, 2026-10-22).
   - The corpus, then the corpus plus 5,000 and 20,000 random pages of the full FEVEROUS Wikipedia
     (seeded, nested samples; `WIKILENSE_FEVEROUS_DB`), each ingested with the FINAL settings: 4,598
-    / 26,700 / 89,650 chunks, HNSW graph 14 / 42 / 113 MB.
+    / 26,700 / 89,650 chunks, HNSW graph 13.0 / 40.0 / 108.0 MB (of 1,048,576 bytes).
   - HNSW search p50 0.83 / 1.05 / 1.23 ms; exact joined statement 2.52 / 10.27 / 19.17 ms; inline
     under the History filter 3.30 / 11.54 / 21.30 ms (never short); overfetch 10 under it 1.03 /
     1.44 / 1.70 ms, short for 69 / 68 / 65 of 75 queries.

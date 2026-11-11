@@ -355,6 +355,45 @@ def test_ef_search_session_restores_the_value_when_the_block_raises() -> None:
     assert conn.sets == [77, 33]
 
 
+class DeadSessionConn(SessionConn):
+    """A connection that breaks inside the block, as PyMySQL leaves it after a lost connection
+    or a Ctrl-C during a socket read: closed, and every later statement raises InterfaceError."""
+
+    def __init__(self, closes: bool) -> None:
+        super().__init__(value=33)
+        self.open = True
+        self.closes = closes
+        self.broken = False
+
+    def break_now(self) -> None:
+        self.broken = True
+        if self.closes:
+            self.open = False
+
+    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
+        if self.broken:
+            raise pymysql.err.InterfaceError(0, "")
+        super().execute(sql, params)
+
+
+@pytest.mark.parametrize("closes", [True, False])
+@pytest.mark.parametrize(
+    "failure",
+    [KeyboardInterrupt(), pymysql.err.OperationalError(2013, "Lost connection to MySQL server")],
+)
+def test_ef_search_session_never_replaces_the_error_of_the_block(
+    closes: bool, failure: BaseException
+) -> None:
+    """The restoring SET on a dead connection raises InterfaceError(0, ''); the caller must still
+    see what happened (the CLI maps KeyboardInterrupt to exit code 130)."""
+    conn = DeadSessionConn(closes=closes)
+    with pytest.raises(type(failure)) as raised, searchmod.ef_search_session(conn, 77):
+        conn.break_now()
+        raise failure
+    assert raised.value is failure
+    assert conn.sets == [77]  # nothing was, or could be, restored
+
+
 def test_ef_search_outside_the_server_range_is_refused_before_anything_is_set() -> None:
     """MariaDB clamps mhnsw_ef_search to 1..10000 with a warning only, so 0 would run at 1 and
     20000 at 10000 while the caller reports its own value."""

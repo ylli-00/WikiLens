@@ -157,8 +157,8 @@ every table and the method.
   ![Chunk rows read under each filter](docs/img/planner_rows.svg)
 
 - **Complete or fast, not both, under a selective filter.** With `heading LIKE '%History%'`
-  (117 chunks pass) the joined statement fills all 10 rows in 3.34 ms. Filtering after the index
-  search takes 1.02 ms and comes back short for 69 of 75 queries.
+  (117 chunks pass) the joined statement fills all 10 rows in 3.07 ms. Filtering after the index
+  search takes 0.78 ms and comes back short for 69 of 75 queries.
 - **Scale.** The same claims with 5,000 and 20,000 random Wikipedia pages added as distractors:
 
   | Pages | Chunks | Article recall@10 | HNSW p50 | Joined (exact) p50 | History filter, joined p50 |
@@ -240,7 +240,7 @@ The ingest ends with a report to compare against this one:
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (383 tests, about 20 s), `make eval` (the headline table, about 15 s),
+Then `make test` (390 tests, about 20 s), `make eval` (the headline table, about 15 s),
 `make serve`, `make experiments` (the whole protocol, about 10 minutes) and `make down`.
 
 **Without a GPU** everything works; only the embedding is slower. The ingest took 225.7 s on this
@@ -301,7 +301,7 @@ To reproduce: `make eval` after `make setup` gives the headline table up to the 
 [scripts/](scripts/) builds the corpus, fetches the page metadata and runs the experiments.
 [data/corpus/](data/corpus/) is the committed corpus and [results/](results/) every experiment as
 JSON and Markdown. [docs/](docs/) has EXAMPLES, SETUP, DATA, VECTOR_INDEX, EVALUATION, DESIGN (every
-decision) and ARCHITECTURE (a beginner's guide to the code). [tests/](tests/) holds 383 tests, and
+decision) and ARCHITECTURE (a beginner's guide to the code). [tests/](tests/) holds 390 tests, and
 [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8` service on
 every push to `main` and every pull request.
 

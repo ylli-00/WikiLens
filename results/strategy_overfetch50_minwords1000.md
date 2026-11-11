@@ -1,6 +1,6 @@
 # WikiLense evaluation: strategy_overfetch50_minwords1000
 
-Generated 2026-10-21T22:44:21+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
+Generated 2026-11-11T03:48:00+00:00. 75 claims; 66 with a sentence-only evidence set (the denominator of evidence recall and unit coverage).
 
 ## Parameters
 
@@ -63,7 +63,7 @@ Generated 2026-10-21T22:44:21+00:00. 75 claims; 66 with a sentence-only evidence
 | hatnote_pattern | ^(?:(?:Main articles?\|See also\|Further information\|For other uses\|Not to be confused with)[:,]\|For (?!example\\b\|instance\\b)[^.]{0,80}?, see \|Not to be confused with \|This (?:article\|page) is about \|"[^"]{1,120}" redirects here) |
 | index_distance | cosine |
 | index_m | 16 |
-| ingested_at | 2026-10-21T22:44:02+00:00 |
+| ingested_at | 2026-10-21T23:46:15+00:00 |
 | mariadb_version | 11.8.9-MariaDB-ubu2404 |
 | n_units_hatnote | 1316 |
 | wikilense_version | 0.1.0 |
@@ -72,14 +72,14 @@ Generated 2026-10-21T22:44:21+00:00. 75 claims; 66 with a sentence-only evidence
 
 | Item | Value |
 |---|---|
-| platform | Linux-7.0.0-38-generic-x86_64-with-glibc2.39 |
+| platform | Linux-7.0.0-43-generic-x86_64-with-glibc2.43 |
 | architecture | x86_64 |
 | cpu | 13th Gen Intel(R) Core(TM) i9-13900H |
 | cpu_count | 20 |
-| memory_gb | 15.2 |
+| memory_gb | 14.7 |
 | embedding_device | cuda |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU |
-| python | 3.12.3 |
+| python | 3.12.16 |
 | wikilense | 0.1.0 |
 | mariadb | 11.8.9-MariaDB-ubu2404 |
 | PyMySQL | 1.2.3 |
@@ -129,11 +129,11 @@ One search() call with LIMIT k, measured by the client; warm.
 
 | k | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|---|
-| 1 | 375 | 0.87 | 1.16 | 0.89 | 0.58 | 1.88 |
-| 3 | 375 | 1.06 | 1.36 | 1.08 | 0.75 | 2.22 |
-| 5 | 375 | 1.27 | 1.66 | 1.31 | 0.94 | 2.90 |
-| 10 | 375 | 1.81 | 2.24 | 1.87 | 1.49 | 3.95 |
-| 20 | 375 | 2.80 | 3.25 | 2.89 | 2.51 | 6.48 |
+| 1 | 375 | 0.83 | 1.15 | 0.86 | 0.51 | 1.92 |
+| 3 | 375 | 0.97 | 1.34 | 1.02 | 0.65 | 2.38 |
+| 5 | 375 | 1.16 | 1.66 | 1.24 | 0.84 | 3.16 |
+| 10 | 375 | 1.71 | 2.33 | 1.80 | 1.44 | 4.17 |
+| 20 | 375 | 2.71 | 3.56 | 2.83 | 2.41 | 6.41 |
 
 ## Query embedding latency (ms)
 
@@ -141,7 +141,7 @@ One embed_queries([text]) call per claim and repeat; warm.
 
 | n | p50 | p95 | mean | min | max |
 |---|---|---|---|---|---|
-| 375 | 4.58 | 4.68 | 4.58 | 4.47 | 4.99 |
+| 375 | 4.41 | 4.54 | 4.42 | 4.25 | 4.74 |
 
 ## Claims with the worst rank of their gold page
 
