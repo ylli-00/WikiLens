@@ -1,0 +1,567 @@
+{
+  "name": "cache_size",
+  "created_at": "2026-11-11T09:00:24+00:00",
+  "k": 10,
+  "passes": 3,
+  "ef_search": 100,
+  "n_queries": 75,
+  "n_chunks": 4598,
+  "configured_cache_bytes": 536870912,
+  "restored_cache_bytes": 536870912,
+  "exact_article_recall": 74,
+  "index_m": 16,
+  "index_distance": "cosine",
+  "results": [
+    {
+      "cache": "as configured",
+      "cache_bytes": 536870912,
+      "table_reopened": false,
+      "statement": "bare",
+      "equal_to_exact": [
+        75,
+        75,
+        75
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 0.649
+    },
+    {
+      "cache": "as configured",
+      "cache_bytes": 536870912,
+      "table_reopened": false,
+      "statement": "joined",
+      "equal_to_exact": [
+        75,
+        75,
+        75
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 2.255
+    },
+    {
+      "cache": "1 MB, table not reopened",
+      "cache_bytes": 1048576,
+      "table_reopened": false,
+      "statement": "bare",
+      "equal_to_exact": [
+        57,
+        58,
+        57
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9547,
+        0.9613,
+        0.9627
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        59,
+        53,
+        55
+      ],
+      "p50_ms": 2.148
+    },
+    {
+      "cache": "1 MB, table not reopened",
+      "cache_bytes": 1048576,
+      "table_reopened": false,
+      "statement": "joined",
+      "equal_to_exact": [
+        57,
+        59,
+        57
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9547,
+        0.9653,
+        0.956
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        55,
+        53,
+        52
+      ],
+      "p50_ms": 2.263
+    },
+    {
+      "cache": "16 MB",
+      "cache_bytes": 16777216,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        75,
+        75,
+        75
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 0.652
+    },
+    {
+      "cache": "16 MB",
+      "cache_bytes": 16777216,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        75,
+        75,
+        75
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 2.338
+    },
+    {
+      "cache": "8 MB",
+      "cache_bytes": 8388608,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        64,
+        65,
+        65
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9747,
+        0.9747,
+        0.9787
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        68,
+        60,
+        64
+      ],
+      "p50_ms": 2.726
+    },
+    {
+      "cache": "8 MB",
+      "cache_bytes": 8388608,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        65,
+        65,
+        65
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.972,
+        0.972,
+        0.972
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 3.797
+    },
+    {
+      "cache": "4 MB",
+      "cache_bytes": 4194304,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        66,
+        66,
+        66
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.984,
+        0.984,
+        0.984
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 2.709
+    },
+    {
+      "cache": "4 MB",
+      "cache_bytes": 4194304,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        67,
+        67,
+        67
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9827,
+        0.9827,
+        0.9827
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 4.142
+    },
+    {
+      "cache": "2 MB",
+      "cache_bytes": 2097152,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        57,
+        58,
+        57
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9547,
+        0.9613,
+        0.9627
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        59,
+        53,
+        55
+      ],
+      "p50_ms": 2.483
+    },
+    {
+      "cache": "2 MB",
+      "cache_bytes": 2097152,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        57,
+        59,
+        57
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9547,
+        0.9653,
+        0.956
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        55,
+        53,
+        52
+      ],
+      "p50_ms": 2.592
+    },
+    {
+      "cache": "1 MB",
+      "cache_bytes": 1048576,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        58,
+        58,
+        58
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9667,
+        0.9667,
+        0.9667
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 2.526
+    },
+    {
+      "cache": "1 MB",
+      "cache_bytes": 1048576,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        58,
+        58,
+        59
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        0.9667,
+        0.9667,
+        0.9613
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        64,
+        64
+      ],
+      "p50_ms": 2.608
+    },
+    {
+      "cache": "as configured, again",
+      "cache_bytes": 536870912,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        75,
+        75,
+        75
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 1.019
+    },
+    {
+      "cache": "as configured, again",
+      "cache_bytes": 536870912,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        75,
+        75,
+        75
+      ],
+      "article_recall": [
+        74,
+        74,
+        74
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        75,
+        75,
+        75
+      ],
+      "p50_ms": 2.58
+    }
+  ],
+  "ingest_meta": {
+    "analyze_seconds": "0.010",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
+    "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
+    "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "1316",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 14.7,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.16",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  }
+}

@@ -39,7 +39,7 @@ scripts/fetch_page_meta.py Revision id, edit date and categories of each page fr
 scripts/run_experiments.py The experiment protocol -> results/
 scripts/make_charts.py     The README charts from results/*.json -> docs/img/
 scripts/compare_separate_index.py  MariaDB against an in-process copy of the vectors -> results/
-scripts/measure_index_behaviour.py  Statement forms, join order, builds, isolation -> results/
+scripts/measure_index_behaviour.py  Statement forms, join order, builds, cache, isolation -> results/
 scripts/make_env.py        .env with generated passwords (run by `make setup`)
 sql/schema.sql             DDL, the single source of truth; db.apply_schema() executes it
 sql/examples.sql           Ten worked statements for the mariadb client
@@ -729,7 +729,7 @@ Decisions (the owner had left them open):
   it upstream is the owner's step to take, under the owner's name.
 
 Measured after the self-grade (three graders, 36 to 37 of 40 with their own stricter reading; their
-suggestions are in the run's handoff report). `scripts/measure_index_behaviour.py`, four parts:
+suggestions are in the run's handoff report). `scripts/measure_index_behaviour.py`, five parts:
 
 - **`forms` (`results/statement_forms.md`).** One nearest-neighbour statement in three shapes.
   Bare: the HNSW search. With a predicate on `chunk` itself (`n_words`, no index on it): the server
@@ -774,6 +774,15 @@ suggestions are in the run's handoff report). `scripts/measure_index_behaviour.p
   pages, the exact ranking's number, and 74 or 75 top-10 lists equal to the exact ones. With the
   server defaults the builds found 65 to 73 gold pages. So the headline recall does not depend
   on which build a reader gets, and `ef_search` 100 is part of the reason.
+- **`cache` (`results/cache_size.md`, `_run1.md`).** The documents said that the size of the index
+  cache does not change the results. That was measured at 16 MB against 512 MB, where the graph
+  fits. With `mhnsw_max_cache_size` at 8, 4, 2 and 1 MB for the 13.0 MB graph, the hit lists were
+  the exact ones for 57 to 67 of 75 claims instead of 75, for the bare statement and for the joined
+  one, the index query took roughly three to five times as long, and two passes no longer agreed.
+  Article recall@10 stayed at 74. So "a join makes the ranking exact" needs the graph to fit in
+  the cache, and the 16 MB default fits little more than this corpus. The README, the compose
+  file's comment and `docs/EVALUATION.md` say so now. The variable is set for the whole server
+  during the run and put back; two runs gave the same picture.
 - `tests/test_search.py` now pins five of the eight rows of the table "Checked against the
   documentation" in `docs/VECTOR_INDEX.md` (the generic `VEC_DISTANCE`, another distance function,
   `DESC`, no `LIMIT`, an expression in ascending order, a threshold next to `ORDER BY ... LIMIT`,

@@ -3,8 +3,10 @@
 Run on 2026-11-11 on the author's laptop (i9-13900H, Ubuntu 26.04.1, Docker 29.1.3, Docker Compose
 2.40.3, the system's Python 3.14.4; the GPU was not used). The repository was cloned from GitHub
 into an empty directory, at commit 832d51e of the branch `fable-review-2026-11-11`, which `main`
-was fast-forwarded to afterwards. The commits after it change documentation only: this record,
-the README lines copied from it, and wording in the README and in `docs/`:
+was fast-forwarded to afterwards. The commits after it change no code that the commands below
+run: they add this record, wording in the README and in `docs/`, a comment in
+`docker-compose.yml`, and one more measurement (`results/cache_size.md`, a part of
+`scripts/measure_index_behaviour.py` and two tests, which is why the suite has 406 tests now):
 
 ```
 git clone --branch fable-review-2026-11-11 https://github.com/ylli-00/WikiLens.git WikiLens

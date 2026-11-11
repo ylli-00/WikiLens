@@ -40,6 +40,9 @@ Goal: retrieval over Wikipedia inside MariaDB. Chunk articles, embed the chunks,
       trials, three runs). Not reported to MariaDB: that is the owner's step.
     - Twenty builds of the graph at the chosen settings all find 74 of 75 gold pages
       (`results/build_variance.md`).
+    - The graph must fit in `mhnsw_max_cache_size` (16 MB by default, 512 MB in our compose
+      file): with 8 MB or less for the 13.0 MB graph the lists were exact for only 57 to 67 of 75
+      claims, joined or not, and the search was slower (`results/cache_size.md`).
     - Corrected: "a derived table without DISTINCT loses the index" was wrong. The merged plan
       keeps the index; the DISTINCT prevents a chunk coming back once per link row.
     - When a timing is compared, time each statement alone and taking turns: alternating with a
@@ -222,7 +225,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - `scripts/make_charts.py` - the README charts (`docs/img/*.svg`) from `results/*.json`
 - `scripts/make_env.py` - writes `.env` with two generated passwords on the first `make setup`
 - `scripts/compare_separate_index.py` - MariaDB against an in-process copy of the vectors (`results/separate_index.md`); hnswlib is optional and must stay out of every requirements and lock file
-- `scripts/measure_index_behaviour.py` - four measured behaviours of the vector index: `forms` (`results/statement_forms.md`), `join_order` (`results/join_order.md`), `builds` (`results/build_variance.md`) and `isolation` (`results/isolation.md`); the last two use scratch tables in the test database: never run them next to pytest
+- `scripts/measure_index_behaviour.py` - five measured behaviours of the vector index: `forms` (`results/statement_forms.md`), `join_order` (`results/join_order.md`), `builds` (`results/build_variance.md`), `cache` (`results/cache_size.md`) and `isolation` (`results/isolation.md`); `builds` and `isolation` use scratch tables in the test database and `cache` changes `mhnsw_max_cache_size` for the whole server while it runs: never run them next to pytest or another measurement
 - `data/corpus/NOTICE.md` - licence and attribution of the committed Wikipedia text and FEVEROUS claims (CC BY-SA 3.0)
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
 

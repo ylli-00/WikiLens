@@ -192,7 +192,8 @@ wrong-dimension vector.
 - Every build of the HNSW graph is a different approximation: two `M=6` builds of the same vectors
   (120-word chunks) agreed on 12 of 75 hit lists. "The same vectors, built twenty times" below
   measures the spread on the final settings. Within one server process the results are
-  deterministic, and the cache size does not change them (75 of 75 identical at 16 MB and 512 MB). A
+  deterministic, and the cache size does not change them while the graph fits in it (75 of 75
+  identical at 16 MB and 512 MB; "The index cache below the size of the graph" has the other case). A
   container restart (`docker restart`) changed 1 of 75 hit lists on the `M=6` index and none on
   `M=16` at `ef_search=100`, without changing recall.
 
@@ -358,6 +359,51 @@ builds inside a run):
 - The scratch table is filled in one transaction, in `chunk_id` order. We did not test whether
   the way a table is filled (batch size, commits between batches) changes the graph's quality.
 
+## The index cache below the size of the graph
+
+`mhnsw_max_cache_size` limits the memory one vector index uses for its graph: 16 MB by default,
+512 MB in our Docker configuration. The protocol had compared 512 MB with 16 MB and found no
+difference (`results/SUMMARY.md`, section 1), and we wrote that the size does not change the
+results. That holds only while the graph fits. The graph of the 4,598 chunks is 13.0 MB on disk
+(`results/scale.md`), and the `cache` part of `scripts/measure_index_behaviour.py` goes below it:
+it sets the variable with `SET GLOBAL`, reopens the table with `FLUSH TABLES chunk`, and searches
+the 75 claims three times with the bare statement and with the joined one (k=10, `ef_search` 100).
+It was run twice ([results/cache_size.md](../results/cache_size.md),
+[results/cache_size_run1.md](../results/cache_size_run1.md)); each cell is the smallest to the
+largest value over both runs:
+
+| `mhnsw_max_cache_size` | Bare: equal to exact, of 75 | Joined: equal to exact, of 75 | Two passes agree, of 75 (bare; joined) | Bare p50 ms | Joined p50 ms |
+|---|---|---|---|---|---|
+| 512 MB (as configured) | 75 | 75 | 75; 75 | 0.65 to 0.77 | 2.25 |
+| 16 MB | 75 | 75 | 75; 75 | 0.59 to 0.65 | 2.16 to 2.34 |
+| 8 MB | 64 to 66 | 65 to 67 | 60 to 75; 75 | 2.73 to 2.98 | 3.80 to 4.18 |
+| 4 MB | 64 to 66 | 65 to 67 | 67 to 75; 75 | 2.70 to 2.71 | 3.02 to 4.14 |
+| 2 MB | 57 to 58 | 57 to 59 | 53 to 75; 52 to 75 | 2.48 to 2.53 | 2.59 to 2.65 |
+| 1 MB | 57 to 58 | 57 to 59 | 53 to 75; 52 to 75 | 2.53 | 2.61 to 2.64 |
+| 1 MB, set without reopening the table | 57 to 58 | 57 to 59 | 53 to 75; 52 to 75 | 2.15 to 2.19 | 2.24 to 2.26 |
+| 512 MB again, after the run | 75 | 75 | 75; 75 | 1.02 to 1.07 | 2.58 to 2.63 |
+
+- **At 512 MB and at the 16 MB default every list is the exact one**, for both statements, in
+  every pass of both runs.
+- **At 8 MB and below the lists are no longer exact**: 57 to 66 of 75 claims for the bare
+  statement and 57 to 67 for the joined one. So "a join makes the ranking exact" holds
+  only while the graph fits in the cache.
+- The gold page is still found: article recall@10 stayed at 74 of 75 in every row, and the lists
+  kept 0.955 to 0.984 of the exact top 10. No answer was short.
+- **The search gets slower**: the bare statement takes 2.15 to 2.98 ms instead of
+  0.59 to 0.77, the joined one 2.24 to 4.18 instead of 2.16 to 2.34.
+- **It is no longer repeatable**: two passes over the same claims, seconds apart on the same
+  server, agreed on as few as 52 of 75 lists.
+- The setting applies at once: 1 MB without reopening the table gave the same picture as 1 MB
+  after `FLUSH TABLES`. After the run the configured value was back and the lists were exact again.
+
+What follows: by this measurement, a table whose graph is larger than the cache is searched less
+exactly, more slowly and not repeatably, and nothing says so. With the 16 MB default that is a
+table not much larger than ours: our graph is 13.0 MB, and those of the scale test are 40.0 and
+108.0 MB (they ran under 512 MB; we did not run them with a small cache). We saw no error. We
+did not read the server's log or its source, and did not measure at which size between 8 and
+16 MB the change starts.
+
 ## Isolation levels, and a reader that leaves the index stale
 
 The documentation says that "all transaction isolation levels are supported". We checked what a
@@ -483,8 +529,9 @@ lose the index; the exact ranking in every joined statement we compared,
 and the approximate, continuing search under a predicate on the indexed table itself; the
 optimizer's switch to a scan under selective range filters, and its choice of the filter's own
 index over the vector index when the join order is left free; the hit lists that change with the
-graph build (and how much, over twenty builds) and, for `M=6`, across a restart; the stale index
-after a REPEATABLE READ reader.
+graph build (and how much, over twenty builds) and, for `M=6`, across a restart; the loss of
+exactness and of repeatability when the graph does not fit in `mhnsw_max_cache_size`; the stale
+index after a REPEATABLE READ reader.
 
 Two facts about the index come from its author's description, not from our measurements
 ([MariaDB Vector: How it works, part II](https://mariadb.org/mariadb-vector-how-it-works-part-ii/)

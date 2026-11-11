@@ -102,11 +102,13 @@ what the exact ranking finds there too.
 - `scripts/compare_separate_index.py` reruns the comparison with a copy of the vectors in the
   application's memory (`results/separate_index.md`; the README section "Where this approach
   loses"). It only reads the database.
-- `scripts/measure_index_behaviour.py` reruns four measurements of the index's behaviour
+- `scripts/measure_index_behaviour.py` reruns five measurements of the index's behaviour
   ([docs/VECTOR_INDEX.md](VECTOR_INDEX.md)): `forms` (`results/statement_forms.md`) and `join_order`
   (`results/join_order.md`) read the corpus database; `builds` (`results/build_variance.md`, ten
   builds of the graph per `M`) and `isolation` (`results/isolation.md`) work on scratch tables in
-  the test database, so do not run them next to the test suite.
+  the test database, so do not run them next to the test suite; `cache`
+  (`results/cache_size.md`) changes `mhnsw_max_cache_size` for the whole server while it runs and
+  puts the configured value back, so run nothing else next to it.
 
 ## Parameters and why
 
@@ -119,4 +121,4 @@ what the exact ranking finds there too.
 | Index `M` | 16 (server default 6) | on the same vectors at `ef_search=20`: article recall@10 67/74/73 of 75 and evidence recall@20 54/64/62 of 66 for M 6/16/32, against 74 and 63 exact; at `ef_search=100` M=16 returns the exact hit list for 69 of 75 claims (M=32: 73); build 2.9 s (M=6 1.1 s, M=32 9.1 s), graph 17 MB (section 3) |
 | `mhnsw_ef_search` | 100 per query (server default 20) | on the final ingest hit lists identical to the exact ranking for 74 of 75 claims against 65 at 20, for 0.51 ms instead of 0.45 ms at k=10 (section 7) |
 | Strategy with filters | `inline`; `overfetch` when latency matters more than a full result | inline always fills `k`, at 2.05 to 3.22 ms p50 while it walks the index and 5.17 ms when the optimizer scans instead; overfetch 10 costs 0.76 to 0.78 ms but comes back short under selective filters (sections 6 and 10) |
-| Index cache | 512 MB (`--mhnsw-max-cache-size`) | capacity only: the size changed no hit list; the graph of the 120-word ingest is 16 MB with `M=6` and 17 MB with `M=16`, at or above the default limit |
+| Index cache | 512 MB (`--mhnsw-max-cache-size`) | the graph must fit: at 16 MB and at 512 MB the hit lists are the same and exact, but with 8 MB or less for the 13.0 MB graph of the final ingest they were exact for only 57 to 67 of 75 claims and the index query took roughly three to five times as long (`results/cache_size.md`); the graph of the 120-word ingest is 16 MB with `M=6` and 17 MB with `M=16`, at or above the default limit |

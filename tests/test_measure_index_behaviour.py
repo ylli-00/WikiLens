@@ -30,6 +30,7 @@ def test_every_statement_is_a_fixed_literal_with_bound_parameters(mib: Any) -> N
         mib.PROBE_FLUSH_SQL, mib.PROBE_EF_SQL, mib.LOCK_WAIT_SQL, mib.SERVER_STATE_SQL, *mib.ISOLATION_LEVELS.values(),
         mib.BUILD_DROP_SQL, mib.BUILD_INSERT_SQL, mib.BUILD_KNN_SQL, mib.CHUNK_PAGE_EXPORT_SQL,
         *mib.BUILD_CREATE_SQL.values(),
+        mib.CACHE_GET_SQL, mib.CHUNK_FLUSH_SQL, *mib.CACHE_SET_SQL.values(),
     ]
     for statement in statements:
         assert "{" not in statement and "%(" not in statement, statement
@@ -224,7 +225,44 @@ def test_the_build_tables_differ_in_m_only_and_copy_the_chunk_index(mib: Any) ->
         assert "VECTOR(384) NOT NULL" in statement
     assert mib.BUILD_CREATE_SQL[16].replace("M=16", "M=6") == mib.BUILD_CREATE_SQL[6]
     assert mib.BUILD_INSERT_SQL.count("%s") == 2 and mib.BUILD_KNN_SQL.count("%s") == 2
-    assert mib.PARTS == ("forms", "join_order", "builds", "isolation")
+    assert mib.PARTS == ("forms", "join_order", "builds", "cache", "isolation")
+
+
+def test_the_cache_statements_set_whole_megabytes_from_the_default_down(mib: Any) -> None:
+    assert mib.CACHE_SIZES_MB == (16, 8, 4, 2, 1)
+    assert mib.CACHE_SET_SQL[16] == "SET GLOBAL mhnsw_max_cache_size = 16777216"  # the default
+    assert mib.CACHE_SET_SQL[1] == "SET GLOBAL mhnsw_max_cache_size = 1048576"  # the minimum
+    for size, statement in mib.CACHE_SET_SQL.items():
+        assert statement.endswith(f" = {size * 1024 * 1024}")
+    assert mib.CHUNK_FLUSH_SQL == "FLUSH TABLES chunk"
+
+
+def test_the_cache_report_shows_every_pass_and_the_restored_size(mib: Any) -> None:
+    def row(cache: str, megabytes: float, statement: str, equal: list[int], agree: list[int],
+            ms: float) -> dict[str, Any]:
+        return {"cache": cache, "cache_bytes": int(megabytes * 1048576), "table_reopened": True,
+                "statement": statement, "equal_to_exact": equal, "article_recall": [74, 74, 74],
+                "overlap_with_exact": [0.9551, 0.9634, 0.96], "short": [0, 0, 0],
+                "identical_between_two_passes": agree, "p50_ms": ms}
+
+    report = {
+        "name": "cache_size", "created_at": "2026-11-11T00:00:00+00:00", "k": 10, "passes": 3,
+        "ef_search": 100, "n_queries": 75, "n_chunks": 4598, "index_m": 16,
+        "configured_cache_bytes": 536870912, "restored_cache_bytes": 536870912,
+        "exact_article_recall": 74, "versions": {"mariadb": "11.8.9"},
+        "results": [
+            row("as configured", 512, "bare", [75, 75, 75], [75, 75, 75], 0.77),
+            row("1 MB", 1, "joined", [57, 59, 57], [55, 53, 52], 2.64),
+            row("as configured, again", 512, "joined", [75, 75, 75], [75, 75, 75], 2.63),
+        ],
+    }
+    text = mib.cache_markdown(report)
+    assert text.startswith("# The index cache at, above and below the size of the graph")
+    assert "was 536,870,912 bytes (512 MB) when the run began and is 536,870,912 bytes again" in text
+    assert "| 512 MB (as configured) | bare | [75, 75, 75] | 74 | 0.955 to 0.963 | 0 | [75, 75, 75] | 0.77 |" in text
+    assert "| 1 MB | joined | [57, 59, 57] | 74 | 0.955 to 0.963 | 0 | [55, 53, 52] | 2.64 |" in text
+    assert "| 512 MB (as configured, after the run) | joined | [75, 75, 75] |" in text
+    assert "SET GLOBAL mhnsw_max_cache_size = 8388608;" in text and "FLUSH TABLES chunk;" in text
 
 
 def test_the_spread_and_the_agreement_between_builds(mib: Any) -> None:

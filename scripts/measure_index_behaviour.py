@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Four behaviours of MariaDB's vector index that its documentation does not describe, measured.
+"""Five behaviours of MariaDB's vector index that its documentation does not describe, measured.
 
 ``forms``
     One nearest-neighbour statement in three shapes, on the ingested corpus (read only): the
@@ -28,6 +28,13 @@
     spread of article recall, of the agreement with NumPy's exact ranking, and of the agreement
     between two builds. Writes ``results/build_variance.json`` and ``.md``.
 
+``cache``
+    The same searches with ``mhnsw_max_cache_size`` at the configured value, at the server
+    default of 16 MB and below the size of the graph (8, 4, 2 and 1 MB), for the bare statement
+    and the joined one, against NumPy's exact ranking. Changes a global server variable as
+    root through ``docker exec`` and puts the configured value back at the end; reads the
+    corpus only. Writes ``results/cache_size.json`` and ``.md``.
+
 ``isolation``
     What a vector search sees while another connection inserts or deletes near neighbours,
     under each transaction isolation level, and one sequence after which the index gives stale
@@ -40,13 +47,15 @@
 
 Usage (from the project root, with the database up and the corpus ingested):
 
-    python scripts/measure_index_behaviour.py            # all four
+    python scripts/measure_index_behaviour.py            # all five
     python scripts/measure_index_behaviour.py forms
     python scripts/measure_index_behaviour.py join_order
     python scripts/measure_index_behaviour.py builds
+    python scripts/measure_index_behaviour.py cache
     python scripts/measure_index_behaviour.py isolation
 
-Do not run it while the test suite runs: ``builds`` and ``isolation`` use the test database.
+Do not run it while the test suite or another measurement runs: ``builds`` and ``isolation``
+use the test database, and ``cache`` changes a server-wide setting for its duration.
 """
 
 from __future__ import annotations
@@ -104,7 +113,20 @@ DISTANCE_COLUMN = 6
 #: Two medians that differ by less than this factor are reported as the same time. Two runs of
 #: one statement on this laptop differed by up to 1.24, and two forms with the same plan by 1.10.
 NOISE_FACTOR = 1.5
-PARTS: tuple[str, ...] = ("forms", "join_order", "builds", "isolation")
+PARTS: tuple[str, ...] = ("forms", "join_order", "builds", "cache", "isolation")
+
+CACHE_PASSES = 3
+CACHE_EF = 100
+MEBIBYTE = 1048576
+#: Cache sizes below the configured one, in MB: the server default first, then smaller.
+CACHE_SIZES_MB: tuple[int, ...] = (16, 8, 4, 2, 1)
+#: One literal statement per size; a server variable cannot be a bound parameter here because
+#: the statement runs through the mariadb client inside the container.
+CACHE_SET_SQL: dict[int, str] = {
+    size: "SET GLOBAL mhnsw_max_cache_size = " + str(size * MEBIBYTE) for size in CACHE_SIZES_MB
+}
+CACHE_GET_SQL = "SELECT @@GLOBAL.mhnsw_max_cache_size"
+CHUNK_FLUSH_SQL = "FLUSH TABLES chunk"
 
 BUILDS = 10
 BUILD_EF: tuple[int, ...] = (20, 100)
@@ -825,6 +847,178 @@ def builds_markdown(report: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------------------------
+# cache
+# ---------------------------------------------------------------------------------------------
+
+
+def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, Any]:
+    """Search with the index cache at several sizes; return the report.
+
+    The configured ``mhnsw_max_cache_size`` is read first and restored at the end, also when a
+    step fails.
+    """
+    import run_experiments  # the route to root inside the container
+
+    try:
+        server = run_experiments.Server(settings)
+        configured = int(server.root_sql(CACHE_GET_SQL)[0][0])
+    except run_experiments.ExperimentError as exc:
+        raise SystemExit(f"the cache part needs root in the container: {exc}") from exc
+    conn = db.connect(settings)
+    try:
+        truths = evaluate.load_ground_truth(conn)
+        if not truths:
+            raise SystemExit("the claim table is empty: run 'wikilense ingest' first")
+        with conn.cursor() as cur:
+            cur.execute(CHUNK_PAGE_EXPORT_SQL)
+            rows = cur.fetchall()
+        meta = evaluate.read_ingest_meta(conn)
+        versions = evaluate.versions_info(conn)
+        index = db.vector_index_info(conn)
+    finally:
+        conn.close()
+    ids = np.asarray([int(row[0]) for row in rows], dtype=np.int64)
+    page_of = {int(row[0]): int(row[1]) for row in rows}
+    vectors = separate.unit_rows(
+        np.vstack([db.vec_from_bytes(row[2]) for row in rows]).astype(np.float64)
+    )
+    queries = separate.unit_rows(
+        np.asarray(embedder.embed_queries([t.text for t in truths]), dtype=np.float32)
+    ).astype(np.float32)
+    separate._quiet_torch()
+    everything = np.arange(ids.shape[0])
+    exact = [
+        separate.top_k(vectors, queries[i].astype(np.float64), ids, K, everything)
+        for i in range(len(truths))
+    ]
+
+    def step(label: str, cache_bytes: int, reopened: bool) -> list[dict[str, Any]]:
+        """``passes`` passes over the claims with both statements at the current cache size."""
+        found: dict[str, list[list[list[int]]]] = {"none": [], "inline": []}
+        times: dict[str, list[float]] = {"none": [], "inline": []}
+        reader = db.connect(settings)
+        try:
+            with searchmod.ef_search_session(reader, CACHE_EF):
+                for _ in range(passes):
+                    for strategy in ("none", "inline"):
+                        lists = []
+                        for query in queries:
+                            started = time.perf_counter()
+                            hits = searchmod.search(reader, query, k=K, strategy=strategy)
+                            times[strategy].append((time.perf_counter() - started) * 1000.0)
+                            lists.append([hit.chunk_id for hit in hits])
+                        found[strategy].append(lists)
+        finally:
+            reader.close()
+        out = []
+        for strategy, statement in (("none", "bare"), ("inline", "joined")):
+            per_pass = found[strategy]
+            out.append({
+                "cache": label, "cache_bytes": cache_bytes, "table_reopened": reopened,
+                "statement": statement,
+                "equal_to_exact": [
+                    sum(1 for got, want in zip(lists, exact, strict=True) if got == want)
+                    for lists in per_pass
+                ],
+                "article_recall": [
+                    sum(1 for hits, truth in zip(lists, truths, strict=True)
+                        if evaluate.article_recall_at_k([page_of[c] for c in hits],
+                                                        truth.gold_pages, K))
+                    for lists in per_pass
+                ],
+                "overlap_with_exact": [
+                    round(float(np.mean([len(set(got) & set(want)) / len(want)
+                                         for got, want in zip(lists, exact, strict=True)])), 4)
+                    for lists in per_pass
+                ],
+                "short": [sum(1 for got in lists if len(got) < K) for lists in per_pass],
+                "identical_between_two_passes": identical_between_builds(per_pass),
+                "p50_ms": round(evaluate.latency_stats(times[strategy]).p50_ms, 3),
+            })  # fmt: skip
+        return out
+
+    results: list[dict[str, Any]] = []
+    restored = None
+    try:
+        results += step("as configured", configured, reopened=False)
+        smallest = CACHE_SIZES_MB[-1]
+        server.root_sql(CACHE_SET_SQL[smallest])
+        results += step(f"{smallest} MB, table not reopened", smallest * MEBIBYTE, reopened=False)
+        for size in CACHE_SIZES_MB:
+            server.root_sql(CACHE_SET_SQL[size])
+            server.root_sql(CHUNK_FLUSH_SQL, database=settings.db_name)
+            results += step(f"{size} MB", size * MEBIBYTE, reopened=True)
+    finally:
+        server.root_sql("SET GLOBAL mhnsw_max_cache_size = " + str(int(configured)))
+        server.root_sql(CHUNK_FLUSH_SQL, database=settings.db_name)
+        restored = int(server.root_sql(CACHE_GET_SQL)[0][0])
+    results += step("as configured, again", restored, reopened=True)
+    return {
+        "name": "cache_size", "created_at": utc_now(), "k": K, "passes": passes,
+        "ef_search": CACHE_EF, "n_queries": len(truths), "n_chunks": int(ids.shape[0]),
+        "configured_cache_bytes": configured, "restored_cache_bytes": restored,
+        "exact_article_recall": sum(
+            1 for hits, truth in zip(exact, truths, strict=True)
+            if evaluate.article_recall_at_k([page_of[c] for c in hits], truth.gold_pages, K)
+        ),
+        **index, "results": results, "ingest_meta": meta,
+        "machine": evaluate.machine_info(embedder), "versions": versions,
+    }  # fmt: skip
+
+
+def cache_markdown(report: dict[str, Any]) -> str:
+    n = report["n_queries"]
+    configured = report["configured_cache_bytes"]
+
+    def size(row: dict[str, Any]) -> str:
+        megabytes = row["cache_bytes"] / MEBIBYTE
+        return f"{megabytes:g} MB" if row["cache"].startswith("as configured") else row["cache"]
+
+    lines = [
+        "# The index cache at, above and below the size of the graph",
+        "",
+        (f"Generated {report['created_at']} by `scripts/measure_index_behaviour.py cache` on "
+        f"MariaDB {report['versions']['mariadb']}: {report['n_chunks']:,} chunks, index M = "
+        f"{report['index_m']}, the {n} corpus claims, k = {report['k']}, `mhnsw_ef_search` "
+        f"{report['ef_search']}. `mhnsw_max_cache_size` was {configured:,} bytes "
+        f"({configured / MEBIBYTE:g} MB) when the run began and is {report['restored_cache_bytes']:,} "
+        "bytes again after it. Each size is set with `SET GLOBAL` as root, and, except in the "
+        "row that says otherwise, the table is reopened with `FLUSH TABLES chunk`. Then the "
+        f"claims are searched in {report['passes']} passes with the bare statement and with the "
+        "joined one, through `wikilense.search.search`, which sorts the returned rows by "
+        "distance and chunk id. \"Equal to exact\" counts, per pass, the claims whose hit list "
+        "is NumPy's exact top 10 in order. \"Two passes agree\" counts, for each pair of passes, "
+        "the claims with identical lists. The times are of the whole call."),
+        "",
+        (f"| Cache | Statement | Equal to exact, of {n}, per pass | Article recall@10, of {n} "
+        f"| Overlap with exact | Short | Two passes agree, of {n} | p50 ms |"),
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for row in report["results"]:
+        lines.append(
+            f"| {size(row)}{' (as configured)' if row['cache'] == 'as configured' else ''}"
+            f"{' (as configured, after the run)' if row['cache'] == 'as configured, again' else ''} "
+            f"| {row['statement']} | {row['equal_to_exact']} | {_span(row['article_recall'])} | "
+            f"{min(row['overlap_with_exact']):.3f} to {max(row['overlap_with_exact']):.3f} | "
+            f"{_span(row['short'])} | {row['identical_between_two_passes']} | "
+            f"{row['p50_ms']:.2f} |"
+        )
+    lines += [
+        "",
+        (f"NumPy's exact ranking finds a gold page for {report['exact_article_recall']} of {n} "
+        "claims. The statements are those of strategy `none` and strategy `inline` in "
+        "`wikilense/search.py`; the settings statements are:"),
+        "",
+        "```sql",
+        *(sql + ";" for sql in CACHE_SET_SQL.values()),
+        CHUNK_FLUSH_SQL + ";",
+        "```",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------------------------
 # isolation
 # ---------------------------------------------------------------------------------------------
 
@@ -1379,7 +1573,8 @@ def isolation_markdown(report: dict[str, Any]) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("parts", nargs="*", metavar="PART",
-                        help="forms, join_order, builds, isolation or several (default: all)")
+                        help="forms, join_order, builds, cache, isolation or several "
+                             "(default: all)")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "results",
                         help="output directory (default: results/ in the repository)")
     args = parser.parse_args(argv)
@@ -1406,6 +1601,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             report = measure_builds(settings, make_embedder(settings), BUILDS)
             text = builds_markdown(report)
+        elif part == "cache":
+            from wikilense.cli import make_embedder
+
+            report = measure_cache(settings, make_embedder(settings), CACHE_PASSES)
+            text = cache_markdown(report)
         else:
             report = measure_isolation(settings, ISOLATION_TRIALS, ISOLATION_CONTROL_TRIALS)
             text = isolation_markdown(report)

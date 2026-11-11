@@ -29,12 +29,11 @@ make setup
 1 hit; model load 3691 ms, embedding 15.2 ms, SQL 5.7 ms (BAAI/bge-small-en-v1.5 on cpu, strategy inline, ef_search 100)
 ```
 
-- That is the whole path. The output is copied from a run in a fresh clone, on a laptop whose GPU
-  was not used ([results/fresh_clone_run.md](results/fresh_clone_run.md)).
-- `make setup` needs Docker, Python 3.10 or newer and `make`. It starts MariaDB 11.8 in a container,
-  builds a virtual environment and loads the 100 Wikipedia pages committed here
-  ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited. That run used `make setup CPU=1`,
-  without the GPU packages, and took 4 minutes 45 seconds.
+- That is the whole path. `make setup` needs Docker, Python 3.10 or newer and `make`. It starts
+  MariaDB 11.8 in a container, builds a virtual environment and loads the 100 Wikipedia pages
+  committed here ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited.
+- The output is from a run in a fresh clone ([the record](results/fresh_clone_run.md)). That run
+  used `make setup CPU=1`, without the GPU packages, and took 4 minutes 45 seconds.
   [Setup and platforms](#setup-and-platforms) has the details, also for a Mac.
 - Put your own question between the quotes. The first number is the cosine distance. `--k 5`
   returns more passages, `--explain` prints the SQL statement and MariaDB's plan, and `make serve`
@@ -185,7 +184,7 @@ every table and the method.
 - **Results are reproducible up to the graph build.** Twenty fresh builds at the chosen settings
   each found 74 of 75 gold pages, as the exact ranking does; with the server defaults they found 65
   to 73 ([results/build_variance.md](results/build_variance.md)). Within one server process the
-  results are deterministic, and the cache size changed none of them. A container restart changed 1
+  results are deterministic while the graph fits in the index cache. A container restart changed 1
   of 75 hit lists on `M=6` and none on `M=16`.
 
 ## What the database-native approach gave
@@ -204,10 +203,9 @@ every table and the method.
 
 ## Where this approach loses
 
-We looked for the cases where keeping the vectors in MariaDB is the worse choice. The first two are
-measured ([results/separate_index.md](results/separate_index.md); the second run in brackets). The
-rest sets MariaDB's documentation against a dedicated store's. We did not measure a dedicated
-vector store.
+We looked for the cases where MariaDB is the worse home for the vectors. The first two are measured
+([results/separate_index.md](results/separate_index.md); the second run in brackets), the rest sets
+MariaDB's documentation against a dedicated store's. We did not measure a dedicated vector store.
 
 1. **Latency, while the corpus fits in memory.** The simplest separate index is a copy of the 4,598
    vectors in the application, scanned exactly with NumPy. It returns the top 10 ids in 0.26 ms
@@ -236,8 +234,10 @@ vector store.
    ([Quantization](https://qdrant.tech/documentation/manage-data/quantization/)) and sharding across
    nodes ([Distributed deployment](https://qdrant.tech/documentation/scaling/distributed_deployment/)).
 5. **Tuning and care are on you.** The server defaults lose 6 of the 74 gold pages that the exact
-   ranking finds. The lower recall over uncommitted rows and the stale index after an old
-   REPEATABLE READ reader are not in the documentation we read.
+   ranking finds. The index cache (16 MB by default) must hold the graph: with 8 MB for our 13 MB
+   graph, the lists were exact for 64 to 67 of 75 claims instead of 75, joined or not
+   ([results/cache_size.md](results/cache_size.md)). The lower recall over uncommitted rows and the
+   stale index are not in the documentation we read.
 
 ## Setup and platforms
 
@@ -253,7 +253,7 @@ The ingest ends with a report to compare against this one:
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (404 tests, about 20 s), `make eval` (the headline table, about 15 s),
+Then `make test` (406 tests, about 20 s), `make eval` (the headline table, about 15 s),
 `make serve`, `make examples` (the ten examples of `sql/examples.sql`, no Python needed),
 `make experiments` (the whole protocol, about 10 minutes with a GPU) and `make down`.
 
@@ -318,7 +318,7 @@ To reproduce: `make eval` after `make setup` gives the headline table up to the 
 JSON and Markdown. [docs/](docs/) has EXAMPLES, SETUP, DATA, VECTOR_INDEX, EVALUATION, DESIGN (every
 decision) and ARCHITECTURE (a beginner's guide to the code). [analysis/](analysis/) is the earlier
 FEVEROUS analysis that chose the benchmark, and [CLAUDE.md](CLAUDE.md) the working notes for the
-coding assistant. [tests/](tests/) holds 404 tests, and [CI](.github/workflows/ci.yml) runs ruff
+coding assistant. [tests/](tests/) holds 406 tests, and [CI](.github/workflows/ci.yml) runs ruff
 and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
