@@ -7,8 +7,16 @@ the queries; their gold evidence is the ground truth for recall.
 
 This file is the contract between modules. Values marked *provisional* were working choices of
 phases 1 and 2, made so that coding did not stall. The experiments of phase 3
-(`scripts/run_experiments.py`, numbers in `results/SUMMARY.md`) fixed them; the section "Phase 3
-outcomes and chosen defaults" at the end says what was chosen and why, and the README repeats it.
+(`scripts/run_experiments.py`) fixed them; the section "Phase 3 outcomes and chosen defaults"
+says what was chosen and why, and the sections after it record what was measured and changed
+later.
+
+How to read the numbers: the sections headed "Phase 1 outcomes", "Phase 2 outcomes" and "Phase 3
+outcomes" are records of their day. Their numbers were measured on the ingest of that day (before
+the hatnote rule, so with 8,868 and not 8,658 chunks of 120 words), and the result files they name
+have been regenerated since, so those files no longer hold them. The current numbers are in
+`results/SUMMARY.md`, which `scripts/run_experiments.py summary` rebuilds from the JSON files, and
+the README and `docs/EVALUATION.md` quote only those.
 
 ## Repository layout
 
@@ -27,13 +35,24 @@ wikilense/                 Python package
   web.py                   Minimal FastAPI query page
 scripts/build_corpus.py    Select pages and claims from a shard -> data/corpus/
 scripts/fetch_wiki_shard.py  Download one Wikipedia shard (existing)
+scripts/fetch_page_meta.py Revision id, edit date and categories of each page from the MediaWiki API
+scripts/run_experiments.py The experiment protocol -> results/
+scripts/make_charts.py     The README charts from results/*.json -> docs/img/
+scripts/compare_separate_index.py  MariaDB against an in-process copy of the vectors -> results/
+scripts/make_env.py        .env with generated passwords (run by `make setup`)
 sql/schema.sql             DDL, the single source of truth; db.apply_schema() executes it
-data/corpus/               pages.jsonl, claims.jsonl, MANIFEST.md (committed, a few MB)
+sql/examples.sql           Ten worked statements for the mariadb client
+sql/docker-init/           Creates the test database when the data volume is first initialised
+data/corpus/               pages.jsonl, claims.jsonl, page_meta.jsonl, MANIFEST.md, PAGE_META.md,
+                           NOTICE.md (committed, a few MB)
 data/feverous/             raw downloads (not committed)
 tests/                     pytest; markers `db` (needs MariaDB) and `slow` (needs the model)
 results/                   harness outputs (committed)
+analysis/feverous/         The FEVEROUS analysis that chose the benchmark (earlier phase)
 docs/DESIGN.md             this file
 docs/ARCHITECTURE.md       beginner's guide: pipeline, every file, one query end to end
+docs/EXAMPLES.md, SETUP.md, DATA.md, VECTOR_INDEX.md, EVALUATION.md  the README's reference pages
+docs/img/                  charts and the screenshot of the web page
 ```
 
 Rules for all code: Python 3.10+, standard library where it is enough, type hints, docstrings that
@@ -86,9 +105,10 @@ limitation).
 
 - `chunk_units(units, max_words, overlap_units=1)` is a pure function over one page's text
   units; ingest passes `Settings.chunk_max_words` and `Settings.chunk_overlap_units`. Chosen with
-  the experiments: `max_words` 240 (120 in phases 1 and 2; equal recall at equal retrieved text
-  with half the vectors, `results/SUMMARY.md` section 4 and Phase 3 below) and `overlap_units` 1
-  (kept, not swept). A chunk never crosses a section boundary.
+  the experiments: `max_words` 240 (120 in phases 1 and 2; at equal retrieved text the same
+  article recall and an evidence recall within 3 claims of the 60- and 120-word chunks, with half
+  the vectors, `results/SUMMARY.md` section 4 and Phase 3 below) and `overlap_units` 1 (kept, not
+  swept). A chunk never crosses a section boundary.
 - Only *chunkable* units take part (`TextUnit.chunkable`): a unit that is empty after cleaning, or
   a hatnote (`wikitext.HATNOTE_RE`: "Main article: X", "See also: Y", "For other uses, see Z",
   ...), is in no chunk and in no `chunk_sentence` row, but stays a `sentence` row so evidence ids
@@ -146,14 +166,16 @@ ingest; a mismatch is an error with a clear message.
 
 `config.Settings` (from environment, `.env` loaded with python-dotenv): `WIKILENSE_DB_HOST`,
 `WIKILENSE_DB_PORT`, `WIKILENSE_DB_USER`, `WIKILENSE_DB_PASSWORD`, `WIKILENSE_DB_NAME`,
-`WIKILENSE_EMBEDDING_MODEL` (default above), `WIKILENSE_CHUNK_MAX_WORDS` (240; 120 until
-2026-09-17), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_VECTOR_DIM` (384) and
+`WIKILENSE_EMBEDDING_MODEL` (default above), `WIKILENSE_CHUNK_MAX_WORDS` (240; decided on
+2026-09-17, in the code since 2026-09-22, 120 before), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1),
+`WIKILENSE_VECTOR_DIM` (384) and
 `WIKILENSE_EF_SEARCH` (100, `Settings.ef_search`: the `mhnsw_ef_search` value the application
 passes per query, 1 to 10000; 0 keeps the server's session value, whose default stays 20;
 anything else is a `SettingsError` when the settings load), and `WIKILENSE_TEST_DB_NAME`
 (default the database name plus `_test`; the test suite resets that database's schema, so
 `tests/conftest.py` refuses a name that equals the main database or does not end in `_test`). The
-index `M` (16; 6 until 2026-09-17) is written literally in `sql/schema.sql` and named
+index `M` (16; decided on 2026-09-17, in the schema since 2026-09-22, 6 before) is written
+literally in `sql/schema.sql` and named
 `db.VECTOR_INDEX_M` in the code; it is not a setting (`WIKILENSE_INDEX_M` existed until
 2026-09-23 but only changed what `ingest_meta` recorded, never the index).
 
@@ -367,7 +389,10 @@ distance, the chunk text and the SQL that ran; no JavaScript framework, no exter
 2026-10-22 a link with the form's parameters (`/?q=...&category=...`) fills the form and runs
 the search (the README's screenshot, `docs/img/web_page.png`).
 
-## Phase 2 outcomes (measured 2026-09-18, 199 tests green, commit b517a67)
+## Phase 2 outcomes (measured 2026-09-17, 199 tests green, commit b517a67)
+
+A record of that day (see "How to read the numbers" at the top): the numbers below, and the result
+files named for them, are those of the phase-2 ingest and have been superseded.
 
 - **Ingest** of the 100-page corpus: 3,173 sections, 33,637 sentence rows (372 empty), 8,868
   chunks (per page min/median/max 2 / 85 / 232), 39,155 chunk-sentence rows, 40,542 links of
@@ -435,14 +460,17 @@ the search (the README's screenshot, `docs/img/web_page.png`).
 
 ## Phase 3 outcomes and chosen defaults (2026-09-17)
 
-The experiment protocol is `scripts/run_experiments.py` (groups `stability`, `ef_search`,
-`index_m`, `chunk_size`, `prefix`, `filters`, `restore`, `summary`; `all` runs them in that order
-and `summary` rebuilds `results/SUMMARY.md` from the JSON files). Every number below is in
-`results/SUMMARY.md` or in the per-run file it names, measured on the 100-page corpus (75 claims,
-66 with a sentence-only evidence set) as ingested in phase 2 (8,868 chunks of at most 120 words,
-prefix on, M=6) unless the bullet says otherwise. The chosen defaults are in the code
-(`sql/schema.sql`, `wikilense/config.py`, `.env.example`) and apply to the next `wikilense
-ingest`; until then the main database holds the phase-2 ingest.
+The experiment protocol is `scripts/run_experiments.py`. Its groups were `stability`,
+`ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `restore` and `summary` then; today
+they are `stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`,
+`restore`, `uncommitted`, `planner`, `scale` and `summary` (`all` runs them in that order without
+`scale`, and `summary` rebuilds `results/SUMMARY.md` from the JSON files). Every number below was
+in `results/SUMMARY.md` or in the per-run file it names when this section was written, measured
+on the 100-page corpus (75 claims, 66 with a sentence-only evidence set) as ingested in phase 2
+(8,868 chunks of at most 120 words, prefix on, M=6) unless the bullet says otherwise; the files
+have been regenerated since and hold today's values. The chosen defaults are in the code
+(`sql/schema.sql`, `wikilense/config.py`, `.env.example`) and are what the main database has held
+since the rerun of 2026-09-22.
 
 - **Index `M` = 16** (`sql/schema.sql`; was 6). Rebuilt with `ALTER TABLE chunk DROP INDEX ...,
   ADD VECTOR INDEX ... M=16 DISTANCE=cosine`: at ef_search 20 the M=16 graph returns the exact
@@ -473,8 +501,9 @@ ingest`; until then the main database holds the phase-2 ingest.
   compare two different M=6 graphs. The exact ranking (the inline statement, which does not depend
   on the graph) settles it: with and without the prefix article recall@10 is 74/75; evidence
   recall@10 is 54/66 with the prefix and 55/66 without, @20 63/66 with and 59/66 without
-  (`results/inline_ef_20.md`, `results/noprefix_inline_ef_20.md`). No gain from removing it, so the
-  prefix stays.
+  (then `results/inline_ef_20.md` and `results/noprefix_inline_ef_20.md`; today the pair is
+  `results/prefix_on_inline.md` and `results/prefix_off_inline.md`, with 63/66 and 61/66 at k=20).
+  No gain from removing it, so the prefix stays.
 - **Filtered queries: strategy `inline`** (the default of `search()`), `overfetch` as the
   low-latency option. Inline always fills `k`: under `heading LIKE '%History%'` (268 of 8,868
   chunks pass) 0 of 75 queries came back short at k=10, against 66 with overfetch 10 and 23 with
@@ -499,21 +528,23 @@ ingest`; until then the main database holds the phase-2 ingest.
 
 After the review fixes (hatnote units out of chunks, `ANALYZE TABLE` after ingest, the `rrf`
 strategy, the chosen defaults) the whole protocol was rerun with `scripts/run_experiments.py all`
-on 2026-09-22; every file in `results/` comes from that run, and `results/SUMMARY.md` is the
-reference for every number in the README. Section 7 there is the final configuration (240-word
-chunks, overlap 1, M=16, prefix on, 4,598 chunks, 1,316 hatnote units excluded): article
-recall@1/5/10/20 63/74/74/74 of 75, evidence recall@1/5/10/20 39/55/60/65 of 66, SQL p50/p95 at
-k=10 0.90/1.41 ms, query embedding 4.7 ms; hit lists identical to the exact ranking for 74/75
-claims, and identical across a server restart for 74/75. Every number of the phase-3 section
-above was measured on the pre-hatnote ingest and is superseded by sections 1 to 7 of the summary,
-which repeat the measurements on the current code; M=16 included: at ef 20 it now gives article
-recall@10 72/75 and evidence recall@20 61/66 (section 3), not the exact ranking's 74/75 and 63/66,
-which it reaches at ef 100.
+on 2026-09-22, and again on 2026-10-22 on the code with page metadata; every file in `results/`
+now comes from the October run or later, and `results/SUMMARY.md` is the reference for every
+number in the README. Section 7 there is the final configuration (240-word chunks, overlap 1,
+M=16, prefix on, 4,598 chunks, 1,316 hatnote units excluded): article recall@1/5/10/20
+63/74/74/74 of 75 and evidence recall@1/5/10/20 39/55/60/65 of 66 in both runs. The September
+run measured SQL p50/p95 at k=10 0.90/1.41 ms, query embedding 4.7 ms, and hit lists identical
+across a server restart for 74/75 claims; the October run, which is what the files hold,
+0.51/0.94 ms, 4.58 ms and 75/75. Both gave hit lists identical to the exact ranking for 74/75
+claims. Every number of the phase-3 section above was measured on the pre-hatnote ingest and is
+superseded by sections 1 to 7 of the summary, M=16 included: at ef 20 the September run gave
+article recall@10 72/75 and evidence recall@20 61/66 and the October run 74/75 and 64/66
+(section 3), each on its own graph build; the exact ranking gives 74/75 and 63/66.
 
 ## Review pass (2026-09-23)
 
-A code review changed behaviour that later runs will see (commits after 92f1838; the committed
-`results/` predate it). The metrics at `k` now come from the `LIMIT k` query, which changes the
+A code review changed behaviour that later runs will see (commits after 92f1838; the `results/`
+committed at the time predated it). The metrics at `k` now come from the `LIMIT k` query, which changes the
 `overfetch` and `rrf` result files with a non-zero `prefix_mismatches`:
 `strategy_overfetch10_history`, `strategy_overfetch50_history`, `final_rrf` and `rrf_120_m6` need
 the experiments rerun (a read-only recomputation of `final_rrf` on the current database changes
@@ -614,8 +645,9 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
     (7.6 times for 19 times the chunks), the bare HNSW search's barely (1.5 times).
 - **Vector arithmetic checked.** On 300 random, unnormalised vectors, `VEC_DISTANCE_COSINE`
   equals NumPy's `1 - cos` for every row (within 1e-5). A scan that ignores the index returns
-  NumPy's exact top 10 in order, and the HNSW index at ef 200 finds all of them
-  (`tests/test_db.py`).
+  NumPy's exact top 10 in order. The HNSW index at ef 200 found all of them in our runs; the test
+  (`tests/test_db.py`) requires a mean overlap of at least 95%, because every graph build is
+  another approximation.
 
 ## Review pass (2026-11-11), after the organizers' evaluation
 
@@ -682,4 +714,45 @@ and rebuilds a venv whose interpreter no longer runs (the author's own venv brok
 operating system upgrade of 2026-10-26 removed Python 3.12); `make eval`'s `results/baseline.*` is
 ignored by git; one hit is printed as "1 hit"; `data/corpus/NOTICE.md` states the licence and
 attribution of the committed Wikipedia text and FEVEROUS claims.
+
+What the review of the code, the scripts and the documents found (three read-only reviewers on a
+snapshot, and our own checks). No bug that changes a recall or latency number was found.
+
+- **A wrong number in `results/`: the History filter's "article ceiling".** The filters group
+  reported that 38 of the 75 claims have a gold page that passes `heading LIKE '%History%'`. It
+  counted pages with such a heading. The filter keeps chunks, and a section whose text is all in
+  its subsections has no chunk, so only 42 of those 66 pages, and 26 claims, are reachable. The
+  pages and sentences a heading filter can reach are now read through `chunk`
+  (`PAGES_HEADING_SQL`, `SENTENCES_HEADING_SQL`), a database test pins it, and the group was
+  rerun: ceiling 26/75, `inline` reaches 25. Recall and the short-result counts did not change;
+  the latencies in `results/strategy_*` are those of 2026-11-11 (inline 3.07 ms p50 under the
+  History filter, overfetch 10 0.78 ms).
+- **Two units under one label.** The scale table printed the graph of the default ingest as
+  14 MB (bytes / 1,000,000) and the other sections as 13.0 MB (bytes / 1,048,576). Every size now
+  goes through `fmt_bytes_mb`, the binary unit that MariaDB's documentation uses for
+  `mhnsw_max_cache_size`; the scale sizes read 13.0 / 40.0 / 108.0 MB.
+- **`run_experiments.py summary` needed the database password** although it reads only
+  `results/`. It no longer loads the settings.
+- **The configuration check ignored which pages were ingested.** An interrupted `scale` group
+  could have left 20,100 pages under the default settings and passed as the default ingest. The
+  check now compares the digests of `pages.jsonl` and `claims.jsonl` too.
+- **NFC on raw JSON.** The scale group normalised a page's raw JSON text before parsing it; NFC
+  can compose the letter of an escape (`\n`) with a combining mark that follows, which breaks the
+  JSON. It now parses first. On 400 pages of the FEVEROUS database both orders gave identical
+  pages, so the published scale numbers are not affected.
+- **An error that hid an error.** `ef_search_session` restored `mhnsw_ef_search` in a `finally`.
+  After a lost connection, or a Ctrl-C while PyMySQL read the socket, the restoring `SET` raised
+  `InterfaceError(0, '')` in place of what had happened, so an interrupted `wikilense query`
+  ended with exit code 1 and "database error: (error 0)". The block's error now always wins.
+- **A malformed `page_meta.jsonl` was found after the tables were dropped.** It is read before
+  the reset now. (`pages.jsonl` and `claims.jsonl` are still read while the steps run.)
+- Left as it is, on purpose: the web API's 503 answer repeats the driver's connection error (the
+  server binds to 127.0.0.1 by default and the text is what a reader needs to fix a setup); the
+  Swagger page loads its script from a CDN (said in docs/EXAMPLES.md).
+- Checked and found right: the metric functions against a hand calculation; the number and
+  order of placeholders against the parameters for 4 strategies and 1,024 filter combinations;
+  `sql/examples.sql` through the `mariadb` client (it leaves the database byte for byte as it
+  was); every statement about MariaDB in the README against the current documentation and the
+  11.8.9 container (`docs/VECTOR_INDEX.md`, last section); no literal credential, no statement
+  built from values, no debug flag, no test without an assertion in 305 test functions.
 

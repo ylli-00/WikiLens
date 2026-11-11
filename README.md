@@ -240,7 +240,7 @@ The ingest ends with a report to compare against this one:
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (390 tests, about 20 s), `make eval` (the headline table, about 15 s),
+Then `make test` (391 tests, about 20 s), `make eval` (the headline table, about 15 s),
 `make serve`, `make experiments` (the whole protocol, about 10 minutes) and `make down`.
 
 **Without a GPU** everything works; only the embedding is slower. The ingest took 225.7 s on this
@@ -275,7 +275,7 @@ was run again twice on 2026-11-11: recall was identical and the SQL p50 at k=10 
 |---|---|---|
 | Embedding model | `BAAI/bge-small-en-v1.5`, 384 dimensions | small enough for a CPU, built for passage retrieval; no second model was measured |
 | Embedded text | `title > section path: chunk text` | the prefix raises evidence recall@20 from 61 to 63 of 66 on the exact ranking |
-| Chunk size | 240 words, overlap 1 unit, never across a section | 60-, 120- and 240-word chunks tie at equal retrieved text; 240 stores 4,598 vectors, not 8,658 or 19,065 |
+| Chunk size | 240 words, overlap 1 unit, never across a section | at equal retrieved text 60-, 120- and 240-word chunks give the same article recall and evidence recall within 3 claims (54, 57, 55 of 66); 240 stores 4,598 vectors, not 8,658 or 19,065 |
 | Index `M` | 16 (server default 6) | at `ef_search=20`, article recall@10 is 67, 74 and 73 of 75 for M 6, 16 and 32; the exact ranking gives 74 |
 | `mhnsw_ef_search` | 100 per query (server default 20) | hit lists equal the exact ranking for 74 of 75 claims against 65 at 20, for 0.51 ms instead of 0.45 ms |
 | Strategy with filters | `inline` (the joined statement) | always fills `k`; `overfetch` is faster and comes back short |
@@ -301,7 +301,7 @@ To reproduce: `make eval` after `make setup` gives the headline table up to the 
 [scripts/](scripts/) builds the corpus, fetches the page metadata and runs the experiments.
 [data/corpus/](data/corpus/) is the committed corpus and [results/](results/) every experiment as
 JSON and Markdown. [docs/](docs/) has EXAMPLES, SETUP, DATA, VECTOR_INDEX, EVALUATION, DESIGN (every
-decision) and ARCHITECTURE (a beginner's guide to the code). [tests/](tests/) holds 390 tests, and
+decision) and ARCHITECTURE (a beginner's guide to the code). [tests/](tests/) holds 391 tests, and
 [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8` service on
 every push to `main` and every pull request.
 

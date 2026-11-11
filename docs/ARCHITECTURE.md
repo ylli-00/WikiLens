@@ -4,8 +4,9 @@ A guide to the code for someone new to vector search and to MariaDB's internals.
 the data from the downloaded files to a search result and a recall number, then goes through
 every file. Two other documents go deeper: [DESIGN.md](DESIGN.md) is the contract between the
 modules and records every decision and measurement, and the [README](../README.md) presents the
-results. Numbers in this guide were measured on the committed corpus on 2026-09-23 unless a
-file under `results/` is named.
+results. The example queries in this guide were run on the committed corpus (first on
+2026-09-23, again on 2026-11-11 with the same chunk ids and distances); every other number names
+the file under `results/` it comes from.
 
 ## 1. What WikiLense does
 
@@ -121,13 +122,15 @@ for is among the first `k` hits. *Article recall* counts a claim when a gold pag
 annotators cited) is among the pages of the top-k chunks. *Evidence recall* is stricter: every
 gold sentence of at least one of the claim's evidence sets must be inside the top-k chunks, found
 through the `chunk_sentence` map. It is counted over the 66 claims whose evidence is made of
-sentences and list items (the other 9 need table cells, which are not indexed). Tonight's check
-with the defaults: article recall@10 74 of 75, evidence recall@10 60 of 66.
+sentences and list items (the other 9 need table cells, which are not indexed). With the
+defaults: article recall@10 74 of 75, evidence recall@10 60 of 66 (`results/final_ef_100.md`).
 
 **Latency p50 and p95.** *Latency* is how long a search takes. Each claim is searched 5 times, and
 the times are summarised as *p50* (the median: half the searches were faster) and *p95* (95% were
 faster; it shows the slow tail). The SQL time and the time to embed the query are reported
-separately. Tonight at k=10: SQL p50 0.47 ms, p95 0.96 ms; query embedding p50 4.52 ms on the GPU.
+separately. In the headline run at k=10: SQL p50 0.51 ms, p95 0.94 ms; query embedding p50
+4.58 ms on the GPU and about 18 ms on the CPU (`results/final_ef_100.md`,
+`results/final_ef_100_rerun_cpu1.md`).
 
 ## 4. File by file
 
@@ -345,13 +348,13 @@ Why the important choices were made:
 
 ## 7. Testing and CI
 
-There are 390 tests of three kinds, told apart by pytest markers.
+There are 391 tests of three kinds, told apart by pytest markers.
 
 - Pure tests (309) need no server and no model. They cover parsing, chunking, SQL assembly,
   metrics, argument checking, and the CLI and web page with fake databases and embedders, and
   they run in seconds anywhere, including a fresh clone without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- `db` tests (75) need MariaDB. They use only the test database (`wikilense_test`, reset before
+- `db` tests (76) need MariaDB. They use only the test database (`wikilense_test`, reset before
   each test) and are skipped with the reason when the server does not answer:
   `.venv/bin/python -m pytest -m db`.
 - `slow` tests (6) load the real embedding model (downloaded on first use):
@@ -368,8 +371,9 @@ give a green run.
 
 ## 8. How this scores with MariaDB, and what is left to do
 
-The brief scores four criteria from 0 to 10. A grader agent using the brief's own prompt gave the
-repository 36 of 40 on 2026-09-22, with no blocking issue.
+The brief scores four criteria from 0 to 10. The organizers ran the brief's evaluation prompt on
+27 October 2026 and gave 39 of 40: documentation 10, MariaDB depth 10, execution 9, usability 10.
+(Our own grader agents with the same prompt had given 36 of 40 on 2026-09-22.)
 
 | Criterion or item of area 4 | Where the project covers it |
 |---|---|
@@ -378,9 +382,9 @@ repository 36 of 40 on 2026-09-22, with no blocking issue.
 | Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability, which filters keep the vector index, the search over uncommitted rows), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
 | Recall and latency against a ground truth you built (execution) | `evaluate.py`, `claim` / `claim_evidence`, `results/SUMMARY.md` |
 | Chunk size, model and index parameters with reasons (execution) | DESIGN.md "Phase 3 outcomes", README "Parameters and why", the comments in `sql/schema.sql` and `config.py` |
-| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 390 tests, parameters only in SQL, CI |
-| An ingest that runs from the README and a query interface (usability) | `make setup`, `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql` |
-| What the database-native approach gave (documentation) | README "What the database-native approach gave" |
+| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 391 tests, parameters only in SQL, CI |
+| An ingest that runs from the README and a query interface (usability) | the README's first screen (`make setup`, one query, its output), `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql`, `docs/EXAMPLES.md` |
+| What the database-native approach gave (documentation) | README "What the database-native approach gave" and "Where this approach loses" (`results/separate_index.md`) |
 
 The five named deductions do not apply today: no credentials in the code (`.env` is ignored; CI
 uses throwaway passwords for its own container); no SQL built from values (values are `%s`
@@ -388,18 +392,23 @@ parameters, and the only text put into statements is fixed literals or names fro
 no debug mode (uvicorn runs without reload or debug); no empty test files; the schema and the code
 agree (checked by a test without a server, and against the live database).
 
-What remains for a top score, from the rubric and the grader's remaining suggestions:
+What the evaluators asked for on 27 October, and what was done (2026-11-11):
 
-- [ ] Choose the benchmark claims (the 75 claims are a development set).
-- [ ] Scale the corpus beyond 100 pages.
-- [x] Rerun `make experiments` on the current code (done 2026-10-22; the four result files
-  computed before the metrics moved to the `LIMIT k` query were regenerated). Rerun again on the
-  final claim set and corpus.
-- [x] Measure query cost against table size (`results/scale.md`, 2026-10-22: up to 89,650 chunks,
-  the joined statement 2.5 to 19 ms, the HNSW search 0.8 to 1.2 ms).
-- [ ] Possibly compare a second embedding model.
-- [x] Add charts and a screenshot of the web page (`docs/img/`, 2026-10-22).
-- [ ] Rewrite the README with the final results.
+- [x] A short path for a reader who only wants to type one question: the README's first screen,
+  and a README of about 310 lines with the reference material in `docs/`.
+- [x] Where the approach is worse than a separate vector store: measured against an in-process
+  copy of the vectors (`scripts/compare_separate_index.py`) and set against the documentation of
+  a dedicated store. No dedicated vector store was measured.
+- [x] `make setup CPU=1` on macOS: the lock file resolves there now. Checked by resolution; not
+  run on a Mac.
+
+What is still open:
+
+- [ ] Run the setup on a Mac and on Windows.
+- [ ] Measure a dedicated vector store, and the copy of the vectors at 89,650 chunks.
+- [ ] Claims that cite several pages, and a larger committed corpus (the scale test adds
+  distractor pages, not claims). The 75 claims and the settings are fixed for this submission.
+- [ ] A second embedding model; tables and captions as chunks; the LLM fact-checker comparison.
 
 ## 9. Command cheat sheet
 
@@ -442,6 +451,7 @@ make experiments
 .venv/bin/python scripts/run_experiments.py uncommitted planner   # ~40 s
 WIKILENSE_FEVEROUS_DB=/path/to/feverous_wikiv1.db .venv/bin/python scripts/run_experiments.py scale   # ~9 min
 .venv/bin/python scripts/make_charts.py              # redraw docs/img/*.svg from results/
+.venv/bin/python scripts/compare_separate_index.py   # MariaDB against an in-process copy (read only)
 
 # page metadata (only to refetch it; the file is committed)
 .venv/bin/python scripts/fetch_page_meta.py          # ~300 polite API requests, a few minutes

@@ -356,3 +356,64 @@ def test_scale_rows_and_markdown(rexp: Any) -> None:
     assert "| 100 | 4,598 | 13.0 MB |" in rexp.scale_markdown(data)
     # One unit for every size in results/: the binary MB of the cache-size documentation.
     assert rexp.fmt_bytes_mb(16_777_216) == "16.0 MB" and rexp.fmt_bytes_mb(None) == "not found"
+
+
+@pytest.mark.db
+def test_the_heading_filter_ceiling_counts_only_pages_with_a_chunk_under_the_heading(
+    rexp: Any, db_conn: Any
+) -> None:
+    """A "History" heading whose text is all in its subsections holds no chunk, so the filter
+    cannot return its page: the page must not count as reachable (until 2026-11-11 it did, and
+    results/ reported a ceiling of 38 of 75 claims where 26 are reachable)."""
+    import numpy as np
+
+    vector = dbmod.vec_param(np.ones(dbmod.VECTOR_DIM, dtype=np.float32))
+    page_columns = ("page_id", "title", "n_sentences", "n_items", "n_words", "n_chars",
+                    "n_sections", "n_tables", "n_lists")
+    dbmod.insert_rows(db_conn, "page", page_columns, [
+        (1, "Container", 1, 0, 50, 300, 2, 0, 0),   # History holds no text of its own
+        (2, "Direct", 1, 0, 60, 360, 1, 0, 0),      # History holds a chunk
+        (3, "Elsewhere", 1, 0, 5000, 30000, 1, 0, 0),
+    ])
+    dbmod.insert_rows(db_conn, "section", ("section_id", "page_id", "ordinal", "heading", "level", "path"), [
+        (10, 1, 1, "History", 2, "History"),
+        (11, 1, 2, "Antiquity", 3, "History > Antiquity"),
+        (20, 2, 1, "History", 2, "History"),
+        (30, 3, 1, "Geography", 2, "Geography"),
+    ])
+    dbmod.insert_rows(db_conn, "sentence", ("sentence_id", "page_id", "section_id", "element_key", "ordinal", "text"), [
+        (101, 1, 11, "sentence_0", 0, "Old times."),
+        (201, 2, 20, "sentence_0", 0, "What happened."),
+        (301, 3, 30, "sentence_0", 0, "Where it lies."),
+    ])
+    dbmod.insert_rows(db_conn, "chunk", ("chunk_id", "page_id", "section_id", "ordinal", "text", "n_words", "embedding"), [
+        (1, 1, 11, 0, "Old times.", 2, vector),
+        (2, 2, 20, 0, "What happened.", 2, vector),
+        (3, 3, 30, 0, "Where it lies.", 3, vector),
+    ])
+    dbmod.insert_rows(db_conn, "chunk_sentence", ("chunk_id", "sentence_id"), [(1, 101), (2, 201), (3, 301)])
+    dbmod.insert_rows(db_conn, "claim", ("claim_id", "split", "text", "label", "challenge"), [
+        (1001, "dev", "about Container", "SUPPORTS", "Other"),
+        (1002, "dev", "about Direct", "REFUTES", "Other"),
+        (1003, "dev", "about Elsewhere", "SUPPORTS", "Other"),
+    ])
+    evidence_columns = ("claim_id", "evidence_set", "position", "element_id", "page_title",
+                        "element_type", "page_id", "sentence_id")
+    dbmod.insert_rows(db_conn, "claim_evidence", evidence_columns, [
+        (1001, 0, 0, "Container_sentence_0", "Container", "sentence", 1, 101),
+        (1002, 0, 0, "Direct_sentence_0", "Direct", "sentence", 2, 201),
+        (1003, 0, 0, "Elsewhere_sentence_0", "Elsewhere", "sentence", 3, 301),
+    ])
+
+    truth = rexp.filter_ground_truth(db_conn)
+
+    history = truth["history"]
+    assert history["n_chunks"] == 3 and history["n_chunks_passing"] == 1
+    assert history["n_pages_passing"] == 1                      # Direct only, not Container
+    assert history["claims_gold_page_excluded_ids"] == [1001, 1003]
+    assert history["article_recall_ceiling"] == 1 and history["n_claims"] == 3
+    assert history["evidence_recall_ceiling"] == 1 and history["n_evidence_claims"] == 3
+    long_pages = truth["minwords1000"]
+    assert long_pages["n_chunks_passing"] == 1 and long_pages["n_pages_passing"] == 1
+    assert long_pages["article_recall_ceiling"] == 1 and long_pages["evidence_recall_ceiling"] == 1
+

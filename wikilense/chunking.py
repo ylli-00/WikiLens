@@ -22,8 +22,8 @@ from wikilense.wikitext import ParsedPage, TextUnit
 
 DEFAULT_MAX_WORDS = DEFAULT_CHUNK_MAX_WORDS
 """The word budget of one chunk (240, ``config.DEFAULT_CHUNK_MAX_WORDS``), chosen with
-results/SUMMARY.md: equal recall at equal retrieved text as 60 or 120 words, with half the
-vectors of 120."""
+results/SUMMARY.md section 4: at equal retrieved text the same article recall as 60 or 120 words
+and an evidence recall within 3 claims of theirs, with half the vectors of 120."""
 
 DEFAULT_OVERLAP_UNITS = DEFAULT_CHUNK_OVERLAP_UNITS
 """How many units the next chunk repeats from the end of the previous one (1,
