@@ -755,9 +755,9 @@ suggestions are in the run's handoff report). `scripts/measure_index_behaviour.p
   transaction searches, another connection commits, the first searches again in its old snapshot
   and ends. After it, index searches from new connections missed the committed rows in 10 of
   10 trials (and returned no row at all after a `DELETE`), until the next committed write or
-  `FLUSH TABLES`. Six controls of 5 trials stayed clean when one thing was changed: the reader at
+  `FLUSH TABLES`. Five controls of 5 trials stayed clean when one thing was changed: the reader at
   READ COMMITTED, in autocommit mode, without its second search, or with a `COUNT(*)` or a scan
-  as its first statement. Once the state is there it reaches every reader we tried: new
+  as its first statement. A sixth shows that the reader's disconnect is not needed. Once the state is there it reaches every reader we tried: new
   connections at three isolation levels and in autocommit mode each found 0 of the 5 rows. The
   experiment was run three times with the same outcome.
   Where WikiLense stands: its search connections have autocommit off at the server default
@@ -765,8 +765,8 @@ suggestions are in the run's handoff report). `scripts/measure_index_behaviour.p
   `COUNT(*)`, loads the model, runs one search and closes: the shape of the clean `COUNT(*)`
   control. `wikilense eval` and the experiment scripts run many searches in one transaction, so a
   committed write to the corpus by another connection during such a run would start the
-  sequence. Only the ingest commits writes to the corpus (`sql/examples.sql` updates a row and
-  rolls back), and nothing here runs the two together. We did not change the connections: no
+  sequence. Only an ingest commits writes to the corpus (`sql/examples.sql` updates a row and
+  rolls back), and nothing here runs a search next to one. We did not change the connections: no
   measured number depends on it. An application that writes while it searches must keep every
   connection from searching the index twice inside one REPEATABLE READ transaction.
 - **`builds` (`results/build_variance.md`, `_run1.md`).** Ten fresh builds of the graph per `M`,

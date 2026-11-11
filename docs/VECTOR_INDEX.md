@@ -191,10 +191,10 @@ wrong-dimension vector.
   (example 8) shows it from the `mariadb` client.
 - Every build of the HNSW graph is a different approximation: two `M=6` builds of the same vectors
   (120-word chunks) agreed on 12 of 75 hit lists. "The same vectors, built twenty times" below
-  measures the spread on the final settings. Within one server process the results are deterministic, and the
-  cache size does not change them (75 of 75 identical at 16 MB and 512 MB). A container restart
-  (`docker restart`) changed 1 of 75 hit lists on the `M=6` index and none on `M=16` at
-  `ef_search=100`, without changing recall.
+  measures the spread on the final settings. Within one server process the results are
+  deterministic, and the cache size does not change them (75 of 75 identical at 16 MB and 512 MB). A
+  container restart (`docker restart`) changed 1 of 75 hit lists on the `M=6` index and none on
+  `M=16` at `ef_search=100`, without changing recall.
 
 ## Three regimes of one statement
 
@@ -377,10 +377,12 @@ of them reader A finds among its top 10 through the index / by a scan, in 5 tria
 | SERIALIZABLE | 0 / 0 | 0 / 0 | 0 / 0 | blocked: Lock wait timeout exceeded; try restarting transaction (error 1205) |
 
 At READ UNCOMMITTED and READ COMMITTED, and in the first two moments at REPEATABLE READ, the index
-agrees with the scan and with what the level promises. One exception: at READ UNCOMMITTED the index found 4 of B's 5 uncommitted rows in 1 of 5 trials; an approximate search can miss a row, and we did not look for another cause. At SERIALIZABLE the search takes locks
-that made B's insert wait and time out, so that row shows a table nothing was written to. The
-last moment of the REPEATABLE READ row is the exception: in A's *next* transaction a scan finds
-the 5 rows and the index finds none.
+agrees with the scan and with what the level promises. One exception: at READ UNCOMMITTED the
+index found 4 of B's 5 uncommitted rows in 1 of 5 trials; an approximate search can miss a row,
+and we did not look for another cause. At SERIALIZABLE the search takes locks that made B's
+insert wait and time out, so that row shows a table nothing was written to. The last moment of
+the REPEATABLE READ row is the finding: in A's *next* transaction a scan finds the 5 rows and the
+index finds none.
 
 The sequence, which we repeated 10 times on fresh tables, with six controls of 5 trials:
 
@@ -403,7 +405,9 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
 - **What it takes.** In every trial that went stale, a REPEATABLE READ transaction had searched
   the index before B's commit and again after it. No control without one of the two went stale:
   not at READ COMMITTED, not in autocommit mode, not without the second search, and not when A's
-  first statement was a `COUNT(*)` or a scan. (In 1 control trial the index found 4 of the 5 rows: an approximate search, not this state.)
+  first statement was a `COUNT(*)` or a scan. (In 1 control trial the index found 4 of the 5
+  rows: an approximate search, not this state.) The last control shows that A's disconnect is
+  not needed: the index was stale when A committed and stayed connected.
 - **Who gets the wrong answer.** Everyone we tried. On 5 stale tables, new connections at
   REPEATABLE READ, READ COMMITTED and READ UNCOMMITTED and in autocommit mode each found 0 of the
   5 rows through the index. The isolation level of the connection that asks does not protect it.
@@ -419,21 +423,21 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
   insert (3 of 3 tables) or `FLUSH TABLES` (once) brought the 10 rows back, and the control
   without A's second search returned 10 rows in 5 of 5.
 
-What to do when other connections write to the table: no connection should search the index
-twice inside one REPEATABLE READ transaction. Searching at READ COMMITTED or in autocommit mode,
-or ending the transaction between searches, did not cause the state. PyMySQL opens connections
-with autocommit off, so a connection that has run one `SELECT` is in a REPEATABLE READ transaction
-until it commits, rolls back or closes. That is how WikiLense's own connections work. A web
-request runs one search and closes. `wikilense query` runs a `COUNT(*)`, loads the model, runs one
-search and closes, which is the shape of the `COUNT(*)` control. `wikilense eval` and the
-experiment scripts run many searches in one transaction, so a committed write to the corpus by
-another connection during such a run would start the sequence. Nothing here does that: only the
-ingest commits writes to the corpus (`sql/examples.sql` updates one row and rolls back), and it
-recreates the tables. The measurements are not affected. The experiment was run three times
-with the same outcome in every row of the sequence table that the runs share
-([results/isolation_run1.md](../results/isolation_run1.md) is the first run, made before four of
-the controls were added). We found no MariaDB ticket that describes this (searched on
-2026-11-11), have not reported it, and measured it on 11.8.9 only, on this one table.
+What to do when other connections write to the table: no connection should search the index twice
+inside one REPEATABLE READ transaction. Searching at READ COMMITTED or in autocommit mode, or ending
+the transaction between searches, did not cause the state. PyMySQL opens connections with autocommit
+off, so a connection that has run one `SELECT` is in a REPEATABLE READ transaction until it commits,
+rolls back or closes. That is how WikiLense's own connections work. A web request runs one search
+and closes. `wikilense query` runs a `COUNT(*)`, loads the model, runs one search and closes, which
+is the shape of the `COUNT(*)` control. `wikilense eval` and the experiment scripts run many
+searches in one transaction, so a committed write to the corpus by another connection during such a
+run would start the sequence. Nothing here does that: only an ingest (`wikilense ingest`, or the one
+inside an experiment group) commits writes to the corpus, and it recreates the tables;
+`sql/examples.sql` updates one row and rolls back. The measurements are not affected. The experiment
+was run three times with the same outcome in every row of the sequence table that the runs share
+([results/isolation_run1.md](../results/isolation_run1.md) is the first run, made before three of
+the controls were added). We found no MariaDB ticket that describes this (searched on 2026-11-11),
+have not reported it, and measured it on 11.8.9 only, on this one table.
 
 ## The joined statement against a brute-force ranking
 
