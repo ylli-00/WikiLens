@@ -26,7 +26,7 @@ make setup
     all of Central Switzerland. There are more than 40 hydroelectric plants along the course of the
     Aare. The river's name dates to at least the La Tène period, and it is attested as Nantaror
     "Aare valley" in the Berne zinc tablet. The name was Latinized as Arula/Arola/Araris.
-1 hit; model load 3533 ms, embedding 9.5 ms, SQL 5.5 ms (BAAI/bge-small-en-v1.5 on cpu, strategy inline, ef_search 100)
+1 hit; model load 3691 ms, embedding 15.2 ms, SQL 5.7 ms (BAAI/bge-small-en-v1.5 on cpu, strategy inline, ef_search 100)
 ```
 
 - That is the whole path. The output is copied from a run in a fresh clone, on a laptop whose GPU
@@ -34,7 +34,7 @@ make setup
 - `make setup` needs Docker, Python 3.10 or newer and `make`. It starts MariaDB 11.8 in a container,
   builds a virtual environment and loads the 100 Wikipedia pages committed here
   ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited. That run used `make setup CPU=1`,
-  without the GPU packages, and took 4 minutes 41 seconds.
+  without the GPU packages, and took 4 minutes 45 seconds.
   [Setup and platforms](#setup-and-platforms) has the details, also for a Mac.
 - Put your own question between the quotes. The first number is the cosine distance. `--k 5`
   returns more passages, `--explain` prints the SQL statement and MariaDB's plan, and `make serve`
@@ -256,7 +256,7 @@ Then `make test` (404 tests, about 20 s), `make eval` (the headline table, about
 `make serve`, `make examples` (the ten examples of `sql/examples.sql`, no Python needed),
 `make experiments` (the whole protocol, about 10 minutes with a GPU) and `make down`.
 
-**Without a GPU** everything works; only the embedding is slower. The ingest took 225.7 s on this
+**Without a GPU** everything works; only the embedding is slower. The ingest took 230.0 s on this
 laptop's CPU against 21 s on its GPU, and a query embedding takes 18 ms against 4.6 ms. The SQL times
 do not change. `make setup CPU=1` installs pinned CPU-only packages: a 1.4 GB environment instead of
 5.8 GB. It needs Python 3.12 or newer.

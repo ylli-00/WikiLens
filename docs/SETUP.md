@@ -30,7 +30,7 @@ Every recipe is echoed, and `make -n setup` prints the commands without running 
    reads `sql/schema.sql` and `data/corpus/` from the checkout, so the editable install is required.
 4. `.venv/bin/wikilense ingest`: creates the tables, parses the 100 committed pages, loads their
    categories and edit dates, embeds the chunks and loads everything. It took 21 s on the laptop's
-   RTX 4060 (17 s of it embedding) and 225.7 s on its CPU (221.6 s embedding;
+   RTX 4060 (17 s of it embedding) and 230.0 s on its CPU (226.0 s embedding;
    [results/fresh_clone_run.md](../results/fresh_clone_run.md)).
 
 Before step 1 `make setup` checks the Python version and stops with one line when it is too old.

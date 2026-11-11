@@ -691,7 +691,8 @@ section records what was changed for each, what else the pass found, and the dec
   environment set to the target's) and with uv, for Python 3.12 to 3.14: macOS 14 on Apple
   Silicon, Linux x86_64 and aarch64, Windows amd64 resolve; macOS 13 and Intel Macs do not (no
   PyTorch 2.14.0 wheel). Not run on a Mac or on Windows. Run for real: `make setup CPU=1` from a
-  fresh clone on Linux with Python 3.14 (4 min 41 s; CPU ingest 225.7 s, 221.6 s of it embedding).
+  fresh clone on Linux with Python 3.14 (4 min 45 s; CPU ingest 230.0 s, 226.0 s of it embedding;
+  the record is of the last run, at 832d51e).
 
 Decisions (the owner had left them open):
 
