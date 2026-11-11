@@ -1,8 +1,9 @@
 # WikiLense: one-command setup, tests, lint, evaluation, web page and experiments.
 # Every recipe is echoed before it runs, so the commands can be copied into a shell.
 #
-#   make setup        .env (from .env.example on first run), MariaDB via Docker Compose,
-#                     the .venv, the package, and the ingest of data/corpus/
+#   make setup        .env (written on the first run, with generated passwords), MariaDB via
+#                     Docker Compose, the .venv, the package, and the ingest of data/corpus/
+#   make setup CPU=1  the same with the pinned CPU-only packages (requirements-cpu.lock)
 #   make test         run the test suite (db tests need the container, slow tests the model)
 #   make lint         ruff
 #   make eval         recall and latency of the ingested corpus -> results/
@@ -16,40 +17,60 @@
 PYTHON  ?= python3
 VENV    ?= .venv
 COMPOSE ?= docker compose
-# `make setup CPU=1` installs the pinned CPU-only build (no CUDA wheels, about 2 GB smaller).
+# What `make setup` installs. The default is the version ranges of requirements-dev.txt.
+#   make setup CPU=1                   the pinned CPU-only build (no CUDA wheels, about 2 GB
+#                                      smaller); Linux, Windows, and macOS 14+ on Apple Silicon
+#   make setup REQS=requirements.lock  the pinned GPU build that results/ was measured with
+#                                      (Linux x86_64 with an NVIDIA GPU)
 REQS    ?= requirements-dev.txt
 ifeq ($(CPU),1)
 REQS    := requirements-cpu.lock
 endif
+# The oldest Python that can install $(REQS): the package needs 3.10, the lock files pin
+# versions that need 3.12 (numpy 2.5.3).
+PY_MIN  := 3.10
+ifneq ($(filter %.lock,$(REQS)),)
+PY_MIN  := 3.12
+endif
 
-.PHONY: setup check-env test lint eval serve experiments down
+.PHONY: setup check-python check-env venv test lint eval serve experiments down
 
 # --- setup -----------------------------------------------------------------------------------
 
-setup: .env check-env $(VENV)/bin/pip
+setup: check-python .env check-env venv
 	$(COMPOSE) up -d --wait
 	$(VENV)/bin/pip install -r $(REQS) -e .
 	$(VENV)/bin/wikilense ingest
 
-# First run only: copy the example file, then stop so the placeholder passwords are replaced
-# before MariaDB initialises its data volume with them. Run `make setup` again afterwards.
-.env:
-	cp .env.example .env
-	@echo "Created .env from .env.example: set WIKILENSE_DB_PASSWORD and WIKILENSE_DB_ROOT_PASSWORD in .env, then run 'make setup' again."
-	@exit 1
+# Stop early, with the reason, when $(PYTHON) is too old: on a Mac without Homebrew, python3 is
+# the 3.9 of the Xcode tools, and pip's own message about it comes late and is hard to read.
+check-python:
+	@$(PYTHON) -c 'import sys; need = tuple(int(part) for part in "$(PY_MIN)".split(".")); sys.exit(0 if sys.version_info[:2] >= need else "$(REQS) needs Python $(PY_MIN) or newer, and $(PYTHON) is Python %d.%d.%d. Install a newer Python and name it, for example: make setup PYTHON=python3.12" % sys.version_info[:3])'
 
-# Refuse to start MariaDB while .env still holds the placeholder passwords of .env.example:
-# the first start initialises the data volume with whatever the file says.
+# First run only: write .env from .env.example with two generated passwords, before MariaDB
+# initialises its data volume with them. An existing .env is never touched; to choose the
+# passwords yourself, copy .env.example to .env and edit it before the first `make setup`.
+.env:
+	$(PYTHON) scripts/make_env.py
+
+# Refuse to start MariaDB while .env still holds the placeholder passwords of .env.example
+# (a hand-made copy that was not edited): the first start initialises the data volume with
+# whatever the file says.
 check-env: .env
 	@if grep -Eq "^[[:space:]]*(export[[:space:]]+)?WIKILENSE_DB_(ROOT_)?PASSWORD[[:space:]]*=[[:space:]]*[\"']?change-me(-too)?[\"']?[[:space:]]*\$$" .env; then \
 		echo "WIKILENSE_DB_PASSWORD or WIKILENSE_DB_ROOT_PASSWORD in .env is still the placeholder of .env.example: set both, then run 'make setup' again."; \
 		exit 1; \
 	fi
 
-# The target is pip, not the directory: a venv that failed half-way (no ensurepip on a stock
-# Ubuntu without python3-venv) leaves the directory behind, and --clear starts it over.
-$(VENV)/bin/pip:
-	$(PYTHON) -m venv --clear $(VENV)
+# Make the venv when it is missing or does not work. The test is "its python can import pip",
+# not "the directory exists": a venv that failed half-way (no ensurepip on a stock Ubuntu
+# without python3-venv), or whose interpreter a system upgrade removed, leaves the directory
+# behind, and --clear starts it over.
+venv:
+	@if ! $(VENV)/bin/python -c "import pip" 2>/dev/null; then \
+		echo "$(PYTHON) -m venv --clear $(VENV)"; \
+		$(PYTHON) -m venv --clear $(VENV); \
+	fi
 
 # --- development -----------------------------------------------------------------------------
 

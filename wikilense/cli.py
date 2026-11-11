@@ -111,6 +111,14 @@ INDENT = "    "
 
 CHUNK_COUNT_SQL = "SELECT COUNT(*) FROM chunk"
 ER_NO_SUCH_TABLE = 1146  # MariaDB: "Table ... doesn't exist"
+ER_ACCESS_DENIED = 1045  # MariaDB: "Access denied for user ... (using password: YES)"
+#: Added to an access-denied error. The usual cause here: MariaDB's image sets the passwords
+#: once, when it creates the data volume, so a new .env does not fit an older volume.
+ACCESS_DENIED_HINT = (
+    "; the password in .env is not the one this MariaDB data volume was created with: put "
+    "that password back in .env, or delete the volume with 'docker compose down -v' (this "
+    "deletes the database) and run 'make setup' again"
+)
 
 
 class CliError(Exception):
@@ -461,9 +469,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _mysql_message(exc: pymysql.err.MySQLError) -> str:
-    """Return the server's message of a PyMySQL error, with its code, without the tuple repr."""
+    """Return the server's message of a PyMySQL error, with its code, without the tuple repr.
+
+    An access-denied error (1045) gets ``ACCESS_DENIED_HINT`` appended.
+    """
     if len(exc.args) >= 2:
-        return f"{exc.args[1]} (error {exc.args[0]})"
+        hint = ACCESS_DENIED_HINT if exc.args[0] == ER_ACCESS_DENIED else ""
+        return f"{exc.args[1]} (error {exc.args[0]}){hint}"
     return str(exc)
 
 
@@ -931,7 +943,8 @@ def cmd_query(args: argparse.Namespace) -> int:
     sys.stdout.flush()  # keep the order stable when stdout and stderr share a pipe
     ef_note = f"{ef_effective}" if ef_search is not None else f"{ef_effective} (server session value)"
     print(
-        f"{len(hits)} hits; model load {load_ms:.0f} ms, embedding {embed_ms:.1f} ms, "
+        f"{len(hits)} {'hit' if len(hits) == 1 else 'hits'}; model load {load_ms:.0f} ms, "
+        f"embedding {embed_ms:.1f} ms, "
         f"SQL {sql_ms:.1f} ms ({embedder.model_name} on {embedder.device}, "
         f"strategy {args.strategy}, ef_search {ef_note})",
         file=sys.stderr,

@@ -320,7 +320,8 @@ Model load, query embedding and SQL time are reported separately in the status l
     var t = body.timing_ms;
     var loaded = t.model_load === null ? 'model loaded lazily' :
       'model loaded at start-up in ' + t.model_load.toFixed(0) + ' ms';
-    status.textContent = body.hits.length + ' hits; embedding ' + t.embed.toFixed(1) +
+    status.textContent = body.hits.length + (body.hits.length === 1 ? ' hit' : ' hits') +
+      '; embedding ' + t.embed.toFixed(1) +
       ' ms, SQL ' + t.sql.toFixed(1) + ' ms; mhnsw_ef_search ' + body.ef_search + ' (' + loaded + ')';
   }
 

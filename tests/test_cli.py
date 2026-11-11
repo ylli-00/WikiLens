@@ -378,6 +378,10 @@ def test_query_prints_rank_distance_title_path_and_wrapped_text(
     assert "strategy inline" in err and err.rstrip().endswith("ef_search 100)")
     assert "fake/model on cpu" in err
 
+    # One hit is "1 hit", not "1 hits": the README's first example asks for --k 1.
+    assert cli.main(["query", "Aare river", "--k", "1"]) == 0
+    assert capsys.readouterr().err.startswith("1 hit; model load ")
+
 
 def test_query_options_map_to_filters_and_search_arguments(
     fake_db: FakeDatabase, fake_embedder: FakeEmbedder, fake_search: dict[str, Any]
@@ -881,6 +885,35 @@ def test_init_db_applies_the_schema_and_closes_the_connection(
     assert cli.main(["init-db", "--reset"]) == 0
     assert calls[1] == (fake_db.connections[1], True)
     assert "reset" in capsys.readouterr().out
+
+
+def _deny_access(settings: Settings | None = None, database: str | None = None) -> Any:
+    raise pymysql.err.OperationalError(
+        1045, "Access denied for user 'wikilense'@'172.18.0.1' (using password: YES)"
+    )
+
+
+def test_a_wrong_password_names_the_data_volume_and_both_ways_out(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # MariaDB's image sets the passwords when it creates the volume; a newer .env does not fit.
+    monkeypatch.setattr(cli.db, "connect", _deny_access)
+    assert cli.main(["init-db"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("wikilense: cannot connect to MariaDB") and err.count("\n") == 1
+    assert "Access denied for user 'wikilense'" in err and "(error 1045); the password in .env" in err
+    assert "docker compose down -v" in err and "put that password back in .env" in err
+    assert "not-a-real-password" not in err
+
+    # The same hint when the error reaches main() directly (ingest opens its own connection).
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        _deny_access()
+
+    monkeypatch.setattr(cli.ingest, "run_ingest", refuse)
+    assert cli.main(["ingest"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("wikilense: database error: Access denied") and err.count("\n") == 1
+    assert "docker compose down -v" in err
 
 
 def test_init_db_reports_unreachable_server(

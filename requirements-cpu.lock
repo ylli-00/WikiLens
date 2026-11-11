@@ -4,10 +4,20 @@
 #   cpu-venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
 #   cpu-venv/bin/pip install -r requirements-dev.txt
 #   cpu-venv/bin/pip freeze --exclude-editable
-# The torch wheel (+cpu) comes from the PyTorch index named below, everything else from PyPI.
 # Use: python3 -m venv .venv && .venv/bin/pip install -r requirements-cpu.lock -e .
-# .github/workflows/ci.yml installs from this file. With an NVIDIA GPU use requirements.lock,
-# the CUDA build that produced the numbers in results/.
+# (`make setup CPU=1` does this). .github/workflows/ci.yml installs from this file. With an
+# NVIDIA GPU on Linux use requirements.lock, the CUDA build that produced the numbers in results/.
+#
+# Platforms (edited by hand on 2026-11-11; the two torch lines and colorama carry markers).
+# torch is the only pin that differs by platform:
+#   - Linux and Windows: torch==2.14.0+cpu, from the PyTorch CPU index named below.
+#   - macOS: torch==2.14.0. PyTorch publishes no "+cpu" build for macOS; its macOS wheel is
+#     the CPU build already. That wheel exists for Apple Silicon and macOS 14 or newer only.
+# colorama is needed on Windows only (pytest, tqdm and typer ask for it there).
+# Needs Python 3.12 or newer (numpy 2.5.3 needs 3.12, networkx 3.6.1 needs 3.11).
+# Does not resolve on an Intel Mac or on macOS 13: torch 2.14.0 has no wheel for them (the
+# newest torch there is 2.2.2 and 2.11.0).
+# README.md, "Platforms", says what was run, what was only resolved, and what to do elsewhere.
 --extra-index-url https://download.pytorch.org/whl/cpu
 annotated-doc==0.0.5
 annotated-types==0.8.0
@@ -15,6 +25,7 @@ anyio==4.15.1
 certifi==2026.7.22
 click==8.5.0
 cloudpickle==3.1.2
+colorama==0.4.6 ; sys_platform == "win32"
 fastapi==0.141.1
 filelock==3.32.3
 fsspec==2026.7.0
@@ -56,7 +67,8 @@ starlette==1.6.0
 sympy==1.14.0
 threadpoolctl==3.7.0
 tokenizers==0.23.2
-torch==2.14.0+cpu
+torch==2.14.0+cpu ; sys_platform != "darwin"
+torch==2.14.0 ; sys_platform == "darwin"
 tqdm==4.70.1
 transformers==5.17.0
 typer==0.27.2
