@@ -27,6 +27,23 @@ Goal: retrieval over Wikipedia inside MariaDB. Chunk articles, embed the chunks,
     3. `make setup CPU=1` failed on macOS (`torch==2.14.0+cpu` has no macOS wheel):
        `requirements-cpu.lock` now has per-platform PyTorch lines. Checked by resolution only;
        nobody ran it on a Mac (`docs/SETUP.md`, "Platforms").
+  - Also measured on 2026-11-11, after a self-grade and a sceptical review of the new claims
+    (`scripts/measure_index_behaviour.py`; `docs/VECTOR_INDEX.md` has the tables):
+    - A predicate on `chunk` itself keeps the HNSW search going until `k` rows pass: not short,
+      but approximate. With a join the result was the exact top 10 in every case measured.
+    - `STRAIGHT_JOIN` stays. Left free, the optimizer starts from the filter's table under 8 of
+      12 filters: much faster under a very selective filter, 4 to 5 times slower under one loose
+      filter (`results/join_order.md`).
+    - A REPEATABLE READ transaction that searches the index before and after another
+      connection's commit leaves the index stale for every later reader, at any isolation
+      level, until the next committed write or `FLUSH TABLES` (`results/isolation.md`, 10 of 10
+      trials, three runs). Not reported to MariaDB: that is the owner's step.
+    - Twenty builds of the graph at the chosen settings all find 74 of 75 gold pages
+      (`results/build_variance.md`).
+    - Corrected: "a derived table without DISTINCT loses the index" was wrong. The merged plan
+      keeps the index; the DISTINCT prevents a chunk coming back once per link row.
+    - When a timing is compared, time each statement alone and taking turns: alternating with a
+      statement that reads thousands of rows made the other one 0.4 ms slower.
   - The core idea is fixed (owner's rule): the 75 claims, the 100-page corpus rule, 240-word
     chunks, overlap 1, bge-small-en-v1.5 with the title prefix, M=16, `mhnsw_ef_search` 100,
     strategy `inline`. A bug that changes results is fixed and the affected groups rerun; the
