@@ -1,6 +1,6 @@
 {
   "name": "statement_forms",
-  "created_at": "2026-11-11T04:12:36+00:00",
+  "created_at": "2026-11-11T08:16:16+00:00",
   "k": 10,
   "repeats": 3,
   "n_queries": 75,
@@ -15,12 +15,13 @@
       "words_below": null,
       "passing_chunks": 4598,
       "ef_search": 20,
-      "p50_ms": 0.274,
-      "p95_ms": 0.498,
+      "p50_ms": 0.357,
+      "p95_ms": 0.769,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 10.0
+      "chunk_rows_read_p50": 10.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "bare_joined",
@@ -29,12 +30,13 @@
       "words_below": null,
       "passing_chunks": 4598,
       "ef_search": 20,
-      "p50_ms": 2.006,
-      "p95_ms": 2.286,
+      "p50_ms": 2.159,
+      "p95_ms": 3.26,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 10.0
+      "chunk_rows_read_p50": 10.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_60",
@@ -43,12 +45,13 @@
       "words_below": 60,
       "passing_chunks": 766,
       "ef_search": 20,
-      "p50_ms": 0.978,
-      "p95_ms": 3.083,
+      "p50_ms": 1.122,
+      "p95_ms": 3.43,
       "equal_to_exact": 61,
       "same_set_as_exact": 61,
       "short": 0,
-      "chunk_rows_read_p50": 88.0
+      "chunk_rows_read_p50": 88.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_60_joined",
@@ -57,12 +60,13 @@
       "words_below": 60,
       "passing_chunks": 766,
       "ef_search": 20,
-      "p50_ms": 2.078,
-      "p95_ms": 2.322,
+      "p50_ms": 2.25,
+      "p95_ms": 3.481,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 84.0
+      "chunk_rows_read_p50": 84.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_30",
@@ -71,12 +75,13 @@
       "words_below": 30,
       "passing_chunks": 304,
       "ef_search": 20,
-      "p50_ms": 3.953,
-      "p95_ms": 12.847,
-      "equal_to_exact": 40,
-      "same_set_as_exact": 40,
+      "p50_ms": 3.99,
+      "p95_ms": 13.717,
+      "equal_to_exact": 41,
+      "same_set_as_exact": 41,
       "short": 0,
-      "chunk_rows_read_p50": 276.0
+      "chunk_rows_read_p50": 276.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_30_joined",
@@ -85,12 +90,13 @@
       "words_below": 30,
       "passing_chunks": 304,
       "ef_search": 20,
-      "p50_ms": 2.248,
-      "p95_ms": 2.701,
+      "p50_ms": 2.451,
+      "p95_ms": 3.77,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 270.0
+      "chunk_rows_read_p50": 270.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "bare",
@@ -99,12 +105,13 @@
       "words_below": null,
       "passing_chunks": 4598,
       "ef_search": 100,
-      "p50_ms": 0.653,
-      "p95_ms": 0.941,
+      "p50_ms": 0.764,
+      "p95_ms": 1.059,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 10.0
+      "chunk_rows_read_p50": 10.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "bare_joined",
@@ -113,12 +120,13 @@
       "words_below": null,
       "passing_chunks": 4598,
       "ef_search": 100,
-      "p50_ms": 2.271,
-      "p95_ms": 2.94,
+      "p50_ms": 2.424,
+      "p95_ms": 3.376,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 10.0
+      "chunk_rows_read_p50": 10.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_60",
@@ -127,12 +135,13 @@
       "words_below": 60,
       "passing_chunks": 766,
       "ef_search": 100,
-      "p50_ms": 2.019,
-      "p95_ms": 4.972,
+      "p50_ms": 2.103,
+      "p95_ms": 4.974,
       "equal_to_exact": 68,
       "same_set_as_exact": 68,
       "short": 0,
-      "chunk_rows_read_p50": 86.0
+      "chunk_rows_read_p50": 86.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_60_joined",
@@ -141,12 +150,13 @@
       "words_below": 60,
       "passing_chunks": 766,
       "ef_search": 100,
-      "p50_ms": 2.323,
-      "p95_ms": 3.021,
+      "p50_ms": 2.459,
+      "p95_ms": 3.226,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 84.0
+      "chunk_rows_read_p50": 84.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_30",
@@ -155,12 +165,13 @@
       "words_below": 30,
       "passing_chunks": 304,
       "ef_search": 100,
-      "p50_ms": 6.463,
-      "p95_ms": 19.18,
-      "equal_to_exact": 50,
-      "same_set_as_exact": 50,
+      "p50_ms": 6.705,
+      "p95_ms": 18.46,
+      "equal_to_exact": 51,
+      "same_set_as_exact": 51,
       "short": 0,
-      "chunk_rows_read_p50": 277.0
+      "chunk_rows_read_p50": 277.0,
+      "chunk_access": "index embedding"
     },
     {
       "form": "predicate_30_joined",
@@ -169,12 +180,13 @@
       "words_below": 30,
       "passing_chunks": 304,
       "ef_search": 100,
-      "p50_ms": 2.557,
-      "p95_ms": 3.228,
+      "p50_ms": 2.682,
+      "p95_ms": 3.389,
       "equal_to_exact": 75,
       "same_set_as_exact": 75,
       "short": 0,
-      "chunk_rows_read_p50": 270.0
+      "chunk_rows_read_p50": 270.0,
+      "chunk_access": "index embedding"
     }
   ],
   "ingest_meta": {

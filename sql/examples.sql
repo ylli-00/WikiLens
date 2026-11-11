@@ -98,8 +98,8 @@ FROM chunk ORDER BY distance LIMIT 3;
 --    the United Nations", longer than 1,000 words, last edited (in the revision the corpus holds)
 --    since 1 December 2020, and linked from the page "Asia"; joined back to page and section.
 --    On the ingested corpus EXPLAIN shows chunk read through the vector index (type index, key embedding) with the two
---    filter tables materialised (<derivedN>). The DISTINCT keeps them materialised: merged into
---    the join they make MariaDB scan chunk in full. Which filters keep the index is measured in
+--    filter tables materialised (<derivedN>). The DISTINCT keeps them materialised and keeps a
+--    chunk from coming back once per link row. Which filters keep the index is measured in
 --    results/planner_choices.md.
 SELECT chunk.chunk_id, page.title, section.path, page.last_edited,
        VEC_DISTANCE_COSINE(chunk.embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance

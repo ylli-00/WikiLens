@@ -133,7 +133,7 @@ assets.)
 
 ![The web page with the four filters of the brief](img/web_page.png)
 
-[sql/examples.sql](../sql/examples.sql) has ten worked statements for the `mariadb` client alone (no
+[sql/examples.sql](../sql/examples.sql) has ten worked examples for the `mariadb` client alone (no
 Python, no model). They include the four-filter statement with its `EXPLAIN`, a page's categories
 and edit date, and a transaction that shows the vector index following `ROLLBACK`. A test runs every
 statement of the file against the schema. `make examples` runs the file through the `mariadb`

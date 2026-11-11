@@ -5,19 +5,21 @@
     One nearest-neighbour statement in three shapes, on the ingested corpus (read only): the
     bare statement, the same with a predicate on the indexed table itself, and the same with a
     join to another table. Every hit list is compared with NumPy's exact ranking of the rows
-    that pass. Result (MariaDB 11.8.9): the bare statement is the HNSW search; a predicate on
-    the table keeps that search going until ``k`` rows pass, so it is never short but stays
-    approximate and gets slower the fewer rows pass; a join makes the result exact and
-    independent of ``mhnsw_ef_search``. Writes ``results/statement_forms.json`` and ``.md``.
+    that pass. Result (MariaDB 11.8.9, 766 and 304 chunks passing, ``mhnsw_ef_search`` 20 and
+    100): the bare statement is the HNSW search; a predicate on the table keeps that search
+    going until ``k`` rows pass, so no result was short, but it stays approximate and gets
+    slower the fewer rows pass; with a join the result was the exact top 10 for every claim at
+    both values. Writes ``results/statement_forms.json`` and ``.md``.
 
 ``join_order``
     The filtered statement of ``wikilense query`` as written, with ``STRAIGHT_JOIN`` and
     ``chunk`` first, against the same text with plain ``JOIN``, where the optimizer picks the
     order (read only, the filters of the ``planner`` experiment). Every hit list is compared
     with the same statement under ``IGNORE INDEX (embedding)``, a scan of every chunk. Result
-    (MariaDB 11.8.9): left free, the optimizer starts from the filter's own index whenever one
-    exists and never walks the vector index then; that is much cheaper under a selective
-    filter. Writes ``results/join_order.json`` and ``.md``.
+    (MariaDB 11.8.9): left free, the optimizer starts from the filter's own index or derived
+    table under 8 of the 12 filters, and the vector index is not in those plans; that is much
+    cheaper under a selective filter and much dearer under one unselective filter. Writes
+    ``results/join_order.json`` and ``.md``.
 
 ``builds``
     How much the results move from one build of the HNSW graph to the next: the chunk vectors
@@ -57,7 +59,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import asdict
 from datetime import date, datetime, timezone
-from itertools import combinations
+from itertools import combinations, pairwise
 from pathlib import Path
 from typing import Any
 
@@ -99,9 +101,9 @@ JOIN_ORDER_EF = 100
 SCAN_FROM = ("FROM chunk ", "FROM chunk IGNORE INDEX (embedding) ")
 #: Position of ``distance`` in the inline statement's select list (search.INLINE_SELECT).
 DISTANCE_COLUMN = 6
-#: Two medians of one run that differ by less than this factor are reported as the same time
-#: (two runs of the same statement on this laptop differed by up to 1.24).
-NOISE_FACTOR = 1.25
+#: Two medians that differ by less than this factor are reported as the same time. Two runs of
+#: one statement on this laptop differed by up to 1.24, and two forms with the same plan by 1.10.
+NOISE_FACTOR = 1.5
 PARTS: tuple[str, ...] = ("forms", "join_order", "builds", "isolation")
 
 BUILDS = 10
@@ -155,6 +157,10 @@ PROBE_SCAN_SQL = (
     "ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT %s"
 )
 PROBE_COUNT_SQL = "SELECT COUNT(*) FROM isolation_probe"
+PROBE_EF_SQL = "SET SESSION mhnsw_ef_search = %s"
+#: How a connection that looks at a stale table may be set up: a level, or autocommit.
+VICTIMS: tuple[str, ...] = ("REPEATABLE READ", "READ COMMITTED", "READ UNCOMMITTED", "autocommit")
+DELETE_RECOVERY_TRIALS = 3
 PROBE_FLUSH_SQL = "FLUSH TABLES isolation_probe"
 #: One fixed statement per isolation level (the level is never interpolated from input).
 ISOLATION_LEVELS: dict[str, str] = {
@@ -246,6 +252,13 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
                     read.append(float(plan[0][9]))  # r_rows of the first table, chunk
             return median(read)
 
+        def chunk_access(case: dict[str, Any]) -> str:
+            """'<type> <key>' of the chunk row in EXPLAIN, for the first claim."""
+            vector = db.vec_param(queries[0])
+            params = (vector, K) if case["limit"] is None else (case["limit"], vector, K)
+            row = next(r for r in db.explain(conn, case["sql"], params) if r["table"] == "chunk")
+            return f"{row['type']} {row['key'] or 'no key'}"
+
         results: list[dict[str, Any]] = []
         for ef in FORMS_EF:
             with searchmod.ef_search_session(conn, ef):
@@ -262,6 +275,7 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
                         "same_set_as_exact": sum(1 for got, want in pairs if set(got) == set(want)),
                         "short": sum(1 for got, want in pairs if len(got) < len(want)),
                         "chunk_rows_read_p50": rows_read(case),
+                        "chunk_access": chunk_access(case),
                     })  # fmt: skip
         return {
             "name": "statement_forms", "created_at": utc_now(), "k": K, "repeats": repeats,
@@ -277,6 +291,21 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
 
 def forms_markdown(report: dict[str, Any]) -> str:
     n = report["n_queries"]
+    rows = report["results"]
+    efs = sorted({row["ef_search"] for row in rows})
+
+    def per_ef(selected: list[dict[str, Any]], key: str) -> str:
+        """'a at ef x and b at ef y' for one form, or a list of values for several."""
+        parts = []
+        for ef in efs:
+            values = [row[key] for row in selected if row["ef_search"] == ef]
+            parts.append(f"{' and '.join(str(v) for v in values)} at `mhnsw_ef_search` {ef}")
+        return ", ".join(parts)
+
+    bare = [row for row in rows if row["form"] == "bare"]
+    predicate = [row for row in rows if row["words_below"] is not None and not row["joined"]]
+    joined = [row for row in rows if row["joined"]]
+    passing = sorted({row["passing_chunks"] for row in predicate}, reverse=True)
     lines = [
         "# One nearest-neighbour statement in three shapes",
         "",
@@ -286,29 +315,35 @@ def forms_markdown(report: dict[str, Any]) -> str:
         f"{report['repeats']} timed passes after one untimed pass, the forms taking turns query "
         "by query. \"Equal to exact\" counts the claims whose hit list is, in order, NumPy's exact "
         "top 10 of the chunks that pass the predicate. \"Rows read\" is the median over the claims "
-        "of `r_rows` for `chunk` in `ANALYZE`."),
+        "of `r_rows` for `chunk` in `ANALYZE`. \"Chunk access\" is the type and key of `chunk` in "
+        "`EXPLAIN`. The `mhnsw_ef_search` values were run one after the other, so compare times "
+        "inside one value."),
         "",
-        "| Statement | Chunks passing | ef_search | p50 ms | p95 ms | Equal to exact | Short | Rows read |",
-        "|---|---|---|---|---|---|---|---|",
+        ("| Statement | Chunks passing | ef_search | p50 ms | p95 ms | Equal to exact | Short "
+        "| Rows read | Chunk access |"),
+        "|---|---|---|---|---|---|---|---|---|",
     ]
-    for row in report["results"]:
+    for row in rows:
         lines.append(
             f"| {row['label']} | {row['passing_chunks']:,} | {row['ef_search']} | "
             f"{row['p50_ms']:.2f} | {row['p95_ms']:.2f} | {row['equal_to_exact']}/{n} | "
-            f"{row['short']}/{n} | {row['chunk_rows_read_p50']:.0f} |"
+            f"{row['short']}/{n} | {row['chunk_rows_read_p50']:.0f} | {row['chunk_access']} |"
         )
     lines += [
         "",
         "How to read it:",
         "",
-        ("- The bare statement is the HNSW search: it reads `LIMIT` rows, and `mhnsw_ef_search` "
-        "decides how often it equals the exact ranking."),
+        ("- The bare statement is the HNSW search: it reads `LIMIT` rows. On the graph now in the "
+        f"database its list was the exact one for {per_ef(bare, 'equal_to_exact')} of {n} claims. "
+        "Other builds of the graph differ (`results/build_variance.md`)."),
         ("- A predicate on the indexed table itself does not stop that search at `LIMIT`: the "
-        "server keeps asking the index for more rows until `k` of them pass. No query comes back "
-        "short. The result stays approximate, more so the fewer rows pass, and a larger "
-        "`mhnsw_ef_search` helps only in part. It also gets slower than the joined form."),
-        ("- With a join in the statement the same predicate gives the exact answer for every "
-        "claim, at both `mhnsw_ef_search` values, at a cost that does not depend on them."),
+        "server keeps taking rows from the index until `k` of them pass. "
+        f"{sum(row['short'] for row in predicate)} of the {len(predicate) * n} answers were short "
+        f"(with {' and '.join(f'{count:,}' for count in passing)} chunks passing; nothing more "
+        "selective was run). The list was the exact one for "
+        f"{per_ef(predicate, 'equal_to_exact')} of {n} claims, in the order of the table."),
+        ("- With a join in the statement the list was the exact one for "
+        f"{per_ef(joined, 'equal_to_exact')} of {n} claims, in the order of the table."),
         "",
         "The statements (the word limit, the query vector and `k` are bound parameters):",
         "",
@@ -344,6 +379,13 @@ def scan_form(sql: str) -> str:
     return sql.replace(old, new)
 
 
+def without_distinct(sql: str) -> str:
+    """The inline statement with its derived tables written without ``DISTINCT``."""
+    if "SELECT DISTINCT" not in sql:
+        raise ValueError("the statement has no DISTINCT derived table")
+    return sql.replace("SELECT DISTINCT", "SELECT")
+
+
 def plan_label(rows: Sequence[dict[str, Any]]) -> str:
     """'<first table> first; chunk <access type> <key>' of one EXPLAIN result."""
     chunk = next(row for row in rows if row["table"] == "chunk")
@@ -370,12 +412,16 @@ def agreement(
     ``swap_gap_max`` is, over every position where the two lists name different chunks although
     they hold the same set, the largest difference between the two distances reported there:
     how close two neighbours were when the server returned them in the other order.
+    ``not_ascending`` counts the lists whose rows are not in ascending order of the distance
+    the statement itself reports for them.
     """
-    same_rows = same_order = short = 0
+    same_rows = same_order = short = not_ascending = 0
     gap = 0.0
     for got, want in zip(lists, scans, strict=True):
         got_ids, want_ids = [hit[0] for hit in got], [hit[0] for hit in want]
         short += int(len(got_ids) < len(want_ids))
+        distances = [hit[1] for hit in got]
+        not_ascending += int(any(b < a for a, b in pairwise(distances)))
         if set(got_ids) != set(want_ids):
             continue
         same_rows += 1
@@ -384,7 +430,7 @@ def agreement(
             if mine[0] != theirs[0]:
                 gap = max(gap, abs(mine[1] - theirs[1]))
     return {"same_rows_as_scan": same_rows, "same_order_as_scan": same_order, "short": short,
-            "swap_gap_max": gap}
+            "swap_gap_max": gap, "not_ascending": not_ascending}
 
 
 def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[str, Any]:
@@ -402,19 +448,20 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
         with conn.cursor() as cur:
             cur.execute(CHUNK_COUNT_SQL)
             n_chunks = int(cur.fetchone()[0])
+        def hits_of(sql: str, params: tuple[Any, ...]) -> list[tuple[int, float]]:
+            """(chunk_id, distance) in the order the server returned the rows."""
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return [(int(row[0]), float(row[DISTANCE_COLUMN])) for row in cur.fetchall()]
+
         results: list[dict[str, Any]] = []
+        merged_tables: list[dict[str, Any]] = []
         with searchmod.ef_search_session(conn, JOIN_ORDER_EF):
             for name, filters in PLANNER_CASES:
                 statements: list[tuple[str, tuple[Any, ...], str, str]] = []
                 for query in queries:
                     sql, params = searchmod.search_statement(query, K, filters, "inline")
                     statements.append((sql, params, free_order(sql), scan_form(sql)))
-
-                def hits_of(sql: str, params: tuple[Any, ...]) -> list[tuple[int, float]]:
-                    """(chunk_id, distance) in the order the server returned the rows."""
-                    with conn.cursor() as cur:
-                        cur.execute(sql, params)
-                        return [(int(row[0]), float(row[DISTANCE_COLUMN])) for row in cur.fetchall()]
 
                 def answer_of(form: int, stmts: list = statements) -> Callable[[int], list[Any]]:
                     return lambda i: hits_of(stmts[i][form], stmts[i][1])
@@ -423,31 +470,64 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
                 sql0, params0 = searchmod.search_statement(queries[0], n_chunks, filters, "inline")
                 passing = len(hits_of(scan_form(sql0), params0))
                 timed = separate.time_methods([answer_of(0), answer_of(2)], n_queries, repeats)
+                # Each form alone as well: when the two take turns, a form that reads thousands
+                # of rows slows the other one's next run (measured: 2.2 against 2.6 ms).
+                alone = [
+                    separate.time_methods([answer_of(form)], n_queries, repeats)[0][0]
+                    for form in (0, 2)
+                ]
                 row: dict[str, Any] = {"filter": name, "passing_chunks": passing}
-                for key, form, (samples, lists) in zip(
-                    ("as_written", "free"), (0, 2), timed, strict=True
+                for key, form, (samples, lists), own in zip(
+                    ("as_written", "free"), (0, 2), timed, alone, strict=True
                 ):
                     plans: Counter[str] = Counter()
                     read: list[float] = []
+                    first_plan = [
+                        {key_: plan_row[key_] for key_ in ("table", "type", "key", "Extra")}
+                        for plan_row in db.explain(conn, statements[0][form], statements[0][1])
+                    ]
                     with conn.cursor() as cur:
                         for stmt in statements:
                             plans[plan_label(db.explain(conn, stmt[form], stmt[1]))] += 1
                             cur.execute("ANALYZE FORMAT=JSON " + stmt[form], stmt[1])
-                            read.append(chunk_rows_read(json.loads(cur.fetchone()[0])))
-                    stats = evaluate.latency_stats(samples)
+                            # r_rows is an average per loop: the product is a whole number
+                            read.append(float(round(chunk_rows_read(json.loads(cur.fetchone()[0])))))
+                    stats = evaluate.latency_stats(own)
+                    turns = evaluate.latency_stats(samples)
                     plan, plan_count = plans.most_common(1)[0]
                     row[key] = {
                         "plan": plan, "plan_count": plan_count, "plans": dict(plans),
+                        "explain_first_claim": first_plan,
                         "chunk_rows_read_p50": median(read), "chunk_rows_read_max": max(read),
                         "p50_ms": round(stats.p50_ms, 3), "p95_ms": round(stats.p95_ms, 3),
+                        "p50_ms_taking_turns": round(turns.p50_ms, 3),
                         **agreement(lists, scans),
                     }  # fmt: skip
                 results.append(row)
+
+                # The filters that join a derived table: the same statement without DISTINCT.
+                if "SELECT DISTINCT" not in statements[0][0]:
+                    continue
+                merged_plans: Counter[str] = Counter()
+                derived = duplicates = 0
+                for stmt in statements:
+                    merged_sql = without_distinct(stmt[0])
+                    plan_rows = db.explain(conn, merged_sql, stmt[1])
+                    merged_plans[plan_label(plan_rows)] += 1
+                    derived += int(any(str(r["table"]).startswith("<derived") for r in plan_rows))
+                    ids = [hit[0] for hit in hits_of(merged_sql, stmt[1])]
+                    duplicates += int(len(set(ids)) < len(ids))
+                merged_tables.append({
+                    "filter": name, "plans": dict(merged_plans),
+                    "plans_with_a_derived_table": derived,
+                    "lists_with_a_chunk_twice": duplicates,
+                })  # fmt: skip
         return {
             "name": "join_order", "created_at": utc_now(), "k": K, "repeats": repeats,
             "ef_search": JOIN_ORDER_EF, "n_queries": n_queries, "n_chunks": n_chunks,
             **db.vector_index_info(conn),
             "results": results,
+            "derived_without_distinct": merged_tables,
             "filters": {
                 name: {key: (str(value) if isinstance(value, date) else value)
                        for key, value in asdict(filters).items() if value is not None}
@@ -466,7 +546,8 @@ def join_order_markdown(report: dict[str, Any]) -> str:
 
     def cells(side: dict[str, Any]) -> str:
         plan = side["plan"] if side["plan_count"] == n else f"{side['plan']} ({side['plan_count']}/{n})"
-        return (f"{plan} | {side['chunk_rows_read_p50']:.0f} | {side['p50_ms']:.2f} | "
+        return (f"{plan} | {side['chunk_rows_read_p50']:.0f} | {side['p50_ms']:.2f} "
+                f"({side['p50_ms_taking_turns']:.2f}) | "
                 f"{side['same_rows_as_scan']} / {side['same_order_as_scan']} |")
 
     lines = [
@@ -475,8 +556,7 @@ def join_order_markdown(report: dict[str, Any]) -> str:
         (f"Generated {report['created_at']} by `scripts/measure_index_behaviour.py join_order` on "
         f"MariaDB {report['versions']['mariadb']}: {report['n_chunks']:,} chunks, index M = "
         f"{report['index_m']}, the {n} corpus claims as queries, k = {report['k']}, "
-        f"`mhnsw_ef_search` {report['ef_search']}, {report['repeats']} timed passes after one "
-        "untimed pass, the two forms taking turns query by query. \"As written\" is the "
+        f"`mhnsw_ef_search` {report['ef_search']}. \"As written\" is the "
         "statement `wikilense query` runs: `STRAIGHT_JOIN`, `chunk` first. \"Free\" is the same "
         "text with every `STRAIGHT_JOIN` replaced by `JOIN`, so the optimizer picks the order. "
         "\"Plan\" is the first table of `EXPLAIN` and how `chunk` is read; `index embedding` is "
@@ -484,11 +564,15 @@ def join_order_markdown(report: dict[str, Any]) -> str:
         "(`r_loops` times `r_rows` in `ANALYZE FORMAT=JSON`). \"Same rows / order\" counts the "
         f"claims, of {n}, whose hit list holds the same chunks, and the same chunks in the same "
         "order, as the same statement under `IGNORE INDEX (embedding)`, which reads and sorts "
-        "every chunk. The times are the statement and the fetch of its rows, without the "
-        "Python sort that `wikilense` adds."),
+        "every chunk. \"p50 ms\" is the median time of the statement and the fetch of its rows "
+        f"(without the Python sort that `wikilense` adds) when the form runs alone: one untimed "
+        f"pass over the claims, then {report['repeats']} timed passes. In brackets is the same "
+        "median when the two forms take turns query by query. Taking turns guards against the "
+        "machine drifting between two blocks, but a form that reads thousands of rows slows down "
+        "the other form's next run, so the bracketed time of the faster form is the larger one."),
         "",
-        ("| Filter | Chunks passing | As written: plan | Rows read | p50 ms | Same rows / order "
-        "| Free: plan | Rows read | p50 ms | Same rows / order |"),
+        ("| Filter | Chunks passing | As written: plan | Rows read | p50 ms (taking turns) "
+        "| Same rows / order | Free: plan | Rows read | p50 ms (taking turns) | Same rows / order |"),
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:
@@ -519,9 +603,10 @@ def join_order_markdown(report: dict[str, Any]) -> str:
         f"filters the server walks the vector index; under the other {len(rows) - len(walked)} it "
         "reads every chunk and sorts."),
         (f"- Left free, the optimizer starts from another table under {len(moved)} of the "
-        f"{len(rows)} filters: the filter's own index or derived table. It then reads only the "
-        "chunks that pass, through `uq_chunk_page_ordinal`, and sorts them. The vector index is "
-        "not used in that plan."),
+        f"{len(rows)} filters: `page`, or the derived table of the link or category filter. It "
+        "then reads `chunk` through `uq_chunk_page_ordinal`, as many rows as pass the filter, "
+        "and the vector index is not in that plan. The JSON file holds every `EXPLAIN` row of "
+        "the first claim for both forms (`explain_first_claim`)."),
         (f"- The plan moved and the median got faster by more than a factor of {NOISE_FACTOR}, as "
         f"written to free: {pairs(cheaper)}."),
         f"- The plan moved and it got slower by more than that: {pairs(dearer)}.",
@@ -535,17 +620,42 @@ def join_order_markdown(report: dict[str, Any]) -> str:
     if swapped:
         notes = "; ".join(
             f"`{name}` {key}: {side['same_rows_as_scan'] - side['same_order_as_scan']} of {n} "
-            f"claims, largest gap {side['swap_gap_max']:.1e}"
+            f"claims, {side['not_ascending']} of them with rows not in ascending order of the "
+            f"distance the statement reports, largest gap {side['swap_gap_max']:.1e}"
             for name, key, side in swapped
         )
         lines.append(
-            "- Same chunks in another order: the server returned two neighbours the other way "
-            "round than the distances it reports for them, which differ by the gap given here "
-            f"({notes}). `wikilense` sorts the rows by the reported distance and the chunk id "
-            "afterwards."
+            "- Same chunks in another order than the scan. The gap is the largest difference "
+            "between the distances the two lists report at a position where they name different "
+            f"chunks ({notes}). `wikilense` sorts the rows by the reported distance and the chunk "
+            "id afterwards."
         )
     else:
         lines.append("- No hit list had its chunks in another order than the scan.")
+    merged = report.get("derived_without_distinct") or []
+    if merged:
+        lines += [
+            "",
+            "## The derived tables without DISTINCT",
+            "",
+            ("The link and category filters join a `SELECT DISTINCT` derived table. The same "
+            f"statement as written, with every `SELECT DISTINCT` turned into `SELECT`, for the {n} "
+            "claims: the plan, how many plans still hold a materialised derived table, and how "
+            "many hit lists name the same chunk more than once."),
+            "",
+            "| Filter | Plan | Plans with a derived table | Lists with a chunk twice |",
+            "|---|---|---|---|",
+        ]
+        for row in merged:
+            plans = "; ".join(f"{plan} ({count}/{n})" for plan, count in row["plans"].items())
+            lines.append(f"| {row['filter']} | {plans} | {row['plans_with_a_derived_table']}/{n} | "
+                         f"{row['lists_with_a_chunk_twice']}/{n} |")
+        lines += [
+            "",
+            ("Without `DISTINCT` MariaDB merges the derived table into the join. Whether the "
+            "vector index survives is in the plan column; a list with a chunk twice means the "
+            "merged join returned one chunk once per matching row of the filter table."),
+        ]
     lines += ["", "Filters:", ""]
     for name, filters in report["filters"].items():
         lines.append(f"- `{name}`: {json.dumps(filters, ensure_ascii=False)}")
@@ -741,7 +851,7 @@ class Probe:
         with conn.cursor() as cur:
             if level is not None:
                 cur.execute(ISOLATION_LEVELS[level])
-            cur.execute("SET SESSION mhnsw_ef_search = %s", (ISOLATION_EF,))
+            cur.execute(PROBE_EF_SQL, (ISOLATION_EF,))
         conn.commit()
         return conn
 
@@ -792,10 +902,19 @@ class Probe:
         finally:
             conn.close()
 
-    def fresh_view(self, new_ids: Sequence[int] = NEW_ROW_IDS) -> dict[str, int]:
-        """What a new connection sees: new rows among the top k through the index and by a scan."""
-        conn = self.connect()
+    def fresh_view(
+        self, new_ids: Sequence[int] = NEW_ROW_IDS, level: str | None = None,
+        autocommit: bool = False,
+    ) -> dict[str, int]:
+        """What a new connection sees: new rows among the top k through the index and by a scan.
+
+        ``level`` sets the connection's isolation level (default: the server's); with
+        ``autocommit`` every statement of the connection is its own transaction.
+        """
+        conn = self.connect(level)
         try:
+            if autocommit:
+                conn.autocommit(True)
             index_hits = self.search(conn)
             scan_hits = self.search(conn, PROBE_SCAN_SQL)
             return {
@@ -853,12 +972,16 @@ def levels_table(probe: Probe, trials: int) -> list[dict[str, Any]]:
 
 
 def stale_sequence(
-    probe: Probe, level: str, search_again: bool, close_reader: bool, autocommit: bool = False
+    probe: Probe, level: str, search_again: bool, close_reader: bool, autocommit: bool = False,
+    first: str = "index",
 ) -> dict[str, int]:
     """Reader searches, writer commits five near rows, reader (maybe) searches again and ends.
 
     With ``autocommit`` the reader opens no transaction: each of its searches is its own.
-    Returns what a new connection then sees (:meth:`Probe.fresh_view`).
+    ``first`` is the reader's statement before the writer's commit: ``index`` (the search),
+    ``scan`` (the same without the index) or ``count`` (``SELECT COUNT(*)``). Returns what a
+    new connection then sees (:meth:`Probe.fresh_view`), plus ``reader_second_search_new``:
+    the new rows the reader's second search returned (None when it did not search again).
     """
     probe.fresh_table()
     reader = probe.connect(level)
@@ -867,18 +990,76 @@ def stale_sequence(
             reader.autocommit(True)
         else:
             reader.begin()
-        probe.search(reader)
-        probe.insert_and_commit(NEW_ROW_IDS)
-        if search_again:
+        if first == "index":
             probe.search(reader)
+        elif first == "scan":
+            probe.search(reader, PROBE_SCAN_SQL)
+        else:
+            with reader.cursor() as cur:
+                cur.execute(PROBE_COUNT_SQL)
+                cur.fetchall()
+        probe.insert_and_commit(NEW_ROW_IDS)
+        second = new_among(probe.search(reader)) if search_again else None
         if not autocommit:
             reader.commit()
         if close_reader:
             reader.close()
-        return probe.fresh_view()
+        return {**probe.fresh_view(), "reader_second_search_new": second}
     finally:
         if reader.open:
             reader.close()
+
+
+def delete_sequence(probe: Probe, search_again: bool) -> dict[str, int]:
+    """The stale sequence with a DELETE: the writer removes the three rows nearest to the query.
+
+    Returns what the reader's snapshot and then a new connection see.
+    """
+    probe.fresh_table()
+    reader = probe.connect("REPEATABLE READ")
+    try:
+        reader.begin()
+        victims = probe.search(reader, PROBE_SCAN_SQL)[:3]
+        probe.search(reader)
+        writer = probe.connect()
+        try:
+            with writer.cursor() as cur:
+                cur.execute(PROBE_DELETE3_SQL, tuple(victims))
+            writer.commit()
+        finally:
+            writer.close()
+        in_snapshot = probe.search(reader) if search_again else []
+        reader.commit()
+    finally:
+        reader.close()
+    conn = probe.connect()
+    try:
+        index_hits = probe.search(conn)
+        scan_hits = probe.search(conn, PROBE_SCAN_SQL)
+        other_rows = [len(probe.search(conn, query=other)) for other in probe.others]
+        with conn.cursor() as cur:
+            cur.execute(PROBE_COUNT_SQL)
+            table_rows = int(cur.fetchone()[0])
+    finally:
+        conn.close()
+    return {
+        "reader_snapshot_rows": len(in_snapshot),
+        "reader_snapshot_still_sees_deleted": sum(1 for v in victims if v in in_snapshot),
+        "new_connection_index_rows": len(index_hits),
+        "new_connection_scan_rows": len(scan_hits),
+        "other_queries_min_rows": min(other_rows),
+        "other_queries_with_no_row": sum(1 for count in other_rows if count == 0),
+        "table_rows": table_rows,
+    }  # fmt: skip
+
+
+def index_rows(probe: Probe) -> int:
+    """Rows a new connection gets for the query through the index."""
+    conn = probe.connect()
+    try:
+        return len(probe.search(conn))
+    finally:
+        conn.close()
 
 
 def flush_as_root(settings: Settings) -> str | None:
@@ -930,7 +1111,28 @@ def measure_isolation(settings: Settings, trials: int, control_trials: int) -> d
                 stale_sequence(probe, "REPEATABLE READ", search_again=True, close_reader=False)
                 for _ in range(control_trials)
             ],
+            "control_first_statement_count": [
+                stale_sequence(probe, "REPEATABLE READ", search_again=True, close_reader=True,
+                               first="count")
+                for _ in range(control_trials)
+            ],
+            "control_first_statement_scan": [
+                stale_sequence(probe, "REPEATABLE READ", search_again=True, close_reader=True,
+                               first="scan")
+                for _ in range(control_trials)
+            ],
         }
+
+        # Who gets the stale answer: new connections at each level and in autocommit mode.
+        victims: list[dict[str, int]] = []
+        for _ in range(control_trials):
+            stale_sequence(probe, "REPEATABLE READ", search_again=True, close_reader=True)
+            victims.append({
+                name: probe.fresh_view(
+                    level=None if name == "autocommit" else name, autocommit=name == "autocommit"
+                )["index_new"]
+                for name in VICTIMS
+            })
 
         # What clears the stale state: the next committed write, or FLUSH TABLES.
         recovery: dict[str, Any] = {"by_write": [], "by_flush": [], "flush_skipped": None,
@@ -956,44 +1158,7 @@ def measure_isolation(settings: Settings, trials: int, control_trials: int) -> d
         recovery["attempts"] = attempts
 
         # Deletes: the writer removes the three nearest rows.
-        deletes = []
-        for _ in range(trials):
-            probe.fresh_table()
-            reader = probe.connect("REPEATABLE READ")
-            try:
-                reader.begin()
-                victims = probe.search(reader, PROBE_SCAN_SQL)[:3]
-                probe.search(reader)
-                writer = probe.connect()
-                try:
-                    with writer.cursor() as cur:
-                        cur.execute(PROBE_DELETE3_SQL, tuple(victims))
-                    writer.commit()
-                finally:
-                    writer.close()
-                in_snapshot = probe.search(reader)
-                reader.commit()
-            finally:
-                reader.close()
-            conn = probe.connect()
-            try:
-                index_hits = probe.search(conn)
-                scan_hits = probe.search(conn, PROBE_SCAN_SQL)
-                other_rows = [len(probe.search(conn, query=other)) for other in probe.others]
-                with conn.cursor() as cur:
-                    cur.execute(PROBE_COUNT_SQL)
-                    table_rows = int(cur.fetchone()[0])
-            finally:
-                conn.close()
-            deletes.append({
-                "reader_snapshot_rows": len(in_snapshot),
-                "reader_snapshot_still_sees_deleted": sum(1 for v in victims if v in in_snapshot),
-                "new_connection_index_rows": len(index_hits),
-                "new_connection_scan_rows": len(scan_hits),
-                "other_queries_min_rows": min(other_rows),
-                "other_queries_with_no_row": sum(1 for count in other_rows if count == 0),
-                "table_rows": table_rows,
-            })  # fmt: skip
+        deletes = [delete_sequence(probe, search_again=True) for _ in range(trials)]
         delete_flush = None
         if deletes and deletes[-1]["new_connection_index_rows"] == 0 and not recovery["flush_skipped"]:
             reason = flush_as_root(settings)
@@ -1003,6 +1168,16 @@ def measure_isolation(settings: Settings, trials: int, control_trials: int) -> d
                     delete_flush = len(probe.search(conn))
                 finally:
                     conn.close()
+        delete_by_write: list[int] = []
+        for _ in range(DELETE_RECOVERY_TRIALS):
+            if delete_sequence(probe, search_again=True)["new_connection_index_rows"] != 0:
+                continue  # this table did not go stale
+            probe.insert_and_commit([EXTRA_ROW_ID], first_vector=len(NEW_ROW_IDS))
+            delete_by_write.append(index_rows(probe))
+        delete_control = [
+            delete_sequence(probe, search_again=False)["new_connection_index_rows"]
+            for _ in range(control_trials)
+        ]
         return {
             "name": "isolation", "created_at": utc_now(), "k": K,
             "rows": ISOLATION_ROWS, "new_rows": len(NEW_ROW_IDS), "ef_search": ISOLATION_EF,
@@ -1010,8 +1185,10 @@ def measure_isolation(settings: Settings, trials: int, control_trials: int) -> d
             "trials": trials, "control_trials": control_trials,
             "mariadb_version": str(version), "default_isolation_level": str(default_level),
             "innodb_snapshot_isolation": int(snapshot_isolation),
-            "levels": levels, "sequences": sequences, "recovery": recovery, "deletes": deletes,
-            "delete_rows_after_flush": delete_flush,
+            "levels": levels, "sequences": sequences, "victims": victims, "recovery": recovery,
+            "deletes": deletes, "delete_rows_after_flush": delete_flush,
+            "delete_rows_after_write": delete_by_write,
+            "delete_control_no_second_search": delete_control,
         }  # fmt: skip
     finally:
         probe.drop_table()
@@ -1023,8 +1200,17 @@ def _span(values: Sequence[int]) -> str:
 
 
 def _stale_count(views: Sequence[dict[str, int]]) -> str:
-    stale = sum(1 for view in views if view["index_new"] < view["scan_new"])
+    """Trials in which the index returned none of the new rows although the scan returned some."""
+    stale = sum(1 for view in views if view["index_new"] == 0 < view["scan_new"])
     return f"{stale} of {len(views)}"
+
+
+def _partial_count(sequences: dict[str, Sequence[dict[str, int]]]) -> int:
+    """Trials, over all sequences, in which the index found some but not all of the new rows."""
+    return sum(
+        1 for views in sequences.values() for view in views
+        if 0 < view["index_new"] < view["scan_new"]
+    )
 
 
 def isolation_markdown(report: dict[str, Any]) -> str:
@@ -1069,12 +1255,14 @@ def isolation_markdown(report: dict[str, Any]) -> str:
         "",
         "1. A, at REPEATABLE READ, opens a transaction and searches the index.",
         f"2. B inserts the {new} rows and commits.",
-        "3. A searches again, still inside its old snapshot (correctly without the new rows).",
+        ("3. A searches again, still inside its old snapshot (it found "
+        f"{_span([v['reader_second_search_new'] for v in seq['repeatable_read_searches_again_and_ends']])} "
+        "of the new rows, as its snapshot requires)."),
         "4. A commits and disconnects.",
         "5. A new connection searches.",
         "",
         ("At step 5 the table holds the new rows and a scan returns them. \"Stale\" below means the "
-        "index search of the new connection returned fewer of them than the scan."),
+        "index search of the new connection returned none of them."),
         "",
         "| Sequence | Stale at step 5 | New rows found through the index, per trial |",
         "|---|---|---|",
@@ -1089,10 +1277,31 @@ def isolation_markdown(report: dict[str, Any]) -> str:
         f"{[v['index_new'] for v in seq['control_autocommit']]} |"),
         (f"| control: A commits but stays connected | {_stale_count(seq['control_reader_stays_connected'])} | "
         f"{[v['index_new'] for v in seq['control_reader_stays_connected']]} |"),
+        ("| control: A's statement in step 1 is `SELECT COUNT(*)`, not a search | "
+        f"{_stale_count(seq['control_first_statement_count'])} | "
+        f"{[v['index_new'] for v in seq['control_first_statement_count']]} |"),
+        ("| control: A's statement in step 1 is the scan, not the index search | "
+        f"{_stale_count(seq['control_first_statement_scan'])} | "
+        f"{[v['index_new'] for v in seq['control_first_statement_scan']]} |"),
         "",
-        ("Once stale, it stays stale for later connections: three more new connections found "
-        f"{recovery['still_stale_for_new_connections']} new rows (one list per stale table). "
-        "What cleared it:"),
+        ("In every trial that went stale, a REPEATABLE READ transaction had searched the index "
+        "before the other connection's commit and again after it; no control without one of "
+        "the two went stale."
+        + (f" In {_partial_count(seq)} trial(s) the index found some but not all of the new rows: "
+           "that is the approximate search, not this state."
+           if _partial_count(seq) else "")),
+        "",
+        ("Who gets the stale answer: after the sequence, new connections found these numbers of "
+        f"the {new} new rows through the index, on {len(report['victims'])} stale tables: "
+        + "; ".join(
+            f"{name if name != 'autocommit' else 'in autocommit mode'} "
+            f"{_span([v[name] for v in report['victims']])}"
+            for name in VICTIMS
+        )
+        + ". The isolation level of the connection that asks does not protect it."),
+        "",
+        ("On each stale table, three more new connections then found these numbers of new rows "
+        f"through the index: {recovery['still_stale_for_new_connections']}. What cleared it:"),
         "",
         (f"- the next committed write to the table: after one more row was inserted and committed, a "
         f"new connection found {recovery['by_write']} of {new + 1} new rows through the index;"),
@@ -1105,14 +1314,21 @@ def isolation_markdown(report: dict[str, Any]) -> str:
             f"{recovery['by_flush']} of {new} new rows through the index."
         )
     deletes = report["deletes"]
+    if recovery["by_flush"]:
+        lines += [
+            "",
+            ("`FLUSH TABLES` makes the server open the table again, so the index as stored was "
+            "right. That fits a copy of the graph in the server's memory that was loaded inside "
+            "A's old snapshot. We did not inspect that cache or read the server source."),
+        ]
     lines += [
-        "",
-        "So the index on disk is right and the copy the server keeps in memory is not.",
         "",
         "## The same sequence with a DELETE",
         "",
-        ("B deletes the three rows nearest to the query instead of inserting. A's snapshot keeps "
-        "seeing them, as it should. Afterwards, for a new connection:"),
+        ("B deletes the three rows nearest to the query instead of inserting. In its second "
+        "search A still found "
+        f"{_span([trial['reader_snapshot_still_sees_deleted'] for trial in deletes])} of the 3 "
+        "deleted rows, as its snapshot requires. Afterwards, for a new connection:"),
         "",
         "| Trial | Rows the index returns for that query | Rows a scan returns | Of 20 other queries, how many got no row (fewest rows any got) | Rows in the table |",
         "|---|---|---|---|---|",
@@ -1128,16 +1344,28 @@ def isolation_markdown(report: dict[str, Any]) -> str:
                       "rows for that query again.")]
     lines += [
         "",
+        (f"After one more row was inserted and committed instead, the index returned "
+        f"{report['delete_rows_after_write']} rows for that query "
+        f"({len(report['delete_rows_after_write'])} stale tables). Control, A does not search "
+        "again after B's commit: the index returned "
+        f"{report['delete_control_no_second_search']} rows."),
+        "",
         "## What follows for an application",
         "",
-        ("- Search at READ COMMITTED or in autocommit mode, or end the transaction before searching "
-        "again, when other connections write to the table. PyMySQL opens connections with "
-        "autocommit off, so a connection that has run one `SELECT` is inside a REPEATABLE READ "
-        "transaction until it commits, rolls back or closes."),
-        ("- WikiLense itself is not affected by this in its measurements: nothing writes to `chunk` "
+        ("- A reader did not cause the state when it searched at READ COMMITTED or in autocommit "
+        "mode, when it ended its transaction before searching again, or when its transaction "
+        "searched the index only after the other connection's commit. Once the state is there, "
+        "connections at every level get the stale answer. So an application that writes while "
+        "it searches is safe only if none of its connections searches the index twice inside "
+        "one REPEATABLE READ transaction."),
+        ("- PyMySQL opens connections with autocommit off, so a connection that has run one "
+        "`SELECT` is inside a REPEATABLE READ transaction until it commits, rolls back or "
+        "closes."),
+        ("- WikiLense's measurements are not affected: no connection commits a write to `chunk` "
         "while a search runs, and `wikilense ingest` recreates the tables."),
         ("- We found no MariaDB ticket that describes this (searched on 2026-11-11) and have not "
-        "reported it. It was measured on one server version only."),
+        "reported it. It was measured on one server version, on one scratch table of "
+        f"{report['rows']:,} random vectors and one query, rebuilt for every trial."),
         "",
     ]
     return "\n".join(lines)

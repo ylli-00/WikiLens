@@ -109,7 +109,7 @@ wrong-dimension vector.
     link filter, 315 under the History heading, 601 under `max_words 2000` (89 chunks pass).
   - The two most selective range filters on indexed `page` columns make it scan all 4,598 chunks,
     compute every distance and sort: `max_words 500` (25 chunks pass) and `edited_before
-    2020-06-01` (4 pass). That plan is exact, at 5.2 and 3.1 ms, and its cost grows with the table.
+    2020-06-01` (4 pass). That plan is exact, at 5.2 and 3.1 ms in that run, and reads every chunk.
     It is the plan under our fixed join order; "The join order we fix" below measures the plan
     the optimizer picks when the order is left to it.
   - No query returned fewer than min(k, passing) rows: under `edited_before 2020-06-01` only 4
@@ -154,9 +154,10 @@ wrong-dimension vector.
     insert and lost the vector index (observed in phase 2, docs/DESIGN.md). The statements use
     `STRAIGHT_JOIN` with `chunk` first, and the ingest runs `ANALYZE TABLE`.
   - An `IN (subquery)` filter becomes a semi-join and loses the index too (a test pins this).
-  - A derived table without `DISTINCT` is merged into the outer join, and `chunk` is scanned in
-    full. We found this with the category filter, even on the 12-chunk test data. A `SELECT
-    DISTINCT` derived table stays materialised and keeps the index; a test pins that plan.
+  - The same filter as a joined derived table keeps the index (a test pins that plan). The
+    derived tables are `SELECT DISTINCT`: without it MariaDB merges them into the join, which
+    still walks the vector index but returns a chunk once per matching link row ("The join
+    order we fix" below has the measurement, and the correction of what this file said before).
 - A test searches rows the transaction has not committed (`results/uncommitted_recall.md`): it
   fills a scratch table with the chunk table's vector column and index inside one transaction and
   searches it before and after `COMMIT`. There are three fresh builds each, and the overlap is
@@ -203,37 +204,43 @@ joined table: a predicate on the indexed table itself.
 [scripts/measure_index_behaviour.py](../scripts/measure_index_behaviour.py) runs the three shapes
 on the corpus and compares every hit list with NumPy's exact ranking of the chunks that pass
 ([results/statement_forms.md](../results/statement_forms.md); 75 claims, k=10, the shapes taking
-turns query by query):
+turns query by query; the two `ef_search` values were run one after the other, so compare times
+inside one value). `EXPLAIN` gives `chunk` the type `index` and the key `embedding` in all six
+shapes:
 
 | Statement | Chunks passing | ef_search | p50 ms | p95 ms | Equal to exact | Short | Rows read |
 |---|---|---|---|---|---|---|---|
-| the bare statement on chunk | 4,598 | 20 | 0.27 | 0.50 | 75/75 | 0/75 | 10 |
-| the same, joined to page | 4,598 | 20 | 2.01 | 2.29 | 75/75 | 0/75 | 10 |
-| WHERE chunk.n_words < 60 | 766 | 20 | 0.98 | 3.08 | 61/75 | 0/75 | 88 |
-| WHERE chunk.n_words < 60, joined to page | 766 | 20 | 2.08 | 2.32 | 75/75 | 0/75 | 84 |
-| WHERE chunk.n_words < 30 | 304 | 20 | 3.95 | 12.85 | 40/75 | 0/75 | 276 |
-| WHERE chunk.n_words < 30, joined to page | 304 | 20 | 2.25 | 2.70 | 75/75 | 0/75 | 270 |
-| the bare statement on chunk | 4,598 | 100 | 0.65 | 0.94 | 75/75 | 0/75 | 10 |
-| the same, joined to page | 4,598 | 100 | 2.27 | 2.94 | 75/75 | 0/75 | 10 |
-| WHERE chunk.n_words < 60 | 766 | 100 | 2.02 | 4.97 | 68/75 | 0/75 | 86 |
-| WHERE chunk.n_words < 60, joined to page | 766 | 100 | 2.32 | 3.02 | 75/75 | 0/75 | 84 |
-| WHERE chunk.n_words < 30 | 304 | 100 | 6.46 | 19.18 | 50/75 | 0/75 | 277 |
-| WHERE chunk.n_words < 30, joined to page | 304 | 100 | 2.56 | 3.23 | 75/75 | 0/75 | 270 |
+| the bare statement on chunk | 4,598 | 20 | 0.36 | 0.77 | 75/75 | 0/75 | 10 |
+| the same, joined to page | 4,598 | 20 | 2.16 | 3.26 | 75/75 | 0/75 | 10 |
+| WHERE chunk.n_words < 60 | 766 | 20 | 1.12 | 3.43 | 61/75 | 0/75 | 88 |
+| WHERE chunk.n_words < 60, joined to page | 766 | 20 | 2.25 | 3.48 | 75/75 | 0/75 | 84 |
+| WHERE chunk.n_words < 30 | 304 | 20 | 3.99 | 13.72 | 41/75 | 0/75 | 276 |
+| WHERE chunk.n_words < 30, joined to page | 304 | 20 | 2.45 | 3.77 | 75/75 | 0/75 | 270 |
+| the bare statement on chunk | 4,598 | 100 | 0.76 | 1.06 | 75/75 | 0/75 | 10 |
+| the same, joined to page | 4,598 | 100 | 2.42 | 3.38 | 75/75 | 0/75 | 10 |
+| WHERE chunk.n_words < 60 | 766 | 100 | 2.10 | 4.97 | 68/75 | 0/75 | 86 |
+| WHERE chunk.n_words < 60, joined to page | 766 | 100 | 2.46 | 3.23 | 75/75 | 0/75 | 84 |
+| WHERE chunk.n_words < 30 | 304 | 100 | 6.71 | 18.46 | 51/75 | 0/75 | 277 |
+| WHERE chunk.n_words < 30, joined to page | 304 | 100 | 2.68 | 3.39 | 75/75 | 0/75 | 270 |
 
 - **Bare.** The HNSW search. It reads `LIMIT` rows.
-- **A predicate on `chunk` itself.** The server does not stop at `LIMIT`: it keeps taking rows
-  from the index until `k` of them pass (88 and 276 rows read at the median). So no query comes
-  back short, unlike a filter applied after the search. But the order the index hands rows over
-  in is the approximate one, so the result is not the exact filtered top 10: 61 and 40 of 75
-  claims at `ef_search` 20, 68 and 50 at 100. And each continuation costs time: with 304 passing
-  chunks the statement takes longer than the exact joined form.
-- **The same predicate with a join in the statement.** Exact for 75 of 75 claims at both
-  `ef_search` values, at about the cost of the joined statement without a predicate. It reads
-  about as many rows (84 and 270), in the exact order.
+- **A predicate on `chunk` itself** (`n_words`, a column without an index). The server does not
+  stop at `LIMIT`: it keeps taking rows from the index until `k` of them pass
+  (88 and 276 rows read at the median at `ef_search` 20). None of the 300 answers
+  came back short, unlike a filter applied after the search; we ran nothing more selective than
+  304 passing chunks. But the order the index hands rows over in is the approximate one, so the
+  result is not the exact filtered top 10: 61 and 41 of 75 claims at `ef_search` 20,
+  68 and 51 at 100. And each continuation costs time: with 304 passing chunks the statement
+  takes longer than the joined form (6.71 against 2.68 ms at `ef_search` 100); with 766 it is still
+  the faster one.
+- **The same predicate with a join in the statement.** The exact top 10 for 75 of 75 claims at
+  both `ef_search` values. It reads about as many rows (84 and 270), in the exact order.
 
-For a schema this means: a filter column copied onto the vector table does not buy an exact
-filtered search, and for selective filters not a fast one either. The join is what makes MariaDB
-rank exactly.
+For a schema this means: copying a filter column onto the vector table, without an index of its
+own, did not buy an exact filtered search here, and under the more selective predicate not a fast
+one either. With a join in the statement MariaDB ranked exactly in every case we measured. We did
+not try an indexed column on `chunk`; the next section shows what the optimizer does with an
+index on the filter column of a joined table.
 
 ## The join order we fix, and the plan the optimizer would pick
 
@@ -242,49 +249,73 @@ The filtered statement names its tables with `STRAIGHT_JOIN`, `chunk` first (the
 `scripts/measure_index_behaviour.py join_order` runs every filter of the planner experiment in two
 forms, as written and with every `STRAIGHT_JOIN` replaced by `JOIN`, and compares both with the
 same statement under `IGNORE INDEX (embedding)`, which reads and sorts every chunk
-([results/join_order.md](../results/join_order.md); 75 claims, k=10, `ef_search` 100, the two forms
-taking turns query by query):
+([results/join_order.md](../results/join_order.md); 75 claims, k=10, `ef_search` 100). Each time is
+the median of the form run alone; in brackets is the median when the two forms take turns query
+by query. Taking turns guards against the laptop drifting between two blocks, but a form that
+reads thousands of rows slows the other form's next run, so we give both:
 
-| Filter | Chunks passing | As written | Rows read | p50 ms | Plain `JOIN` | Rows read | p50 ms |
+| Filter | Chunks passing | As written | Rows read | p50 ms (taking turns) | Plain `JOIN` | Rows read | p50 ms (taking turns) |
 |---|---|---|---|---|---|---|---|
-| none | 4,598 | vector index | 10 | 2.05 | vector index | 10 | 2.04 |
-| min_words_1000 | 4,544 | vector index | 10 | 2.18 | vector index | 10 | 2.13 |
-| min_words_5000 | 3,891 | vector index | 17 | 2.92 | `page` first | 3891 | 10.44 |
-| max_words_2000 | 89 | vector index | 601 | 3.06 | `page` first | 89 | 0.91 |
-| max_words_500 | 25 | scan of `chunk` | 4598 | 4.59 | `page` first | 25 | 0.63 |
-| heading_history | 117 | vector index | 315 | 2.94 | vector index | 315 | 2.94 |
-| linked_from | 661 | vector index | 121 | 3.12 | derived table first | 661 | 2.58 |
-| category | 695 | vector index | 108 | 3.00 | derived table first | 695 | 2.58 |
-| edited_since_2020_12_01 | 4,525 | vector index | 10 | 2.52 | vector index | 10 | 2.54 |
-| edited_before_2020_12_15 | 778 | vector index | 67 | 2.68 | `page` first | 778 | 2.64 |
-| edited_before_2020_06_01 | 4 | scan of `chunk` | 4598 | 3.15 | `page` first | 4 | 0.67 |
-| four_filters | 377 | vector index | 184 | 3.42 | derived table first | 377 | 2.10 |
+| none | 4,598 | vector index | 10 | 2.11 (2.19) | vector index | 10 | 2.09 (2.19) |
+| min_words_1000 | 4,544 | vector index | 10 | 2.08 (2.09) | vector index | 10 | 2.31 (2.10) |
+| min_words_5000 | 3,891 | vector index | 17 | 2.11 (2.61) | `page` first | 3891 | 10.24 (10.37) |
+| max_words_2000 | 89 | vector index | 601 | 3.29 (3.20) | `page` first | 89 | 0.77 (0.96) |
+| max_words_500 | 25 | scan of `chunk` | 4598 | 4.76 (4.72) | `page` first | 25 | 0.50 (0.73) |
+| heading_history | 117 | vector index | 315 | 2.99 (3.02) | vector index | 315 | 2.93 (3.03) |
+| linked_from | 661 | vector index | 121 | 3.13 (3.17) | derived table first | 661 | 2.58 (2.66) |
+| category | 695 | vector index | 108 | 2.41 (3.09) | derived table first | 695 | 2.34 (2.62) |
+| edited_since_2020_12_01 | 4,525 | vector index | 10 | 2.54 (2.60) | vector index | 10 | 2.61 (2.60) |
+| edited_before_2020_12_15 | 778 | vector index | 67 | 2.86 (2.81) | `page` first | 778 | 2.63 (2.79) |
+| edited_before_2020_06_01 | 4 | scan of `chunk` | 4598 | 3.59 (3.31) | `page` first | 4 | 1.09 (0.84) |
+| four_filters | 377 | vector index | 184 | 3.36 (3.47) | derived table first | 377 | 2.07 (2.12) |
+
+A run made a minute earlier ([results/join_order_run1.md](../results/join_order_run1.md)) has the
+same plans, rows read and agreement with the scan in every row. Its medians show how far a time
+below a millisecond moves on this laptop: under `max_words 500` the free form took
+0.54 ms there and the form as written 4.94 ms; under `min_words 5000`,
+10.61 and 2.58 ms.
 
 - **As written**, the server walks the vector index under 10 of the 12 filters. Under the two most
-  selective range filters it reads all 4,598 chunks and sorts: `EXPLAIN` shows `chunk` with type
-  `ALL` and `page` read by `range` on its index through a join buffer.
-- **With a plain `JOIN`**, the optimizer starts from the filter's own index or derived table under
-  8 of the 12 filters. It reads only the chunks that pass, through `uq_chunk_page_ordinal`, and
-  sorts them. This is the plan a vector store calls pre-filtering, chosen by cost. The vector index
-  is not used in it, and we saw no plan that combines the two.
-- **That is cheaper when few chunks pass:** 0.63 ms instead of
-  4.59 ms when 25 pass, 0.67 instead of
-  3.15 when 4 pass, 0.91 instead of
-  3.06 when 89 pass, and 2.10 instead of
-  3.42 under the brief's four filters (377 pass).
+  selective range filters it reads all 4,598 chunks and sorts (`chunk` has type `ALL` in
+  `EXPLAIN`; the `wikilense query ... --explain` output for `--max-words 500` also shows `page`
+  read by `range` on `ix_page_n_words` through a join buffer).
+- **With a plain `JOIN`**, the optimizer starts from another table under 8 of the 12 filters:
+  `page`, or the derived table of the link or category filter. It reads `chunk` by
+  `uq_chunk_page_ordinal`, exactly as many rows as pass the filter, and the vector index is not
+  in the plan. This is what a vector store calls pre-filtering, chosen here by cost. We saw no
+  plan that combines it with the vector index.
+- **That is cheaper when few chunks pass:** 0.50 ms instead of
+  4.76 ms when 25 pass, 1.09 instead of
+  3.59 when 4 pass, 0.77 instead of
+  3.29 when 89 pass, and 2.07 instead of
+  3.36 under the brief's four filters (377 pass).
 - **And dearer when many pass:** under `min_words 5000` (3,891 of 4,598 chunks pass) the free plan
-  reads those 3,891 chunks and sorts, 10.44 ms instead of
-  2.92 ms. That cost grows with the table. The fixed order never
-  takes this plan, which is the reason it stays.
-- Under the link, category and `edited_before 2020-12-15` filters the plan moves too, and the time
-  stays within the run-to-run noise of this laptop (a factor of 1.25).
-- Both forms return the same 10 chunks as the scan for every claim under every filter.
-- **Order.** Under the four filters the statement as written returned two neighbours the other way
-  round than the distances it reports for them, for 2 of 75 claims. Those distances differ by at
-  most 3.9e-06. This fits the index comparing its 16-bit copies of the vectors (its author's
-  description, linked below) while the select list computes the distance from the stored 32-bit
-  vector; we did not read the server source. `wikilense` sorts the returned rows by the reported
+  reads those 3,891 chunks and sorts, 10.24 ms instead of
+  2.11 ms. The free plan reads every passing chunk, so its cost
+  follows the number that pass; we did not measure it on a larger table. The fixed order took no
+  such plan under any of the 12 filters, which is the reason it stays. Its own worst case is the
+  scan of all 4,598 chunks under the two most selective filters.
+- Under the link, category and `edited_before 2020-12-15` filters the plan moves too, and the
+  times stay within a factor of 1.5, which we do not read as a difference on this laptop.
+- Both forms return the same chunks as the scan for every claim under every filter (10 of them,
+  or the 4 that pass `edited_before 2020-06-01`).
+- **Order.** Under the four filters the statement as written returned the same 10 chunks in
+  another order than the scan for 2 of 75 claims. In those 2 lists the rows are not in ascending
+  order of the distance the statement itself reports, and where the list differs from the
+  scan's the two reported distances differ by at most 3.9e-06. That fits the index ranking by
+  its 16-bit copies of the vectors (its author's description, linked below) while the select
+  list computes the distance from the stored 32-bit vector. We did not test that explanation
+  and did not read the server source. `wikilense` sorts the returned rows by the reported
   distance and the chunk id, so its lists equal the exact ranking.
+
+- **The derived tables need their `DISTINCT` for the result, not for the index.** The same
+  statements with `SELECT DISTINCT` turned into `SELECT`: MariaDB merges the derived table into
+  the join (no `<derived>` row in `EXPLAIN`) and still walks the vector index, for all 75 claims
+  under the link, the category and the four filters. But under the link filter 75 of 75 hit
+  lists then name the same chunk more than once (0 under the category filter, 75 under the four
+  filters), because a page can link to another page several times. Earlier versions of the
+  README and of this file said that the merged form loses the index. That does not reproduce on
+  11.8.9, neither on the corpus nor on the test data, and the statement was removed.
 
 What follows for the design: `STRAIGHT_JOIN` trades the best plan under a very selective filter
 for a predictable one. A statement that leaves the order free only when few rows pass would be
@@ -330,9 +361,10 @@ builds inside a run):
 ## Isolation levels, and a reader that leaves the index stale
 
 The documentation says that "all transaction isolation levels are supported". We checked what a
-search sees while another connection writes, and found one sequence after which the index is wrong
-for every connection ([results/isolation.md](../results/isolation.md); a scratch table of 1,000
-random vectors with the chunk table's index definition, in the test database, `ef_search` 100).
+search sees while another connection writes, and found one sequence after which the index gave
+wrong answers to every connection we tried ([results/isolation.md](../results/isolation.md); a
+scratch table of 1,000 random vectors with the chunk table's index definition, in the test
+database, one query, `ef_search` 100, the table rebuilt for every trial).
 
 Writer B inserts 5 rows that are nearer to the query than every other row. Each cell is how many
 of them reader A finds among its top 10 through the index / by a scan, in 5 trials each:
@@ -344,20 +376,19 @@ of them reader A finds among its top 10 through the index / by a scan, in 5 tria
 | REPEATABLE READ | 0 / 0 | 0 / 0 | 0 / 5 | went through |
 | SERIALIZABLE | 0 / 0 | 0 / 0 | 0 / 0 | blocked: Lock wait timeout exceeded; try restarting transaction (error 1205) |
 
-The first two rows and the first two moments of the third are what the levels promise, and the
-index agrees with the scan. (One exception in one trial: at READ UNCOMMITTED the index found 4 of
-B's 5 uncommitted rows. That is the lower recall over uncommitted rows measured above, here for
-another transaction's rows. An earlier run of the same script gave 5 of 5 in every trial.) The last moment of the REPEATABLE READ row does not: in A's *next*
-transaction a scan finds the 5 rows and the index finds none. (At SERIALIZABLE the search takes
-locks that make B's insert wait.)
+At READ UNCOMMITTED and READ COMMITTED, and in the first two moments at REPEATABLE READ, the index
+agrees with the scan and with what the level promises. One exception: at READ UNCOMMITTED the index found 4 of B's 5 uncommitted rows in 1 of 5 trials; an approximate search can miss a row, and we did not look for another cause. At SERIALIZABLE the search takes locks
+that made B's insert wait and time out, so that row shows a table nothing was written to. The
+last moment of the REPEATABLE READ row is the exception: in A's *next* transaction a scan finds
+the 5 rows and the index finds none.
 
-The sequence, which we repeated 10 times on fresh tables, with four controls of 5 trials:
+The sequence, which we repeated 10 times on fresh tables, with six controls of 5 trials:
 
 1. A, at REPEATABLE READ, opens a transaction and searches the index.
 2. B inserts the 5 rows and commits.
-3. A searches again, still inside its old snapshot.
+3. A searches again, still inside its old snapshot (and finds none of the new rows, as it should).
 4. A commits and disconnects.
-5. A new connection searches: is it missing committed rows that a scan returns?
+5. A new connection searches: does the index return none of the committed rows that a scan returns?
 
 | Sequence | Stale at step 5 | New rows found through the index, per trial |
 |---|---|---|
@@ -365,31 +396,44 @@ The sequence, which we repeated 10 times on fresh tables, with four controls of 
 | control: A is at READ COMMITTED | 0 of 5 | [5, 5, 5, 5, 5] |
 | control: A skips step 3 | 0 of 5 | [5, 5, 5, 5, 5] |
 | control: A is in autocommit mode, so step 3 is a new transaction | 0 of 5 | [5, 5, 5, 5, 5] |
+| control: A's statement in step 1 is `SELECT COUNT(*)`, not a search | 0 of 5 | [5, 4, 5, 5, 5] |
+| control: A's statement in step 1 is the scan, not the index search | 0 of 5 | [5, 5, 5, 5, 5] |
 | control: A commits but stays connected | 5 of 5 | [0, 0, 0, 0, 0] |
 
-- It needs the old snapshot (not at READ COMMITTED) and the search inside it after B's commit
-  (step 3).
-- It lasts: three further new connections each found 0 of the 5 rows through the index, on six
-  stale tables.
-- It ends with the next committed write to the table (then the index found all 6 of 6 new rows)
-  or with `FLUSH TABLES` on the table (5 of 5). So the index on disk is right; the copy of the
-  graph that the server keeps in memory was filled from A's old snapshot.
-- With a `DELETE` in step 2 (B deletes the three nearest rows), the index then returned **no row
-  at all** for that query in 10 of 10 trials, from a table of 997 rows where a scan returned 10.
-  Of 20 other queries none came back empty, but the shortest answer had 6 rows.
+- **What it takes.** In every trial that went stale, a REPEATABLE READ transaction had searched
+  the index before B's commit and again after it. No control without one of the two went stale:
+  not at READ COMMITTED, not in autocommit mode, not without the second search, and not when A's
+  first statement was a `COUNT(*)` or a scan. (In 1 control trial the index found 4 of the 5 rows: an approximate search, not this state.)
+- **Who gets the wrong answer.** Everyone we tried. On 5 stale tables, new connections at
+  REPEATABLE READ, READ COMMITTED and READ UNCOMMITTED and in autocommit mode each found 0 of the
+  5 rows through the index. The isolation level of the connection that asks does not protect it.
+- **It lasts.** Three further new connections each found 0 of the 5 rows, on six stale tables.
+- **What ends it.** The next committed write to the table (then the index found all 6 of 6 new
+  rows, 3 of 3 tables) or `FLUSH TABLES` on the table (5 of 5, 3 of 3 tables). `FLUSH TABLES`
+  makes the server open the table again, so the index as stored was right. That fits a copy of
+  the graph in the server's memory that was loaded inside A's old snapshot; we did not inspect
+  the cache or read the server source.
+- **With a `DELETE` in step 2** (B deletes the three nearest rows), the index then returned **no
+  row at all** for that query in 10 of 10 trials, from a table of 997 rows where a scan returned
+  10. Of 20 other queries none came back empty, but the shortest answer had 5 rows. A committed
+  insert (3 of 3 tables) or `FLUSH TABLES` (once) brought the 10 rows back, and the control
+  without A's second search returned 10 rows in 5 of 5.
 
-What to do when other connections write to the table: search at READ COMMITTED or in autocommit
-mode (both controls were clean), or end the transaction before searching again. PyMySQL opens
-connections with autocommit off, so a connection that has run one `SELECT` is in a REPEATABLE READ
-transaction until it commits, rolls back or closes. That is how WikiLense's own connections work:
-a `wikilense query` and a web request run one search and close, while `wikilense eval` and the
-experiment scripts run many searches in one transaction. Its measurements are not affected:
-nothing writes to `chunk` while a search runs, and `wikilense ingest` recreates the tables. The
-whole experiment was run twice with the same outcome in every row but the one noted above
-([results/isolation_run1.md](../results/isolation_run1.md) is the first run, made before the
-autocommit control was added). We found no MariaDB
-ticket that describes this (searched on 2026-11-11), have not reported it, and measured it on
-11.8.9 only.
+What to do when other connections write to the table: no connection should search the index
+twice inside one REPEATABLE READ transaction. Searching at READ COMMITTED or in autocommit mode,
+or ending the transaction between searches, did not cause the state. PyMySQL opens connections
+with autocommit off, so a connection that has run one `SELECT` is in a REPEATABLE READ transaction
+until it commits, rolls back or closes. That is how WikiLense's own connections work. A web
+request runs one search and closes. `wikilense query` runs a `COUNT(*)`, loads the model, runs one
+search and closes, which is the shape of the `COUNT(*)` control. `wikilense eval` and the
+experiment scripts run many searches in one transaction, so a committed write to the corpus by
+another connection during such a run would start the sequence. Nothing here does that: only the
+ingest commits writes to the corpus (`sql/examples.sql` updates one row and rolls back), and it
+recreates the tables. The measurements are not affected. The experiment was run three times
+with the same outcome in every row of the sequence table that the runs share
+([results/isolation_run1.md](../results/isolation_run1.md) is the first run, made before four of
+the controls were added). We found no MariaDB ticket that describes this (searched on
+2026-11-11), have not reported it, and measured it on 11.8.9 only, on this one table.
 
 ## The joined statement against a brute-force ranking
 
@@ -422,16 +466,16 @@ and each statement tried on the 11.8.9 container:
 | The documentation says | On 11.8.9 |
 |---|---|
 | The index is used only for `ORDER BY VEC_DISTANCE_*(column, vector)`, or its alias, ascending, with a `LIMIT` | confirmed: without `LIMIT`, and with `DESC`, `EXPLAIN` shows type `ALL` and a filesort (a test pins both) |
-| A distance wrapped in an expression, and a `WHERE` on the distance without `ORDER BY ... LIMIT`, fall back to a full scan | confirmed (tests pin both) |
+| A distance wrapped in an expression, and a `WHERE` on the distance without `ORDER BY ... LIMIT`, fall back to a full scan | confirmed (tests pin both, the expression ascending and descending) |
 | A `WHERE` on the distance added to an `ORDER BY ... LIMIT` query still uses the index | confirmed: type `index`, key `embedding`, `Using where` (a test pins it) |
 | A search with another distance function than the index was built for cannot use the index | confirmed: `VEC_DISTANCE_EUCLIDEAN` on our cosine index gives type `ALL`; the generic `VEC_DISTANCE` uses the index (a test pins both) |
 | Only one vector index per table; the indexed column must be `NOT NULL` | our schema follows it |
 | `M` from 3 to 200, default 6; `mhnsw_ef_search` from 1 to 10000, default 20; `mhnsw_max_cache_size` default 16 MB | the same values in `information_schema.SYSTEM_VARIABLES` (a test reads them) |
 | `INFORMATION_SCHEMA.VECTOR_INDEXES` exists from MariaDB 13.1 | the table does not exist in 11.8.9, which is why the graph size was read from the tablespace file |
-| "Concurrent reads/writes and all transaction isolation levels are supported" | we measured one thing it does not mention: the lower recall over a transaction's own uncommitted rows |
+| "Concurrent reads/writes and all transaction isolation levels are supported" | we measured two things it does not mention: the lower recall over a transaction's own uncommitted rows, and the index left stale by a REPEATABLE READ reader ("Isolation levels" above) |
 
-Not in the reference, and measured here: the second `ORDER BY` key, the `IN (subquery)` and the
-non-`DISTINCT` derived table that lose the index; the exact ranking as soon as a join is present,
+Not in the reference, and measured here: the second `ORDER BY` key and the `IN (subquery)` that
+lose the index; the exact ranking in every joined statement we compared,
 and the approximate, continuing search under a predicate on the indexed table itself; the
 optimizer's switch to a scan under selective range filters, and its choice of the filter's own
 index over the vector index when the join order is left free; the hit lists that change with the

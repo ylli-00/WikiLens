@@ -8,7 +8,7 @@
 #   make lint         ruff
 #   make eval         recall and latency of the ingested corpus -> results/
 #   make serve        the web query page on http://127.0.0.1:8000
-#   make examples     the ten statements of sql/examples.sql through the mariadb client (no Python)
+#   make examples     the ten examples of sql/examples.sql through the mariadb client (no Python)
 #   make experiments  the whole experiment protocol (scripts/run_experiments.py all)
 #   make down         stop the MariaDB container (the data volume is kept)
 #

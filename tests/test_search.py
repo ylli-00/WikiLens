@@ -607,6 +607,18 @@ def test_the_four_filters_of_the_brief_in_one_statement(meta_corpus) -> None:
     assert plan[0]["table"] == "chunk" and plan[0]["key"] == "embedding", plan
     assert plan[0]["type"] == "index", plan
     assert any(row["table"] == "<derived2>" for row in plan), plan  # materialised, not merged
+    # The same statement without DISTINCT in the derived table: MariaDB merges it into the
+    # join (no <derived> row) and still reads chunk through the vector index. An earlier note
+    # said the merged plan scans chunk; that does not happen on 11.8.9 (results/join_order.md).
+    sql, params = search_statement(QUERY, k=3, filters=Filters(category="Places"))
+    assert sql.count("SELECT DISTINCT page_category.page_id") == 1
+    merged = dbmod.explain(
+        meta_corpus, sql.replace("SELECT DISTINCT page_category.page_id", "SELECT page_category.page_id"),
+        params,
+    )
+    assert not any(row["table"].startswith("<derived") for row in merged), merged
+    merged_chunk = next(row for row in merged if row["table"] == "chunk")
+    assert merged_chunk["type"] == "index" and merged_chunk["key"] == "embedding", merged
     # dropping any one filter lets another page in
     assert _pages(search(meta_corpus, QUERY, k=N_CHUNKS, filters=replace(filters, category=None))) \
         == {BETA}
@@ -873,6 +885,10 @@ def test_the_statement_shapes_that_keep_or_lose_the_vector_index(corpus) -> None
             "SELECT chunk_id FROM chunk ORDER BY 1 - VEC_DISTANCE_COSINE(embedding, %s) DESC LIMIT 3",
             (q,),
         ),
+        "expression ascending": (
+            "SELECT chunk_id FROM chunk ORDER BY VEC_DISTANCE_COSINE(embedding, %s) + 0 LIMIT 3",
+            (q,),
+        ),
         "threshold": (
             "SELECT chunk_id FROM chunk WHERE VEC_DISTANCE_COSINE(embedding, %s) < 0.5",
             (q,),
@@ -897,13 +913,14 @@ def test_the_statement_shapes_that_keep_or_lose_the_vector_index(corpus) -> None
             ("Alpha", q),
         ),
     }
+
     def chunk_row(name: str) -> dict[str, Any]:
         sql, params = shapes[name]
         return next(r for r in dbmod.explain(corpus, sql, params) if r["table"] == "chunk")
 
     for name in ("index", "derived"):
         assert chunk_row(name)["key"] == "embedding" and chunk_row(name)["type"] == "index", name
-    for name in ("tie-break", "expression", "threshold", "semi-join"):
+    for name in ("tie-break", "expression", "expression ascending", "threshold", "semi-join"):
         assert chunk_row(name)["key"] != "embedding" and chunk_row(name)["type"] == "ALL", name
     with corpus.cursor() as cur:
         cur.execute("SELECT VEC_DISTANCE_COSINE(embedding, %s) FROM chunk LIMIT 2",
@@ -941,8 +958,10 @@ def test_what_the_vector_documentation_says_about_the_index_holds_on_this_server
 
     for name in ("generic", "threshold and limit", "own predicate"):
         assert chunk_row(name)["key"] == "embedding" and chunk_row(name)["type"] == "index", name
+    assert "Using where" in chunk_row("threshold and limit")["Extra"]
     for name in ("euclidean", "descending", "no limit"):
         assert chunk_row(name)["key"] != "embedding" and chunk_row(name)["type"] == "ALL", name
+        assert "Using filesort" in chunk_row(name)["Extra"], name
 
 
 @pytest.mark.db

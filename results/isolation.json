@@ -1,6 +1,6 @@
 {
   "name": "isolation",
-  "created_at": "2026-11-11T07:51:23+00:00",
+  "created_at": "2026-11-11T08:18:10+00:00",
   "k": 10,
   "rows": 1000,
   "new_rows": 5,
@@ -25,8 +25,8 @@
       "writer_uncommitted": {
         "index": [
           5,
-          5,
           4,
+          5,
           5,
           5
         ],
@@ -252,61 +252,71 @@
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       }
     ],
     "control_read_committed": [
@@ -314,31 +324,36 @@
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       }
     ],
     "control_no_second_search": [
@@ -346,31 +361,36 @@
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": null
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": null
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": null
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": null
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": null
       }
     ],
     "control_autocommit": [
@@ -378,31 +398,36 @@
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       },
       {
         "index_rows": 10,
         "index_new": 5,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 5
       }
     ],
     "control_reader_stays_connected": [
@@ -410,34 +435,145 @@
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
       },
       {
         "index_rows": 10,
         "index_new": 0,
         "scan_rows": 10,
-        "scan_new": 5
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      }
+    ],
+    "control_first_statement_count": [
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 4,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      }
+    ],
+    "control_first_statement_scan": [
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
+      },
+      {
+        "index_rows": 10,
+        "index_new": 5,
+        "scan_rows": 10,
+        "scan_new": 5,
+        "reader_second_search_new": 0
       }
     ]
   },
+  "victims": [
+    {
+      "REPEATABLE READ": 0,
+      "READ COMMITTED": 0,
+      "READ UNCOMMITTED": 0,
+      "autocommit": 0
+    },
+    {
+      "REPEATABLE READ": 0,
+      "READ COMMITTED": 0,
+      "READ UNCOMMITTED": 0,
+      "autocommit": 0
+    },
+    {
+      "REPEATABLE READ": 0,
+      "READ COMMITTED": 0,
+      "READ UNCOMMITTED": 0,
+      "autocommit": 0
+    },
+    {
+      "REPEATABLE READ": 0,
+      "READ COMMITTED": 0,
+      "READ UNCOMMITTED": 0,
+      "autocommit": 0
+    },
+    {
+      "REPEATABLE READ": 0,
+      "READ COMMITTED": 0,
+      "READ UNCOMMITTED": 0,
+      "autocommit": 0
+    }
+  ],
   "recovery": {
     "by_write": [
       6,
@@ -535,7 +671,7 @@
       "reader_snapshot_still_sees_deleted": 3,
       "new_connection_index_rows": 0,
       "new_connection_scan_rows": 10,
-      "other_queries_min_rows": 6,
+      "other_queries_min_rows": 5,
       "other_queries_with_no_row": 0,
       "table_rows": 997
     },
@@ -576,5 +712,17 @@
       "table_rows": 997
     }
   ],
-  "delete_rows_after_flush": 10
+  "delete_rows_after_flush": 10,
+  "delete_rows_after_write": [
+    10,
+    10,
+    10
+  ],
+  "delete_control_no_second_search": [
+    10,
+    10,
+    10,
+    10,
+    10
+  ]
 }

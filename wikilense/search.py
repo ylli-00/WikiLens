@@ -11,8 +11,9 @@ tests/test_search.py):
 ``inline``
     One statement: ``chunk STRAIGHT_JOIN page STRAIGHT_JOIN section [...] WHERE <filters>
     ORDER BY VEC_DISTANCE_COSINE(chunk.embedding, %s) LIMIT k``. ``STRAIGHT_JOIN`` keeps
-    ``chunk`` first in the join order; with a plain ``JOIN`` the optimizer starts from ``page``
-    and sorts every chunk instead of using the vector index. With the join present MariaDB
+    ``chunk`` first in the join order; with a plain ``JOIN`` the optimizer starts from the
+    filter's table under most filters and sorts the chunks that pass, without the vector index
+    (results/join_order.md: faster under a very selective filter, slower under a loose one). With the join present MariaDB
     walks the vector index in distance order until ``k`` rows have passed the filters, so the
     result is never short when enough chunks match, at the price of a walk whose length grows
     with the selectivity of the filter and with the table (``mhnsw_ef_search`` does not change
@@ -204,7 +205,9 @@ FILTER_TITLES_SUFFIX = ")"
 #: pages. A ``chunk.page_id IN (SELECT ...)`` predicate is rewritten by the optimizer into a
 #: semi-join whose table order ignores STRAIGHT_JOIN; measured on 11.8.9 it then starts from
 #: ``link`` and drops the vector index. The derived table with DISTINCT is materialised once
-#: and joined after the index scan. Parameter: the source page title.
+#: and joined after the index scan. The DISTINCT is needed for the result: a page can link to
+#: another one several times, and without it a chunk comes back once per link row.
+#: Parameter: the source page title.
 LINKED_FROM_JOIN = (
     "(SELECT DISTINCT link.to_page_id AS page_id FROM link "
     "JOIN page AS src ON src.page_id = link.from_page_id "
@@ -221,10 +224,11 @@ LINKS_TO_JOIN = (
 #: Pages in the category with the given exact name, joined like the link filters (a
 #: ``chunk.page_id IN (SELECT ...)`` would become a semi-join that loses the vector index).
 #: ``page_category`` holds one row per (page, category), so the rows are already distinct; the
-#: DISTINCT is there for the plan: without it MariaDB merges the derived table into the outer
-#: join and, measured on 11.8.9, scans ``chunk`` in full (EXPLAIN type ``ALL``) instead of
-#: walking the vector index. With it the derived table is materialised and joined after the
-#: index scan, as for the link filters. Parameter: the category name, no "Category:" prefix.
+#: DISTINCT keeps the plan the same as for the link filters: the derived table is materialised
+#: and joined after the index scan. Without it MariaDB 11.8.9 merges the derived table into
+#: the outer join and still walks the vector index (results/join_order.md; an earlier comment
+#: here said it scans ``chunk``, which does not reproduce). Parameter: the category name, no
+#: "Category:" prefix.
 CATEGORY_JOIN = (
     "(SELECT DISTINCT page_category.page_id FROM page_category "
     "JOIN category ON category.category_id = page_category.category_id "

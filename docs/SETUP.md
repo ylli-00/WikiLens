@@ -121,7 +121,7 @@ reads the metadata only.
 ## Afterwards
 
 `make test` runs the suite, `make eval` writes the headline table to `results/baseline.md` (ignored
-by git), `make serve` starts the web page, `make examples` runs the ten statements of
+by git), `make serve` starts the web page, `make examples` runs the ten examples of
 `sql/examples.sql` through the `mariadb` client inside the container (no Python), `make experiments`
 reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
 deletes the data volume.

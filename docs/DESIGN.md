@@ -1,4 +1,4 @@
-# WikiLense design (phases 1 to 3, 2026-09-17)
+# WikiLense design (from phase 1, 2026-09-17, to the review pass of 2026-11-11)
 
 Retrieval over Wikipedia inside MariaDB 11.8: chunk pages, embed chunks, store them in a
 `VECTOR` column with a cosine `VECTOR INDEX`, query with `VEC_DISTANCE_COSINE`, and combine the
@@ -604,6 +604,8 @@ of the full `feverous_wikiv1.db` and three pages read by hand confirmed this.
   table into the outer join and reads `chunk` in full (EXPLAIN type `ALL`), even on the 12-chunk
   test data. With it, the table is materialised (`<derived2>`) and the vector index drives the
   scan, like the link filters. `tests/test_search.py` pins this plan.
+  **Corrected on 2026-11-11:** the first sentence does not reproduce. On the corpus and on the
+  test data the merged plan still walks the vector index; see "Review pass (2026-11-11)".
 - **When the optimizer keeps the vector index under a filter** (`results/planner_choices.md`,
   group `planner`): 75 claims, inline statement, k 10, ef 100.
   - Nine of the eleven filters, and the unfiltered statement, plan `chunk` through the index for
@@ -718,7 +720,7 @@ Decisions (the owner had left them open):
   with a rerun of the tests and of `scripts/measure_index_behaviour.py`.
 - **`STRAIGHT_JOIN` stays in the filtered statement**, although `results/join_order.md` shows that
   it is the slower plan under the most selective filters (see below). The settings are fixed since
-  the evaluation, the fixed order never takes the 10.44 ms plan the
+  the evaluation, the fixed order never takes the 10.24 ms plan the
   optimizer picked for one unselective filter, and a rule for when to leave the order free would
   need its own measurement at scale. The README and `docs/VECTOR_INDEX.md` state the cost.
 - **The stale index was not reported to MariaDB.** It is a behaviour measured on one patch release
@@ -729,42 +731,60 @@ Measured after the self-grade (three graders, 36 to 37 of 40 with their own stri
 suggestions are in the run's handoff report). `scripts/measure_index_behaviour.py`, four parts:
 
 - **`forms` (`results/statement_forms.md`).** One nearest-neighbour statement in three shapes.
-  Bare: the HNSW search. With a predicate on `chunk` itself: the server keeps taking rows from the
-  index until `k` pass, so no result is short, but the list is the exact filtered top 10 for only
-  50 of 75 claims when 304 chunks pass (68 of 75 when 766 pass), and it takes 6.46 ms. With a join
-  in the statement: exact for 75 of 75, at both `mhnsw_ef_search` values. So a filter column
-  copied onto the vector table would not have bought an exact filtered search; the join does.
+  Bare: the HNSW search. With a predicate on `chunk` itself (`n_words`, no index on it): the server
+  keeps taking rows from the index until `k` pass, so none of the 300 answers was short, but the
+  list is the exact filtered top 10 for only 51 of 75 claims when 304 chunks pass (68 of 75 when
+  766 pass), and it takes 6.71 ms. With a join in the statement: the exact top 10 for 75 of
+  75, at `mhnsw_ef_search` 20 and 100. So copying a filter column onto the vector table, without
+  an index of its own, would not have bought an exact filtered search here. An indexed column on
+  `chunk` was not tried.
 - **`join_order` (`results/join_order.md`).** The filtered statement as written against the same
   text with plain `JOIN`. Left free, the optimizer starts from the filter's own index or derived
   table under 8 of the 12 filters and sorts the chunks that pass, without the vector index:
-  0.63 ms instead of 4.59 ms when 25 chunks pass, and
-  10.44 ms instead of 2.92 ms when 3,891 pass. Both forms return the same 10
+  0.50 ms instead of 4.76 ms when 25 chunks pass, and
+  10.24 ms instead of 2.11 ms when 3,891 pass. Both forms return the same
   chunks as a scan for every claim and filter. Under the four filters the statement as written
-  returned two near-equal neighbours (distances at most 3.9e-06 apart) in the other order for 2 of
-  75 claims; `search()` sorts by the reported distance, so its lists are not affected.
-- **`isolation` (`results/isolation.md`).** A search through the index sees what a scan sees at
-  each of the four isolation levels while another connection inserts. One sequence breaks that: a
-  REPEATABLE READ transaction searches, another connection commits, the first searches again in
-  its old snapshot and ends. After it, index searches from new connections missed the committed
-  rows in 10 of 10 trials (and returned no row at all after a `DELETE`), until the next committed
-  write or `FLUSH TABLES`. The controls (READ COMMITTED, autocommit, no second search) were clean
-  in 5 of 5, and a second run of the whole experiment gave the same outcome.
-  Where WikiLense stands: its connections have autocommit off and the server default
-  REPEATABLE READ, so each is one transaction. A `wikilense query` and a web request run one
-  search and close. `wikilense eval` and the experiment scripts run many searches in one
-  transaction, so a write to the corpus by another connection during such a run would start the
-  sequence. Only the ingest writes to the corpus, and nothing here runs the two together. We
-  did not change the connections: no measured number depends on it, and an application that
-  writes while it searches should search at READ COMMITTED or in autocommit mode, or end the
-  transaction between searches.
+  returned them in another order for 2 of 75 claims (reported distances at most 3.9e-06 apart);
+  `search()` sorts by the reported distance, so its lists are not affected. The times are each
+  form run alone; taking turns with a form that reads thousands of rows made the other one
+  slower (2.11 against 2.61 ms), which the report shows in brackets.
+- **`isolation` (`results/isolation.md`).** While another connection inserts, a search through
+  the index saw what a scan saw at READ UNCOMMITTED, READ COMMITTED and REPEATABLE READ (at
+  SERIALIZABLE the insert waited and timed out). One sequence breaks that: a REPEATABLE READ
+  transaction searches, another connection commits, the first searches again in its old snapshot
+  and ends. After it, index searches from new connections missed the committed rows in 10 of
+  10 trials (and returned no row at all after a `DELETE`), until the next committed write or
+  `FLUSH TABLES`. Six controls of 5 trials stayed clean when one thing was changed: the reader at
+  READ COMMITTED, in autocommit mode, without its second search, or with a `COUNT(*)` or a scan
+  as its first statement. Once the state is there it reaches every reader we tried: new
+  connections at three isolation levels and in autocommit mode each found 0 of the 5 rows. The
+  experiment was run three times with the same outcome.
+  Where WikiLense stands: its search connections have autocommit off at the server default
+  REPEATABLE READ. A web request runs one search and closes. `wikilense query` runs a
+  `COUNT(*)`, loads the model, runs one search and closes: the shape of the clean `COUNT(*)`
+  control. `wikilense eval` and the experiment scripts run many searches in one transaction, so a
+  committed write to the corpus by another connection during such a run would start the
+  sequence. Only the ingest commits writes to the corpus (`sql/examples.sql` updates a row and
+  rolls back), and nothing here runs the two together. We did not change the connections: no
+  measured number depends on it. An application that writes while it searches must keep every
+  connection from searching the index twice inside one REPEATABLE READ transaction.
 - **`builds` (`results/build_variance.md`, `_run1.md`).** Ten fresh builds of the graph per `M`,
   twice. At the chosen settings (`M=16`, `ef_search` 100) all twenty builds found 74 of 75 gold
   pages, the exact ranking's number, and 74 or 75 top-10 lists equal to the exact ones. With the
   server defaults the builds found 65 to 73 gold pages. So the headline recall does not depend
   on which build a reader gets, and `ef_search` 100 is part of the reason.
-- `tests/test_search.py` now pins the rows of the table "Checked against the documentation" in
-  `docs/VECTOR_INDEX.md` (the generic `VEC_DISTANCE`, another distance function, `DESC`, no
-  `LIMIT`, a threshold next to `ORDER BY ... LIMIT`, the system variables' defaults and ranges).
+- `tests/test_search.py` now pins five of the eight rows of the table "Checked against the
+  documentation" in `docs/VECTOR_INDEX.md` (the generic `VEC_DISTANCE`, another distance function,
+  `DESC`, no `LIMIT`, an expression in ascending order, a threshold next to `ORDER BY ... LIMIT`,
+  the system variables' defaults and ranges).
+- **A statement in the README was wrong and is corrected.** It listed "a derived table without
+  `DISTINCT`, which MariaDB merges into the join" among the shapes that lose the vector index (a
+  note of 2026-10-22, never pinned by a test). `results/join_order.md` now runs the link,
+  category and four-filter statements without `DISTINCT`: the derived table is merged and the
+  vector index is still walked, for 75 of 75 claims each. What the `DISTINCT` does prevent is a
+  chunk coming back once per link row (75 of 75 lists under the link filter). The README, this
+  file, `docs/VECTOR_INDEX.md`, the comments in `wikilense/search.py` and `sql/examples.sql` say
+  so now, and a test pins the merged plan.
 - `make examples` runs `sql/examples.sql` through the `mariadb` client in the container, the path
   for a reader without Python.
 
@@ -813,5 +833,6 @@ snapshot, and our own checks). No bug that changes a recall or latency number wa
   `sql/examples.sql` through the `mariadb` client (it leaves the database byte for byte as it
   was); every statement about MariaDB in the README against the current documentation and the
   11.8.9 container (`docs/VECTOR_INDEX.md`, last section); no literal credential, no statement
-  built from values, no debug flag, no test without an assertion in 305 test functions.
+  built from values, no debug flag, no test without an assertion in 305 test functions (the
+  number at the time of that scan).
 

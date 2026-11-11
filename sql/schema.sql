@@ -4,7 +4,7 @@
 -- dependency order (parents first) and dropped in the reverse order on reset. Every table is
 -- InnoDB with utf8mb4. Title columns use utf8mb4_bin so that a title matches exactly (case- and
 -- accent-sensitive, as Wikipedia titles are); other text keeps the server's default
--- case-insensitive collation so that a heading filter such as `heading LIKE 'history%'` matches
+-- case-insensitive collation so that a heading filter such as `heading LIKE '%history%'` matches
 -- "History". Rows that belong to a page (sections, sentences, chunks, outgoing links) are
 -- deleted with it (ON DELETE CASCADE); references that only resolve a title to a corpus page
 -- become NULL again when that page goes (ON DELETE SET NULL).
@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS page (
 
 -- section: the section tree of a page, flattened in page order. Ordinal 0 is the lead
 -- (heading '', level 1, path ''); path is the headings from the top of the tree joined by ' > '.
--- heading is indexed for the "chunks under a heading like X" filter.
+-- heading has an index, which can serve an equality or a prefix pattern (`LIKE 'History%'`). The
+-- filter measured in results/ is `LIKE '%History%'`: its leading wildcard cannot use the index,
+-- and the plans read section by primary key and check the heading on the row.
 CREATE TABLE IF NOT EXISTS section (
     section_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     page_id    INT UNSIGNED NOT NULL,

@@ -1,0 +1,1171 @@
+{
+  "name": "join_order",
+  "created_at": "2026-11-11T08:17:13+00:00",
+  "k": 10,
+  "repeats": 3,
+  "ef_search": 100,
+  "n_queries": 75,
+  "n_chunks": 4598,
+  "index_m": 16,
+  "index_distance": "cosine",
+  "results": [
+    {
+      "filter": "none",
+      "passing_chunks": 4598,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 10.0,
+        "p50_ms": 2.156,
+        "p95_ms": 2.395,
+        "p50_ms_taking_turns": 2.138,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 10.0,
+        "p50_ms": 2.14,
+        "p95_ms": 3.44,
+        "p50_ms_taking_turns": 2.156,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "min_words_1000",
+      "passing_chunks": 4544,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 19.0,
+        "p50_ms": 2.6,
+        "p95_ms": 4.232,
+        "p50_ms_taking_turns": 2.643,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 19.0,
+        "p50_ms": 2.35,
+        "p95_ms": 3.388,
+        "p50_ms_taking_turns": 2.637,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "min_words_5000",
+      "passing_chunks": 3891,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 17.0,
+        "chunk_rows_read_max": 75.0,
+        "p50_ms": 2.582,
+        "p95_ms": 3.738,
+        "p50_ms_taking_turns": 2.937,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_n_words",
+            "Extra": "Using index condition; Using temporary; Using filesort"
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 3891.0,
+        "chunk_rows_read_max": 3891.0,
+        "p50_ms": 10.611,
+        "p95_ms": 12.113,
+        "p50_ms_taking_turns": 10.792,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "max_words_2000",
+      "passing_chunks": 89,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 601.0,
+        "chunk_rows_read_max": 1662.0,
+        "p50_ms": 3.297,
+        "p95_ms": 4.46,
+        "p50_ms_taking_turns": 3.114,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_n_words",
+            "Extra": "Using index condition; Using temporary; Using filesort"
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 89.0,
+        "chunk_rows_read_max": 89.0,
+        "p50_ms": 0.765,
+        "p95_ms": 0.943,
+        "p50_ms_taking_turns": 0.952,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "max_words_500",
+      "passing_chunks": 25,
+      "as_written": {
+        "plan": "chunk first; chunk ALL no key",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk ALL no key": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "ALL",
+            "key": null,
+            "Extra": "Using temporary; Using filesort"
+          },
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_n_words",
+            "Extra": "Using index condition; Using where; Using join buffer (flat, BNL join)"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 4598.0,
+        "chunk_rows_read_max": 4598.0,
+        "p50_ms": 4.942,
+        "p95_ms": 7.154,
+        "p50_ms_taking_turns": 4.946,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_n_words",
+            "Extra": "Using index condition; Using temporary; Using filesort"
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 25.0,
+        "chunk_rows_read_max": 25.0,
+        "p50_ms": 0.538,
+        "p95_ms": 0.8,
+        "p50_ms_taking_turns": 0.898,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "heading_history",
+      "passing_chunks": 117,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          }
+        ],
+        "chunk_rows_read_p50": 315.0,
+        "chunk_rows_read_max": 1013.0,
+        "p50_ms": 3.053,
+        "p95_ms": 3.949,
+        "p50_ms_taking_turns": 2.982,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          }
+        ],
+        "chunk_rows_read_p50": 315.0,
+        "chunk_rows_read_max": 1013.0,
+        "p50_ms": 3.102,
+        "p95_ms": 3.996,
+        "p50_ms_taking_turns": 2.968,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "linked_from",
+      "passing_chunks": 661,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "<derived2>",
+            "type": "ref",
+            "key": "key0",
+            "Extra": ""
+          },
+          {
+            "table": "src",
+            "type": "const",
+            "key": "uq_page_title",
+            "Extra": "Using index"
+          },
+          {
+            "table": "link",
+            "type": "range|filter",
+            "key": "ix_link_to_page|ix_link_from_page",
+            "Extra": "Using index condition; Using where; Using rowid filter"
+          }
+        ],
+        "chunk_rows_read_p50": 121.0,
+        "chunk_rows_read_max": 492.0,
+        "p50_ms": 2.834,
+        "p95_ms": 3.362,
+        "p50_ms_taking_turns": 2.882,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "<derived2> first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "<derived2> first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "<derived2>",
+            "type": "ALL",
+            "key": null,
+            "Extra": "Using where; Using temporary; Using filesort"
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "src",
+            "type": "const",
+            "key": "uq_page_title",
+            "Extra": "Using index"
+          },
+          {
+            "table": "link",
+            "type": "range|filter",
+            "key": "ix_link_to_page|ix_link_from_page",
+            "Extra": "Using index condition; Using where; Using rowid filter"
+          }
+        ],
+        "chunk_rows_read_p50": 661.0,
+        "chunk_rows_read_max": 661.0,
+        "p50_ms": 2.267,
+        "p95_ms": 4.472,
+        "p50_ms_taking_turns": 2.413,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "category",
+      "passing_chunks": 695,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "<derived2>",
+            "type": "ref",
+            "key": "key0",
+            "Extra": ""
+          },
+          {
+            "table": "category",
+            "type": "const",
+            "key": "uq_category_name",
+            "Extra": "Using index"
+          },
+          {
+            "table": "page_category",
+            "type": "ref",
+            "key": "ix_page_category_category",
+            "Extra": "Using where; Using index"
+          }
+        ],
+        "chunk_rows_read_p50": 108.0,
+        "chunk_rows_read_max": 420.0,
+        "p50_ms": 2.908,
+        "p95_ms": 4.855,
+        "p50_ms_taking_turns": 2.98,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "<derived2> first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "<derived2> first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "<derived2>",
+            "type": "ALL",
+            "key": null,
+            "Extra": "Using temporary; Using filesort"
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "category",
+            "type": "const",
+            "key": "uq_category_name",
+            "Extra": "Using index"
+          },
+          {
+            "table": "page_category",
+            "type": "ref",
+            "key": "ix_page_category_category",
+            "Extra": "Using where; Using index"
+          }
+        ],
+        "chunk_rows_read_p50": 695.0,
+        "chunk_rows_read_max": 695.0,
+        "p50_ms": 2.475,
+        "p95_ms": 5.009,
+        "p50_ms_taking_turns": 2.554,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "edited_since_2020_12_01",
+      "passing_chunks": 4525,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 25.0,
+        "p50_ms": 2.37,
+        "p95_ms": 3.827,
+        "p50_ms_taking_turns": 2.488,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 10.0,
+        "chunk_rows_read_max": 25.0,
+        "p50_ms": 2.441,
+        "p95_ms": 2.949,
+        "p50_ms_taking_turns": 2.472,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "edited_before_2020_12_15",
+      "passing_chunks": 778,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 67.0,
+        "chunk_rows_read_max": 491.0,
+        "p50_ms": 2.763,
+        "p95_ms": 5.064,
+        "p50_ms_taking_turns": 2.876,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_last_edited",
+            "Extra": "Using index condition; Using temporary; Using filesort"
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 778.0,
+        "chunk_rows_read_max": 778.0,
+        "p50_ms": 2.742,
+        "p95_ms": 4.862,
+        "p50_ms_taking_turns": 2.821,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "edited_before_2020_06_01",
+      "passing_chunks": 4,
+      "as_written": {
+        "plan": "chunk first; chunk ALL no key",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk ALL no key": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "ALL",
+            "key": null,
+            "Extra": "Using temporary; Using filesort"
+          },
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_last_edited",
+            "Extra": "Using index condition; Using where; Using join buffer (flat, BNL join)"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 4598.0,
+        "chunk_rows_read_max": 4598.0,
+        "p50_ms": 3.232,
+        "p95_ms": 4.497,
+        "p50_ms_taking_turns": 3.253,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      },
+      "free": {
+        "plan": "page first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "page first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "page",
+            "type": "range",
+            "key": "ix_page_last_edited",
+            "Extra": "Using index condition; Using temporary; Using filesort"
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          }
+        ],
+        "chunk_rows_read_p50": 4.0,
+        "chunk_rows_read_max": 4.0,
+        "p50_ms": 0.516,
+        "p95_ms": 1.089,
+        "p50_ms_taking_turns": 0.723,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    },
+    {
+      "filter": "four_filters",
+      "passing_chunks": 377,
+      "as_written": {
+        "plan": "chunk first; chunk index embedding",
+        "plan_count": 75,
+        "plans": {
+          "chunk first; chunk index embedding": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "chunk",
+            "type": "index",
+            "key": "embedding",
+            "Extra": ""
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "<derived2>",
+            "type": "ref",
+            "key": "key0",
+            "Extra": ""
+          },
+          {
+            "table": "<derived3>",
+            "type": "ref",
+            "key": "key0",
+            "Extra": ""
+          },
+          {
+            "table": "category",
+            "type": "const",
+            "key": "uq_category_name",
+            "Extra": "Using index"
+          },
+          {
+            "table": "page_category",
+            "type": "ref",
+            "key": "ix_page_category_category",
+            "Extra": "Using where; Using index"
+          },
+          {
+            "table": "src",
+            "type": "const",
+            "key": "uq_page_title",
+            "Extra": "Using index"
+          },
+          {
+            "table": "link",
+            "type": "range|filter",
+            "key": "ix_link_to_page|ix_link_from_page",
+            "Extra": "Using index condition; Using where; Using rowid filter"
+          }
+        ],
+        "chunk_rows_read_p50": 184.0,
+        "chunk_rows_read_max": 888.0,
+        "p50_ms": 3.351,
+        "p95_ms": 4.806,
+        "p50_ms_taking_turns": 3.596,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 73,
+        "short": 0,
+        "swap_gap_max": 3.8832106481478945e-06,
+        "not_ascending": 2
+      },
+      "free": {
+        "plan": "<derived2> first; chunk ref uq_chunk_page_ordinal",
+        "plan_count": 75,
+        "plans": {
+          "<derived2> first; chunk ref uq_chunk_page_ordinal": 75
+        },
+        "explain_first_claim": [
+          {
+            "table": "<derived2>",
+            "type": "ALL",
+            "key": null,
+            "Extra": "Using where; Using temporary; Using filesort"
+          },
+          {
+            "table": "page",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": "Using where"
+          },
+          {
+            "table": "<derived3>",
+            "type": "ref",
+            "key": "key1",
+            "Extra": ""
+          },
+          {
+            "table": "chunk",
+            "type": "ref",
+            "key": "uq_chunk_page_ordinal",
+            "Extra": ""
+          },
+          {
+            "table": "section",
+            "type": "eq_ref",
+            "key": "PRIMARY",
+            "Extra": ""
+          },
+          {
+            "table": "category",
+            "type": "const",
+            "key": "uq_category_name",
+            "Extra": "Using index"
+          },
+          {
+            "table": "page_category",
+            "type": "ref",
+            "key": "ix_page_category_category",
+            "Extra": "Using where; Using index"
+          },
+          {
+            "table": "src",
+            "type": "const",
+            "key": "uq_page_title",
+            "Extra": "Using index"
+          },
+          {
+            "table": "link",
+            "type": "range|filter",
+            "key": "ix_link_to_page|ix_link_from_page",
+            "Extra": "Using index condition; Using where; Using rowid filter"
+          }
+        ],
+        "chunk_rows_read_p50": 377.0,
+        "chunk_rows_read_max": 377.0,
+        "p50_ms": 1.828,
+        "p95_ms": 2.21,
+        "p50_ms_taking_turns": 2.165,
+        "same_rows_as_scan": 75,
+        "same_order_as_scan": 75,
+        "short": 0,
+        "swap_gap_max": 0.0,
+        "not_ascending": 0
+      }
+    }
+  ],
+  "filters": {
+    "none": {},
+    "min_words_1000": {
+      "min_words": 1000
+    },
+    "min_words_5000": {
+      "min_words": 5000
+    },
+    "max_words_2000": {
+      "max_words": 2000
+    },
+    "max_words_500": {
+      "max_words": 500
+    },
+    "heading_history": {
+      "heading_like": "%History%"
+    },
+    "linked_from": {
+      "linked_from": "Asia"
+    },
+    "category": {
+      "category": "Member states of the United Nations"
+    },
+    "edited_since_2020_12_01": {
+      "edited_since": "2020-12-01"
+    },
+    "edited_before_2020_12_15": {
+      "edited_before": "2020-12-15"
+    },
+    "edited_before_2020_06_01": {
+      "edited_before": "2020-06-01"
+    },
+    "four_filters": {
+      "min_words": 1000,
+      "linked_from": "Asia",
+      "category": "Member states of the United Nations",
+      "edited_since": "2020-12-01"
+    }
+  },
+  "ingest_meta": {
+    "analyze_seconds": "0.010",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
+    "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
+    "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "1316",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 14.7,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.16",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  }
+}

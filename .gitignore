@@ -11,7 +11,7 @@ dist/
 # Secrets and local settings
 .env
 
-# Raw FEVEROUS downloads: fetched by scripts, too large for GitHub (see README)
+# Raw FEVEROUS downloads: fetched by scripts, too large for GitHub (see docs/DATA.md)
 data/feverous/
 
 # Local outputs: temporary files, and what a plain `make eval` writes (results/baseline.*)

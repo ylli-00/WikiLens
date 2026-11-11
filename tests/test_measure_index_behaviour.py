@@ -27,7 +27,7 @@ def test_every_statement_is_a_fixed_literal_with_bound_parameters(mib: Any) -> N
         mib.FORM_BARE, mib.FORM_BARE_JOINED, mib.FORM_PREDICATE, mib.FORM_PREDICATE_JOINED,
         mib.CHUNK_EXPORT_SQL, mib.CHUNK_COUNT_SQL, mib.PROBE_DROP_SQL, mib.PROBE_CREATE_SQL, mib.PROBE_INSERT_SQL,
         mib.PROBE_DELETE3_SQL, mib.PROBE_KNN_SQL, mib.PROBE_SCAN_SQL, mib.PROBE_COUNT_SQL,
-        mib.PROBE_FLUSH_SQL, mib.LOCK_WAIT_SQL, mib.SERVER_STATE_SQL, *mib.ISOLATION_LEVELS.values(),
+        mib.PROBE_FLUSH_SQL, mib.PROBE_EF_SQL, mib.LOCK_WAIT_SQL, mib.SERVER_STATE_SQL, *mib.ISOLATION_LEVELS.values(),
         mib.BUILD_DROP_SQL, mib.BUILD_INSERT_SQL, mib.BUILD_KNN_SQL, mib.CHUNK_PAGE_EXPORT_SQL,
         *mib.BUILD_CREATE_SQL.values(),
     ]
@@ -55,6 +55,9 @@ def test_the_small_helpers(mib: Any) -> None:
     assert mib._span([5, 5, 5]) == "5" and mib._span([0, 5, 3]) == "0 to 5"
     views = [{"index_new": 0, "scan_new": 5}, {"index_new": 5, "scan_new": 5}]
     assert mib._stale_count(views) == "1 of 2"
+    partial = [{"index_new": 4, "scan_new": 5}, {"index_new": 5, "scan_new": 5}]
+    assert mib._stale_count(partial) == "0 of 2"  # an approximate miss is not the stale state
+    assert mib._partial_count({"a": views, "b": partial}) == 1
     assert mib.median([3.0, 1.0, 2.0]) == 2.0
 
 
@@ -76,18 +79,29 @@ def _forms_report() -> dict[str, Any]:
         "form": "predicate_30", "label": "WHERE chunk.n_words < 30", "joined": False,
         "words_below": 30, "passing_chunks": 304, "ef_search": 20, "p50_ms": 3.94, "p95_ms": 12.87,
         "equal_to_exact": 40, "same_set_as_exact": 41, "short": 0, "chunk_rows_read_p50": 276.0,
+        "chunk_access": "index embedding",
     }
+    bare = {**row, "form": "bare", "label": "the bare statement on chunk", "words_below": None,
+            "passing_chunks": 4598, "equal_to_exact": 75, "chunk_rows_read_p50": 10.0}
+    joined = {**row, "form": "predicate_30_joined", "joined": True, "equal_to_exact": 75,
+              "label": "WHERE chunk.n_words < 30, joined to page"}
     return {
         "name": "statement_forms", "created_at": "2026-11-11T00:00:00+00:00", "k": 10,
         "repeats": 3, "n_queries": 75, "n_chunks": 4598, "index_m": 16,
-        "versions": {"mariadb": "11.8.9"}, "results": [row],
+        "versions": {"mariadb": "11.8.9"}, "results": [bare, row, joined],
     }
 
 
 def test_the_forms_report_shows_each_form_and_the_statements(mib: Any) -> None:
     text = mib.forms_markdown(_forms_report())
     assert text.startswith("# One nearest-neighbour statement in three shapes")
-    assert "| WHERE chunk.n_words < 30 | 304 | 20 | 3.94 | 12.87 | 40/75 | 0/75 | 276 |" in text
+    assert ("| WHERE chunk.n_words < 30 | 304 | 20 | 3.94 | 12.87 | 40/75 | 0/75 | 276 "
+            "| index embedding |") in text
+    # the three summary sentences are computed from the rows
+    assert "its list was the exact one for 75 at `mhnsw_ef_search` 20 of 75 claims" in text
+    assert "0 of the 75 answers were short (with 304 chunks passing" in text
+    assert "The list was the exact one for 40 at `mhnsw_ef_search` 20 of 75 claims" in text
+    assert "With a join in the statement the list was the exact one for 75 at" in text
     assert "4,598 chunks, index M = 16, the 75 corpus claims" in text
     for statement in (mib.FORM_BARE, mib.FORM_PREDICATE_JOINED):
         assert statement + ";" in text
@@ -112,6 +126,11 @@ def test_the_two_rewrites_of_the_inline_statement_change_one_thing_each(mib: Any
     # The distance the report reads is the seventh selected column.
     before_distance = sql[: sql.index("VEC_DISTANCE_COSINE(chunk.embedding, %s) AS distance")]
     assert before_distance.count(",") == mib.DISTANCE_COLUMN
+    merged = mib.without_distinct(sql)
+    assert "DISTINCT" not in merged and merged.count("SELECT") == sql.count("SELECT") == 3
+    assert merged.replace("(SELECT ", "(SELECT DISTINCT ") == sql
+    with pytest.raises(ValueError, match="no DISTINCT"):
+        mib.without_distinct("SELECT 1")
     with pytest.raises(ValueError, match="join order"):
         mib.free_order("SELECT 1")
     with pytest.raises(ValueError, match="FROM chunk"):
@@ -135,20 +154,24 @@ def test_the_plan_label_the_rows_read_and_the_agreement_with_the_scan(mib: Any) 
 
     scan = [[(1, 0.10), (2, 0.20), (3, 0.30)], [(4, 0.10), (5, 0.20)], [(7, 0.1), (8, 0.2)]]
     same = mib.agreement(scan, scan)
-    assert same == {"same_rows_as_scan": 3, "same_order_as_scan": 3, "short": 0, "swap_gap_max": 0.0}
+    assert same == {"same_rows_as_scan": 3, "same_order_as_scan": 3, "short": 0,
+                    "swap_gap_max": 0.0, "not_ascending": 0}
     got = [[(1, 0.10), (3, 0.30), (2, 0.20)], [(4, 0.10)], [(7, 0.1), (9, 0.3)]]
     other = mib.agreement(got, scan)
     assert other["same_rows_as_scan"] == 1 and other["same_order_as_scan"] == 0
     assert other["short"] == 1
     assert other["swap_gap_max"] == pytest.approx(0.10)
+    assert other["not_ascending"] == 1  # the first list: 0.10, 0.30, 0.20
 
 
 def _join_order_report() -> dict[str, Any]:
     def side(plan: str, rows: float, ms: float, order: int = 75) -> dict[str, Any]:
         return {"plan": plan, "plan_count": 75, "plans": {plan: 75}, "chunk_rows_read_p50": rows,
                 "chunk_rows_read_max": rows, "p50_ms": ms, "p95_ms": ms * 2,
+                "p50_ms_taking_turns": ms + 0.5,
                 "same_rows_as_scan": 75, "same_order_as_scan": order, "short": 0,
-                "swap_gap_max": 3.9e-06 if order < 75 else 0.0}
+                "swap_gap_max": 3.9e-06 if order < 75 else 0.0,
+                "not_ascending": 75 - order}
 
     walk, scan = "chunk first; chunk index embedding", "chunk first; chunk ALL no key"
     page = "page first; chunk ref uq_chunk_page_ordinal"
@@ -166,6 +189,10 @@ def _join_order_report() -> dict[str, Any]:
             {"filter": "edited_before", "passing_chunks": 778,
              "as_written": side(walk, 67, 2.75), "free": side(page, 778, 2.73)},
         ],
+        "derived_without_distinct": [
+            {"filter": "linked_from", "plans": {walk: 75}, "plans_with_a_derived_table": 0,
+             "lists_with_a_chunk_twice": 75},
+        ],
         "filters": {"none": {}, "max_words_500": {"max_words": 500}},
     }
 
@@ -173,15 +200,17 @@ def _join_order_report() -> dict[str, Any]:
 def test_the_join_order_report_sorts_the_filters_by_what_the_free_plan_did(mib: Any) -> None:
     text = mib.join_order_markdown(_join_order_report())
     assert text.startswith("# The filtered statement with its join order fixed")
-    assert ("| max_words_500 | 25 | chunk first; chunk ALL no key | 4598 | 4.80 | 75 / 75 | "
-            "page first; chunk ref uq_chunk_page_ordinal | 25 | 0.80 | 75 / 75 |") in text
+    assert ("| max_words_500 | 25 | chunk first; chunk ALL no key | 4598 | 4.80 (5.30) | 75 / 75 | "
+            "page first; chunk ref uq_chunk_page_ordinal | 25 | 0.80 (1.30) | 75 / 75 |") in text
     assert "Under 3 of the 4 filters the server walks the vector index; under the other 1" in text
     assert "starts from another table under 3 of the 4 filters" in text
     assert "as written to free: `max_words_500` 4.80 to 0.80 ms." in text
     assert "got slower by more than that: `min_words_5000` 2.70 to 10.60 ms." in text
     assert "stayed within that factor: `edited_before` 2.75 to 2.73 ms." in text
-    assert "(`min_words_5000` as written: 2 of 75 claims, largest gap 3.9e-06)" in text
+    assert ("(`min_words_5000` as written: 2 of 75 claims, 2 of them with rows not in ascending "
+            "order of the distance the statement reports, largest gap 3.9e-06)") in text
     assert '- `max_words_500`: {"max_words": 500}' in text
+    assert "| linked_from | chunk first; chunk index embedding (75/75) | 0/75 | 75/75 |" in text
 
     report = _join_order_report()
     report["results"][2]["as_written"]["same_order_as_scan"] = 75
@@ -240,8 +269,10 @@ def _isolation_report(flush_skipped: str | None = None) -> dict[str, Any]:
     def moments(index: list[int], scan: list[int]) -> dict[str, Any]:
         return {"index": index, "scan": scan}
 
-    stale = {"index_rows": 10, "index_new": 0, "scan_rows": 10, "scan_new": 5}
-    fine = {"index_rows": 10, "index_new": 5, "scan_rows": 10, "scan_new": 5}
+    stale = {"index_rows": 10, "index_new": 0, "scan_rows": 10, "scan_new": 5,
+             "reader_second_search_new": 0}
+    fine = {"index_rows": 10, "index_new": 5, "scan_rows": 10, "scan_new": 5,
+            "reader_second_search_new": 0}
     return {
         "name": "isolation", "created_at": "2026-11-11T00:00:00+00:00", "k": 10, "rows": 1000,
         "new_rows": 5, "ef_search": 100, "index": "VECTOR INDEX (embedding) M=16 DISTANCE=cosine",
@@ -263,7 +294,13 @@ def _isolation_report(flush_skipped: str | None = None) -> dict[str, Any]:
             "control_no_second_search": [fine, fine],
             "control_autocommit": [fine, fine],
             "control_reader_stays_connected": [stale, fine],
+            "control_first_statement_count": [fine, fine],
+            "control_first_statement_scan": [fine, fine],
         },
+        "victims": [
+            {"REPEATABLE READ": 0, "READ COMMITTED": 0, "READ UNCOMMITTED": 0, "autocommit": 0},
+            {"REPEATABLE READ": 0, "READ COMMITTED": 0, "READ UNCOMMITTED": 0, "autocommit": 1},
+        ],
         "recovery": {"by_write": [6], "by_flush": [] if flush_skipped else [5],
                      "flush_skipped": flush_skipped,
                      "still_stale_for_new_connections": [[0, 0, 0]], "attempts": 2},
@@ -273,6 +310,8 @@ def _isolation_report(flush_skipped: str | None = None) -> dict[str, Any]:
             "other_queries_min_rows": 6, "other_queries_with_no_row": 0, "table_rows": 997,
         }],
         "delete_rows_after_flush": None if flush_skipped else 10,
+        "delete_rows_after_write": [10, 10],
+        "delete_control_no_second_search": [10, 10],
     }
 
 
@@ -288,7 +327,17 @@ def test_the_isolation_report_states_what_was_seen_and_what_cleared_it(mib: Any)
     assert "`FLUSH TABLES isolation_probe` (as root): afterwards a new connection found [5] of 5" in text
     assert "| 1 | 0 | 10 | 0 (6) | 997 |" in text
     assert "After `FLUSH TABLES` the index returned 10 rows for that query again." in text
+    assert "3. A searches again, still inside its old snapshot (it found 0 of the new rows" in text
+    assert "| control: A's statement in step 1 is `SELECT COUNT(*)`, not a search | 0 of 2 | [5, 5] |" in text
+    assert "| control: A's statement in step 1 is the scan, not the index search | 0 of 2 | [5, 5] |" in text
+    assert ("on 2 stale tables: REPEATABLE READ 0; READ COMMITTED 0; READ UNCOMMITTED 0; "
+            "in autocommit mode 0 to 1.") in text
+    assert "In its second search A still found 3 of the 3 deleted rows" in text
+    assert "the index returned [10, 10] rows for that query (2 stale tables)" in text
+    assert "the index as stored was right" in text
 
     without_docker = mib.isolation_markdown(_isolation_report("docker is not on PATH"))
     assert "`FLUSH TABLES` was not tried: docker is not on PATH." in without_docker
     assert "After `FLUSH TABLES`" not in without_docker
+    # no conclusion about the stored index without the measurement behind it
+    assert "the index as stored was right" not in without_docker
