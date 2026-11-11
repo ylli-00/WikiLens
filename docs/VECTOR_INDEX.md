@@ -189,7 +189,8 @@ wrong-dimension vector.
   to its vectors. There is no synchronisation job and no second store. `sql/examples.sql`
   (example 8) shows it from the `mariadb` client.
 - Every build of the HNSW graph is a different approximation: two `M=6` builds of the same vectors
-  agreed on 12 of 75 hit lists. Within one server process the results are deterministic, and the
+  (120-word chunks) agreed on 12 of 75 hit lists. "The same vectors, built twenty times" below
+  measures the spread on the final settings. Within one server process the results are deterministic, and the
   cache size does not change them (75 of 75 identical at 16 MB and 512 MB). A container restart
   (`docker restart`) changed 1 of 75 hit lists on the `M=6` index and none on `M=16` at
   `ef_search=100`, without changing recall.
@@ -289,6 +290,42 @@ What follows for the design: `STRAIGHT_JOIN` trades the best plan under a very s
 for a predictable one. A statement that leaves the order free only when few rows pass would be
 faster there. We did not build it: the settings are fixed since the evaluation, and the rule for
 "few" would need its own measurement at scale.
+
+## The same vectors, built twenty times
+
+"Every build of the HNSW graph is a different approximation" above rested on two builds. The
+`builds` part of `scripts/measure_index_behaviour.py` copies the 4,598 chunk vectors into a scratch
+table with the chunk table's vector column and index, ten times for `M=16` and ten times for the
+server default `M=6`, and searches every build with the 75 claims (the bare statement, k=10). It
+was run twice ([results/build_variance.md](../results/build_variance.md),
+[results/build_variance_run1.md](../results/build_variance_run1.md)). Each cell is the smallest to
+the largest value over the twenty builds of that `M` (for "two builds agree", over the pairs of
+builds inside a run):
+
+| M | ef_search | Article recall@10, of 75 | Top-10 list equal to exact, of 75 | Two builds agree, of 75 | Build, s |
+|---|---|---|---|---|---|
+| 16 | 100 | 74 | 74 to 75 | 74 to 75 | 1.4 to 2.3 |
+| 16 | 20 | 73 to 74 | 70 to 74 | 68 to 74 | 1.4 to 2.3 |
+| 6 | 100 | 72 to 74 | 50 to 63 | 39 to 57 | 0.4 to 0.6 |
+| 6 | 20 | 65 to 73 | 38 to 51 | 26 to 44 | 0.4 to 0.6 |
+
+- **At the chosen settings (`M=16`, `ef_search` 100) the build does not matter for recall.** Every
+  one of the twenty builds found the gold page for 74 of 75 claims, which is what NumPy's exact
+  ranking of the same vectors finds, and its top-10 lists equalled the exact ones for 74 or 75
+  claims.
+- **At `ef_search` 20 the same graphs differ more**: 70 to 74 lists equal to the exact ones, and
+  73 to 74 gold pages. So the larger `ef_search` is also what makes a result repeatable across
+  builds.
+- **With the server defaults (`M=6`, `ef_search` 20) the build decides several claims**: 65 to 73
+  gold pages, 38 to 51 lists equal to the exact ones, and two builds agree on only
+  26 to 44 of 75 lists.
+- Two more builds are in the other results files, measured differently (top-20 lists against the
+  joined statement): the build behind the headline run gave 74 of 75 identical lists at
+  `ef_search` 100 and 65 at 20 (`results/final_ef_100.md`, `final_ef_20.md`). The build now in the
+  database, made by the ingest that followed, gave 75 of 75 top-10 lists equal to the exact ones at
+  both values (`results/statement_forms.md`).
+- The scratch table is filled in one transaction, in `chunk_id` order. We did not test whether
+  the way a table is filled (batch size, commits between batches) changes the graph's quality.
 
 ## Isolation levels, and a reader that leaves the index stale
 
@@ -398,7 +435,8 @@ non-`DISTINCT` derived table that lose the index; the exact ranking as soon as a
 and the approximate, continuing search under a predicate on the indexed table itself; the
 optimizer's switch to a scan under selective range filters, and its choice of the filter's own
 index over the vector index when the join order is left free; the hit lists that change with the
-graph build and, for `M=6`, across a restart; the stale index after a REPEATABLE READ reader.
+graph build (and how much, over twenty builds) and, for `M=6`, across a restart; the stale index
+after a REPEATABLE READ reader.
 
 Two facts about the index come from its author's description, not from our measurements
 ([MariaDB Vector: How it works, part II](https://mariadb.org/mariadb-vector-how-it-works-part-ii/)

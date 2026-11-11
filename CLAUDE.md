@@ -205,7 +205,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - `scripts/make_charts.py` - the README charts (`docs/img/*.svg`) from `results/*.json`
 - `scripts/make_env.py` - writes `.env` with two generated passwords on the first `make setup`
 - `scripts/compare_separate_index.py` - MariaDB against an in-process copy of the vectors (`results/separate_index.md`); hnswlib is optional and must stay out of every requirements and lock file
-- `scripts/measure_index_behaviour.py` - three measured behaviours of the vector index: `forms` (`results/statement_forms.md`), `join_order` (`results/join_order.md`), `isolation` (`results/isolation.md`, uses a scratch table in the test database: never run it next to pytest)
+- `scripts/measure_index_behaviour.py` - four measured behaviours of the vector index: `forms` (`results/statement_forms.md`), `join_order` (`results/join_order.md`), `builds` (`results/build_variance.md`) and `isolation` (`results/isolation.md`); the last two use scratch tables in the test database: never run them next to pytest
 - `data/corpus/NOTICE.md` - licence and attribution of the committed Wikipedia text and FEVEROUS claims (CC BY-SA 3.0)
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
 

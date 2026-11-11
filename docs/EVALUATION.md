@@ -102,10 +102,11 @@ what the exact ranking finds there too.
 - `scripts/compare_separate_index.py` reruns the comparison with a copy of the vectors in the
   application's memory (`results/separate_index.md`; the README section "Where this approach
   loses"). It only reads the database.
-- `scripts/measure_index_behaviour.py` reruns three measurements of the index's behaviour
+- `scripts/measure_index_behaviour.py` reruns four measurements of the index's behaviour
   ([docs/VECTOR_INDEX.md](VECTOR_INDEX.md)): `forms` (`results/statement_forms.md`) and `join_order`
-  (`results/join_order.md`) read the corpus database; `isolation` (`results/isolation.md`) works on
-  a scratch table in the test database, so do not run it next to the test suite.
+  (`results/join_order.md`) read the corpus database; `builds` (`results/build_variance.md`, ten
+  builds of the graph per `M`) and `isolation` (`results/isolation.md`) work on scratch tables in
+  the test database, so do not run them next to the test suite.
 
 ## Parameters and why
 

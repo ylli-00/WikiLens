@@ -28,6 +28,8 @@ def test_every_statement_is_a_fixed_literal_with_bound_parameters(mib: Any) -> N
         mib.CHUNK_EXPORT_SQL, mib.CHUNK_COUNT_SQL, mib.PROBE_DROP_SQL, mib.PROBE_CREATE_SQL, mib.PROBE_INSERT_SQL,
         mib.PROBE_DELETE3_SQL, mib.PROBE_KNN_SQL, mib.PROBE_SCAN_SQL, mib.PROBE_COUNT_SQL,
         mib.PROBE_FLUSH_SQL, mib.LOCK_WAIT_SQL, mib.SERVER_STATE_SQL, *mib.ISOLATION_LEVELS.values(),
+        mib.BUILD_DROP_SQL, mib.BUILD_INSERT_SQL, mib.BUILD_KNN_SQL, mib.CHUNK_PAGE_EXPORT_SQL,
+        *mib.BUILD_CREATE_SQL.values(),
     ]
     for statement in statements:
         assert "{" not in statement and "%(" not in statement, statement
@@ -184,6 +186,54 @@ def test_the_join_order_report_sorts_the_filters_by_what_the_free_plan_did(mib: 
     report = _join_order_report()
     report["results"][2]["as_written"]["same_order_as_scan"] = 75
     assert "No hit list had its chunks in another order than the scan." in mib.join_order_markdown(report)
+
+
+def test_the_build_tables_differ_in_m_only_and_copy_the_chunk_index(mib: Any) -> None:
+    assert list(mib.BUILD_CREATE_SQL) == [16, 6]
+    for m, statement in mib.BUILD_CREATE_SQL.items():
+        assert f"VECTOR INDEX (embedding) M={m} DISTANCE=cosine" in statement
+        assert "VECTOR(384) NOT NULL" in statement
+    assert mib.BUILD_CREATE_SQL[16].replace("M=16", "M=6") == mib.BUILD_CREATE_SQL[6]
+    assert mib.BUILD_INSERT_SQL.count("%s") == 2 and mib.BUILD_KNN_SQL.count("%s") == 2
+    assert mib.PARTS == ("forms", "join_order", "builds", "isolation")
+
+
+def test_the_spread_and_the_agreement_between_builds(mib: Any) -> None:
+    assert mib.spread([74, 73, 74, 70]) == {"min": 70.0, "median": 73.5, "max": 74.0}
+    first = [[1, 2, 3], [4, 5, 6]]
+    second = [[1, 2, 3], [4, 6, 5]]
+    third = [[1, 2, 3], [4, 5, 6]]
+    # pairs in order: (first, second), (first, third), (second, third)
+    assert mib.identical_between_builds([first, second, third]) == [1, 2, 1]
+    assert mib.identical_between_builds([first]) == []
+
+
+def test_the_builds_report_gives_one_number_where_every_build_agreed(mib: Any) -> None:
+    def cell(low: float, mid: float, high: float) -> dict[str, float]:
+        return {"min": low, "median": mid, "max": high}
+
+    report = {
+        "name": "build_variance", "created_at": "2026-11-11T00:00:00+00:00", "k": 10,
+        "n_queries": 75, "n_chunks": 4598, "builds": 10, "batch": 500, "exact_article_recall": 74,
+        "versions": {"mariadb": "11.8.9"},
+        "results": [
+            {"m": 16, "ef_search": 100, "builds": 10, "article_recall": cell(74, 74, 74),
+             "equal_to_exact": cell(74, 75, 75), "overlap_with_exact": cell(0.9987, 1.0, 1.0),
+             "identical_between_two_builds": cell(74, 75, 75), "build_seconds": cell(1.42, 1.5, 2.31)},
+            {"m": 6, "ef_search": 20, "builds": 10, "article_recall": cell(65, 69, 70),
+             "equal_to_exact": cell(38, 42, 49), "overlap_with_exact": cell(0.775, 0.8, 0.869),
+             "identical_between_two_builds": cell(26, 34, 44), "build_seconds": cell(0.41, 0.45, 0.52)},
+        ],
+    }
+    text = mib.builds_markdown(report)
+    assert text.startswith("# The same vectors, built into the HNSW graph several times")
+    assert "NumPy's exact ranking of the same vectors gives 74 of 75" in text
+    assert ("| 16 | 100 | 74 | 74 to 75 (median 75) | 0.999 to 1.000 | 74 to 75 (median 75) "
+            "| 1.4 to 2.3 |") in text
+    assert ("| 6 | 20 | 65 to 70 (median 69) | 38 to 49 (median 42) | 0.775 to 0.869 "
+            "| 26 to 44 (median 34) | 0.4 to 0.5 |") in text
+    for statement in (*mib.BUILD_CREATE_SQL.values(), mib.BUILD_KNN_SQL):
+        assert statement + ";" in text
 
 
 def _isolation_report(flush_skipped: str | None = None) -> dict[str, Any]:

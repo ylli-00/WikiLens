@@ -1,0 +1,171 @@
+{
+  "name": "build_variance",
+  "created_at": "2026-11-11T07:57:11+00:00",
+  "k": 10,
+  "n_queries": 75,
+  "n_chunks": 4598,
+  "builds": 10,
+  "batch": 500,
+  "exact_article_recall": 74,
+  "results": [
+    {
+      "m": 16,
+      "ef_search": 20,
+      "builds": 10,
+      "article_recall": {
+        "min": 73.0,
+        "median": 74.0,
+        "max": 74.0
+      },
+      "equal_to_exact": {
+        "min": 70.0,
+        "median": 72.0,
+        "max": 74.0
+      },
+      "overlap_with_exact": {
+        "min": 0.98,
+        "median": 0.9906666666666666,
+        "max": 0.996
+      },
+      "identical_between_two_builds": {
+        "min": 68.0,
+        "median": 71.0,
+        "max": 74.0
+      },
+      "build_seconds": {
+        "min": 1.40603606300283,
+        "median": 1.462531390001459,
+        "max": 2.2648205760015117
+      }
+    },
+    {
+      "m": 16,
+      "ef_search": 100,
+      "builds": 10,
+      "article_recall": {
+        "min": 74.0,
+        "median": 74.0,
+        "max": 74.0
+      },
+      "equal_to_exact": {
+        "min": 74.0,
+        "median": 75.0,
+        "max": 75.0
+      },
+      "overlap_with_exact": {
+        "min": 0.9986666666666667,
+        "median": 1.0,
+        "max": 1.0
+      },
+      "identical_between_two_builds": {
+        "min": 74.0,
+        "median": 75.0,
+        "max": 75.0
+      },
+      "build_seconds": {
+        "min": 1.40603606300283,
+        "median": 1.462531390001459,
+        "max": 2.2648205760015117
+      }
+    },
+    {
+      "m": 6,
+      "ef_search": 20,
+      "builds": 10,
+      "article_recall": {
+        "min": 68.0,
+        "median": 69.0,
+        "max": 73.0
+      },
+      "equal_to_exact": {
+        "min": 41.0,
+        "median": 43.5,
+        "max": 51.0
+      },
+      "overlap_with_exact": {
+        "min": 0.8053333333333335,
+        "median": 0.8426666666666667,
+        "max": 0.8866666666666667
+      },
+      "identical_between_two_builds": {
+        "min": 33.0,
+        "median": 37.0,
+        "max": 43.0
+      },
+      "build_seconds": {
+        "min": 0.4459667020018969,
+        "median": 0.4732983720004995,
+        "max": 0.555305722002231
+      }
+    },
+    {
+      "m": 6,
+      "ef_search": 100,
+      "builds": 10,
+      "article_recall": {
+        "min": 72.0,
+        "median": 74.0,
+        "max": 74.0
+      },
+      "equal_to_exact": {
+        "min": 55.0,
+        "median": 60.0,
+        "max": 63.0
+      },
+      "overlap_with_exact": {
+        "min": 0.9333333333333333,
+        "median": 0.9606666666666666,
+        "max": 0.9706666666666668
+      },
+      "identical_between_two_builds": {
+        "min": 45.0,
+        "median": 52.0,
+        "max": 57.0
+      },
+      "build_seconds": {
+        "min": 0.4459667020018969,
+        "median": 0.4732983720004995,
+        "max": 0.555305722002231
+      }
+    }
+  ],
+  "ingest_meta": {
+    "analyze_seconds": "0.010",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "a9a36c5c14f9a3baea97df6b42361f866249a4c636e4504cd259d7e54725b8ac",
+    "corpus_dir": "data/corpus",
+    "corpus_page_meta_sha256": "9a892f80de5b63818fe79061445e224e3ec142554abab183531529da630f96ff",
+    "corpus_pages_sha256": "edf0955892c37fe54bb840cda33a6df5a06c44394289e7176a922556d09621dc",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-10-21T23:46:15+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "1316",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 14.7,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.16",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  }
+}

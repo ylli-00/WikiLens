@@ -165,9 +165,6 @@ every table and the method.
 
   ![Chunk rows read under each filter](docs/img/planner_rows.svg)
 
-- **Complete or fast, not both, under a selective filter.** With `heading LIKE '%History%'`
-  (117 chunks pass) the joined statement fills all 10 rows in 3.07 ms. Filtering after the index
-  search takes 0.78 ms and comes back short for 69 of 75 queries.
 - **Scale.** The same claims with 5,000 and 20,000 random Wikipedia pages added as distractors:
 
   | Pages | Chunks | Article recall@10 | HNSW p50 | Joined (exact) p50 | History filter, joined p50 |
@@ -184,9 +181,11 @@ every table and the method.
   the lower recall over uncommitted rows, and the stale index above. With a `DELETE` in that
   sequence the index returned no row at all, until `FLUSH TABLES` or the next committed write.
   Searching at READ COMMITTED or in autocommit mode avoids it.
-- **Results are reproducible up to the graph build.** Two `M=6` builds of the same vectors agreed on
-  12 of 75 hit lists. Within one server process the results are deterministic, and the cache size
-  changed none of them. A container restart changed 1 of 75 hit lists on `M=6` and none on `M=16`.
+- **Results are reproducible up to the graph build.** Twenty fresh builds at the chosen settings
+  each found 74 of 75 gold pages, as the exact ranking does; with the server defaults they found 65
+  to 73 ([results/build_variance.md](results/build_variance.md)). Within one server process the
+  results are deterministic, and the cache size changed none of them. A container restart changed 1
+  of 75 hit lists on `M=6` and none on `M=16`.
 
 ## What the database-native approach gave
 
@@ -253,7 +252,7 @@ The ingest ends with a report to compare against this one:
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (401 tests, about 20 s), `make eval` (the headline table, about 15 s),
+Then `make test` (404 tests, about 20 s), `make eval` (the headline table, about 15 s),
 `make serve`, `make examples` (the ten statements of `sql/examples.sql`, no Python needed),
 `make experiments` (the whole protocol, about 10 minutes with a GPU) and `make down`.
 
@@ -293,7 +292,7 @@ headline, 0.83 ms in the scale test and 0.78 ms in the comparison. Compare insid
 | Chunk size | 240 words, overlap 1 unit, never across a section | at equal retrieved text 60-, 120- and 240-word chunks give the same article recall and evidence recall within 3 claims (54, 57, 55 of 66); 240 stores 4,598 vectors, not 8,658 or 19,065 |
 | Index `M` | 16 (server default 6) | at `ef_search=20`, article recall@10 is 67, 74 and 73 of 75 for M 6, 16 and 32; the exact ranking gives 74 (another build of the `M=6` graph gave 68: builds differ) |
 | `mhnsw_ef_search` | 100 per query (server default 20) | hit lists equal the exact ranking for 74 of 75 claims against 65 at 20, for 0.51 ms instead of 0.45 ms |
-| Strategy with filters | `inline` (the joined statement) | always fills `k`; `overfetch` is faster and comes back short |
+| Strategy with filters | `inline` (the joined statement) | complete or fast, not both: under `heading LIKE '%History%'` (117 chunks pass) `inline` fills all 10 rows in 3.07 ms; `overfetch`, which filters after the index search, takes 0.78 ms and comes back short for 69 of 75 queries |
 
 To reproduce: `make eval` after `make setup` gives the headline table up to the HNSW build, and
 `make experiments` reruns every group in `results/SUMMARY.md`.
@@ -318,7 +317,7 @@ To reproduce: `make eval` after `make setup` gives the headline table up to the 
 JSON and Markdown. [docs/](docs/) has EXAMPLES, SETUP, DATA, VECTOR_INDEX, EVALUATION, DESIGN (every
 decision) and ARCHITECTURE (a beginner's guide to the code). [analysis/](analysis/) is the earlier
 FEVEROUS analysis that chose the benchmark, and [CLAUDE.md](CLAUDE.md) the working notes for the
-coding assistant. [tests/](tests/) holds 401 tests, and [CI](.github/workflows/ci.yml) runs ruff
+coding assistant. [tests/](tests/) holds 404 tests, and [CI](.github/workflows/ci.yml) runs ruff
 and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team

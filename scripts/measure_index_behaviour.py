@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Three behaviours of MariaDB's vector index that its documentation does not describe, measured.
+"""Four behaviours of MariaDB's vector index that its documentation does not describe, measured.
 
 ``forms``
     One nearest-neighbour statement in three shapes, on the ingested corpus (read only): the
@@ -19,6 +19,13 @@
     exists and never walks the vector index then; that is much cheaper under a selective
     filter. Writes ``results/join_order.json`` and ``.md``.
 
+``builds``
+    How much the results move from one build of the HNSW graph to the next: the chunk vectors
+    are copied into a scratch table in the *test* database ten times per ``M`` (16 and 6), and
+    every build is searched with the claims at ``mhnsw_ef_search`` 20 and 100. Reports the
+    spread of article recall, of the agreement with NumPy's exact ranking, and of the agreement
+    between two builds. Writes ``results/build_variance.json`` and ``.md``.
+
 ``isolation``
     What a vector search sees while another connection inserts or deletes near neighbours,
     under each transaction isolation level, and one sequence after which the index gives stale
@@ -31,12 +38,13 @@
 
 Usage (from the project root, with the database up and the corpus ingested):
 
-    python scripts/measure_index_behaviour.py            # all three
+    python scripts/measure_index_behaviour.py            # all four
     python scripts/measure_index_behaviour.py forms
     python scripts/measure_index_behaviour.py join_order
+    python scripts/measure_index_behaviour.py builds
     python scripts/measure_index_behaviour.py isolation
 
-Do not run it while the test suite runs: both use the test database.
+Do not run it while the test suite runs: ``builds`` and ``isolation`` use the test database.
 """
 
 from __future__ import annotations
@@ -49,6 +57,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import asdict
 from datetime import date, datetime, timezone
+from itertools import combinations
 from pathlib import Path
 from typing import Any
 
@@ -93,7 +102,30 @@ DISTANCE_COLUMN = 6
 #: Two medians of one run that differ by less than this factor are reported as the same time
 #: (two runs of the same statement on this laptop differed by up to 1.24).
 NOISE_FACTOR = 1.25
-PARTS: tuple[str, ...] = ("forms", "join_order", "isolation")
+PARTS: tuple[str, ...] = ("forms", "join_order", "builds", "isolation")
+
+BUILDS = 10
+BUILD_EF: tuple[int, ...] = (20, 100)
+BUILD_BATCH = 500
+BUILD_DROP_SQL = "DROP TABLE IF EXISTS build_probe"
+#: The chunk table's vector column and index, once per M. M cannot be a bound parameter.
+BUILD_CREATE_SQL: dict[int, str] = {
+    16: (
+        "CREATE TABLE build_probe (chunk_id INT UNSIGNED NOT NULL PRIMARY KEY, "
+        "embedding VECTOR(384) NOT NULL, VECTOR INDEX (embedding) M=16 DISTANCE=cosine) "
+        "ENGINE=InnoDB"
+    ),
+    6: (
+        "CREATE TABLE build_probe (chunk_id INT UNSIGNED NOT NULL PRIMARY KEY, "
+        "embedding VECTOR(384) NOT NULL, VECTOR INDEX (embedding) M=6 DISTANCE=cosine) "
+        "ENGINE=InnoDB"
+    ),
+}
+BUILD_INSERT_SQL = "INSERT INTO build_probe (chunk_id, embedding) VALUES (%s, %s)"
+BUILD_KNN_SQL = (
+    "SELECT chunk_id FROM build_probe ORDER BY VEC_DISTANCE_COSINE(embedding, %s) LIMIT %s"
+)
+CHUNK_PAGE_EXPORT_SQL = "SELECT chunk_id, page_id, embedding FROM chunk ORDER BY chunk_id"
 
 CHUNK_COUNT_SQL = "SELECT COUNT(*) FROM chunk"
 CHUNK_EXPORT_SQL = "SELECT chunk_id, n_words, embedding FROM chunk ORDER BY chunk_id"
@@ -518,6 +550,167 @@ def join_order_markdown(report: dict[str, Any]) -> str:
     for name, filters in report["filters"].items():
         lines.append(f"- `{name}`: {json.dumps(filters, ensure_ascii=False)}")
     lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------------------------
+# builds
+# ---------------------------------------------------------------------------------------------
+
+
+def spread(values: Sequence[float]) -> dict[str, float]:
+    """Smallest, median and largest of ``values``."""
+    return {"min": float(min(values)), "median": median(values), "max": float(max(values))}
+
+
+def identical_between_builds(builds: Sequence[Sequence[Sequence[int]]]) -> list[int]:
+    """For every pair of builds, the number of queries whose hit lists are identical."""
+    return [
+        sum(1 for mine, theirs in zip(first, second, strict=True) if list(mine) == list(theirs))
+        for first, second in combinations(builds, 2)
+    ]
+
+
+def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, Any]:
+    """Build the index ``builds`` times per M on a scratch table and search each build."""
+    if settings.test_db_name == settings.db_name:
+        raise SystemExit("the builds experiment needs a test database other than the corpus")
+    corpus = db.connect(settings)
+    try:
+        truths = evaluate.load_ground_truth(corpus)
+        if not truths:
+            raise SystemExit("the claim table is empty: run 'wikilense ingest' first")
+        with corpus.cursor() as cur:
+            cur.execute(CHUNK_PAGE_EXPORT_SQL)
+            rows = cur.fetchall()
+        meta = evaluate.read_ingest_meta(corpus)
+        versions = evaluate.versions_info(corpus)
+    finally:
+        corpus.close()
+    ids = np.asarray([int(row[0]) for row in rows], dtype=np.int64)
+    page_of = {int(row[0]): int(row[1]) for row in rows}
+    stored = [(int(row[0]), bytes(row[2])) for row in rows]
+    vectors = separate.unit_rows(
+        np.vstack([db.vec_from_bytes(row[2]) for row in rows]).astype(np.float64)
+    )
+    queries = separate.unit_rows(
+        np.asarray(embedder.embed_queries([t.text for t in truths]), dtype=np.float32)
+    ).astype(np.float32)
+    separate._quiet_torch()
+    everything = np.arange(ids.shape[0])
+    exact = [
+        separate.top_k(vectors, queries[i].astype(np.float64), ids, K, everything)
+        for i in range(len(truths))
+    ]
+
+    def recalled(lists: Sequence[Sequence[int]]) -> int:
+        return sum(
+            1 for hits, truth in zip(lists, truths, strict=True)
+            if evaluate.article_recall_at_k([page_of[c] for c in hits], truth.gold_pages, K)
+        )
+
+    conn = db.connect(settings, database=settings.test_db_name)
+    results: list[dict[str, Any]] = []
+    try:
+        for m, create_sql in BUILD_CREATE_SQL.items():
+            lists: dict[int, list[list[list[int]]]] = {ef: [] for ef in BUILD_EF}
+            seconds: list[float] = []
+            for _ in range(builds):
+                started = time.perf_counter()
+                with conn.cursor() as cur:
+                    cur.execute(BUILD_DROP_SQL)
+                    cur.execute(create_sql)
+                    for start in range(0, len(stored), BUILD_BATCH):
+                        cur.executemany(BUILD_INSERT_SQL, stored[start : start + BUILD_BATCH])
+                conn.commit()
+                seconds.append(time.perf_counter() - started)
+                for ef in BUILD_EF:
+                    with searchmod.ef_search_session(conn, ef), conn.cursor() as cur:
+                        found = []
+                        for query in queries:
+                            cur.execute(BUILD_KNN_SQL, (db.vec_param(query), K))
+                            found.append([int(row[0]) for row in cur.fetchall()])
+                    lists[ef].append(found)
+                conn.commit()
+            for ef in BUILD_EF:
+                per_build = lists[ef]
+                results.append({
+                    "m": m, "ef_search": ef, "builds": builds,
+                    "article_recall": spread([recalled(found) for found in per_build]),
+                    "equal_to_exact": spread([
+                        sum(1 for got, want in zip(found, exact, strict=True) if got == want)
+                        for found in per_build
+                    ]),
+                    "overlap_with_exact": spread([
+                        float(np.mean([len(set(got) & set(want)) / len(want)
+                                       for got, want in zip(found, exact, strict=True)]))
+                        for found in per_build
+                    ]),
+                    "identical_between_two_builds": spread(identical_between_builds(per_build)),
+                    "build_seconds": spread(seconds),
+                })  # fmt: skip
+        with conn.cursor() as cur:
+            cur.execute(BUILD_DROP_SQL)
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        "name": "build_variance", "created_at": utc_now(), "k": K, "n_queries": len(truths),
+        "n_chunks": int(ids.shape[0]), "builds": builds, "batch": BUILD_BATCH,
+        "exact_article_recall": recalled(exact),
+        "results": results, "ingest_meta": meta,
+        "machine": evaluate.machine_info(embedder), "versions": versions,
+    }  # fmt: skip
+
+
+def builds_markdown(report: dict[str, Any]) -> str:
+    n = report["n_queries"]
+
+    def whole(values: dict[str, float]) -> str:
+        low, mid, high = values["min"], values["median"], values["max"]
+        if low == high:
+            return f"{low:g}"
+        return f"{low:g} to {high:g} (median {mid:g})"
+
+    lines = [
+        "# The same vectors, built into the HNSW graph several times",
+        "",
+        (f"Generated {report['created_at']} by `scripts/measure_index_behaviour.py builds` on "
+        f"MariaDB {report['versions']['mariadb']}. The {report['n_chunks']:,} chunk vectors of "
+        "the corpus are copied, in `chunk_id` order and in one transaction, into a scratch table "
+        "with the chunk table's vector column and index, in the test database. That is done "
+        f"{report['builds']} times for each `M`, and every build is searched with the {n} corpus "
+        f"claims, k = {report['k']}, the bare statement. \"Article recall\" counts the claims "
+        "with a gold page among the pages of the hits; NumPy's exact ranking of the same vectors "
+        f"gives {report['exact_article_recall']} of {n}. \"Equal to exact\" counts the claims "
+        "whose hit list is NumPy's exact top 10 in order. \"Two builds agree\" counts, for each "
+        "pair of builds, the claims with identical hit lists. Each cell is the smallest to the "
+        "largest value over the builds (or pairs), one number when they are all the same."),
+        "",
+        (f"| M | ef_search | Article recall@10, of {n} | Equal to exact, of {n} "
+        f"| Overlap with exact | Two builds agree, of {n} | Build, s |"),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for row in report["results"]:
+        overlap = row["overlap_with_exact"]
+        seconds = row["build_seconds"]
+        lines.append(
+            f"| {row['m']} | {row['ef_search']} | {whole(row['article_recall'])} | "
+            f"{whole(row['equal_to_exact'])} | {overlap['min']:.3f} to {overlap['max']:.3f} | "
+            f"{whole(row['identical_between_two_builds'])} | "
+            f"{seconds['min']:.1f} to {seconds['max']:.1f} |"
+        )
+    lines += [
+        "",
+        "The statements (`M` is part of the table definition; the vector and `k` are bound):",
+        "",
+        "```sql",
+        *(sql + ";" for sql in BUILD_CREATE_SQL.values()),
+        BUILD_INSERT_SQL + ";",
+        BUILD_KNN_SQL + ";",
+        "```",
+        "",
+    ]
     return "\n".join(lines)
 
 
@@ -958,7 +1151,7 @@ def isolation_markdown(report: dict[str, Any]) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("parts", nargs="*", metavar="PART",
-                        help="forms, join_order, isolation or several (default: all three)")
+                        help="forms, join_order, builds, isolation or several (default: all)")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "results",
                         help="output directory (default: results/ in the repository)")
     args = parser.parse_args(argv)
@@ -980,6 +1173,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             report = measure_join_order(settings, make_embedder(settings), JOIN_ORDER_REPEATS)
             text = join_order_markdown(report)
+        elif part == "builds":
+            from wikilense.cli import make_embedder
+
+            report = measure_builds(settings, make_embedder(settings), BUILDS)
+            text = builds_markdown(report)
         else:
             report = measure_isolation(settings, ISOLATION_TRIALS, ISOLATION_CONTROL_TRIALS)
             text = isolation_markdown(report)

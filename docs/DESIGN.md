@@ -39,7 +39,7 @@ scripts/fetch_page_meta.py Revision id, edit date and categories of each page fr
 scripts/run_experiments.py The experiment protocol -> results/
 scripts/make_charts.py     The README charts from results/*.json -> docs/img/
 scripts/compare_separate_index.py  MariaDB against an in-process copy of the vectors -> results/
-scripts/measure_index_behaviour.py  Statement forms, join order, isolation levels -> results/
+scripts/measure_index_behaviour.py  Statement forms, join order, builds, isolation -> results/
 scripts/make_env.py        .env with generated passwords (run by `make setup`)
 sql/schema.sql             DDL, the single source of truth; db.apply_schema() executes it
 sql/examples.sql           Ten worked statements for the mariadb client
@@ -726,7 +726,7 @@ Decisions (the owner had left them open):
   it upstream is the owner's step to take, under the owner's name.
 
 Measured after the self-grade (three graders, 36 to 37 of 40 with their own stricter reading; their
-suggestions are in the run's handoff report). `scripts/measure_index_behaviour.py`, three parts:
+suggestions are in the run's handoff report). `scripts/measure_index_behaviour.py`, four parts:
 
 - **`forms` (`results/statement_forms.md`).** One nearest-neighbour statement in three shapes.
   Bare: the HNSW search. With a predicate on `chunk` itself: the server keeps taking rows from the
@@ -757,6 +757,11 @@ suggestions are in the run's handoff report). `scripts/measure_index_behaviour.p
   did not change the connections: no measured number depends on it, and an application that
   writes while it searches should search at READ COMMITTED or in autocommit mode, or end the
   transaction between searches.
+- **`builds` (`results/build_variance.md`, `_run1.md`).** Ten fresh builds of the graph per `M`,
+  twice. At the chosen settings (`M=16`, `ef_search` 100) all twenty builds found 74 of 75 gold
+  pages, the exact ranking's number, and 74 or 75 top-10 lists equal to the exact ones. With the
+  server defaults the builds found 65 to 73 gold pages. So the headline recall does not depend
+  on which build a reader gets, and `ef_search` 100 is part of the reason.
 - `tests/test_search.py` now pins the rows of the table "Checked against the documentation" in
   `docs/VECTOR_INDEX.md` (the generic `VEC_DISTANCE`, another distance function, `DESC`, no
   `LIMIT`, a threshold next to `ORDER BY ... LIMIT`, the system variables' defaults and ranges).

@@ -172,7 +172,7 @@ column names the one function to read to understand the file.
 | `run_experiments.py` | The experiment protocol behind `results/`. Groups (`stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `scale`, `summary`) ingest a named configuration, rebuild the index for another M, restart the container, and evaluate. `uncommitted` searches a scratch vector table before and after COMMIT; `planner` records which filters keep the vector index; `scale` adds random pages of the full FEVEROUS Wikipedia as distractors and measures the cost growth; `summary` rebuilds `results/SUMMARY.md` from the JSON files. Root-level SQL goes through `docker exec` with the password in the environment only. | the main database, docker; writes `results/` | `run_eval` |
 | `make_charts.py` | Draws the README charts (recall at k, the uncommitted search, rows read per filter, query time against table size) as SVG with a dark variant, from the JSON in `results/`. Standard library only. | reads `results/`; writes `docs/img/` | `main` |
 | `compare_separate_index.py` | Measures where the database-native search loses: reads the chunk vectors out of MariaDB once and answers every claim with MariaDB's statements, with an exact NumPy scan of that copy (pre-filtered under a filter, alone and followed by the `SELECT` of the hit rows) and, when it is installed, with hnswlib. Every list is compared with NumPy's exact ranking. Read only; hnswlib is in no requirements file. | reads the database; writes `results/separate_index.json/.md` | `run` |
-| `measure_index_behaviour.py` | Three measurements of the vector index that the documentation does not describe. `forms`: the bare statement, a predicate on `chunk` itself and the same with a join, each against NumPy's exact ranking. `join_order`: the filtered statement as written (`STRAIGHT_JOIN`) against the same text with plain `JOIN`, both against a scan. `isolation`: what a search sees under each isolation level while another connection writes, and the sequence that leaves the index stale. | `forms` and `join_order` read the corpus database; `isolation` uses a scratch table in the test database; writes `results/statement_forms.*`, `join_order.*`, `isolation.*` | `measure_forms`, `measure_join_order`, `measure_isolation` |
+| `measure_index_behaviour.py` | Four measurements of the vector index that the documentation does not describe. `forms`: the bare statement, a predicate on `chunk` itself and the same with a join, each against NumPy's exact ranking. `join_order`: the filtered statement as written (`STRAIGHT_JOIN`) against the same text with plain `JOIN`, both against a scan. `builds`: ten builds of the graph per `M` on a scratch table, and how far recall and the hit lists move between them. `isolation`: what a search sees under each isolation level while another connection writes, and the sequence that leaves the index stale. | `forms` and `join_order` read the corpus database; `builds` and `isolation` use scratch tables in the test database; writes `results/statement_forms.*`, `join_order.*`, `build_variance.*`, `isolation.*` | `measure_forms`, `measure_join_order`, `measure_builds`, `measure_isolation` |
 | `make_env.py` | Writes `.env` from `.env.example` with two random passwords, once; `make setup` runs it when there is no `.env`. Never prints a password, never touches an existing file. Standard library only. | reads `.env.example`; writes `.env` | `create` |
 
 ### `tests/`
@@ -190,7 +190,7 @@ column names the one function to read to understand the file.
 | `test_experiments.py`, `test_fetch_wiki_shard.py` | The script parts that need no server: hit-list comparison, configuration check, fixed SQL, the password route to `docker exec`, the uncommitted group's report; download error handling. |
 | `test_fetch_page_meta.py`, `test_make_charts.py` | The metadata fetch without the network: request spacing, retries, the User-Agent, category extraction, the revision choice and moved pages; every chart renders valid, labelled SVG. |
 | `test_make_env.py`, `test_compare_separate_index.py` | The generated `.env` (two strong passwords, nothing else changed, never overwritten, nothing printed); the comparison's pure parts (the exact top k with ties, the filters evaluated on the copy, the interleaved timing) and that hnswlib is in no requirements or lock file. |
-| `test_measure_index_behaviour.py` | The measurement script's pure parts: every statement is a fixed literal, the two rewrites of the inline statement change one thing each, the plan label, the rows read from `ANALYZE FORMAT=JSON`, the agreement with the scan, and the three reports. |
+| `test_measure_index_behaviour.py` | The measurement script's pure parts: every statement is a fixed literal, the two rewrites of the inline statement change one thing each, the plan label, the rows read from `ANALYZE FORMAT=JSON`, the agreement with the scan, the spread over builds, and the four reports. |
 | `test_docs.py` | The README's first line, its length, that its first output block is the recorded run, that every relative link and anchor in every Markdown file resolves, and that the stated numbers of tests are the numbers collected. |
 
 ### Top-level files
@@ -350,9 +350,9 @@ Why the important choices were made:
 
 ## 7. Testing and CI
 
-There are 401 tests of three kinds, told apart by pytest markers.
+There are 404 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (317) need no server and no model. They cover parsing, chunking, SQL assembly,
+- Pure tests (320) need no server and no model. They cover parsing, chunking, SQL assembly,
   metrics, argument checking, and the CLI and web page with fake databases and embedders, and
   they run in seconds anywhere, including a fresh clone without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
@@ -384,7 +384,7 @@ The brief scores four criteria from 0 to 10. The organizers ran the brief's eval
 | Going beyond the tutorial (depth) | measured index behaviour (joins make ranking exact, `M` and `ef_search` sweeps, restart stability, which filters keep the vector index, the search over uncommitted rows), the RRF hybrid with `FULLTEXT`, `EXPLAIN` checked by tests (README, DESIGN.md) |
 | Recall and latency against a ground truth you built (execution) | `evaluate.py`, `claim` / `claim_evidence`, `results/SUMMARY.md` |
 | Chunk size, model and index parameters with reasons (execution) | DESIGN.md "Phase 3 outcomes", README "Parameters and why", the comments in `sql/schema.sql` and `config.py` |
-| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 401 tests, parameters only in SQL, CI |
+| Code quality (execution): separation, error handling, real tests, security, CI | one module per stage (section 4), one-line errors with exit codes (`cli.py`), 404 tests, parameters only in SQL, CI |
 | An ingest that runs from the README and a query interface (usability) | the README's first screen (`make setup`, one query, its output), `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql`, `docs/EXAMPLES.md` |
 | What the database-native approach gave (documentation) | README "What the database-native approach gave" and "Where this approach loses" (`results/separate_index.md`) |
 
@@ -455,7 +455,7 @@ make experiments
 WIKILENSE_FEVEROUS_DB=/path/to/feverous_wikiv1.db .venv/bin/python scripts/run_experiments.py scale   # ~9 min
 .venv/bin/python scripts/make_charts.py              # redraw docs/img/*.svg from results/
 .venv/bin/python scripts/compare_separate_index.py   # MariaDB against an in-process copy (read only)
-.venv/bin/python scripts/measure_index_behaviour.py  # statement forms, join order, isolation (~3 min)
+.venv/bin/python scripts/measure_index_behaviour.py  # statement forms, join order, builds, isolation (~3 min)
 
 # page metadata (only to refetch it; the file is committed)
 .venv/bin/python scripts/fetch_page_meta.py          # ~300 polite API requests, a few minutes
