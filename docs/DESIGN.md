@@ -194,7 +194,8 @@ variable `mhnsw_ef_search` (default 20, session scope) sets the minimum number o
 index looks at; the application passes `Settings.ef_search` (100) per query, see Phase 3.
 `mhnsw_max_cache_size` (16 MB default, global) bounds the index cache; `docker-compose.yml` starts
 the server with 512 MB because the M=6 graph of the 120-word ingest (8,658 chunks) is already 16 MB
-on disk (the size does not change the results, see results/SUMMARY.md section 1).
+on disk (the size does not change the results while the graph fits in it, see results/SUMMARY.md
+section 1; with a smaller cache it does, see "Review pass (2026-11-11)").
 
 ## Corpus selection (`corpus.py`, `scripts/build_corpus.py`)
 
@@ -445,7 +446,8 @@ files named for them, are those of the phase-2 ingest and have been superseded.
     deterministic within one server process (three repeated runs at ef 20 returned the same 20
     chunks in the same order for 75/75 claims, at a 512 MB cache and again at 16 MB), the cache
     size changes nothing (`SET GLOBAL mhnsw_max_cache_size` 512 MB -> 16 MB: 75/75 identical hit
-    lists), and a server restart changes them: the run after the restart matched the runs before
+    lists; measured on 2026-11-11: this holds while the graph fits in the cache and not below,
+    `results/cache_size.md`), and a server restart changes them: the run after the restart matched the runs before
     it for 46/75 claims, 13 claims lost their gold page from the top 20 and none gained one, and
     article recall@10 at ef 20 went from 73/75 to 61/75. The committed baseline is a third state
     of the same on-disk M=6 index (58/75 identical hit lists with the pre-restart runs, 48/75 with
@@ -514,9 +516,10 @@ since the rerun of 2026-09-22.
   matters more than a complete result. The inline cost is an exact ranking over the index and
   grows with the table, which is the number to watch when the corpus is scaled. Section 6,
   `results/strategy_*.md`.
-- **`mhnsw_max_cache_size` = 512 MB kept** (`docker-compose.yml`) for capacity only: the cache
+- **`mhnsw_max_cache_size` = 512 MB kept** (`docker-compose.yml`) for capacity: the cache
   size did not change one hit list (75/75 identical at 512 MB and 16 MB within one server
-  process) and the graph of 8,868 chunks is already 16 MB on disk, which the 16 MB default would
+  process; a cache smaller than the graph does change them, `results/cache_size.md`, 2026-11-11)
+  and the graph of 8,868 chunks is already 16 MB on disk, which the 16 MB default would
   not hold for a larger corpus. Section 1, `results/stability_comparison.md`.
 - **Reproducibility, for the README**: at M=6 and ef 20 the counts depend on the HNSW graph the
   server holds (three states of one on-disk index were observed, and each rebuild is another
