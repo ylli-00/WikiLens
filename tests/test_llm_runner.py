@@ -23,7 +23,6 @@ from wikilense.llm.runner import (
     EXIT_SIGNAL,
     EXIT_WINDOW,
     RunConfig,
-    Runner,
     load_rows,
     run_with_lock,
 )

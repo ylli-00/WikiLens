@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from wikilense.llm.retrieval import Retriever, RetrievalError
+from wikilense.llm.retrieval import RetrievalError, Retriever
 from wikilense.search import Hit
 
 SETTINGS = SimpleNamespace(ef_search=100, embedding_model="BAAI/bge-small-en-v1.5")

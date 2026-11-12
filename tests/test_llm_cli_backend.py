@@ -246,3 +246,19 @@ def test_preflight_refuses_api_key_login_and_keeps_no_email(fake, monkeypatch):
 def test_aliases_never_reach_the_cli(fake):
     with pytest.raises(ModelError):
         fake.argv(request("x", model="sonnet"))
+
+
+def test_the_api_key_never_reaches_the_cli_child(fake, tmp_path, monkeypatch):
+    """Even with ANTHROPIC_API_KEY in the shell and in a .env next to the run, the claude child
+    sees no ANTHROPIC* variable and no key-shaped value: the CLI must never bill the API."""
+    secret = "sk-ant-api03-THIS-MUST-NEVER-REACH-THE-CLI"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", secret)
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", secret)
+    (tmp_path / ".env").write_text(f"ANTHROPIC_API_KEY={secret}\n")
+    monkeypatch.chdir(tmp_path)
+    assert fake.call(request("a claim"), threading.Event()).status == "ok"
+    (call,) = fake.calls()
+    env = call["env_all"]
+    assert not [k for k in env if k.upper().startswith("ANTHROPIC")]
+    assert secret not in json.dumps(env) and "sk-ant-" not in json.dumps(env)
+    assert call["cwd"] == str(fake.cwd)        # not the folder holding the .env

@@ -22,8 +22,11 @@ class NoCallBackend:
     def describe(self):
         return {"version": "test"}
 
-    def preflight(self):
+    def preflight(self, model_ids=None):
         return {}
+
+    def start(self, rows):
+        pass
 
     def call(self, request, stop):  # pragma: no cover - must never run
         raise AssertionError("the guard must stop the run before any call")

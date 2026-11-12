@@ -10,8 +10,15 @@ prompt hash). A key is done once any row with that key is final: a parsed label,
 failure after the retries, or a refusal. Keys whose last row ended in an error (timeout, CLI
 error, spent usage window, fatal stop) are asked again. Rows are indexed by key, not by claim
 id, so a later non-final row never hides an earlier final one (kit review C4/D2). A run folder
-whose manifest differs in models, effort, prompt hash, k, strategy, ef_search, embedding model,
-database, claims-file hash or CLI version is refused.
+whose manifest differs in backend, models, effort, prompt hash, k, strategy, ef_search,
+embedding model, database, claims-file hash or backend version (CLI or SDK) is refused.
+
+**Backends.** ``--backend subscription`` (Claude Code CLI on the subscription) or ``--backend api``
+(Anthropic Messages API with the key from the repo's ``.env``; needs ``--max-usd``). Everything
+else is identical, so a job moves between routes by changing only that option; each row and the
+manifest record the backend. A ``<<<CACHE_BREAK>>>`` line in a user template marks a prefix the
+API backend caches; ``--group-by <claim field>`` sends the items sharing that field (same model
+and condition) to one worker, back to back.
 
 **Order.** Items run claim by claim (all conditions and models of a claim, then the next
 claim), so a stop leaves every condition and model on the same finished claims (kit review
@@ -20,12 +27,13 @@ B17/E27).
 **Stops.** The whole run stops, finishing only the calls in flight, on a spent window (exit 3),
 a five-hour or weekly utilization reading at or above its threshold (exit 3, both 0.80 by
 default; separate thresholds, kit review C9/E9), a fatal result (exit 4), five non-final results
-in a row (exit 5, kit D-49), a sign of paid extra usage (exit 6, kit review A1/C2) or
+in a row (exit 5, kit D-49), a sign of paid extra usage (exit 6, kit review A1/C2), the API
+backend's money stop: ``--max-usd`` reached, or the account's spend limit or credit (exit 7), or
 SIGINT/SIGTERM/SIGHUP (exit 130). The runner never waits out a window by itself.
 
 Exit codes: 0 every planned item is final; 1 some are not (re-run the same command); 2 bad
 configuration or the item guard; 3 window; 4 fatal; 5 circuit breaker; 6 paid-usage signal;
-130 signal.
+7 money stop (API); 130 signal.
 """
 
 from __future__ import annotations
@@ -66,14 +74,15 @@ ROW_VERSION = 1
 BREAKER_LIMIT = 5
 #: Manifest fields that must be equal to resume into a run folder (dotted paths).
 RESUME_FIELDS: tuple[str, ...] = (
-    "models", "effort", "prompt.prompt_id", "prompt.prompt_hash", "retrieval.database",
+    "backend", "models", "effort", "prompt.prompt_id", "prompt.prompt_hash", "retrieval.database",
     "retrieval.k", "retrieval.strategy", "retrieval.ef_search", "retrieval.embedding_model",
-    "claims_file.sha256", "cli.version",
+    "claims_file.sha256", "backend_info.version",
 )
+CACHE_BREAK = "<<<CACHE_BREAK>>>"
 WEEKLY_PREFIX = "seven_day"
 
 EXIT_OK, EXIT_INCOMPLETE, EXIT_CONFIG, EXIT_WINDOW = 0, 1, 2, 3
-EXIT_FATAL, EXIT_BREAKER, EXIT_OVERAGE, EXIT_SIGNAL = 4, 5, 6, 130
+EXIT_FATAL, EXIT_BREAKER, EXIT_OVERAGE, EXIT_MONEY, EXIT_SIGNAL = 4, 5, 6, 7, 130
 
 
 class RunError(RuntimeError):
@@ -185,6 +194,7 @@ class RunConfig:
     min_free_mb: int = 2500
     claims_sha256: str | None = None
     allow_cli_change: bool = False
+    group_by: str | None = None
     argv: list[str] = field(default_factory=list)
 
 
@@ -253,7 +263,7 @@ def write_json_atomic(path: Path, value: Any) -> None:
 
 def check_resume(old: dict[str, Any], new: dict[str, Any], allow_cli_change: bool) -> None:
     """Raise :class:`RunError` when a run folder's manifest differs in a resume field."""
-    fields = [f for f in RESUME_FIELDS if not (allow_cli_change and f == "cli.version")]
+    fields = [f for f in RESUME_FIELDS if not (allow_cli_change and f == "backend_info.version")]
     diffs = [f"{f}: {_get(old, f)!r} != {_get(new, f)!r}" for f in fields
              if _get(old, f) != _get(new, f)]
     if diffs:
@@ -313,11 +323,14 @@ class Runner:
             "retrieval": self.retriever.describe(),
             "claims_file": {"path": str(self.cfg.claims_path), "sha256": claims_sha,
                             "n_claims_in_file": n_claims},
-            "cli": {},
+            "backend_info": {},
             "notes": {
                 "list_price_usd_not_billed": "the CLI's total_cost_usd: what the call would "
                 "cost on the API at list price; the subscription does not bill it",
-                "computed_usage": "sums computed by the runner from the CLI's modelUsage",
+                "computed_usage": "sums computed by the runner from the backend's own usage "
+                "fields (the CLI's modelUsage, or the API's usage)",
+                "cost_usd": "API backend only: a list-price computation from each response's "
+                "usage (prices and their source in backend_info), not the invoice",
             },
         }
 
@@ -345,8 +358,9 @@ class Runner:
         manifest = self._base_manifest(sha, n_in_file)
         if self.manifest_path.exists():
             old = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-            # the CLI version is compared in run(), once the binary has been asked
-            check_resume(old, manifest | {"cli": old.get("cli", {})}, cfg.allow_cli_change)
+            # the backend version is compared in run(), once the backend has been asked
+            check_resume(old, manifest | {"backend_info": old.get("backend_info", {})},
+                         cfg.allow_cli_change)
             manifest = old
         pending = [i for i in planned if i.key not in done]
         return planned, pending, manifest, n_in_file
@@ -364,9 +378,14 @@ class Runner:
     def request(self, item: Item) -> CallRequest:
         """Return the backend request of one item."""
         p = self.cfg.prompt
+        text = self.render(item)
+        prefix = ""
+        if CACHE_BREAK in text:
+            head, _, tail = text.partition(CACHE_BREAK)
+            prefix, text = head, head + tail.lstrip("\n")
         return CallRequest(model_id=item.model_id, effort=self.cfg.effort, system=p.system,
-                           user_text=self.render(item), schema=p.schema,
-                           schema_json=p.schema_json, label_path=p.label_path)
+                           user_text=text, schema=p.schema, schema_json=p.schema_json,
+                           label_path=p.label_path, cache_prefix=prefix)
 
     def row(self, item: Item, request: CallRequest, res: CallResult) -> dict[str, Any]:
         """Return the results row of one answer."""
@@ -386,6 +405,7 @@ class Runner:
             "condition": item.condition,
             "gold_label": item.claim["label"],
             "kind": item.claim.get("kind"),
+            "backend": self.backend.name,
             "model_option": item.model_option,
             "model_requested": item.model_id,
             "model_served": res.served_models[0] if len(res.served_models) == 1
@@ -409,11 +429,14 @@ class Runner:
             "elapsed_s_total": res.elapsed_s_total,
             "attempts": res.attempts,
             "attempt_log": res.attempt_log,
-            "cli": res.cli,
+            "cli": res.cli or None,
+            "api": res.api or None,
+            "cost_usd": res.cost_usd,
             "computed_usage": res.computed_usage,
             "window_utilization": res.window_utilization or None,
             "raw_response": res.raw_response,
             "raw_stream_file": raw_name,
+            "backend_version": self.cfg_cli_version,
             "cli_version": self.cfg_cli_version,
             "ts": now_iso(),
         }
@@ -446,10 +469,14 @@ class Runner:
                 st.last_window = reading
             if res.status == "window":
                 st.request_stop(EXIT_WINDOW, res.stop_signal or "window spent")
+            elif res.status == "money":
+                st.request_stop(EXIT_MONEY, res.stop_signal or f"money: {res.error}")
             elif res.status == "fatal":
                 st.request_stop(EXIT_FATAL, f"fatal: {res.error}")
             if res.stop_signal and res.stop_signal.startswith("overage"):
                 st.request_stop(EXIT_OVERAGE, res.stop_signal)
+            if res.stop_signal and res.stop_signal.startswith("money"):
+                st.request_stop(EXIT_MONEY, res.stop_signal)
             for name, value in (res.window_utilization or {}).items():
                 if value is None:
                     continue
@@ -479,33 +506,43 @@ class Runner:
                 warned = True
             self.state.stop.wait(15)
 
-    def work(self, queue: list[Item], queue_lock: threading.Lock) -> None:
-        """A worker thread: take the next item, call, write the row, apply the stop rules."""
+    def work(self, queue: list[list[Item]], queue_lock: threading.Lock) -> None:
+        """A worker thread: take the next group of items and run them in order (call, write the
+        row, apply the stop rules). Without --group-by every group is one item."""
         while not self.state.stop.is_set():
             with queue_lock:
                 if not queue:
                     return
-                item = queue.pop(0)
-            self.memory_gate()
-            if self.state.stop.is_set():
-                return
-            try:
-                request = self.request(item)
-                res = self.backend.call(request, self.state.stop)
-            except Exception as exc:  # one item must not kill the worker
-                log.exception("claim %s %s %s: unexpected error", item.claim_id,
-                              item.condition, item.model_id)
-                with self.state.lock:
-                    self.state.consecutive_errors += 1
-                    if self.state.consecutive_errors >= BREAKER_LIMIT:
-                        self.state.request_stop(EXIT_BREAKER, f"unexpected errors ({exc})")
-                continue
-            if res.attempts == 0:       # stopped before the call: nothing to record
-                continue
-            self.write_row(self.row(item, request, res), res.raw_stream)
-            self.account(item, res)
-            log.info("claim %s %-12s %-18s %s label=%s %.1fs", item.claim_id, item.condition,
-                     item.model_id, res.status, res.label, res.latency_s or 0.0)
+                group = queue.pop(0)
+            for item in group:
+                if self.state.stop.is_set():
+                    return
+                self.run_item(item)
+
+    def run_item(self, item: Item) -> None:
+        """One item: memory gate, the call, the row, the stop rules."""
+        self.memory_gate()
+        if self.state.stop.is_set():
+            return
+        try:
+            request = self.request(item)
+            res = self.backend.call(request, self.state.stop)
+        except Exception as exc:  # one item must not kill the worker
+            log.exception("claim %s %s %s: unexpected error", item.claim_id,
+                          item.condition, item.model_id)
+            with self.state.lock:
+                self.state.consecutive_errors += 1
+                if self.state.consecutive_errors >= BREAKER_LIMIT:
+                    self.state.request_stop(EXIT_BREAKER, f"unexpected errors ({exc})")
+            return
+        if res.attempts == 0:       # nothing was sent: no row, but a money stop still stops
+            if res.stop_signal and res.stop_signal.startswith("money"):
+                self.state.request_stop(EXIT_MONEY, res.stop_signal)
+            return
+        self.write_row(self.row(item, request, res), res.raw_stream)
+        self.account(item, res)
+        log.info("claim %s %-12s %-18s %s label=%s %.1fs", item.claim_id, item.condition,
+                 item.model_id, res.status, res.label, res.latency_s or 0.0)
 
     # ----------------------------------------------------------------------------------
     def run(self) -> int:
@@ -522,17 +559,20 @@ class Runner:
         if cfg.dry_run:
             self.dry_run(planned)
             return EXIT_OK
-        cli = self.backend.describe()
-        auth = self.backend.preflight()
-        if manifest.get("cli") and manifest["cli"].get("version") != cli["version"] \
-                and not cfg.allow_cli_change:
-            log.error("the CLI version changed (%s -> %s); pass --allow-cli-change or start a "
-                      "new run folder", manifest["cli"].get("version"), cli["version"])
+        info = self.backend.describe()
+        old_info = manifest.get("backend_info") or {}
+        if old_info and old_info.get("version") != info["version"] and not cfg.allow_cli_change:
+            log.error("the backend version changed (%s -> %s); pass --allow-cli-change or start "
+                      "a new run folder", old_info.get("version"), info["version"])
             return EXIT_CONFIG
+        auth = self.backend.preflight(list(cfg.models.values()))
         manifest.setdefault("created_at", now_iso())
-        manifest["cli"] = manifest.get("cli") or cli
+        manifest["backend_info"] = old_info or info
+        if self.backend.name == "claude_cli_subscription":
+            manifest["cli"] = manifest.get("cli") or info       # the name used before 2026-11-12
         manifest["auth"] = auth
-        self.cfg_cli_version = cli["version"]
+        self.cfg_cli_version = info["version"]
+        self.backend.start(load_rows(self.results_path))
         if "retrieved" in cfg.conditions:
             claims = {i.claim_id: i.claim["claim"] for i in planned if i.condition == "retrieved"}
             try:
@@ -544,7 +584,8 @@ class Runner:
         invocation = {"started_at": now_iso(), "argv": cfg.argv, "conditions": cfg.conditions,
                       "limit_claims": cfg.limit_claims, "workers": cfg.workers,
                       "n_planned": len(planned), "n_pending": len(pending),
-                      "cli_version": cli["version"], "git": git_info(),
+                      "backend": self.backend.name, "backend_version": info["version"],
+                      "group_by": cfg.group_by, "git": git_info(),
                       "thresholds": {"five_hour": cfg.stop_five_hour, "weekly": cfg.stop_weekly}}
         manifest.setdefault("invocations", []).append(invocation)
         manifest["started_at"] = manifest.get("started_at") or invocation["started_at"]
@@ -571,7 +612,7 @@ class Runner:
         """Run the pending items on the worker threads; return the exit code."""
         if not pending:
             return EXIT_OK
-        queue = list(pending)
+        queue = group_items(pending, self.cfg.group_by)
         queue_lock = threading.Lock()
 
         def on_signal(signum: int, _frame: Any) -> None:
@@ -619,10 +660,17 @@ class Runner:
                 self.hits[item.claim_id] = cached
             request = self.request(item)
             argv_fn = getattr(self.backend, "argv", None)
+            kwargs_fn = getattr(self.backend, "request_kwargs", None)
             if argv_fn is not None:
                 argv = [f"<system prompt: {len(request.system)} chars>" if a == request.system
                         else a for a in argv_fn(request)]
                 print(json.dumps(argv))
+            if kwargs_fn is not None:
+                kwargs = kwargs_fn(request)
+                print(json.dumps(kwargs, ensure_ascii=False, indent=1))
+                problems = request_parity(request, kwargs)
+                print(f"----- parity with the subscription request ({item.condition}): "
+                      + ("MATCH" if not problems else "DIFFERS: " + "; ".join(problems)))
             print(f"----- stdin of claim {item.claim_id}, {item.condition} -----")
             print(request.user_text)
 
@@ -630,9 +678,53 @@ class Runner:
 # --------------------------------------------------------------------------------------
 # Command line
 # --------------------------------------------------------------------------------------
+def group_items(items: list[Item], group_by: str | None) -> list[list[Item]]:
+    """Return the work queue: groups of items, in the order of their first item.
+
+    Without ``group_by`` every item is its own group. With it, the items of one model and one
+    condition whose claims share the value of ``group_by`` form one group, which one worker runs
+    back to back so a cached shared prefix is read by the next item (kit D-117 / ``--group-by``).
+    """
+    if not group_by:
+        return [[item] for item in items]
+    groups: dict[tuple[str, str, str], list[Item]] = {}
+    for item in items:
+        value = json.dumps(item.claim.get(group_by), sort_keys=True, ensure_ascii=False)
+        groups.setdefault((item.model_id, item.condition, value), []).append(item)
+    return list(groups.values())
+
+
+def request_parity(request: CallRequest, kwargs: dict[str, Any]) -> list[str]:
+    """Return how an API request differs from the subscription request built from the same
+    :class:`CallRequest` (empty when the model, effort, system text, user text and schema
+    are the same; the CLI sends exactly ``request``'s fields)."""
+    problems: list[str] = []
+    if kwargs.get("model") != request.model_id:
+        problems.append(f"model {kwargs.get('model')!r}")
+    if (kwargs.get("output_config") or {}).get("effort") != request.effort:
+        problems.append("effort")
+    system = "".join(b.get("text", "") for b in kwargs.get("system") or [])
+    if system != request.system:
+        problems.append("system text")
+    content = kwargs["messages"][0]["content"]
+    user = content if isinstance(content, str) else "".join(b["text"] for b in content)
+    if user != request.user_text:
+        problems.append("user text")
+    sent = ((kwargs.get("output_config") or {}).get("format") or {}).get("schema")
+    if sent != request.schema:
+        problems.append("schema (after the API's keyword sanitising)")
+    for forbidden in ("temperature", "top_p", "top_k", "tools", "tool_choice", "fallbacks"):
+        if forbidden in kwargs:
+            problems.append(f"sends {forbidden}")
+    return problems
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Return the argument parser of ``scripts/llm_run.py``."""
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    p.add_argument("--backend", choices=["subscription", "api"], default="subscription",
+                   help="subscription: Claude Code CLI on the subscription; api: Anthropic API "
+                        "with the key in the repo's .env (needs --max-usd)")
     p.add_argument("--runs-root", required=True, type=Path,
                    help="folder of the run folders (outside the repository)")
     p.add_argument("--run-id", default=None, help="run folder name (default: time + prompt)")
@@ -643,43 +735,85 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--effort", required=True, choices=["low", "medium", "high", "xhigh", "max"])
     p.add_argument("--conditions", default=",".join(CONDITIONS))
     p.add_argument("--limit-claims", type=int, default=None, help="only the first N claims")
-    p.add_argument("--workers", type=int, default=5, help="parallel claude processes (1-8)")
+    p.add_argument("--workers", type=int, default=5, help="parallel calls (1-8)")
+    p.add_argument("--group-by", default=None,
+                   help="claim field: items sharing it (same model and condition) run on one "
+                        "worker, back to back (for a cached <<<CACHE_BREAK>>> prefix)")
     p.add_argument("--database", default=None, help="database for 'retrieved' (default: settings)")
     p.add_argument("--k", type=int, default=5)
     p.add_argument("--strategy", default="inline")
     p.add_argument("--ef-search", type=int, default=None)
-    p.add_argument("--binary", default=None, help="claude binary (default: $CLAUDE_BIN)")
-    p.add_argument("--timeout-s", type=float, default=300.0)
+    p.add_argument("--timeout-s", type=float, default=None,
+                   help="per call (default: 300 subscription, 480 api)")
     p.add_argument("--max-attempts", type=int, default=4)
-    p.add_argument("--stop-five-hour", type=float, default=0.80)
-    p.add_argument("--stop-weekly", type=float, default=0.80)
     p.add_argument("--min-free-mb", type=int, default=2500)
-    p.add_argument("--allow-5m-cache-writes", action="store_true")
-    p.add_argument("--allow-cli-change", action="store_true")
+    p.add_argument("--allow-cli-change", action="store_true",
+                   help="resume although the CLI / SDK version changed")
+    g = p.add_argument_group("subscription backend")
+    g.add_argument("--binary", default=None, help="claude binary (default: $CLAUDE_BIN)")
+    g.add_argument("--stop-five-hour", type=float, default=0.80)
+    g.add_argument("--stop-weekly", type=float, default=0.80)
+    g.add_argument("--allow-5m-cache-writes", action="store_true")
+    a = p.add_argument_group("api backend")
+    a.add_argument("--max-usd", type=float, default=None,
+                   help="REQUIRED with --backend api: stop at this list-price spend, counting "
+                        "the earlier rows of the same results file")
+    a.add_argument("--env-file", type=Path, default=None,
+                   help="dotenv file holding ANTHROPIC_API_KEY (default: the repo's .env)")
+    a.add_argument("--cache-ttl", choices=["5m", "1h", "off"], default="5m")
+    a.add_argument("--thinking-display", choices=["omitted", "summarized"], default="omitted")
+    a.add_argument("--max-tokens", type=int, default=None, help="default: by effort (low 4,096)")
     p.add_argument("--full", action="store_true",
                    help="allow more than 50 items per model (never with a generic_probe prompt)")
-    p.add_argument("--dry-run", action="store_true", help="plan and print; no call, no database")
+    p.add_argument("--dry-run", action="store_true",
+                   help="plan and print; no call, no key, no database")
     p.add_argument("-v", "--verbose", action="store_true")
     return p
+
+
+def make_backend(args: argparse.Namespace, runs_root: Path) -> Backend:
+    """Return the backend ``--backend`` names. Raises RunError for a bad configuration."""
+    if args.backend == "api":
+        from wikilense.config import DEFAULT_ENV_FILE
+        from wikilense.llm.api_backend import AnthropicApiBackend
+
+        if args.max_usd is None:
+            raise RunError("--max-usd is required with --backend api")
+        return AnthropicApiBackend(
+            args.env_file or DEFAULT_ENV_FILE, LABELS, max_usd=args.max_usd,
+            timeout_s=args.timeout_s or 480.0, max_attempts=args.max_attempts,
+            cache_ttl=args.cache_ttl, thinking_display=args.thinking_display,
+            max_tokens=args.max_tokens)
+    from wikilense.llm.cli_backend import ClaudeCliBackend
+
+    binary = args.binary or os.environ.get("CLAUDE_BIN")
+    if not binary:
+        raise RunError("no claude binary: pass --binary or set CLAUDE_BIN")
+    return ClaudeCliBackend(binary, runs_root / ".empty_cwd", LABELS,
+                            timeout_s=args.timeout_s or 300.0, max_attempts=args.max_attempts,
+                            allow_5m_cache_writes=args.allow_5m_cache_writes)
 
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point of ``scripts/llm_run.py``."""
     from wikilense.config import load_settings
-    from wikilense.llm.cli_backend import ClaudeCliBackend, CliBackendError
+    from wikilense.llm.api_backend import ApiBackendError
+    from wikilense.llm.cli_backend import CliBackendError
     from wikilense.llm.prompts import load_prompt_set
     from wikilense.llm.retrieval import Retriever
 
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(threadName)s %(message)s")
+    for name in ("anthropic", "httpx", "httpcore"):     # never debug-log HTTP traffic
+        logging.getLogger(name).setLevel(logging.WARNING)
     try:
         models = resolve_models(args.models)
         prompt = load_prompt_set(args.prompt)
         if not 1 <= args.workers <= 8:
             raise RunError("--workers must be 1..8 (the kit's cap; 5 at most was ever measured)")
         if args.workers > 5:
-            log.warning("more than 5 claude processes was never measured (kit D-87)")
+            log.warning("more than 5 parallel calls was never measured on the CLI (kit D-87)")
         settings = load_settings()
         database = args.database or settings.db_name
         run_id = args.run_id or datetime.now().astimezone().strftime(
@@ -688,13 +822,8 @@ def main(argv: list[str] | None = None) -> int:
         run_dir = runs_root / run_id
         retriever = Retriever(settings, database, runs_root / "retrieval_cache", k=args.k,
                               strategy=args.strategy, ef_search=args.ef_search)
-        binary = args.binary or os.environ.get("CLAUDE_BIN")
-        if not binary:
-            raise RunError("no claude binary: pass --binary or set CLAUDE_BIN")
-        backend = ClaudeCliBackend(binary, runs_root / ".empty_cwd", LABELS,
-                                   timeout_s=args.timeout_s, max_attempts=args.max_attempts,
-                                   allow_5m_cache_writes=args.allow_5m_cache_writes)
-    except (RunError, CliBackendError, ValueError) as exc:
+        backend = make_backend(args, runs_root)
+    except (RunError, CliBackendError, ApiBackendError, ValueError) as exc:
         log.error("%s", exc)
         return EXIT_CONFIG
     config = RunConfig(
@@ -703,14 +832,15 @@ def main(argv: list[str] | None = None) -> int:
         limit_claims=args.limit_claims, workers=args.workers, full=args.full,
         dry_run=args.dry_run, stop_five_hour=args.stop_five_hour, stop_weekly=args.stop_weekly,
         min_free_mb=args.min_free_mb, claims_sha256=args.claims_sha256,
-        allow_cli_change=args.allow_cli_change, argv=sys.argv if argv is None else list(argv),
+        allow_cli_change=args.allow_cli_change, group_by=args.group_by,
+        argv=sys.argv if argv is None else list(argv),
     )
     return run_with_lock(config, backend, retriever, runs_root)
 
 
 def run_with_lock(config: RunConfig, backend: Backend, retriever: Any, runs_root: Path) -> int:
     """Run under the machine-wide runner lock: one runner at a time (at most ``workers``
-    claude processes on the laptop; kit review C12/D3)."""
+    calls in flight on the laptop; kit review C12/D3)."""
     if config.dry_run:
         return Runner(config, backend, retriever).run()
     runs_root.mkdir(parents=True, exist_ok=True)
@@ -722,10 +852,11 @@ def run_with_lock(config: RunConfig, backend: Backend, retriever: Any, runs_root
             log.error("another LLM runner holds %s: one runner at a time", lock_path)
             return EXIT_CONFIG
         config.run_dir.mkdir(parents=True, exist_ok=True)
+        from wikilense.llm.api_backend import ApiBackendError
         from wikilense.llm.cli_backend import CliBackendError
 
         try:
             return Runner(config, backend, retriever).run()
-        except CliBackendError as exc:      # not logged in, API-key auth, ...
+        except (CliBackendError, ApiBackendError) as exc:   # login, key, refused variables
             log.error("%s", exc)
             return EXIT_FATAL

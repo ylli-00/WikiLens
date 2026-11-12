@@ -436,7 +436,10 @@ class ClaudeCliBackend:
             "cwd": str(self.cwd),
         }
 
-    def preflight(self) -> dict[str, Any]:
+    def start(self, rows: list[dict[str, Any]]) -> None:
+        """Nothing to restore from earlier rows on the subscription route."""
+
+    def preflight(self, model_ids: list[str] | None = None) -> dict[str, Any]:
         """``claude auth status --json`` (no model call). Fail closed [C21].
 
         Refuses when the output cannot be read, when not logged in, and when the login is not the

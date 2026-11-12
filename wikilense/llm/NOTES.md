@@ -76,3 +76,32 @@ ef_search, embedding model, claim id); the strategy is added to the prompt's lis
 - The prompt quoted "3,500 to 4,000 calls per Max window at about 5,500 prompt tokens". The
   RefChecker window was about 3.4k prompt tokens per call (review B24), and the plan tier of
   those windows is unknown (review B2).
+
+## The API backend (`api_backend.py`, added 2026-11-12)
+
+Sources:
+- **API kit:** `reviews/ANTHROPIC_API_RUNNER_KIT_2026-11-12.zip`, unpacked in `llm_kit_api/`:
+  its `REPORT.md` sections, design records D-NN, and `code/standalone/api_runner.py`.
+- **pricing page:** https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12.
+- **skill:** the claude-api skill, cached 2026-11-03.
+
+| choice | follows |
+|---|---|
+| `--backend subscription\|api` per run. Everything else is shared: claims, prompts, conditions, retrieval, resume key, rows, guards. `backend` is in every row and in the manifest, and resuming a folder with another backend is refused. | the owner's prompt; API kit REPORT 2.10 (results from the two routes are not byte-comparable: say which route produced them) |
+| The key is read with `dotenv_values(<repo>/.env)`, never from `os.environ`, and passed to `anthropic.Anthropic(api_key=..., base_url=..., max_retries=0)`. It is never logged or written. | the owner's prompt; API kit 2.10 (an empty key counts as set; refuse it) |
+| `ANTHROPIC_BASE_URL` or `ANTHROPIC_AUTH_TOKEN` in the environment: refuse to start. The SDK reads them even when given a key. | API kit 2.10; skill (credential resolution order) |
+| The SDK and httpx loggers are kept at WARNING. | so a `-v` run cannot log HTTP traffic |
+| A free preflight with `models.retrieve` per model, before any billed call: 401 or 404 there is fatal. | API kit 2.5 / `api_check.py` (the project's free key check) |
+| Streaming (`messages.stream`) with a watchdog that closes the stream at the time limit (480 s), counting the billed tokens. | API kit 2.1, D-92 |
+| `system` is a text block with a 5-minute cache mark; a `<<<CACHE_BREAK>>>` prefix in the user turn gets its own mark. `--group-by` sends items sharing a field to one worker, back to back. | API kit 2.4, D-117 |
+| No caching in the probes: the generic prompt is under the 512-token minimum, so no cache reads are expected. It is not padded. | skill (minimum cacheable prefix: 512 tokens on Sonnet 5.5, Opus 5.5 and Haiku 5.5); the owner's prompt |
+| Structured output in `output_config.format` (json_schema), with the schema sanitised. Never `tools`, `tool_choice` (a forced choice is a 400 on Sonnet 5.5 and Opus 5.5), `temperature`, `top_p` or `top_k`. | API kit 2.2, 2.9 |
+| **`fallbacks` is never sent.** Another model answering (top-level `model`, a `fallback_message` iteration, a `fallback` block) is recorded as a refusal. | the owner's rule; API kit 2.3. The skill recommends `fallbacks: "default"` for Sonnet 5.5 and Opus 5.5; that would let a backup model's answer count as the requested model's |
+| `output_config.effort` is sent on every call (low for the probes). `max_tokens` by effort (low 4,096); it caps thinking plus the answer. | API kit 2.2 (Opus 5.5 and Haiku 5.5 default to medium) |
+| `thinking: {type: adaptive, display: omitted}`. The kit's default is `summarized`; `omitted` matches the subscription route, which never returns thinking text. Billing is the same. | skill ("display controls visibility only") |
+| The error chain in the kit's order: 401/403/404/402 fatal; 400 = the account limit (money) or a bad request (error); 429 = the spend cap (money) or a per-minute limit (shared gate, budget of 20); 5xx/overloaded = back off; timeout at most 2; network = back off. | API kit 2.7, `client_anthropic.py` |
+| `--max-usd` is required. Before every request, the spend of this run plus every earlier row of the same results file is checked against it. A money stop is exit 7. | API kit 2.5; the owner's prompt. The kit used exit 3, which is the window stop here |
+| `cost_usd` is a list-price computation over every billed attempt, not the invoice. | API kit 2.8; the pricing page for all three models, including Haiku 5.5's prices above 100k prompt tokens and the 1.1x US-only multiplier |
+| Invalid JSON or schema: asked again up to `max_attempts`, then `parse_failed` (final), the same rule as the subscription route. `max_tokens` truncation: an error, asked again on the next run. A refusal: final, with `stop_details`. | the runner's shared rule; API kit 2.7 |
+| Served model: exact, or the id plus `-YYYYMMDD`; never a prefix test. | API kit 2.3 (D-95) |
+| 5 workers by default, as on the subscription route. The kit ran 50 with no 429. | the owner's prompt |

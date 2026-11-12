@@ -26,6 +26,25 @@ def _stats(values: list[float]) -> str:
             f"{min(values):,.1f} / {max(values):,.1f}")
 
 
+def native_tokens(row: dict[str, Any]) -> dict[str, Any]:
+    """The backend's own token fields of one row, under common names (None when absent)."""
+    if row.get("api"):
+        usage = row["api"].get("usage") or {}
+        details = usage.get("output_tokens_details") or {}
+        return {"uncached": usage.get("input_tokens"), "read": usage.get("cache_read_input_tokens"),
+                "write": usage.get("cache_creation_input_tokens"),
+                "output": usage.get("output_tokens"), "thinking": details.get("thinking_tokens"),
+                "turns": None}
+    cli = row.get("cli") or {}
+    served = row.get("model_served")
+    entry = (cli.get("model_usage") or {}).get(served) if isinstance(served, str) else None
+    if not entry:
+        return {}
+    return {"uncached": entry.get("inputTokens"), "read": entry.get("cacheReadInputTokens"),
+            "write": entry.get("cacheCreationInputTokens"), "output": entry.get("outputTokens"),
+            "thinking": entry.get("thinkingTokens"), "turns": cli.get("num_turns")}
+
+
 def summarize(run_dir: Path, n_examples: int = 2, cache_root: Path | None = None) -> str:
     """Return the Markdown summary of a run folder."""
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -33,7 +52,8 @@ def summarize(run_dir: Path, n_examples: int = 2, cache_root: Path | None = None
     out: list[str] = [f"# Run {manifest.get('run_id')}", ""]
     out.append(f"- models: {manifest.get('models')}; effort {manifest.get('effort')}; prompt "
                f"{manifest['prompt']['prompt_id']} ({manifest['prompt']['prompt_hash'][:12]})")
-    out.append(f"- CLI: {manifest.get('cli', {}).get('version')}; claims file sha256 "
+    info = manifest.get("backend_info") or manifest.get("cli") or {}
+    out.append(f"- backend: {manifest.get('backend')} ({info.get('version')}); claims file sha256 "
                f"{manifest['claims_file']['sha256'][:12]}; retrieval {manifest.get('retrieval')}")
     out.append(f"- rows: {len(rows)}; statuses {dict(Counter(r['status'] for r in rows))}")
     out.append("")
@@ -49,34 +69,41 @@ def summarize(run_dir: Path, n_examples: int = 2, cache_root: Path | None = None
         dur = [float(r["cli"]["duration_ms"]) for r in group
                if r.get("cli") and r["cli"].get("duration_ms") is not None]
         out.append(f"| {model} | {cond} | {len(group)} | {st['ok']} | {st['parse_failed']} | "
-                   f"{st['refusal']} | {st['error'] + st['window'] + st['fatal']} | "
+                   f"{st['refusal']} | {st['error'] + st['window'] + st['money'] + st['fatal']} | "
                    f"{_stats(lat)} | {_stats(dur)} |")
-    out += ["", ("Tokens per call (mean / median / min / max), as the CLI's modelUsage reports "
-                 "them for the requested model; `prompt` is the runner's computed sum "
-                 "inputTokens + cacheReadInputTokens + cacheCreationInputTokens:"), ""]
-    out.append("| model | condition | inputTokens | cacheRead | cacheCreation | prompt (computed) "
-               "| outputTokens | thinkingTokens | num_turns |")
-    out.append("|---|---|---|---|---|---|---|---|---|")
+    out += ["", ("Tokens per call (mean / median / min / max), from the backend's own usage "
+                 "fields for the requested model (subscription: the CLI's modelUsage; api: the "
+                 "response's usage). `prompt` is the runner's computed sum uncached + cache read "
+                 "+ cache write:"), ""]
+    out.append("| model | condition | uncached input | cache read | cache write | prompt (computed) "
+               "| output | thinking | num_turns | cost_usd per call (list price, API only) |")
+    out.append("|---|---|---|---|---|---|---|---|---|---|")
     for (model, cond), group in sorted(groups.items()):
         cols: dict[str, list[float]] = defaultdict(list)
         for r in group:
-            usage = ((r.get("cli") or {}).get("model_usage") or {})
-            served = r.get("model_served")
-            entry = usage.get(served) if isinstance(served, str) else None
-            if not entry:
-                continue
-            for name in ("inputTokens", "cacheReadInputTokens", "cacheCreationInputTokens",
-                         "outputTokens", "thinkingTokens"):
-                if entry.get(name) is not None:
-                    cols[name].append(float(entry[name]))
-            cols["prompt"].append(float(r["computed_usage"].get("prompt_tokens", 0)))
-            if r["cli"].get("num_turns") is not None:
-                cols["turns"].append(float(r["cli"]["num_turns"]))
-        out.append(f"| {model} | {cond} | {_stats(cols['inputTokens'])} | "
-                   f"{_stats(cols['cacheReadInputTokens'])} | "
-                   f"{_stats(cols['cacheCreationInputTokens'])} | {_stats(cols['prompt'])} | "
-                   f"{_stats(cols['outputTokens'])} | {_stats(cols['thinkingTokens'])} | "
-                   f"{_stats(cols['turns'])} |")
+            for name, value in native_tokens(r).items():
+                if value is not None:
+                    cols[name].append(float(value))
+            cols["prompt"].append(float((r.get("computed_usage") or {}).get("prompt_tokens", 0)))
+            if r.get("cost_usd") is not None:
+                cols["cost"].append(float(r["cost_usd"]))
+        cost = (f"{statistics.mean(cols['cost']):.6f} (total {sum(cols['cost']):.6f})"
+                if cols["cost"] else "-")
+        out.append(f"| {model} | {cond} | {_stats(cols['uncached'])} | {_stats(cols['read'])} | "
+                   f"{_stats(cols['write'])} | {_stats(cols['prompt'])} | "
+                   f"{_stats(cols['output'])} | {_stats(cols['thinking'])} | "
+                   f"{_stats(cols['turns'])} | {cost} |")
+    costs = [float(r["cost_usd"]) for r in rows if r.get("cost_usd") is not None]
+    if costs:
+        line = (f"- cost_usd, LIST-PRICE computation (not the invoice): total "
+                f"${sum(costs):.6f} over {len(costs)} rows, mean ${statistics.mean(costs):.6f}")
+        out += ["", line]
+    n429 = sum(1 for r in rows for e in (r.get("attempt_log") or []) if e.get("outcome") == "429")
+    out.append(f"- 429 responses inside the rows' attempts: {n429}")
+    remaining = [((r.get("api") or {}).get("ratelimit") or {}) for r in rows if r.get("api")]
+    if remaining:
+        out.append(f"- lowest rate-limit headers seen: "
+                   f"{ {k: min(d[k] for d in remaining if k in d) for k in sorted({k for d in remaining for k in d}) if k.endswith('remaining')} }")
     readings = [(r["ts"], r["window_utilization"]) for r in rows if r.get("window_utilization")]
     with_event = sum(1 for r in rows if (r.get("cli") or {}).get("last_rate_limit_event"))
     out += ["", f"- rows with a rate_limit_event: {with_event} of {len(rows)}"]

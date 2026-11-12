@@ -70,6 +70,7 @@ def main() -> int:
         "argv": ["<sys>" if i > 0 and argv[i - 1] == "--system-prompt" else a
                  for i, a in enumerate(argv)],
         "env": {k: os.environ.get(k) for k in ENV_SEEN},
+        "env_all": dict(os.environ),          # test fake only: the whole child environment
         "cwd": os.getcwd(), "stdin": stdin, "start": time.time(), "pid": os.getpid(),
     }
 
