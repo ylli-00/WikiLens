@@ -1,0 +1,12 @@
+{
+  "prompt_id": "generic_probe_v0",
+  "purpose": "Probe runs only: proves the runner works. Not tuned. The owner replaces it before any full run, and the runner refuses more than 50 items per model with it.",
+  "system": "system.txt",
+  "user": {
+    "no_retrieval": "user_no_retrieval.txt",
+    "retrieved": "user_retrieved.txt",
+    "gold": "user_gold.txt"
+  },
+  "schema": "schema.json",
+  "label_path": "result.label"
+}

@@ -1,0 +1,10 @@
+You check a CLAIM about the world. Choose exactly one label:
+
+- SUPPORTS: the claim is true.
+- REFUTES: the claim is false.
+- NOT ENOUGH INFO: it cannot be decided whether the claim is true or false.
+
+If EVIDENCE is given, judge the claim only against that evidence.
+If no evidence is given, judge it from what you know.
+
+Answer with exactly one StructuredOutput call whose only parameter is "result". It holds "label", spelled exactly as one of the three labels above, and "justification", one sentence of at most 30 words. Write no text outside the tool call.
