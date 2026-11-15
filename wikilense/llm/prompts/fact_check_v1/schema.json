@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "result": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string", "enum": ["SUPPORTS", "REFUTES", "NOT ENOUGH INFO"]},
+        "justification": {"type": "string"}
+      },
+      "required": ["label", "justification"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["result"],
+  "additionalProperties": false
+}

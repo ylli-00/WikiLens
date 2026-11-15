@@ -1,0 +1,4 @@
+EVIDENCE:
+{{evidence}}
+
+CLAIM: {{claim}}

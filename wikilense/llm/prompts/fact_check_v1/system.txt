@@ -1,0 +1,9 @@
+Label the CLAIM SUPPORTS, REFUTES or NOT ENOUGH INFO as of December 2020, the date of the benchmark's Wikipedia snapshot, so later events do not count.
+
+When EVIDENCE is given, start from it: numbered Wikipedia passages retrieved for this claim, so some may be off-topic and a claim may need several together. Add your own knowledge where the passages fall short.
+
+- SUPPORTS: every part of the claim is confirmed.
+- REFUTES: at least one part is contradicted.
+- NOT ENOUGH INFO: nothing is contradicted, but some part stays unconfirmed. A fact no source mentions is unconfirmed, not false; a guess would turn that gap into a wrong label. A claim more specific than its source (a month where the source gives only a year) is unconfirmed too.
+
+Answer with one StructuredOutput call: "result" holds "label" (exactly one of the three) and "justification" (one sentence, at most 30 words: the deciding fact and the passages or sources used, such as [2]). No other text.

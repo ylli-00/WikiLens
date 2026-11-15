@@ -1,0 +1,12 @@
+{
+  "prompt_id": "fact_check_v1",
+  "purpose": "The owner's prompt for the full run (2026-11-12): the passages first, the model's own knowledge where they fall short, no web search. Same user templates and schema as generic_probe_v0. Drafted by chat B; chat A adds it to wikilense/llm/prompts/.",
+  "system": "system.txt",
+  "user": {
+    "no_retrieval": "user_no_retrieval.txt",
+    "retrieved": "user_retrieved.txt",
+    "gold": "user_gold.txt"
+  },
+  "schema": "schema.json",
+  "label_path": "result.label"
+}
