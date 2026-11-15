@@ -1,0 +1,10 @@
+{
+  "prompt_id": "fact_check_web_v1",
+  "purpose": "The owner's web condition (2026-11-12): Claude Haiku 5.5 gets only the claim plus Claude Code's WebSearch and WebFetch tools, as a normal user who lets the model use the internet. Same schema as fact_check_v1; the system text differs from fact_check_v1 only in paragraph 2 and the end of the last sentence.",
+  "system": "system.txt",
+  "user": {
+    "web": "user_web.txt"
+  },
+  "schema": "schema.json",
+  "label_path": "result.label"
+}

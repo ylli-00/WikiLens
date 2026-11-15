@@ -25,6 +25,15 @@ chosen by TRIGGER_* words in the user turn read from stdin:
   TRIGGER_OVERAGE         rate_limit_info.isUsingOverage true
   TRIGGER_5M              a 5-minute cache write
   TRIGGER_NOUSAGE         an empty modelUsage
+  TRIGGER_WEB             one WebSearch and one WebFetch (en.wikipedia.org) before the answer;
+                          webSearchRequests 1 (CLI 2.1.322 shapes from the 2026-11-15 smoke test)
+  TRIGGER_WEB_DENY        a WebFetch of fever.ai denied by a rule (permission_denials)
+  TRIGGER_FOREIGN         the message with the StructuredOutput call names claude-sonnet-5-5
+  TRIGGER_MAXTURNS        the result is error_max_turns on every call
+  TRIGGER_MAXTURNS_ONCE   error_max_turns on the first call for this stdin, success after
+  TRIGGER_NO_WEBFETCH     init.tools lacks WebFetch although --tools names it
+
+init.tools follows --tools: "none" gives [StructuredOutput], a comma list adds those names.
 
 Environment: FAKE_LOG (required for -p: one JSON line per call), FAKE_UTIL5 / FAKE_UTIL7
 (utilization fractions, default 0.23 / 0.50), FAKE_NO_UTIL=1 (no utilization numbers),
@@ -86,7 +95,13 @@ def main() -> int:
     time.sleep(float(os.environ.get("FAKE_DELAY", "0")))
     if "TRIGGER_SLEEP" in stdin:
         time.sleep(30)
-    tools = ["StructuredOutput", "Bash", "Read"] if "TRIGGER_TOOLS" in stdin else ["StructuredOutput"]
+    tools = ["StructuredOutput"]
+    if "--tools" in argv and argv[argv.index("--tools") + 1] != "none":
+        tools += argv[argv.index("--tools") + 1].split(",")
+    if "TRIGGER_TOOLS" in stdin:
+        tools += ["Bash", "Read"]
+    if "TRIGGER_NO_WEBFETCH" in stdin:
+        tools = [t for t in tools if t != "WebFetch"]
     emit({"type": "system", "subtype": "init", "model": model, "tools": tools,
           "apiKeySource": "ANTHROPIC_API_KEY" if "TRIGGER_APIKEY" in stdin else "none",
           "claude_code_version": "9.9.9"})
@@ -128,8 +143,53 @@ def main() -> int:
               "result": "API Error: 529 overloaded"})
         return finish(1)
 
+    if "TRIGGER_MAXTURNS" in stdin and ("TRIGGER_MAXTURNS_ONCE" not in stdin
+                                        or first_time(stdin, "maxturns")):
+        emit({"type": "assistant", "message": {"model": model, "content": [
+            {"type": "tool_use", "id": "toolu_cap", "name": "WebSearch", "input": {"query": "q"}}]}})
+        rate_event()
+        emit({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 21,
+              "modelUsage": {model: {"inputTokens": 9, "outputTokens": 9}},
+              "permission_denials": [], "usage": {}})
+        return finish(1)
+
+    def tool_round(tool_id, name, args, text, structured=None, error=False):
+        emit({"type": "assistant", "message": {"model": model, "content": [
+            {"type": "tool_use", "id": tool_id, "name": name, "input": args}]}})
+        if error:
+            emit({"type": "system", "subtype": "permission_denied", "tool_name": name,
+                  "tool_use_id": tool_id, "message": text})
+        emit({"type": "user", "message": {"role": "user", "content": [
+            {"tool_use_id": tool_id, "type": "tool_result", "content": text,
+             **({"is_error": True} if error else {})}]},
+              "tool_use_result": structured if structured is not None else text})
+
+    denials = []
+    if "TRIGGER_WEB_DENY" in stdin:
+        url = "https://fever.ai/dataset/feverous.html"
+        tool_round("toolu_d1", "WebFetch", {"url": url, "prompt": "labels?"},
+                   "WebFetch denied access to domain:fever.ai.", error=True)
+        denials.append({"tool_name": "WebFetch", "tool_use_id": "toolu_d1",
+                        "tool_input": {"url": url, "prompt": "labels?"}})
+    if "TRIGGER_WEB" in stdin and "TRIGGER_WEB_DENY" not in stdin:
+        links = [{"title": "A", "url": "https://en.wikipedia.org/wiki/A"},
+                 {"title": "B", "url": "https://www.britannica.com/B"}]
+        tool_round("toolu_s1", "WebSearch", {"query": "claim words"},
+                   'Web search results for query: "claim words"\n\nLinks: ' + json.dumps(links)
+                   + "\n\nA summary of the results.",
+                   {"query": "claim words", "results": [{"tool_use_id": "srv1", "content": links},
+                                                        "A summary of the results."],
+                    "durationSeconds": 1.0, "searchCount": 1})
+        tool_round("toolu_f1", "WebFetch", {"url": "https://en.wikipedia.org/wiki/A",
+                                            "prompt": "When was A founded?"},
+                   "A was founded in 1968.", {"bytes": 182090, "code": 200, "codeText": "OK",
+                                              "result": "A was founded in 1968.",
+                                              "url": "https://en.wikipedia.org/wiki/A"})
+
     usage = {model: {"inputTokens": 3, "outputTokens": 40, "cacheReadInputTokens": 1200,
                      "cacheCreationInputTokens": 300, "thinkingTokens": 0}}
+    if "TRIGGER_WEB" in stdin and "TRIGGER_WEB_DENY" not in stdin:
+        usage[model]["webSearchRequests"] = 1
     if "TRIGGER_WRONGMODEL" in stdin:
         usage = {"claude-opus-4-8[1m]": usage[model]}
     if "TRIGGER_FALLBACK" in stdin:
@@ -152,7 +212,8 @@ def main() -> int:
     if "TRIGGER_LOOP" in stdin:
         blocks.append({"type": "tool_use", "name": "StructuredOutput",
                        "input": {"$PARAMETER_NAME": answer}})
-    emit({"type": "assistant", "message": {"content": blocks}})
+    answer_model = "claude-sonnet-5-5" if "TRIGGER_FOREIGN" in stdin else model
+    emit({"type": "assistant", "message": {"model": answer_model, "content": blocks}})
     extra = {"isUsingOverage": True} if "TRIGGER_OVERAGE" in stdin else {}
     rate_event(**extra)
     result = {"type": "result", "subtype": "success", "is_error": False, "num_turns": 2,
@@ -160,7 +221,8 @@ def main() -> int:
               "modelUsage": usage, "total_cost_usd": 0.01,
               "usage": {"input_tokens": 3, "cache_creation": {
                   "ephemeral_1h_input_tokens": 300,
-                  "ephemeral_5m_input_tokens": 100 if "TRIGGER_5M" in stdin else 0}}}
+                  "ephemeral_5m_input_tokens": 100 if "TRIGGER_5M" in stdin else 0}},
+              "permission_denials": denials}
     if "TRIGGER_LOOP" in stdin:
         result["num_turns"] = 4
     else:

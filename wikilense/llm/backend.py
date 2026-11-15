@@ -46,6 +46,8 @@ class CallRequest:
     ``user_text`` is the whole user turn. ``cache_prefix`` is its start up to a
     ``<<<CACHE_BREAK>>>`` line in the template (empty without one): the API backend marks it for
     the prompt cache; the subscription backend sends ``user_text`` unchanged (it has no marks).
+    ``condition`` is the item's condition; only ``web`` changes a call (the subscription backend
+    then adds the web tools, see :mod:`wikilense.llm.web`); the API backend has no web condition.
     """
 
     model_id: str
@@ -56,6 +58,7 @@ class CallRequest:
     schema_json: str
     label_path: tuple[str, ...]
     cache_prefix: str = ""
+    condition: str = ""
 
 
 @dataclass
@@ -93,6 +96,7 @@ class CallResult:
     latency_s: float | None = None
     elapsed_s_total: float = 0.0
     stop_signal: str | None = None           # why the whole run should stop after this call
+    web: dict[str, Any] = field(default_factory=dict)   # web condition: trace and counts
 
     @property
     def final(self) -> bool:

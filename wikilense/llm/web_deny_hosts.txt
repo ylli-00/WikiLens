@@ -1,0 +1,23 @@
+# WebFetch deny list of the `web` condition (wikilense/llm/web.py). One host pattern per line;
+# each becomes one `WebFetch(domain:<pattern>)` entry of --disallowedTools. `*.x` matches every
+# subdomain of x at any depth but not x itself (CLI 2.1.322's matcher), so both forms are listed.
+# Why these hosts: the FEVEROUS labels are public there (chat B's check, 2026-11-12).
+# Changing this file changes its sha256 in the run manifest; a run folder made with another list
+# is not resumed.
+fever.ai
+*.fever.ai
+zenodo.org
+*.zenodo.org
+github.com
+*.github.com
+*.github.io
+githubusercontent.com
+*.githubusercontent.com
+huggingface.co
+*.huggingface.co
+hf.co
+*.hf.co
+kaggle.com
+*.kaggle.com
+paperswithcode.com
+*.paperswithcode.com

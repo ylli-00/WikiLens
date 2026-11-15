@@ -14,7 +14,13 @@ label path. It is written into every row, the manifest and the resume key, so ed
 these files makes a resumed run refuse the folder (``runner.check_resume``) and a new run ask
 again.
 
-The system prompt is one text for all three conditions (kit REPORT §4 "Prompt layout"): the CLI
+A set's conditions are the keys of ``user`` in its ``prompt.json``, in that order
+(:attr:`PromptSet.conditions`): ``fact_check_v1`` and ``generic_probe_v0`` have the three passage
+conditions, ``fact_check_web_v1`` has only ``web``. A run may ask only for conditions its set has
+(``runner.Runner.prepare``). Every condition must be one the runner can build
+(:data:`KNOWN_CONDITIONS`).
+
+The system prompt is one text for all the conditions of a set (kit REPORT §4 "Prompt layout"): the CLI
 caches the system prompt and the schema tool as one shared prefix with a 1-hour TTL (kit D-59;
 live 2026-11-11: 1,113 tokens read back from call 2 on), so one prefix serves every condition,
 and the wording is not a confound between them. Only the user turn differs; it ends with the
@@ -34,7 +40,12 @@ from pathlib import Path
 from typing import Any
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+#: The three passage conditions of the first runs (memory only, top-k passages, gold evidence).
 CONDITIONS: tuple[str, ...] = ("no_retrieval", "retrieved", "gold")
+#: The claim with Claude Code's WebSearch and WebFetch tools, no passages (owner, 2026-11-12).
+WEB_CONDITION = "web"
+#: Every condition the runner can build a request for.
+KNOWN_CONDITIONS: tuple[str, ...] = (*CONDITIONS, WEB_CONDITION)
 LABELS: tuple[str, ...] = ("SUPPORTS", "REFUTES", "NOT ENOUGH INFO")
 _FIELD_RE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 #: Linux caps one argv string at 128 KiB (MAX_ARG_STRLEN); the system prompt goes on argv.
@@ -67,6 +78,7 @@ class PromptSet:
     label_path: tuple[str, ...]
     prompt_hash: str
     file_hashes: dict[str, str] = field(default_factory=dict)
+    conditions: tuple[str, ...] = ()
 
     @property
     def is_generic_probe(self) -> bool:
@@ -106,8 +118,8 @@ class PromptSet:
 def load_prompt_set(prompt_id: str, prompts_dir: Path | None = None) -> PromptSet:
     """Load ``<prompts_dir>/<prompt_id>/prompt.json`` and its files; compute the prompt hash.
 
-    Checks: the folder name equals the id in ``prompt.json``; every condition in
-    :data:`CONDITIONS` has a user template; the schema has exactly one top-level property (kit
+    Checks: the folder name equals the id in ``prompt.json``; the set has at least one user
+    template and each one names a condition in :data:`KNOWN_CONDITIONS`; the schema has exactly one top-level property (kit
     D-50/D-53/D-63: flat schemas made the CLI loop far more often); the schema carries no
     ``maxLength``/``maxItems`` (kit D-85/D-86: size limits make the model rewrite its answer);
     the system prompt fits on one argv string.
@@ -130,9 +142,12 @@ def load_prompt_set(prompt_id: str, prompts_dir: Path | None = None) -> PromptSe
     if len(system.encode("utf-8")) > MAX_SYSTEM_BYTES:
         raise PromptError(f"system prompt over {MAX_SYSTEM_BYTES} bytes (it goes on argv)")
     users = {cond: read(name) for cond, name in dict(spec.get("user") or {}).items()}
-    missing = [c for c in CONDITIONS if c not in users]
-    if missing:
-        raise PromptError(f"prompt {prompt_id!r} has no user template for {missing}")
+    if not users:
+        raise PromptError(f"prompt {prompt_id!r} has no user template")
+    unknown = [c for c in users if c not in KNOWN_CONDITIONS]
+    if unknown:
+        raise PromptError(f"prompt {prompt_id!r} names unknown conditions {unknown}; "
+                          f"known: {list(KNOWN_CONDITIONS)}")
     schema = json.loads(read(spec["schema"]))
     if len(schema.get("properties") or {}) != 1:
         raise PromptError("the answer schema needs exactly one top-level property (kit D-53/D-63)")
@@ -159,4 +174,5 @@ def load_prompt_set(prompt_id: str, prompts_dir: Path | None = None) -> PromptSe
         prompt_hash=sha256_text(canonical_json(material)),
         file_hashes={name: sha256_text(path.read_text(encoding="utf-8"))
                      for name, path in sorted(files.items())},
+        conditions=tuple(users),
     )

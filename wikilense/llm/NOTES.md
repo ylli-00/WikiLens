@@ -105,3 +105,32 @@ Sources:
 | Invalid JSON or schema: asked again up to `max_attempts`, then `parse_failed` (final), the same rule as the subscription route. `max_tokens` truncation: an error, asked again on the next run. A refusal: final, with `stop_details`. | the runner's shared rule; API kit 2.7 |
 | Served model: exact, or the id plus `-YYYYMMDD`; never a prefix test. | API kit 2.3 (D-95) |
 | 5 workers by default, as on the subscription route. The kit ran 50 with no 429. | the owner's prompt |
+
+## The `web` condition (`web.py`, added 2026-11-15)
+
+Owner's decision of 2026-11-12: Claude Haiku 5.5 gets only the claim plus Claude Code's WebSearch
+and WebFetch (prompt `fact_check_web_v1`), to see how it scores when a normal user lets it use
+the internet. Sources:
+- **binary:** strings of CLI 2.1.322 (`llm_kit/bin/claude`), read 2026-11-15;
+- **smoke:** the smoke test of 2026-11-15, `llm_runs/test_web_smoke_haiku_2026-11-12/` (deny
+  check, 3 claims) and `llm_runs/test_web_smoke_haiku_2026-11-12_turncap1/` (turn cap);
+- **owner:** the owner's prompt of 2026-11-12 for this condition.
+
+| choice | follows |
+|---|---|
+| A set's conditions come from its `prompt.json`; a run may ask only for those. `fact_check_v1` and `generic_probe_v0` keep their files, conditions and prompt hashes (tested). | owner |
+| A web-only run builds no retriever, reads no settings and opens no database (`runner.NoRetrieval`); `--database` is refused with it. | owner |
+| The argv of `no_retrieval`, `retrieved` and `gold` is byte-identical to the 2026-11-12 run (tested against that run's base flags). | owner |
+| `--tools WebSearch,WebFetch` replaces `--tools none`: the comma form `--help` shows. | binary (`--help`); kit D-42 (never a bare `--tools`) |
+| `--allowedTools WebSearch WebFetch(domain:*)`: without an allow rule a `-p` call that needs approval is denied. `domain:*` matches every host: the matcher returns true for it before any other test. | binary (the WebFetch domain matcher) |
+| `--disallowedTools mcp__* WebFetch(domain:<host>)...`, one rule per line of `web_deny_hosts.txt`. Deny rules win over allow rules. `*.x` matches subdomains of x at any depth but not x itself, so both forms are listed. | binary (matcher; `WebFetch(domain:*.google.com)` is its own example); owner (the list); smoke: fever.ai and raw.githubusercontent.com both denied ("WebFetch denied access to domain:fever.ai.") |
+| `--permission-prompts none`: anything that would still prompt is denied. | `--help` lists it; owner (use it only if listed) |
+| `--max-turns 20`. **`--help` does not list `--max-turns`**: the binary defines it as a hidden option ("Maximum number of agentic turns in non-interactive mode ... (only works with --print)"). With `--max-turns 1` the CLI ended the call with `subtype: error_max_turns`, so it is honoured. | binary; smoke (turn cap) |
+| Every value of a multi-value flag is its own argv item; no flag is ever left without a value. | owner; kit D-42 |
+| `init.tools` must be exactly StructuredOutput, WebSearch, WebFetch (missing or extra: fatal). The old three conditions keep "StructuredOutput only". | owner; smoke: `["StructuredOutput", "WebFetch", "WebSearch"]` on every call |
+| Fallback check on web calls: every assistant message of the stream (the StructuredOutput one included) must name the requested model in `message.model`, exact for Haiku; another model is a refusal (`fallback`), never a label. A side model with output tokens counts as the fallback only on a call that ran no web tool. | owner; smoke: WebFetch's page reading is counted under `claude-haiku-5-5` itself (no other name in `modelUsage`); WebSearch too (`webSearchRequests` in Haiku's entry). For a Sonnet or Opus request WebFetch would show a Haiku side model, which this rule allows |
+| A call that reaches the turn cap without an answer is `parse_failed` with `error_kind: max_turns` (final), after one retry at most (`web.MAX_TURN_CAP_ATTEMPTS = 2`). | owner (never more than one retry); smoke: 2 attempts, both `error_max_turns` |
+| Web calls have their own time limit, 900 s (`--web-timeout-s`); the other conditions keep 300 s. Timeouts are retried as before (at most 2). | owner (WebFetch has its own 5-minute deadline per fetch); smoke: 10 to 15 s per call |
+| Each web row stores `web_trace` (per tool call: query, or URL and WebFetch prompt, result length, error, denied, result URLs, HTTP code), `n_web_search`, `n_web_fetch`, `n_denied`, `web_search_requests` (from `modelUsage`), `assistant_models`, `num_turns`. Denials are read from the result event's `permission_denials`. | owner; smoke (field names of 2.1.322) |
+| `scripts/llm_web_audit.py` lists the hosts fetched and flags rows; flagged rows stay in `results.jsonl`. It also reads the tool-result text of the raw stream, because **WebSearch returns more than titles and URLs**: after the link list comes a summary written from the result pages, and that summary can quote pages on denied hosts (smoke: "Zenodo lists the dataset as cc-by-sa-3.0, and the Hugging Face dataset card gives ..."). The deny list covers WebFetch only. | smoke (deny check) |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` stays: WebSearch returned results and WebFetch returned page content (HTTP 200, 182,090 bytes from en.wikipedia.org) with it set. | owner; smoke |

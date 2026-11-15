@@ -27,6 +27,13 @@ brackets). ``wikilense/llm/NOTES.md`` lists every choice with its source.
 - Retries: transient errors and invalid answers up to ``max_attempts`` with 10/20/40 s back-off
   (+-20%), no back-off after the last attempt [C13]; at most 2 timeouts; a timeout whose output
   already holds a valid answer keeps that answer [C10].
+- The ``web`` condition (:mod:`wikilense.llm.web`): ``--tools none`` becomes the web tools, plus
+  allow and deny rules, ``--permission-prompts none`` and ``--max-turns``; its own time limit;
+  ``init.tools`` must be exactly StructuredOutput, WebSearch and WebFetch. WebFetch reads pages
+  through a side model, so instead of "a side model wrote output" the fallback check there is
+  "an assistant message of the stream comes from another model". A call that reaches the turn
+  cap without an answer is ``parse_failed`` / ``max_turns`` after at most one retry. The other
+  three conditions are unchanged, argv included.
 - Paid overflow: ``isUsingOverage``, ``overageInUse``, ``rateLimitType: "overage"`` or a grace
   period paid by extra usage, and any 5-minute cache write (Claude Code drops to the 5-minute
   TTL when usage credits pay, kit D-59), set a stop signal [A1, B1, C2].
@@ -48,6 +55,15 @@ from typing import Any
 
 from wikilense.llm.backend import CallRequest, CallResult
 from wikilense.llm.models import check_full_id
+from wikilense.llm.prompts import WEB_CONDITION
+from wikilense.llm.web import (
+    WEB_INIT_TOOLS,
+    WebConfig,
+    assistant_messages,
+    foreign_messages,
+    trace_counts,
+    web_trace,
+)
 
 #: Every flag was on every call of the kit project's CLI route (CLAUDE_CLI_BASE_FLAGS).
 BASE_FLAGS: tuple[str, ...] = (
@@ -386,6 +402,7 @@ class ClaudeCliBackend:
         max_attempts: int = 4,
         backoff_base_s: float = 10.0,
         allow_5m_cache_writes: bool = False,
+        web: WebConfig | None = None,
     ) -> None:
         path = Path(binary)
         if not path.is_file() or not os.access(path, os.X_OK):
@@ -402,6 +419,7 @@ class ClaudeCliBackend:
         self.max_attempts = int(max_attempts)
         self.backoff_base_s = float(backoff_base_s)
         self.allow_5m_cache_writes = allow_5m_cache_writes
+        self.web = web
         self._inflight: set[subprocess.Popen] = set()
         self._inflight_lock = threading.Lock()
         self._killing = threading.Event()
@@ -470,11 +488,22 @@ class ClaudeCliBackend:
                 if k in status}
 
     def argv(self, request: CallRequest) -> list[str]:
-        """Return the full command line of one call (the user turn is not in it)."""
+        """Return the full command line of one call (the user turn is not in it).
+
+        A ``web`` request has the base flags without their final ``--tools none``, then the web
+        flags (:func:`wikilense.llm.web.web_flags`); every other request is unchanged.
+        """
         check_full_id(request.model_id)
         if request.effort not in EFFORTS:
             raise CliBackendError(f"effort {request.effort!r} not in {EFFORTS}")
-        return [self.binary, *BASE_FLAGS, "--model", request.model_id,
+        flags: list[str] = list(BASE_FLAGS)
+        if request.condition == WEB_CONDITION:
+            if self.web is None:
+                raise CliBackendError("a web request needs the backend's web settings")
+            if flags[-2:] != ["--tools", "none"]:
+                raise CliBackendError("BASE_FLAGS must end with --tools none")
+            flags = flags[:-2] + self.web.flags()
+        return [self.binary, *flags, "--model", request.model_id,
                 "--effort", request.effort, "--system-prompt", request.system,
                 "--json-schema", request.schema_json]
 
@@ -487,7 +516,8 @@ class ClaudeCliBackend:
             kill_group(proc)
 
     # ----------------------------------------------------------------------------------
-    def _run_once(self, argv: list[str], stdin_text: str) -> tuple[int | None, str, str, bool]:
+    def _run_once(self, argv: list[str], stdin_text: str,
+                  timeout_s: float | None = None) -> tuple[int | None, str, str, bool]:
         """Run ``claude`` once in its own process group: (exit code, stdout, stderr, timed out)."""
         proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, encoding="utf-8",
@@ -499,7 +529,7 @@ class ClaudeCliBackend:
             kill_group(proc)
         try:
             try:
-                out, err = proc.communicate(stdin_text, timeout=self.timeout_s)
+                out, err = proc.communicate(stdin_text, timeout=timeout_s or self.timeout_s)
                 return proc.returncode, out, err, False
             except subprocess.TimeoutExpired:
                 kill_group(proc)
@@ -521,9 +551,13 @@ class ClaudeCliBackend:
     def call(self, request: CallRequest, stop: threading.Event) -> CallResult:
         """Make one item's call with its retries. Never raises for model or CLI errors."""
         argv = self.argv(request)
+        is_web = request.condition == WEB_CONDITION and self.web is not None
+        timeout_s = self.web.timeout_s if is_web else self.timeout_s
+        cap_attempts = self.web.turn_cap_attempts if is_web else 1
         log: list[dict[str, Any]] = []
         started_all = time.monotonic()
         timeouts = 0
+        turn_caps = 0
         last: dict[str, Any] = {"status": "error", "error_kind": "not_called", "error": None}
         attempt = 0
         while attempt < self.max_attempts:
@@ -532,7 +566,7 @@ class ClaudeCliBackend:
             attempt += 1
             started = time.monotonic()
             try:
-                code, out, err, timed_out = self._run_once(argv, request.user_text)
+                code, out, err, timed_out = self._run_once(argv, request.user_text, timeout_s)
             except OSError as exc:
                 return self._finish(CallResult("fatal", error=f"cannot run {self.binary}: {exc}",
                                                error_kind="binary"), log, started_all, attempt)
@@ -552,11 +586,22 @@ class ClaudeCliBackend:
                 timeouts += 1
                 entry["outcome"] = "timeout"
                 last = {"status": "error", "error_kind": "timeout",
-                        "error": f"timed out after {self.timeout_s:.0f} s", **current}
+                        "error": f"timed out after {timeout_s:.0f} s", **current}
                 if timeouts >= MAX_TIMEOUTS:
                     break
                 if attempt < self.max_attempts:
                     self._backoff(attempt, stop)
+                continue
+            if not success_event and result.get("subtype") == "error_max_turns":
+                # the CLI's --max-turns stop: no answer within the cap. Final as parse_failed
+                # with its own error_kind, after at most one retry (web.MAX_TURN_CAP_ATTEMPTS).
+                turn_caps += 1
+                entry["outcome"] = "max_turns"
+                last = {"status": "parse_failed", "error_kind": "max_turns",
+                        "error": f"reached --max-turns without a StructuredOutput answer "
+                                 f"(num_turns {result.get('num_turns')})", **current}
+                if turn_caps >= cap_attempts:
+                    break
                 continue
             if not success_event:
                 detail = str(result.get("result") or err.strip() or out.strip()[-400:]
@@ -600,10 +645,15 @@ class ClaudeCliBackend:
             tools = [t if isinstance(t, str) else str(t)
                      for t in (parts["init"].get("tools") or [])]
             extra_tools = [t for t in tools if t not in ALLOWED_INIT_TOOLS]
+            if is_web:      # exactly StructuredOutput, WebSearch and WebFetch, nothing else
+                extra_tools = [t for t in tools if t not in WEB_INIT_TOOLS]
+                missing = sorted(WEB_INIT_TOOLS - set(tools))
+                if missing:
+                    extra_tools.append(f"(missing {missing})")
             if extra_tools:                                         # [C7]
                 entry["outcome"] = "unexpected_tools"
                 res = CallResult("fatal", error_kind="unexpected_tools",
-                                 error=f"the CLI offered the model tools {extra_tools}")
+                                 error=f"the CLI offered the model tools {tools}: {extra_tools}")
                 return self._finish(res, log, started_all, attempt, current, request)
             key_source = parts["init"].get("apiKeySource")
             if key_source not in (None, "none"):                    # [C21]
@@ -618,6 +668,8 @@ class ClaudeCliBackend:
                 if int(u.get("outputTokens") or 0) > 0
                 and not (name.startswith("claude-haiku") and not is_haiku and requested_out > 0)
             ]
+            if is_web:
+                fallback = self._web_fallback(out, parts, served, side)
             if fallback or result.get("stop_reason") == "refusal":
                 entry["outcome"] = "fallback" if fallback else "stop_reason_refusal"
                 why = (f"another model {fallback} wrote output (the CLI's fallback)" if fallback
@@ -649,6 +701,25 @@ class ClaudeCliBackend:
                             {k: last[k] for k in ("parts", "out", "elapsed") if k in last} or None,
                             request)
 
+    @staticmethod
+    def _web_fallback(out: str, parts: dict[str, Any], served: list[str],
+                      side: dict[str, dict[str, Any]]) -> list[str]:
+        """Return why a web call counts as another model's answer (empty when it does not).
+
+        WebFetch reads each page through a side model, so a side model with output tokens is
+        expected once a web tool ran. The fallback check is instead: every assistant message of
+        the stream, the one with the StructuredOutput call included, comes from the requested
+        model (``message.model``; for Haiku the exact id). A side model that wrote output on a
+        call that ran no web tool still counts as the fallback, as in the other conditions.
+        """
+        foreign = foreign_messages(assistant_messages(out), served)
+        if foreign:
+            return [f"assistant messages from {sorted(set(foreign))}"]
+        used_tools = trace_counts(web_trace(out, parts["result"]), None)
+        if used_tools["n_web_search"] + used_tools["n_web_fetch"] == 0:
+            return [name for name, u in side.items() if int(u.get("outputTokens") or 0) > 0]
+        return []
+
     def _finish(self, res: CallResult, log: list[dict[str, Any]], started_all: float,
                 attempt: int, current: dict[str, Any] | None = None,
                 request: CallRequest | None = None) -> CallResult:
@@ -667,6 +738,12 @@ class ClaudeCliBackend:
             "result_event": parts["result"] or None,
             "structured_output_blocks": parts["structured_blocks"],
         })
+        if request is not None and request.condition == WEB_CONDITION:
+            trace = web_trace(current["out"], parts["result"])
+            messages = assistant_messages(current["out"])
+            res.web = {"trace": trace, **trace_counts(trace, parts["result"].get("modelUsage")),
+                       "assistant_models": sorted({str(m["model"]) for m in messages}),
+                       "n_assistant_messages": len(messages)}
         if request is not None and parts["result"].get("modelUsage"):
             sums, served, side = computed_usage(parts["result"], request.model_id)
             res.computed_usage, res.served_models, res.side_models = sums, served, side

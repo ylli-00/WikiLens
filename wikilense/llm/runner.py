@@ -20,6 +20,11 @@ manifest record the backend. A ``<<<CACHE_BREAK>>>`` line in a user template mar
 API backend caches; ``--group-by <claim field>`` sends the items sharing that field (same model
 and condition) to one worker, back to back.
 
+**Conditions** come from the prompt set (its ``prompt.json``); a run may ask only for those.
+``web`` (prompt ``fact_check_web_v1``) runs on the subscription backend only, needs no database
+and no retriever, and records its tools, deny list and turn cap in the manifest's ``web`` section
+(:mod:`wikilense.llm.web`); a folder made with another deny list or turn cap is not resumed.
+
 **Order.** Items run claim by claim (all conditions and models of a claim, then the next
 claim), so a stop leaves every condition and model on the same finished claims (kit review
 B17/E27).
@@ -64,7 +69,13 @@ from wikilense.llm.claims import (
 )
 from wikilense.llm.guard import GuardError, check_item_budget, items_per_model
 from wikilense.llm.models import resolve_models
-from wikilense.llm.prompts import CONDITIONS, LABELS, PromptSet, canonical_json, sha256_text
+from wikilense.llm.prompts import (
+    LABELS,
+    WEB_CONDITION,
+    PromptSet,
+    canonical_json,
+    sha256_text,
+)
 
 log = logging.getLogger("wikilense.llm")
 
@@ -76,8 +87,10 @@ BREAKER_LIMIT = 5
 RESUME_FIELDS: tuple[str, ...] = (
     "backend", "models", "effort", "prompt.prompt_id", "prompt.prompt_hash", "retrieval.database",
     "retrieval.k", "retrieval.strategy", "retrieval.ef_search", "retrieval.embedding_model",
-    "claims_file.sha256", "backend_info.version",
+    "claims_file.sha256", "backend_info.version", "web.deny_hosts_sha256", "web.max_turns",
 )
+#: Conditions that need no database: a run made only of these gets :class:`NoRetrieval`.
+NO_DATABASE_CONDITIONS = frozenset({WEB_CONDITION})
 CACHE_BREAK = "<<<CACHE_BREAK>>>"
 WEEKLY_PREFIX = "seven_day"
 
@@ -87,6 +100,24 @@ EXIT_FATAL, EXIT_BREAKER, EXIT_OVERAGE, EXIT_MONEY, EXIT_SIGNAL = 4, 5, 6, 7, 13
 
 class RunError(RuntimeError):
     """The run cannot start as configured (exit 2)."""
+
+
+class NoRetrieval:
+    """The retriever of a run without the ``retrieved`` condition and without a database
+    (``web`` only): it describes itself as nothing and refuses to search."""
+
+    def describe(self) -> dict[str, Any]:
+        return {"database": None, "k": None, "strategy": None, "ef_search": None,
+                "embedding_model": None, "device": None, "note": "no retrieval in this run"}
+
+    def count_chunks(self) -> None:
+        raise RunError("this run has no database")
+
+    def retrieve_many(self, claims: Any) -> dict[int, list[dict[str, Any]]]:
+        raise RunError("this run has no database")
+
+    def _read_cache(self, claim_id: int, claim_text: str) -> None:
+        return None
 
 
 def now_iso() -> str:
@@ -308,8 +339,23 @@ class Runner:
             claims = claims[: self.cfg.limit_claims]
         return claims, sha, n_in_file
 
+    def _web_config(self) -> Any:
+        """Return the backend's web settings (``web`` runs only), or raise RunError."""
+        web = getattr(self.backend, "web", None)
+        if web is None:
+            raise RunError(f"the web condition needs the subscription backend with its web "
+                           f"settings; backend {self.backend.name!r} has none")
+        return web
+
     def _base_manifest(self, claims_sha: str, n_claims: int) -> dict[str, Any]:
         """Return the manifest fields fixed for the life of the run folder."""
+        manifest = self._manifest_core(claims_sha, n_claims)
+        if WEB_CONDITION in self.cfg.conditions:
+            manifest["web"] = self._web_config().describe()
+        return manifest
+
+    def _manifest_core(self, claims_sha: str, n_claims: int) -> dict[str, Any]:
+        """Return the manifest fields every run has (unchanged since 2026-11-12)."""
         p = self.cfg.prompt
         return {
             "manifest_version": MANIFEST_VERSION,
@@ -337,9 +383,12 @@ class Runner:
     def prepare(self) -> tuple[list[Item], list[Item], dict[str, Any], int]:
         """Plan, guard, compare manifests. Returns (planned, pending, manifest, n_in_file)."""
         cfg = self.cfg
-        unknown = [c for c in cfg.conditions if c not in CONDITIONS]
-        if unknown:
-            raise RunError(f"unknown conditions {unknown}; choose from {list(CONDITIONS)}")
+        unknown = [c for c in cfg.conditions if c not in cfg.prompt.conditions]
+        if unknown or not cfg.conditions:
+            raise RunError(f"prompt {cfg.prompt.prompt_id!r} has no condition {unknown or '(none)'}"
+                           f"; it has {list(cfg.prompt.conditions)}")
+        if WEB_CONDITION in cfg.conditions:
+            self._web_config()
         claims, sha, n_in_file = self._claims()
         if "gold" in cfg.conditions:
             empty = [c["id"] for c in claims if c.get("gold_set") is None or not c["gold_evidence"]]
@@ -385,7 +434,8 @@ class Runner:
             prefix, text = head, head + tail.lstrip("\n")
         return CallRequest(model_id=item.model_id, effort=self.cfg.effort, system=p.system,
                            user_text=text, schema=p.schema, schema_json=p.schema_json,
-                           label_path=p.label_path, cache_prefix=prefix)
+                           label_path=p.label_path, cache_prefix=prefix,
+                           condition=item.condition)
 
     def row(self, item: Item, request: CallRequest, res: CallResult) -> dict[str, Any]:
         """Return the results row of one answer."""
@@ -398,7 +448,7 @@ class Runner:
         if res.raw_stream:
             raw_name = f"raw/{item.claim_id}__{item.condition}__{item.model_option}__" \
                        f"{item.key[:12]}__{int(time.time() * 1000)}.jsonl"
-        return {
+        row = {
             "row_version": ROW_VERSION,
             "key": item.key,
             "claim_id": item.claim_id,
@@ -440,6 +490,14 @@ class Runner:
             "cli_version": self.cfg_cli_version,
             "ts": now_iso(),
         }
+        if item.condition == WEB_CONDITION:
+            web = res.web or {}
+            row.update({"web_trace": web.get("trace"), "n_web_search": web.get("n_web_search"),
+                        "n_web_fetch": web.get("n_web_fetch"), "n_denied": web.get("n_denied"),
+                        "web_search_requests": web.get("web_search_requests"),
+                        "assistant_models": web.get("assistant_models"),
+                        "num_turns": (res.cli or {}).get("num_turns")})
+        return row
 
     def write_row(self, row: dict[str, Any], raw_stream: str) -> None:
         """Append one row (flush + fsync, under a lock) and its raw stream file."""
@@ -733,7 +791,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--prompt", required=True, help="prompt id (folder in wikilense/llm/prompts)")
     p.add_argument("--models", required=True, help="comma-separated: sonnet, opus, haiku")
     p.add_argument("--effort", required=True, choices=["low", "medium", "high", "xhigh", "max"])
-    p.add_argument("--conditions", default=",".join(CONDITIONS))
+    p.add_argument("--conditions", default=None,
+                   help="comma-separated (default: every condition of the prompt set)")
     p.add_argument("--limit-claims", type=int, default=None, help="only the first N claims")
     p.add_argument("--workers", type=int, default=5, help="parallel calls (1-8)")
     p.add_argument("--group-by", default=None,
@@ -754,6 +813,13 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--stop-five-hour", type=float, default=0.80)
     g.add_argument("--stop-weekly", type=float, default=0.80)
     g.add_argument("--allow-5m-cache-writes", action="store_true")
+    w = p.add_argument_group("web condition (subscription only)")
+    w.add_argument("--web-max-turns", type=int, default=None,
+                   help="the CLI's --max-turns for web calls (default: web.DEFAULT_MAX_TURNS)")
+    w.add_argument("--web-timeout-s", type=float, default=None,
+                   help="per web call (default: web.DEFAULT_TIMEOUT_S)")
+    w.add_argument("--web-deny-hosts", type=Path, default=None,
+                   help="WebFetch deny list (default: wikilense/llm/web_deny_hosts.txt)")
     a = p.add_argument_group("api backend")
     a.add_argument("--max-usd", type=float, default=None,
                    help="REQUIRED with --backend api: stop at this list-price spend, counting "
@@ -784,14 +850,19 @@ def make_backend(args: argparse.Namespace, runs_root: Path) -> Backend:
             timeout_s=args.timeout_s or 480.0, max_attempts=args.max_attempts,
             cache_ttl=args.cache_ttl, thinking_display=args.thinking_display,
             max_tokens=args.max_tokens)
+    from wikilense.llm import web as web_mod
     from wikilense.llm.cli_backend import ClaudeCliBackend
 
     binary = args.binary or os.environ.get("CLAUDE_BIN")
     if not binary:
         raise RunError("no claude binary: pass --binary or set CLAUDE_BIN")
+    web = web_mod.WebConfig(
+        deny=web_mod.load_deny_hosts(args.web_deny_hosts),
+        max_turns=args.web_max_turns or web_mod.DEFAULT_MAX_TURNS,
+        timeout_s=args.web_timeout_s or web_mod.DEFAULT_TIMEOUT_S)
     return ClaudeCliBackend(binary, runs_root / ".empty_cwd", LABELS,
                             timeout_s=args.timeout_s or 300.0, max_attempts=args.max_attempts,
-                            allow_5m_cache_writes=args.allow_5m_cache_writes)
+                            allow_5m_cache_writes=args.allow_5m_cache_writes, web=web)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -814,21 +885,28 @@ def main(argv: list[str] | None = None) -> int:
             raise RunError("--workers must be 1..8 (the kit's cap; 5 at most was ever measured)")
         if args.workers > 5:
             log.warning("more than 5 parallel calls was never measured on the CLI (kit D-87)")
-        settings = load_settings()
-        database = args.database or settings.db_name
+        conditions = ([c.strip() for c in args.conditions.split(",") if c.strip()]
+                      if args.conditions else list(prompt.conditions))
         run_id = args.run_id or datetime.now().astimezone().strftime(
             f"%Y%m%dT%H%M%S_{prompt.prompt_id}")
         runs_root = args.runs_root.resolve()
         run_dir = runs_root / run_id
-        retriever = Retriever(settings, database, runs_root / "retrieval_cache", k=args.k,
-                              strategy=args.strategy, ef_search=args.ef_search)
+        if conditions and set(conditions) <= NO_DATABASE_CONDITIONS:
+            if args.database:
+                raise RunError(f"conditions {conditions} use no database; drop --database")
+            retriever: Any = NoRetrieval()           # no settings, no MariaDB connection
+        else:
+            settings = load_settings()
+            database = args.database or settings.db_name
+            retriever = Retriever(settings, database, runs_root / "retrieval_cache", k=args.k,
+                                  strategy=args.strategy, ef_search=args.ef_search)
         backend = make_backend(args, runs_root)
-    except (RunError, CliBackendError, ApiBackendError, ValueError) as exc:
+    except (RunError, CliBackendError, ApiBackendError, ValueError, OSError) as exc:
         log.error("%s", exc)
         return EXIT_CONFIG
     config = RunConfig(
         run_dir=run_dir, claims_path=args.claims.resolve(), prompt=prompt, models=models,
-        effort=args.effort, conditions=[c.strip() for c in args.conditions.split(",") if c.strip()],
+        effort=args.effort, conditions=conditions,
         limit_claims=args.limit_claims, workers=args.workers, full=args.full,
         dry_run=args.dry_run, stop_five_hour=args.stop_five_hour, stop_weekly=args.stop_weekly,
         min_free_mb=args.min_free_mb, claims_sha256=args.claims_sha256,
