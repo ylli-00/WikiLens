@@ -363,3 +363,11 @@ def test_the_audit_script_writes_its_report(env):
     assert summary["fetched_hosts"] == {"en.wikipedia.org": 1, "fever.ai": 1}
     assert [f["claim_id"] for f in summary["flagged"]] == [2]
     assert "flagged rows: 1" in (cfg.run_dir / "WEB_AUDIT.md").read_text()
+
+
+def test_web_defaults_are_the_owners_choices():
+    # owner, 2026-11-15: 200 s per web call (first proposal 900 s); turn cap 20, one retry
+    assert web.DEFAULT_TIMEOUT_S == 200.0
+    assert web.DEFAULT_MAX_TURNS == 20
+    assert web.MAX_TURN_CAP_ATTEMPTS == 2
+    assert web.WebConfig(deny=web.load_deny_hosts()).describe()["timeout_s"] == 200.0

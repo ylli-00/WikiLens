@@ -32,7 +32,7 @@ DENY_HOSTS_FILE = Path(__file__).resolve().parent / "web_deny_hosts.txt"
 #: Owner's start value, to be confirmed from the smoke test.
 DEFAULT_MAX_TURNS = 20
 #: Per call. WebFetch has its own deadline per fetch; a web call makes several tool calls.
-DEFAULT_TIMEOUT_S = 900.0
+DEFAULT_TIMEOUT_S = 200.0
 #: Attempts of an item whose call reached --max-turns without an answer: one retry at most.
 MAX_TURN_CAP_ATTEMPTS = 2
 #: The assistant "model" of messages the CLI writes itself (errors), not a model's output.
