@@ -183,7 +183,7 @@ Not chosen:
 ### Wikipedia pages
 
 - **`feverous-wiki-pages-db.zip`:** 10.4 GB, containing one SQLite file, `feverous_wikiv1.db`, of 53.5 GB (a December 2020 version of Wikipedia, full articles).
-  - Unpacked on 2026-10-21 onto the Windows partition: `/mnt/windows/Users/yllir/Desktop/Projects/WikiLense/wikilense-linux/data/feverous/feverous_wikiv1.db`. Owner's decision: it stays there and is not copied to Linux (see "Working rules").
+  - Unpacked on 2026-10-21 onto the Windows partition (mounted at `/mnt/windows`). The scripts take its path from `WIKILENSE_FEVEROUS_DB`; the full path is not written in this repository. Owner's decision: it stays there and is not copied to Linux (see "Working rules").
   - Schema `wiki (id PRIMARY KEY, data json)`; `data` is the same page object as in the shards. Open it read-only (`sqlite3.connect("file:...?mode=ro", uri=True)`).
   - Ids and text are stored NFD (decomposed). The first 2,000 pages of `wiki_000` equal the shard pages after NFC-normalising both. Look titles up in NFD and normalise what comes back to NFC.
   - Random 100-page sample, plus three pages read by hand (2026-10-21): no category, edit-date or revision data anywhere. The pages end before "See also" content, references and the category box. All 100 pages have links, and 85.7% of the 2,550 link targets are pages in the DB.
