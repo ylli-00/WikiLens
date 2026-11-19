@@ -8,7 +8,7 @@ database: the db tests reset the schema of the database they use.
 
 Tests marked ``slow`` need the embedding model. They are skipped, with the reason, when the
 model is neither in the Hugging Face cache nor downloadable (``huggingface.co`` does not accept
-a TCP connection within one second, or ``HF_HUB_OFFLINE`` is set), so an offline grader sees
+a TCP connection within one second, or ``HF_HUB_OFFLINE`` is set), so an offline run shows
 skips instead of download failures.
 
 Where the database and the model are known to be there (CI), set ``WIKILENSE_REQUIRE_DB=1`` and

@@ -283,7 +283,7 @@ def test_scaled_pages_are_normalised_after_parsing_not_before(rexp: Any) -> None
     page = {"title": decomposed, "sentence_0": "line one\n\u0303tail", "order": ["sentence_0"]}
     raw = json.dumps(page, ensure_ascii=False)
     with pytest.raises(json.JSONDecodeError):
-        json.loads(unicodedata.normalize("NFC", raw))  # what the script did until 2026-11-11
+        json.loads(unicodedata.normalize("NFC", raw))  # NFC on the raw text breaks the JSON
     parsed = rexp._nfc_strings(json.loads(raw))
     assert parsed["title"] == "Andr\u00e9" and parsed["order"] == ["sentence_0"]
     assert parsed["sentence_0"] == unicodedata.normalize("NFC", page["sentence_0"])
@@ -363,8 +363,8 @@ def test_the_heading_filter_ceiling_counts_only_pages_with_a_chunk_under_the_hea
     rexp: Any, db_conn: Any
 ) -> None:
     """A "History" heading whose text is all in its subsections holds no chunk, so the filter
-    cannot return its page: the page must not count as reachable (until 2026-11-11 it did, and
-    results/ reported a ceiling of 38 of 75 claims where 26 are reachable)."""
+    cannot return its page: the page must not count as reachable (counting it would give a
+    ceiling of 38 of 75 claims where 26 are reachable)."""
     import numpy as np
 
     vector = dbmod.vec_param(np.ones(dbmod.VECTOR_DIM, dtype=np.float32))

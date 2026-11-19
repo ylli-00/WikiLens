@@ -83,7 +83,7 @@ def test_child_env_strips_then_adds_the_forced_variables():
     ("Not logged in · Please run /login", None, "auth"),
     ("something else", None, ""),
 ])
-def test_classify_follows_the_kit_order_with_the_2_1_322_wording(text, rate, kind):
+def test_classify_follows_the_failure_order_with_the_2_1_322_wording(text, rate, kind):
     assert classify(text, rate) == kind
 
 
