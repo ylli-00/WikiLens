@@ -94,7 +94,7 @@ ROLLBACK;
 SELECT chunk_id, VEC_DISTANCE_COSINE(embedding, (SELECT embedding FROM chunk WHERE chunk_id = 1)) AS distance
 FROM chunk ORDER BY distance LIMIT 3;
 
--- 9. The brief's four predicates in one statement: only pages in the category "Member states of
+-- 9. The four metadata predicates in one statement: only pages in the category "Member states of
 --    the United Nations", longer than 1,000 words, last edited (in the revision the corpus holds)
 --    since 1 December 2020, and linked from the page "Asia"; joined back to page and section.
 --    On the ingested corpus EXPLAIN shows chunk read through the vector index (type index, key embedding) with the two

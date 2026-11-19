@@ -1,4 +1,4 @@
-"""Page coverage of the scaled run, as FEVEROUS's Table 4 reports document retrieval (decision #4c).
+"""Page coverage of the scaled run, as FEVEROUS's Table 4 reports document retrieval.
 
 The paper (arXiv 2106.05707, Table 4) gives "document coverage" at the top 1, 2, 3 and 5 pages
 (0.39, 0.49, 0.58, 0.69 on the dev set) without a formula. The only definition is the baseline

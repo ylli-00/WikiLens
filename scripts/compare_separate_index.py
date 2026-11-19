@@ -112,7 +112,7 @@ FILTER_CASES: tuple[FilterCase, ...] = (
     ),
     FilterCase(
         "four_filters",
-        "the brief's four filters: category 'Member states of the United Nations', at least "
+        "the four filters: category 'Member states of the United Nations', at least "
         "1,000 words, edited since 2020-12-01, linked from 'Asia'",
         Filters(
             category="Member states of the United Nations",
@@ -205,7 +205,7 @@ def page_mask(page_ids: np.ndarray, passing_pages: set[int]) -> np.ndarray:
 def four_filter_pages(copy: Copy, filters: Filters) -> set[int]:
     """Return the pages that pass category, minimum length, edit date and "linked from".
 
-    Only the fields the brief's four-filter case sets are read; any other set field is an
+    Only the fields the four-filter case sets are read; any other set field is an
     error, so a new case cannot silently be evaluated wrongly.
     """
     unsupported = [

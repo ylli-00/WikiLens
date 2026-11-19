@@ -1,6 +1,6 @@
 """Stage 2 of the scaled experiment: load the corpus folders S0 and S1 into their own databases.
 
-Owner's decisions of 2026-11-11 (sizes S0 and S1), go-ahead 2026-11-12. Subcommands, in order:
+Subcommands, in order:
 
     create-dbs  CREATE DATABASE wikilense_s0 / wikilense_s1 and GRANT them to 'wikilense'@'%'
                 (root, through ``docker exec``; the root password reaches the client only through
@@ -18,7 +18,7 @@ Owner's decisions of 2026-11-11 (sizes S0 and S1), go-ahead 2026-11-12. Subcomma
 The chunk texts are made exactly as the ingest makes them (``parse_page``, ``chunk_page`` with the
 settings' chunk parameters, ``embedding_text`` with the title prefix); ``embed`` checks their
 SHA-256 against the one ``scripts/scaled_build.py corpora`` recorded. ``ingest`` and ``verify``
-stop unless WIKILENSE_DB_NAME is wikilense_s0 or wikilense_s1: never the graded database
+stop unless WIKILENSE_DB_NAME is wikilense_s0 or wikilense_s1: never the 100-page database
 ``wikilense`` and never a ``*_test`` database (the ingest drops every table of its target).
 """
 
@@ -82,7 +82,7 @@ def log(message: str) -> None:
 def check_database(settings: Settings) -> str:
     """Return ``settings.db_name`` when it is one of ALLOWED_DATABASES; else raise.
 
-    The graded database ``wikilense`` and every ``*_test`` database are refused by name first.
+    The 100-page database ``wikilense`` and every ``*_test`` database are refused by name first.
     """
     name = settings.db_name
     if name == "wikilense" or name.endswith("_test") or name not in ALLOWED_DATABASES:

@@ -323,9 +323,9 @@ CHUNKS_HEADING_SQL = (
 PAGES_MIN_WORDS_SQL = "SELECT page_id FROM page WHERE n_words >= %s"
 #: The pages and the sentences a heading filter can reach. Both go through ``chunk``, because
 #: the filter keeps chunks: a section whose text is all in its subsections has no chunk of its
-#: own, so its heading matching does not make its page reachable (until 2026-11-11 the pages were
-#: read from ``section`` and the sentences from ``sentence``, which counted 66 pages and a ceiling
-#: of 38 of 75 claims under '%History%' where 42 pages and 26 claims are reachable).
+#: own, so its heading matching does not make its page reachable (reading the pages from
+#: ``section`` and the sentences from ``sentence`` would count 66 pages and a ceiling of 38 of
+#: 75 claims under '%History%', where 42 pages and 26 claims are reachable).
 PAGES_HEADING_SQL = (
     "SELECT DISTINCT chunk.page_id FROM chunk "
     "JOIN section ON section.section_id = chunk.section_id WHERE section.heading LIKE %s"
@@ -2126,8 +2126,7 @@ def fmt_bytes_mb(value: Any) -> str:
 
     That is how MariaDB's documentation writes ``mhnsw_max_cache_size`` (16777216 is "16 MB"),
     and InnoDB tablespace files come in whole multiples of it. Every size in results/ uses this
-    function (until 2026-11-11 the scale table divided by 1,000,000 and printed the same graph
-    file as 14 MB that the other sections print as 13.0 MB).
+    function (dividing by 1,000,000 instead would print the 13.0 MB graph file as 14 MB).
     """
     if not isinstance(value, (int, float)):
         return "not found"

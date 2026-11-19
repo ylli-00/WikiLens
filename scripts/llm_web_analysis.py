@@ -4,8 +4,8 @@
 Reads the run folders (``results.jsonl``; for each item key the newest final row) and the claims
 file (the label and kind of every claim; its sha256 is checked). For every condition: accuracy
 over all claims, per label and per kind, the confusion matrix (rows: FEVEROUS label, columns: the
-answer, "no answer" for a claim without a final ``ok`` answer), F1 per label and macro F1 (the
-definitions of ``scaled_data/HAIKU_RUN_2026-11-12.md``), seconds per call, and tokens per call.
+answer, "no answer" for a claim without a final ``ok`` answer), F1 per label and macro F1
+(``f1_scores``), seconds per call, and tokens per call.
 For the web condition also: the time calls were running (the union of the calls' intervals), the
 run's sessions with their usage-window readings, the web tool use and accuracy by tool use, the
 failures, and the audit summary (``web_audit.json``, from ``scripts/llm_web_audit.py``). Paired
@@ -289,7 +289,8 @@ def markdown(res: dict[str, Any]) -> str:
     L += [f"- `{c}`: `{res['runs'][c]}`" for c in conds]
     L += ["", "## 1. Accuracy", "",
           ("Accuracy = the answer equals the FEVEROUS label; a claim without a final answer counts as "
-          "wrong. F1 per label and macro F1 as in `scaled_data/HAIKU_RUN_2026-11-12.md`."), "",
+          "wrong. F1 per label counts a missing answer as a miss for the claim's label; macro F1 is the "
+          "mean of the three."), "",
           ("| condition | all | single | needs2 | SUPPORTS | REFUTES | NOT ENOUGH INFO | macro F1 | "
           "F1 S / R / NEI | answered |"), "|---|---|---|---|---|---|---|---|---|---|"]
     for c in conds:

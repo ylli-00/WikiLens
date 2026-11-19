@@ -1,13 +1,13 @@
-"""The light timing of the scaled run (owner's decision #5, 2026-11-11): fast vs slow searches.
+"""The light timing of the scaled run: fast vs slow searches.
 
 ``scripts/run_experiments.py``'s ``scale`` protocol (``measure_scale``: the HNSW search, the exact
 search, and the History-filtered search inline and with overfetch 10; per claim and statement one
 untimed run, then 3 timed ones; ``mhnsw_ef_search`` = the chosen 100) on every claim of an
-already loaded database, at k = 5, the new headline k (decision #6), instead of its built-in 10.
+already loaded database, at k = 5, the headline k of the scaled run, instead of its built-in 10.
 The full timing of the fast search at every k is ``wikilense eval`` (the main harness).
 
 Run every timing under the same laptop setting (Turbo, CPU 50%, GPU 2,100 MHz, thermal guard),
-alone, and compare sizes only within the new run (decision #5a).
+alone, and compare sizes only within the scaled run.
 
 Usage: .venv/bin/python scripts/scaled_timing.py --database wikilense_s1 --out <json>
 """

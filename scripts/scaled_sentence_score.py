@@ -1,10 +1,10 @@
-"""The FEVEROUS-style evidence score of the scaled run (owner's decisions #4a and #4b, 2026-11-11).
+"""The FEVEROUS-style evidence score of the scaled run.
 
 FEVEROUS lets a system return at most 5 sentences and 25 table cells or list items; a claim's
 evidence counts only when a complete gold evidence set is among them. Our own score counts a
 claim when a complete set lies inside the top-k chunks (about 7 units per chunk), which is far
-easier. Decided: report both; pick the units by embedding each one and ranking it against the
-claim, only the units of each claim's top 10 chunks, each unit embedded once.
+easier. Both are reported. The units are picked by embedding each one and ranking it against
+the claim, only the units of each claim's top 10 chunks, each unit embedded once.
 
 Per claim of the database (its ``claim`` and ``claim_evidence`` tables, as the evaluation harness
 reads them with ``evaluate.load_ground_truth``):
@@ -18,14 +18,14 @@ reads them with ``evaluate.load_ground_truth``):
    embedded on (``chunking.embedding_text``: page title and section path, then the unit's text);
 4. selection ``embed``: the 5 sentences and the 25 list items with the highest dot product with the
    claim (vectors are L2-normalised, so this is the cosine); ties go to the earlier unit in hit
-   order. Selection ``chunk_order`` (the free alternative of #4b, for comparison): the first 5
+   order. Selection ``chunk_order`` (no extra embedding, for comparison): the first 5
    sentences and 25 items in hit order;
 5. a claim is found when one of its sentence-only evidence sets is a subset of the selection.
    Eligible claims are those with at least one sentence-only set (the harness's denominator);
    ``in_top_chunks`` (a complete set inside the 10 chunks) is the upper bound of both selections
    and equals our evidence recall@10.
 
-Tables stay out (decision #8), so cells never count and a set with a cell is not sentence-only.
+Tables stay out, so cells never count and a set with a cell is not sentence-only.
 
 Writes ``<out_dir>/<database>/``: ``claims.jsonl`` (one record per claim), ``units.npz`` (the unit
 ids and their vectors), ``summary.json`` and ``SENTENCE_SCORE.md`` (overall and the six groups,
