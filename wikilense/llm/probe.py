@@ -7,7 +7,7 @@ are drawn with a fixed seed. The gold text is each unit's ``TextUnit.text`` from
 ``wikitext.parse_page`` over ``data/corpus/pages.jsonl`` (already NFC). ``findable`` is null: it
 needs the chunks, which the probes do not compute.
 
-Rules, as in chat B's pool script (``reviews/SCALING_PLAN_2026-11-11_claim_pool.py``):
+Rules, as in ``describe()`` of ``scripts/scaled_build.py``:
 - text-only set: every element a ``sentence`` or ``item`` (and here: every unit resolves to a
   unit with text on a corpus page);
 - kind: ``single`` when every set cites one page and it is the same page, ``needs2`` when every

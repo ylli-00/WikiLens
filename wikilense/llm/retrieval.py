@@ -4,7 +4,7 @@ Per claim: ``Embedder(settings.embedding_model, device="cpu").embed_queries([cla
 BGE query instruction and pins the model revision), then ``search.search(conn, qvec, k=k,
 strategy=strategy, ef_search=..., query_text=claim)`` on ``db.connect(settings,
 database=...)``. The device is fixed to the CPU because the Embedder takes the GPU by itself when
-it sees one, and chat B needs the GPU. ``ef_search`` is always passed: without it the server's
+it sees one, and the GPU is kept free for other jobs. ``ef_search`` is always passed: without it the server's
 value (20) applies instead of the repository's 100.
 
 The connection only reads: nothing is committed, and it is rolled back and closed afterwards.

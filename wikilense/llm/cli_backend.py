@@ -1,32 +1,29 @@
 """The subscription backend: one ``claude -p`` (Claude Code CLI, headless) call per item.
 
-Ported from the kit's ``code/standalone/cc_runner.py`` (itself distilled from the
-running_benchmarks client, ``code/reference/src/client_claude_cli.py``), with the fixes the
-checked review of the kit asked for (``reviews/LLM_RUNNER_KIT_REVIEW_2026-11-12.md``, ids in
-brackets). ``wikilense/llm/NOTES.md`` lists every choice with its source.
+``wikilense/llm/NOTES.md`` lists every choice with its source.
 
 - argv: :data:`BASE_FLAGS`, then ``--model <full id> --effort <level> --system-prompt <text>
-  --json-schema <schema>``. The user turn goes on stdin, never on argv (kit D-42, REPORT §2.1).
+  --json-schema <schema>``. The user turn goes on stdin, never on argv.
 - Child environment: every ``CLAUDE*``, ``ANTHROPIC*`` and ``AI_AGENT*`` variable is removed
-  (this session exports ``CLAUDE_EFFORT`` and ``CLAUDECODE``; an API key could make the CLI
-  bill), plus the caching and thinking variables without that prefix [A19, C22]; THEN
-  ``CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`` (no hidden Haiku call, kit D-48) and
+  (a Claude Code session exports ``CLAUDE_EFFORT`` and ``CLAUDECODE``; an API key could make
+  the CLI bill), plus the caching and thinking variables without that prefix; THEN
+  ``CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`` (no hidden Haiku call) and
   ``CLAUDE_CODE_DISABLE_REFUSAL_FALLBACK=1`` (no automatic re-send of a flagged claim to
-  another model; read by CLI 2.1.322 [C8]) are added. Order matters: both start with CLAUDE.
+  another model; read by CLI 2.1.322) are added. Order matters: both start with CLAUDE.
 - cwd: a fixed empty folder (the CLI's default prompt includes cwd and git status).
-- Failures are classified in the kit's order (auth, not-your-limit, spent window, refusal,
+- Failures are classified in this order (auth, not-your-limit, spent window, refusal,
   transient). The spent-window markers include CLI 2.1.322's wording "You've hit your 5-hour
-  limit" (also Sonnet, Fable and usage credit limits) [C1], and a failed call whose
+  limit" (also Sonnet, Fable and usage credit limits), and a failed call whose
   ``rate_limit_info.status`` is ``rejected`` counts as a spent window too.
 - Served model: the requested full id must appear in ``modelUsage`` (exact, or id + ``[...]``;
   for Haiku exactly the id). Anything else is fatal. Another model that wrote output is the
-  CLI's fallback: the row is a refusal, never a label (kit D-95).
+  CLI's fallback: the row is a refusal, never a label.
 - Parsing: ``result.structured_output`` first, then the ``StructuredOutput`` tool blocks from
-  last to first; the first one valid against the schema wins [A21, C15]. No valid one after the
+  last to first; the first one valid against the schema wins. No valid one after the
   retries: ``parse_failed``. A label is never read from free text.
 - Retries: transient errors and invalid answers up to ``max_attempts`` with 10/20/40 s back-off
-  (+-20%), no back-off after the last attempt [C13]; at most 2 timeouts; a timeout whose output
-  already holds a valid answer keeps that answer [C10].
+  (+-20%), no back-off after the last attempt; at most 2 timeouts; a timeout whose output
+  already holds a valid answer keeps that answer.
 - The ``web`` condition (:mod:`wikilense.llm.web`): ``--tools none`` becomes the web tools, plus
   allow and deny rules, ``--permission-prompts none`` and ``--max-turns``; its own time limit;
   ``init.tools`` must be exactly StructuredOutput, WebSearch and WebFetch. WebFetch reads pages
@@ -36,7 +33,7 @@ brackets). ``wikilense/llm/NOTES.md`` lists every choice with its source.
   three conditions are unchanged, argv included.
 - Paid overflow: ``isUsingOverage``, ``overageInUse``, ``rateLimitType: "overage"`` or a grace
   period paid by extra usage, and any 5-minute cache write (Claude Code drops to the 5-minute
-  TTL when usage credits pay, kit D-59), set a stop signal [A1, B1, C2].
+  TTL when usage credits pay), set a stop signal.
 """
 
 from __future__ import annotations
@@ -65,7 +62,7 @@ from wikilense.llm.web import (
     web_trace,
 )
 
-#: Every flag was on every call of the kit project's CLI route (CLAUDE_CLI_BASE_FLAGS).
+#: The flags of every call.
 BASE_FLAGS: tuple[str, ...] = (
     "--print",                         # headless
     "--output-format", "stream-json",  # content blocks + rate_limit_event + result event
@@ -75,9 +72,9 @@ BASE_FLAGS: tuple[str, ...] = (
     "--disable-slash-commands",
     "--setting-sources", "",           # load no settings file
     "--no-session-persistence",        # no resumable session file per call
-    "--tools", "none",                 # no built-in tools; never a bare --tools (it swallowed
-                                       # --model once, kit D-42). The kit used "none"; 2.1.322's
-                                       # help documents "" (kit D-42: only "none" was tested)
+    "--tools", "none",                 # no built-in tools; never a bare --tools (it can
+                                       # swallow the next --model). 2.1.322's help documents
+                                       # ""; "none" is the tested value
 )
 EFFORTS: tuple[str, ...] = ("low", "medium", "high", "xhigh", "max")
 
@@ -206,7 +203,7 @@ def utilization_of(rate_info: dict[str, Any]) -> dict[str, float | None]:
 
     Always a fraction (CLI 2.1.322: "utilization is the fraction of the window used ... values
     above 1 occur when usage legitimately runs past a window's cap"), so 1.04 means past the
-    cap, never 1.04 % [C2]. A missing value is None, never 0 [A3].
+    cap, never 1.04 %. A missing value is None, never 0.
     """
     result: dict[str, float | None] = {}
     for name, window in windows_of(rate_info).items():
@@ -243,7 +240,7 @@ def served_names(model_usage: dict[str, Any], model_id: str) -> list[str]:
 
 
 def validate(instance: Any, schema: dict[str, Any], path: str = "$") -> list[str]:
-    """Return the problems of ``instance`` against a small JSON-Schema subset (kit validator).
+    """Return the problems of ``instance`` against a small JSON-Schema subset.
 
     Supports type, enum, properties, required, additionalProperties false, items.
     """
@@ -317,8 +314,8 @@ def computed_usage(result: dict[str, Any], model_id: str) -> tuple[dict[str, Any
     """Return ``(computed sums, served names, side models with their tokens)`` of one call.
 
     ``prompt_tokens`` = ``inputTokens + cacheReadInputTokens + cacheCreationInputTokens`` of the
-    requested model (``inputTokens`` alone is only the uncached remainder; reading it alone
-    under-reported prompts about 1,800 times in the kit project, D-42/D-45). Every other model
+    requested model (``inputTokens`` alone is only the uncached remainder, so reading it alone
+    under-reports every cached prompt). Every other model
     in ``modelUsage`` is a side model, kept with its own unchanged entry.
     """
     model_usage = result.get("modelUsage") or {}
@@ -363,7 +360,7 @@ def cli_fields(parts: dict[str, Any]) -> dict[str, Any]:
         "subtype": result.get("subtype"),
         "is_error": result.get("is_error"),
         # the CLI's total_cost_usd: what the call would cost on the API at list price; the
-        # subscription does not bill it (kit naming). Never a cost.
+        # subscription does not bill it. Never a cost.
         "list_price_usd_not_billed": result.get("total_cost_usd"),
         "last_rate_limit_event": parts["rate_event"] or None,
         "init": {k: init.get(k) for k in ("model", "tools", "apiKeySource",
@@ -458,7 +455,7 @@ class ClaudeCliBackend:
         """Nothing to restore from earlier rows on the subscription route."""
 
     def preflight(self, model_ids: list[str] | None = None) -> dict[str, Any]:
-        """``claude auth status --json`` (no model call). Fail closed [C21].
+        """``claude auth status --json`` (no model call). Fail closed.
 
         Refuses when the output cannot be read, when not logged in, and when the login is not the
         claude.ai subscription (an API-key login bills per token). Keeps only the plan fields,
@@ -525,7 +522,7 @@ class ClaudeCliBackend:
                                 start_new_session=True)
         with self._inflight_lock:
             self._inflight.add(proc)
-        if self._killing.is_set():      # a signal arrived between the check and Popen [C19]
+        if self._killing.is_set():      # a signal arrived between the check and Popen
             kill_group(proc)
         try:
             try:
@@ -534,7 +531,7 @@ class ClaudeCliBackend:
             except subprocess.TimeoutExpired:
                 kill_group(proc)
                 try:
-                    out, err = proc.communicate(timeout=10)      # [D13]
+                    out, err = proc.communicate(timeout=10)
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     out, err = "", ""
@@ -650,13 +647,13 @@ class ClaudeCliBackend:
                 missing = sorted(WEB_INIT_TOOLS - set(tools))
                 if missing:
                     extra_tools.append(f"(missing {missing})")
-            if extra_tools:                                         # [C7]
+            if extra_tools:
                 entry["outcome"] = "unexpected_tools"
                 res = CallResult("fatal", error_kind="unexpected_tools",
                                  error=f"the CLI offered the model tools {tools}: {extra_tools}")
                 return self._finish(res, log, started_all, attempt, current, request)
             key_source = parts["init"].get("apiKeySource")
-            if key_source not in (None, "none"):                    # [C21]
+            if key_source not in (None, "none"):
                 entry["outcome"] = "api_key_source"
                 res = CallResult("fatal", error_kind="api_key_source",
                                  error=f"init.apiKeySource is {key_source!r}: not the subscription")
@@ -749,7 +746,7 @@ class ClaudeCliBackend:
             res.computed_usage, res.served_models, res.side_models = sums, served, side
             if sums["cache_write_5m"] > 0 and not self.allow_5m_cache_writes and not res.stop_signal:
                 res.stop_signal = ("overage: a 5-minute cache write; Claude Code drops to the "
-                                   "5-minute TTL when usage credits pay (kit D-59)")
+                                   "5-minute TTL when usage credits pay")
         signal_text = overage_signal(parts["rate_info"])
         if signal_text and not res.stop_signal:
             res.stop_signal = f"overage: {signal_text}"

@@ -5,8 +5,8 @@ plus the items already done in a resumed run folder (their union, so a resume wi
 ``--limit-claims`` cannot hide earlier work). Two rules:
 
 1. A prompt whose id starts with ``generic_probe`` never goes over :data:`ITEM_LIMIT` items per
-   model, **even with --full**. The generic prompt only proves that the runner works; the owner
-   replaces it before any full run.
+   model, **even with --full**. The generic prompt only proves that the runner works; a full run
+   uses a task prompt.
 2. Any run with more than :data:`ITEM_LIMIT` items per model needs ``--full``, whatever the
    prompt.
 """
