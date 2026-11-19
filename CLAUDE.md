@@ -239,7 +239,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - torch with CUDA works on the RTX 4060 (`torch.cuda.is_available()` is true); the embedding model downloads to `~/.cache/huggingface`.
 - `docs/DESIGN.md` is the module contract: layout, data formats, parsing and chunking rules, schema, provisional settings and their reasons. Update it when a decision changes.
 - `docs/ARCHITECTURE.md` (2026-09-23) is the beginner's guide to how the code is built: the pipeline, key ideas, every file, one query end to end, the database, tests, and what is left for the grading. Keep it true when a file or a flow changes.
-- Git: initialised on `main` on 2026-09-17, local identity `ylli <yrada@constructor.university>`. Remote `origin` is github.com/ylli-00/WikiLens. `docs/DESIGN.md` holds the reasoning behind every decision.
+- Git: initialised on `main` on 2026-09-17; the commit identity is set in the repository's git config. Remote `origin` is github.com/ylli-00/WikiLens. `docs/DESIGN.md` holds the reasoning behind every decision.
 - The README must stay short (the evaluators' request; `tests/test_docs.py` caps it at 330 lines and checks its first line, its first-screen output, every link and anchor, and the stated number of tests). Put reference material in `docs/`.
 
 ## Working rules
@@ -263,6 +263,23 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - Do not commit the raw files in `data/feverous/` to Git. `feverous_train_challenges.jsonl` (177.6 MB) and `wiki_000.jsonl` (181.6 MB) are over GitHub's 100 MB per-file limit, so the README has to fetch data with a documented step.
 - Ask before downloads over 5 GB and before deleting files.
 - Explain results in simple language, conclusion first - this is the owner's first databases course.
+
+## Comments, docstrings and personal details
+
+- Comments and docstrings say what the code does and why, in neutral terms that stay true as long
+  as the code does. They do not record who decided, approved or asked for something, when it was
+  decided, how the code reached its present form, or that a course, brief, grader or prompt
+  requires it. That history belongs in commit messages and in notes outside the repository.
+- The same holds for text the code writes into reports and logs, and for the docs: a decision is
+  stated with its reason and its evidence, not with who took it.
+- No personal details in tracked files. The author's name appears only in the README's Team
+  section and `LICENSE`; the GitHub account only as part of the repository URL. No email
+  addresses, no home-directory or Windows user paths, and no IP addresses other than `127.0.0.1`,
+  `0.0.0.0` and the addresses Docker assigns inside its own network (in recorded output). A
+  User-Agent names the repository URL only.
+- Files that are data or whose bytes are hashed into a run record (`data/corpus/`,
+  `results/*.json`, the prompt sets under `wikilense/llm/prompts/`) are not edited for wording; a
+  problem there is reported instead.
 
 ## Token efficiency and agents
 
