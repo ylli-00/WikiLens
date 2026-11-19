@@ -1,7 +1,7 @@
 """Stage 3 of the scaled experiment: categories and edit dates for the pages of S0 and S1.
 
-Owner's decision #7 (2026-11-11, "fetch the categories and edit dates for every page of the big
-database, so all four of the brief's filters work there"); go-ahead 2026-11-15. Subcommands:
+With them, all four metadata filters (category, length, edited since, linked from) work on the
+scaled databases as on the 100-page one. Subcommands:
 
     fetch   for every page of a corpus folder's pages.jsonl, the December 2020 Wikipedia revision,
             its timestamp and its categories, with ``scripts/fetch_page_meta.py``'s own
@@ -16,7 +16,7 @@ database, so all four of the brief's filters work there"); go-ahead 2026-11-15. 
             writes when the corpus folder holds ``page_meta.jsonl`` (category ids 1, 2, ... in
             the order the pages first name them, pages in ``page_id`` order). One transaction:
             the three tables are cleared and refilled, so a second load gives the same rows.
-            Only ``wikilense_s0`` or ``wikilense_s1``; never the graded ``wikilense`` and never
+            Only ``wikilense_s0`` or ``wikilense_s1``; never the 100-page ``wikilense`` and never
             a ``*_test`` database.
     verify  the database's metadata counts against the file.
 
@@ -72,7 +72,7 @@ def fetch_module() -> Any:
 
 
 def check_database(name: str) -> str:
-    """Return ``name`` when it is one of ALLOWED_DATABASES; else raise (graded and test DBs first)."""
+    """Return ``name`` when it is one of ALLOWED_DATABASES; else raise (the 100-page and test DBs first)."""
     if name == "wikilense" or name.endswith("_test") or name not in ALLOWED_DATABASES:
         raise Stage3Error(f"refusing database {name!r}: only {ALLOWED_DATABASES}")
     return name

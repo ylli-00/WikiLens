@@ -61,3 +61,4 @@ After `FLUSH TABLES` the index returned 10 rows for that query again.
 - Search at READ COMMITTED or in autocommit mode, or end the transaction before searching again, when other connections write to the table. PyMySQL opens connections with autocommit off, so a connection that has run one `SELECT` is inside a REPEATABLE READ transaction until it commits, rolls back or closes.
 - WikiLense itself is not affected by this in its measurements: nothing writes to `chunk` while a search runs, and `wikilense ingest` recreates the tables.
 - We found no MariaDB ticket that describes this (searched on 2026-11-11) and have not reported it. It was measured on one server version only.
+- The behaviour is MariaDB issue [MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321).

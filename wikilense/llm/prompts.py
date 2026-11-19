@@ -20,14 +20,14 @@ conditions, ``fact_check_web_v1`` has only ``web``. A run may ask only for condi
 (``runner.Runner.prepare``). Every condition must be one the runner can build
 (:data:`KNOWN_CONDITIONS`).
 
-The system prompt is one text for all the conditions of a set (kit REPORT §4 "Prompt layout"): the CLI
-caches the system prompt and the schema tool as one shared prefix with a 1-hour TTL (kit D-59;
-live 2026-11-11: 1,113 tokens read back from call 2 on), so one prefix serves every condition,
+The system prompt is one text for all the conditions of a set: the CLI caches the system prompt
+and the schema tool as one shared prefix with a 1-hour TTL (measured 2026-11-11: 1,113 tokens
+read back from call 2 on), so one prefix serves every condition,
 and the wording is not a confound between them. Only the user turn differs; it ends with the
-claim, because text after the per-call payload is never cached (kit D-117 §2).
+claim, because text after the per-call payload is never cached.
 
 Templates use ``{{field}}`` placeholders. A missing field raises instead of sending ``{{claim}}``
-to the model (kit ``cc_runner.render``).
+to the model.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from typing import Any
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 #: The three passage conditions of the first runs (memory only, top-k passages, gold evidence).
 CONDITIONS: tuple[str, ...] = ("no_retrieval", "retrieved", "gold")
-#: The claim with Claude Code's WebSearch and WebFetch tools, no passages (owner, 2026-11-12).
+#: The claim with Claude Code's WebSearch and WebFetch tools, no passages.
 WEB_CONDITION = "web"
 #: Every condition the runner can build a request for.
 KNOWN_CONDITIONS: tuple[str, ...] = (*CONDITIONS, WEB_CONDITION)
@@ -119,9 +119,9 @@ def load_prompt_set(prompt_id: str, prompts_dir: Path | None = None) -> PromptSe
     """Load ``<prompts_dir>/<prompt_id>/prompt.json`` and its files; compute the prompt hash.
 
     Checks: the folder name equals the id in ``prompt.json``; the set has at least one user
-    template and each one names a condition in :data:`KNOWN_CONDITIONS`; the schema has exactly one top-level property (kit
-    D-50/D-53/D-63: flat schemas made the CLI loop far more often); the schema carries no
-    ``maxLength``/``maxItems`` (kit D-85/D-86: size limits make the model rewrite its answer);
+    template and each one names a condition in :data:`KNOWN_CONDITIONS`; the schema has exactly one top-level property
+    (flat schemas made the CLI loop far more often); the schema carries no
+    ``maxLength``/``maxItems`` (size limits make the model rewrite its answer);
     the system prompt fits on one argv string.
     """
     base = (prompts_dir or PROMPTS_DIR) / prompt_id
@@ -150,9 +150,9 @@ def load_prompt_set(prompt_id: str, prompts_dir: Path | None = None) -> PromptSe
                           f"known: {list(KNOWN_CONDITIONS)}")
     schema = json.loads(read(spec["schema"]))
     if len(schema.get("properties") or {}) != 1:
-        raise PromptError("the answer schema needs exactly one top-level property (kit D-53/D-63)")
+        raise PromptError("the answer schema needs exactly one top-level property")
     if any(k in canonical_json(schema) for k in ('"maxLength"', '"maxItems"')):
-        raise PromptError("put length limits in the prompt, not the schema (kit D-85/D-86)")
+        raise PromptError("put length limits in the prompt, not the schema")
     label_path = tuple(str(spec.get("label_path", "result.label")).split("."))
     material = {
         "prompt_id": prompt_id,

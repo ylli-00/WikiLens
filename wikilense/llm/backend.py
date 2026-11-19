@@ -5,9 +5,9 @@ takes a :class:`CallRequest` and returns a :class:`CallResult`. Two backends imp
 :class:`Backend` protocol, chosen per run with ``--backend``:
 
 - ``subscription``: :class:`wikilense.llm.cli_backend.ClaudeCliBackend`, the Claude Code CLI on
-  the owner's Claude subscription;
+  a Claude subscription;
 - ``api``: :class:`wikilense.llm.api_backend.AnthropicApiBackend`, the Anthropic Messages API
-  with the owner's API key, billed per token.
+  with an API key, billed per token.
 
 Everything else (claims, prompts, conditions, retrieval, resume key, rows, guards) is the same
 for both.

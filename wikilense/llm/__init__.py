@@ -4,12 +4,10 @@ Each claim gets one label, SUPPORTS, REFUTES or NOT ENOUGH INFO, in three condit
 ``no_retrieval`` (the claim alone), ``retrieved`` (the claim plus WikiLense's own top-k chunks)
 and ``gold`` (the claim plus its gold evidence text).
 
-The only backend so far is the Claude Code CLI in headless mode on the owner's Claude
-subscription (:mod:`wikilense.llm.cli_backend`). :mod:`wikilense.llm.backend` defines the small
-interface an API backend would implement later. The design follows the owner's LLM runner kit
-(``reviews/LLM_RUNNER_KIT_2026-11-11.zip``, unpacked in ``llm_kit/``) and its checked review
-(``reviews/LLM_RUNNER_KIT_REVIEW_2026-11-12.md``). ``wikilense/llm/NOTES.md`` maps each design
-choice to the finding it follows.
+The runs use the Claude Code CLI in headless mode on a Claude subscription
+(:mod:`wikilense.llm.cli_backend`). :mod:`wikilense.llm.backend` defines the small interface
+both backends implement. ``wikilense/llm/NOTES.md`` maps each design choice to the finding it
+follows.
 
 Modules:
 - :mod:`~wikilense.llm.models`: option names (sonnet, opus, haiku) mapped to full model ids.

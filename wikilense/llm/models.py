@@ -1,8 +1,8 @@
 """The runner's model option names and the full model ids they stand for.
 
-Only full ids are ever passed to ``--model``. The kit saw ``--model sonnet`` serve an older model
-(``claude-sonnet-4-6`` on 2026-08-14; kit ``code/reference/src/models.py``), and its runner
-refuses aliases. The table is the single place to change when a newer model comes out.
+Only full ids are ever passed to ``--model``: an alias such as ``--model sonnet`` has served an
+older model (``claude-sonnet-4-6`` on 2026-08-14), so aliases are refused. The table is the
+single place to change when a newer model comes out.
 """
 
 from __future__ import annotations

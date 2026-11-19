@@ -1,6 +1,5 @@
 """Build the data of the scaled experiment: 3,000 claims, the rule-D distractor pages and the two
-corpus folders S0 (gold pages) and S1 (gold pages + rule D), as the owner decided on 2026-11-11
-(decisions 1, 2 and 3 of the scaling plan).
+corpus folders S0 (gold pages) and S1 (gold pages + rule D).
 
 Run from the repository root, one subcommand at a time and in this order; each one reads what the
 one before wrote into OUT_DIR:
@@ -21,8 +20,8 @@ read-only; titles are looked up NFD and every string that comes back is normalis
 
 Rules:
 
-1. Claims (decision 1). From train + dev (train first, then dev, each in file order):
-   - ``kind`` is ``describe()`` of reviews/SCALING_PLAN_2026-11-11_claim_pool.py, unchanged:
+1. Claims. From train + dev (train first, then dev, each in file order):
+   - ``kind`` is ``describe()``:
      "single" when every evidence set cites the same one page, "needs2" when every set cites two
      or more pages (sets with an empty ``content`` are ignored);
    - a set is *text-only* when it is not empty and holds only sentences and list items;
@@ -33,13 +32,13 @@ Rules:
    - eligible are the single and needs2 claims with a text-only set; unfindable ones are left
      out before sampling;
    - ``random.Random(20261111)``; per label (SUPPORTS, REFUTES, NOT ENOUGH INFO)
-     ``rng.sample(single, 700)`` then ``rng.sample(needs2, 300)``, as the planning script did.
-     A group with too few findable claims stops the step (exit 3): the rule is the owner's.
-2. Distractors (decision 2, rule D). Gold articles in ``sorted(gold)`` order shuffled with
+     ``rng.sample(single, 700)`` then ``rng.sample(needs2, 300)``.
+     A group with too few findable claims stops the step (exit 3).
+2. Distractors (rule D). Gold articles in ``sorted(gold)`` order shuffled with
    ``random.Random(7)``; each takes its most-linked title (``wikitext.extract_links``, duplicates
    kept, ties broken by the first mention), skipping gold pages, titles taken by an earlier
    article and titles missing from the DB; one page per gold article, no cap.
-3. Corpora (decision 3). S0 = every page cited by any evidence set of the 3,000 claims (table
+3. Corpora. S0 = every page cited by any evidence set of the 3,000 claims (table
    sets too), sorted by title; S1 = S0's lines, then the rule-D pages in the order taken.
 """
 
@@ -240,8 +239,7 @@ def check_chunk_settings() -> None:
 
 
 def describe(c: dict) -> tuple[str, bool, bool, set[str]]:
-    """Return (kind, any_text, all_text, all_pages); verbatim from the planning script
-    reviews/SCALING_PLAN_2026-11-11_claim_pool.py (only ``TEXT`` renamed)."""
+    """Return (kind, any_text, all_text, all_pages) of one claim."""
     sets = []
     for s in c["evidence"]:
         parsed = [parse_element_id(e) for e in s["content"]]
@@ -873,8 +871,8 @@ def manifest(name: str, stats: dict, groups: dict, d_note: str) -> str:
     lines = [
         f"# Corpus {name}",
         "",
-        "Built by `scripts/scaled_build.py corpora` for the scaled experiment (owner's decisions of",
-        "2026-11-11: 3,000 claims, rule D, the sizes S0 and S1). Load it with",
+        "Built by `scripts/scaled_build.py corpora` for the scaled experiment (3,000 claims, rule D,",
+        "the sizes S0 and S1). Load it with",
         f"`WIKILENSE_DB_NAME=wikilense_{name.lower()} wikilense ingest --corpus-dir <this folder>`.",
         "",
         "## Contents",
@@ -1044,9 +1042,9 @@ def selection_md(sel: dict, corpora: dict, claims_name: str) -> str:
         "every number below was measured by `scripts/scaled_build.py claims` and `corpora` on the",
         "FEVEROUS train + dev files and `feverous_wikiv1.db`.",
         "",
-        "## Rule (owner's decision 1, 2026-11-11)",
+        "## Rule",
         "",
-        "- Kinds as `describe()` in the planning script: **single** = every evidence set cites the",
+        "- Kinds as `describe()` in `scripts/scaled_build.py`: **single** = every evidence set cites the",
         "  same one page; **needs2** = every set cites two or more pages.",
         "- Eligible: a single or needs2 claim with a text-only evidence set (sentences and list",
         "  items only).",
@@ -1135,7 +1133,7 @@ def selection_md(sel: dict, corpora: dict, claims_name: str) -> str:
         f" (`numpy.percentile`, linear), max {cp['max']:,}; min {cp['min']:,}; total {cp['sum']:,}."),
         f"- Gold pages without any chunk: {corpora['S0']['pages_without_chunks']:,}.",
         "",
-        f"The claims file is `{claims_name}`; its format is the contract with the LLM runner (chat A).",
+        f"The claims file is `{claims_name}`; its format is the contract with the LLM runner.",
         "",
     ]
     return "\n".join(out)
@@ -1151,7 +1149,7 @@ def distractors_md(dj: dict, corpora: dict) -> str:
         "Written by `scripts/scaled_build.py report` from `distractors_D.json` and `corpora.json`",
         "(measured by the `distractors` and `corpora` steps). The list is `distractors_D.jsonl`.",
         "",
-        "## Rule (owner's decision 2, 2026-11-11)",
+        "## Rule",
         "",
         "Per gold article, count its links (`wikitext.extract_links`, duplicates kept, page order);",
         "its favourite is the most-linked title, ties broken by the first mention. Skip gold pages,",

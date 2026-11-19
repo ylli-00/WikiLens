@@ -1,6 +1,6 @@
 """A FAKE ``claude`` binary for the LLM runner's tests. It makes no network call.
 
-Adapted from the kit's ``code/standalone/tests/fake_claude.py``, with the CLI 2.1.322 shapes
+It produces the CLI 2.1.322 shapes
 (the "5-hour limit" wording, ``rate_limit_info`` with ``unifiedWindows`` and overage fields).
 It answers ``--version``, ``auth status --json`` and ``-p`` calls. What a ``-p`` call does is
 chosen by TRIGGER_* words in the user turn read from stdin:

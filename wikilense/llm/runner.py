@@ -9,7 +9,7 @@ output). Retrieval results are cached in ``<runs_root>/retrieval_cache/`` (see
 prompt hash). A key is done once any row with that key is final: a parsed label, a parse
 failure after the retries, or a refusal. Keys whose last row ended in an error (timeout, CLI
 error, spent usage window, fatal stop) are asked again. Rows are indexed by key, not by claim
-id, so a later non-final row never hides an earlier final one (kit review C4/D2). A run folder
+id, so a later non-final row never hides an earlier final one. A run folder
 whose manifest differs in backend, models, effort, prompt hash, k, strategy, ef_search,
 embedding model, database, claims-file hash or backend version (CLI or SDK) is refused.
 
@@ -26,13 +26,12 @@ and no retriever, and records its tools, deny list and turn cap in the manifest'
 (:mod:`wikilense.llm.web`); a folder made with another deny list or turn cap is not resumed.
 
 **Order.** Items run claim by claim (all conditions and models of a claim, then the next
-claim), so a stop leaves every condition and model on the same finished claims (kit review
-B17/E27).
+claim), so a stop leaves every condition and model on the same finished claims.
 
 **Stops.** The whole run stops, finishing only the calls in flight, on a spent window (exit 3),
 a five-hour or weekly utilization reading at or above its threshold (exit 3, both 0.80 by
-default; separate thresholds, kit review C9/E9), a fatal result (exit 4), five non-final results
-in a row (exit 5, kit D-49), a sign of paid extra usage (exit 6, kit review A1/C2), the API
+default; separate thresholds), a fatal result (exit 4), five non-final results
+in a row (exit 5), a sign of paid extra usage (exit 6), the API
 backend's money stop: ``--max-usd`` reached, or the account's spend limit or credit (exit 7), or
 SIGINT/SIGTERM/SIGHUP (exit 130). The runner never waits out a window by itself.
 
@@ -165,7 +164,7 @@ def final_keys(rows: list[dict[str, Any]]) -> set[str]:
 
 
 def repair_torn_tail(path: Path) -> None:
-    """End the file with a newline if a crash left a torn last line (kit review C17)."""
+    """End the file with a newline if a crash left a torn last line."""
     if path.exists() and path.stat().st_size:
         with path.open("rb") as fh:
             fh.seek(-1, os.SEEK_END)
@@ -328,7 +327,7 @@ class Runner:
             raise RunError(f"{self.cfg.claims_path} has sha256 {sha}, not the expected "
                            f"{self.cfg.claims_sha256}")
         if self.cfg.claims_path.name == "claims_3000.jsonl" and not self.cfg.claims_sha256:
-            raise RunError("claims_3000.jsonl needs --claims-sha256 from chat B's status file "
+            raise RunError("claims_3000.jsonl needs --claims-sha256, the hash of the final file "
                            "(the file may still be being written)")
         try:
             claims = load_claims(self.cfg.claims_path)
@@ -355,7 +354,7 @@ class Runner:
         return manifest
 
     def _manifest_core(self, claims_sha: str, n_claims: int) -> dict[str, Any]:
-        """Return the manifest fields every run has (unchanged since 2026-11-12)."""
+        """Return the manifest fields every run has."""
         p = self.cfg.prompt
         return {
             "manifest_version": MANIFEST_VERSION,
@@ -627,7 +626,7 @@ class Runner:
         manifest.setdefault("created_at", now_iso())
         manifest["backend_info"] = old_info or info
         if self.backend.name == "claude_cli_subscription":
-            manifest["cli"] = manifest.get("cli") or info       # the name used before 2026-11-12
+            manifest["cli"] = manifest.get("cli") or info       # the same, under its older name
         manifest["auth"] = auth
         self.cfg_cli_version = info["version"]
         self.backend.start(load_rows(self.results_path))
@@ -741,7 +740,7 @@ def group_items(items: list[Item], group_by: str | None) -> list[list[Item]]:
 
     Without ``group_by`` every item is its own group. With it, the items of one model and one
     condition whose claims share the value of ``group_by`` form one group, which one worker runs
-    back to back so a cached shared prefix is read by the next item (kit D-117 / ``--group-by``).
+    back to back so a cached shared prefix is read by the next item (``--group-by``).
     """
     if not group_by:
         return [[item] for item in items]
@@ -882,9 +881,9 @@ def main(argv: list[str] | None = None) -> int:
         models = resolve_models(args.models)
         prompt = load_prompt_set(args.prompt)
         if not 1 <= args.workers <= 8:
-            raise RunError("--workers must be 1..8 (the kit's cap; 5 at most was ever measured)")
+            raise RunError("--workers must be 1..8 (at most 5 parallel calls have been measured)")
         if args.workers > 5:
-            log.warning("more than 5 parallel calls was never measured on the CLI (kit D-87)")
+            log.warning("more than 5 parallel calls was never measured on the CLI")
         conditions = ([c.strip() for c in args.conditions.split(",") if c.strip()]
                       if args.conditions else list(prompt.conditions))
         run_id = args.run_id or datetime.now().astimezone().strftime(
@@ -918,7 +917,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def run_with_lock(config: RunConfig, backend: Backend, retriever: Any, runs_root: Path) -> int:
     """Run under the machine-wide runner lock: one runner at a time (at most ``workers``
-    calls in flight on the laptop; kit review C12/D3)."""
+    calls in flight on the machine)."""
     if config.dry_run:
         return Runner(config, backend, retriever).run()
     runs_root.mkdir(parents=True, exist_ok=True)

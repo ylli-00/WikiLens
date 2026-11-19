@@ -584,7 +584,7 @@ def test_edited_since_and_before_filters(meta_corpus, strategy: str) -> None:
 
 
 @pytest.mark.db
-def test_the_four_filters_of_the_brief_in_one_statement(meta_corpus) -> None:
+def test_the_four_filters_in_one_statement(meta_corpus) -> None:
     """"Only articles in this category, longer than this, edited since that date, linked from
     that other article": one inline statement; only Beta passes all four (Places, 5000 words,
     edited 2020-12-15, linked from Alpha).

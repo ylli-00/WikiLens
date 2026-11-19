@@ -1,7 +1,8 @@
-"""The claims-file contract shared with chat B, file hashing, and evidence rendering.
+"""The claims-file contract shared with ``scripts/scaled_build.py``, file hashing, and evidence
+rendering.
 
-One JSON object per line (``scaled_data/claims_3000.jsonl`` from chat B; the probe file from
-:mod:`wikilense.llm.probe` uses the same format):
+One JSON object per line (``claims_3000.jsonl`` from ``scripts/scaled_build.py``; the probe
+file from :mod:`wikilense.llm.probe` uses the same format):
 
 - ``id`` (int), ``split``, ``label``, ``claim``;
 - ``kind`` (``"single"`` or ``"needs2"``) and ``challenge`` (FEVEROUS's challenge tag);
@@ -47,7 +48,7 @@ def load_claims(path: str | Path) -> list[dict[str, Any]]:
 
     Raises :class:`ClaimsError` for a line that is not JSON, a missing field, a non-integer or
     duplicate id, an unknown label, or a ``gold_set`` that does not index ``evidence_sets``. A
-    file that does not end in a newline is refused: chat B may still be writing it.
+    file that does not end in a newline is refused: it may still be being written.
     """
     raw = Path(path).read_bytes()
     if raw and not raw.endswith(b"\n"):

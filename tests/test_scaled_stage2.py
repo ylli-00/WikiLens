@@ -33,7 +33,7 @@ def settings(name: str) -> Settings:
 
 
 @pytest.mark.parametrize("name", ["wikilense", "wikilense_test", "wikilense_s0_test", "other", ""])
-def test_the_graded_and_test_databases_are_refused(s2: Any, name: str) -> None:
+def test_every_database_but_s0_and_s1_is_refused(s2: Any, name: str) -> None:
     with pytest.raises(s2.Stage2Error, match="refusing database"):
         s2.check_database(settings(name))
 
@@ -43,7 +43,7 @@ def test_the_two_new_databases_are_accepted(s2: Any, name: str) -> None:
     assert s2.check_database(settings(name)) == name
 
 
-def test_the_root_statements_are_the_owners(s2: Any) -> None:
+def test_the_root_statements_are_exactly_these_four(s2: Any) -> None:
     assert s2.CREATE_STATEMENTS == (
         "CREATE DATABASE wikilense_s0",
         "CREATE DATABASE wikilense_s1",

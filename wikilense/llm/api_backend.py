@@ -1,9 +1,6 @@
-"""The API backend: one Anthropic Messages API request per item, with the owner's API key.
+"""The API backend: one Anthropic Messages API request per item, with an API key.
 
-Ported from the API kit's ``code/standalone/api_runner.py``
-(``reviews/ANTHROPIC_API_RUNNER_KIT_2026-11-12.zip``, unpacked in ``llm_kit_api/``), which
-distils the running_benchmarks project's API client (``code/reference/src/client_anthropic.py``
-and ``api_limits.py``). ``wikilense/llm/NOTES.md`` maps every choice to its source.
+``wikilense/llm/NOTES.md`` maps every choice to its source.
 
 - **The key** comes from the repository's ``.env`` through python-dotenv's ``dotenv_values``,
   the way ``wikilense.config`` reads ``.env``: never from ``os.environ``. It is passed to the SDK
@@ -17,8 +14,8 @@ and ``api_limits.py``). ``wikilense/llm/NOTES.md`` maps every choice to its sour
   ``temperature``/``top_p``/``top_k``, ``tools``/``tool_choice`` (forced tool choice is a 400 on
   Sonnet 5.5 and Opus 5.5) and ``fallbacks``. A fallback model's answer would be counted as the
   requested model's and spoil the comparison between models, so another model answering is
-  recorded as a refusal (kit REPORT 2.3).
-- **Errors**, in the kit's order: 401/403/404/402 fatal; 400 = the account's spend limit or empty
+  recorded as a refusal.
+- **Errors**, in this order: 401/403/404/402 fatal; 400 = the account's spend limit or empty
   credit (``money``) or a bad request (error); 429 = the account's spend cap (``money``) or a
   per-minute limit (one gate shared by every worker, its own budget of 20); 5xx / overloaded =
   back off and retry; timeout = at most 2; network = back off.
@@ -56,7 +53,7 @@ log = logging.getLogger("wikilense.llm.api")
 
 API_BASE_URL = "https://api.anthropic.com"
 PLACEHOLDER_KEYS = frozenset({"sk-ant-REPLACE_ME", "<the key>", ""})
-#: Variables the SDK reads by itself even with an explicit key; refused (kit REPORT 2.10).
+#: Variables the SDK reads by itself even with an explicit key; refused.
 REFUSED_ENV = ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
 
 
@@ -72,9 +69,7 @@ class Price:
 
 
 #: List prices. Source: https://platform.claude.com/docs/en/about-claude/pricing, fetched
-#: 2026-11-12 ("Model pricing" table). Sonnet 5.5 and Opus 5.5 also equal the API kit's registry
-#: (code/reference/src/models.py, Sonnet's cache read corrected to $0.10 on 2026-10-17) and the
-#: claude-api skill (cached 2026-11-03). Haiku 5.5 is priced by prompt length: a request whose
+#: 2026-11-12 ("Model pricing" table). Haiku 5.5 is priced by prompt length: a request whose
 #: prompt (all input tokens, cache reads and writes included) is over 100,000 tokens pays the
 #: second set (same page, "Long context pricing").
 PRICES: dict[str, Price] = {
@@ -88,11 +83,9 @@ LONG_PROMPT_PRICES: dict[str, tuple[int, Price]] = {
 #: "specifying US-only inference through the inference_geo parameter incurs a 1.1x multiplier"
 #: (same page). Never requested here; applied if a response reports it.
 US_GEO_MULTIPLIER = 1.1
-PRICE_SOURCE = ("https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12 "
-                "(Sonnet 5.5 and Opus 5.5 also match the API kit's registry and the claude-api "
-                "skill cached 2026-11-03)")
+PRICE_SOURCE = "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12"
 
-#: max_tokens by effort (kit, from the project's registry); it caps thinking PLUS the answer.
+#: max_tokens by effort; it caps thinking PLUS the answer.
 MAX_TOKENS_BY_EFFORT = {"low": 4_096, "medium": 16_384, "high": 32_768, "xhigh": 65_536,
                         "max": 128_000}
 CACHE_MARKS = {"5m": {"type": "ephemeral"}, "1h": {"type": "ephemeral", "ttl": "1h"}}
@@ -233,7 +226,7 @@ def sendable_schema(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
 
     A deep copy with the keywords the structured-output grammar does not support removed
     (minItems 0/1 kept) and ``additionalProperties: false`` added to objects lacking it; an
-    object that allows extra properties is refused (kit ``sendable_schema``).
+    object that allows extra properties is refused.
     """
     stripped: list[str] = []
 
@@ -443,7 +436,7 @@ class SpendGuard:
 
 
 def http_error_classes(anthropic_mod: Any) -> tuple[tuple[type, ...], tuple[type, ...]]:
-    """(timeout classes, network classes): the SDK's and its HTTP library's (kit)."""
+    """(timeout classes, network classes): the SDK's and its HTTP library's."""
     timeouts: list[type] = [anthropic_mod.APITimeoutError]
     network: list[type] = [anthropic_mod.APIConnectionError]
     for name in ("httpx2", "httpx"):
@@ -635,7 +628,7 @@ class AnthropicApiBackend:
 
         A watchdog CLOSES the stream at the deadline (a read timeout fires only after silence,
         and the API keeps streams alive with pings). Raises TimeLimit with the usage billed so
-        far when it cut the stream (kit ``Caller._stream``, D-92).
+        far when it cut the stream.
         """
         limit = self.timeout_s
         started = time.monotonic()

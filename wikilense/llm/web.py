@@ -1,7 +1,7 @@
 """The ``web`` condition: the claim alone, with Claude Code's WebSearch and WebFetch tools.
 
-Owner's decision of 2026-11-12: how does Claude Haiku 5.5 score when a normal user lets it use
-the internet? The FEVEROUS labels are public on the web (fever.ai, Zenodo, GitHub copies,
+The question: how does Claude Haiku 5.5 score when a normal user lets it use the internet? The
+FEVEROUS labels are public on the web (fever.ai, Zenodo, GitHub copies,
 Hugging Face), so WebFetch is denied on those hosts, and every web row keeps a trace of what the
 model searched and opened for the audit (``scripts/llm_web_audit.py``). ``wikilense/llm/NOTES.md``
 lists each choice with its source.
@@ -29,7 +29,7 @@ WEB_TOOLS: tuple[str, ...] = ("WebSearch", "WebFetch")
 #: ``init.tools`` of a web call must be exactly this set; anything else is fatal.
 WEB_INIT_TOOLS = frozenset({"StructuredOutput", *WEB_TOOLS})
 DENY_HOSTS_FILE = Path(__file__).resolve().parent / "web_deny_hosts.txt"
-#: Owner's start value, to be confirmed from the smoke test.
+#: Turn cap of a web call.
 DEFAULT_MAX_TURNS = 20
 #: Per call. WebFetch has its own deadline per fetch; a web call makes several tool calls.
 DEFAULT_TIMEOUT_S = 200.0
@@ -369,7 +369,7 @@ def audit_row(row: dict[str, Any], deny: DenyList, raw_text: str | None = None) 
 def audit_rows(rows: list[dict[str, Any]], deny: DenyList,
                raw_texts: dict[str, str] | None = None) -> AuditResult:
     """Audit every web row; ``raw_texts`` maps a row's ``raw_stream_file`` to its tool-result
-    text. Flagged rows are reported, never removed (the owner decides)."""
+    text. Flagged rows are reported, never removed."""
     result = AuditResult()
     for row in rows:
         if row.get("condition") != "web":

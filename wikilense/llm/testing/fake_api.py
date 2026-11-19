@@ -1,6 +1,6 @@
 """A fake Anthropic Messages API for the API backend's offline tests (no network, no key).
 
-Ported from the API kit's ``code/standalone/tests/test_api_runner.py``: the real ``anthropic``
+The real ``anthropic``
 SDK talks to this object through ``httpx.MockTransport``, so the request the SDK builds and the
 streamed (SSE) replies it parses are the real code paths. What a ``POST /v1/messages`` does is
 chosen by a TRIGGER_* word in the user turn:

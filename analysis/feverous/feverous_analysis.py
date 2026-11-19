@@ -4,8 +4,8 @@
 Streams the FEVEROUS train/dev annotation files (JSONL) and measures how many
 claims need evidence from two or more Wikipedia pages, plus related statistics.
 Every figure is computed from the files. The only constants are the paper's
-reference numbers (comparison table), the tier thresholds from the project
-brief, the timestamp threshold used to describe annotator_operations, and the
+reference numbers (comparison table), the tier thresholds of ``tier_of``,
+the timestamp threshold used to describe annotator_operations, and the
 id/page shown in the paper's QA-interface screenshot (a lookup, not a result).
 
 Standard library only (Python 3.8+).

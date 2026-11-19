@@ -8,7 +8,7 @@ WebSearch returned, with counts, and flags every row whose queries, URLs or tool
 fever.ai, "feverous", zenodo, huggingface or hf.co, raw.githubusercontent.com or a GitHub path
 ending in .jsonl/.json/.csv, a host on the deny list, or "Verdict" next to one of the three
 labels (``wikilense.llm.web.audit_row``). Writes ``<run_dir>/WEB_AUDIT.md`` and
-``<run_dir>/web_audit.json``. Flagged rows stay in results.jsonl: the owner decides.
+``<run_dir>/web_audit.json``. Flagged rows are reported, not removed from results.jsonl.
 
 Only the newest row of each item key is audited (a re-asked item's earlier error rows are not).
 
@@ -78,7 +78,7 @@ def report(s: dict) -> str:
               f" ({s['rows_without_raw_stream']} without a raw stream)"),
              (f"- WebSearch calls: {s['web_search_calls']}; WebFetch calls: "
               f"{s['web_fetch_calls']}; denied: {s['denied_calls']}"),
-             f"- **flagged rows: {len(s['flagged'])}** (kept in results.jsonl; the owner decides)",
+             f"- **flagged rows: {len(s['flagged'])}** (kept in results.jsonl)",
              "", "## Hosts WebFetch opened", ""]
     lines += ["| host | fetches |", "|---|---|"] if s["fetched_hosts"] else ["(none)"]
     lines += [f"| {h} | {n} |" for h, n in s["fetched_hosts"].items()]

@@ -170,7 +170,7 @@ def _cands(sb: Any, n: int) -> list[Any]:
     ]
 
 
-def test_pick_matches_the_planning_scripts_call_order(sb: Any) -> None:
+def test_pick_samples_single_then_needs2_per_label_in_order(sb: Any) -> None:
     cands = _cands(sb, 5)
     picked = sb.pick(cands, seed=11, per_group={"single": 2, "needs2": 1})
     rng = random.Random(11)

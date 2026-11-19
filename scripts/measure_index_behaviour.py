@@ -1546,19 +1546,25 @@ def isolation_markdown(report: dict[str, Any]) -> str:
         "",
         "## What follows for an application",
         "",
-        ("- A reader did not cause the state when it searched at READ COMMITTED or in autocommit "
-        "mode, when it ended its transaction before searching again, or when its transaction "
-        "searched the index only after the other connection's commit. Once the state is there, "
-        "connections at every level get the stale answer. So an application that writes while "
-        "it searches is safe only if none of its connections searches the index twice inside "
-        "one REPEATABLE READ transaction."),
+        ("- On this table, a reader did not cause the state when it searched at READ COMMITTED or "
+        "in autocommit mode, when it ended its transaction before searching again, or when its "
+        "transaction searched the index only after the other connection's commit. The last case "
+        "is not safe in general: in a plain-SQL repro with 8-dimensional vectors on 11.8.9 and "
+        "13.0.2, a REPEATABLE READ transaction whose first statement was `SELECT COUNT(*)`, a "
+        "scan or `START TRANSACTION WITH CONSISTENT SNAPSHOT`, and that searched the index once "
+        "after the other connection's commit, left the index stale in 3 of 3 trials. Once the "
+        "state is there, connections at every level get the stale answer. So an application "
+        "that writes while it searches is safe only if none of its connections searches the "
+        "index inside a REPEATABLE READ transaction whose snapshot predates another "
+        "connection's commit."),
         ("- PyMySQL opens connections with autocommit off, so a connection that has run one "
         "`SELECT` is inside a REPEATABLE READ transaction until it commits, rolls back or "
         "closes."),
         ("- WikiLense's measurements are not affected: no connection commits a write to `chunk` "
         "while a search runs, and `wikilense ingest` recreates the tables."),
-        ("- We found no MariaDB ticket that describes this (searched on 2026-11-11) and have not "
-        "reported it. It was measured on one server version, on one scratch table of "
+        ("- The behaviour is MariaDB issue "
+        "[MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321). The tables above were measured "
+        "on one server version, on one scratch table of "
         f"{report['rows']:,} random vectors and one query, rebuilt for every trial."),
         "",
     ]
