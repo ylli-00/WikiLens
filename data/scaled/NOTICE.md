@@ -8,3 +8,8 @@ The gold evidence text in each record is Wikipedia text of December 2020. The li
 FEVEROUS annotations and of the Wikipedia text, with the attribution, is in
 [data/corpus/NOTICE.md](../corpus/NOTICE.md); it applies to this file in the same way. If you pass
 the file on, changed or not, keep it under CC BY-SA 3.0 and keep both notices.
+
+The release file `wikilense_s1_v1.tar.gz` (`make fetch-s1`,
+[docs/SETUP.md](../../docs/SETUP.md#get-the-scaled-database-s1)) holds the pages, claims, vectors
+and page metadata of S1 under the same terms; its own `NOTICE.md` gives the attribution and the
+changes.

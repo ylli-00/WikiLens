@@ -124,6 +124,60 @@ by git), `make serve` starts the web page, `make examples` runs the ten examples
 reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
 deletes the data volume.
 
+## Get the scaled database (S1)
+
+`wikilense_s1` is the database behind the README's headline results: 7,686 Wikipedia pages (the
+3,851 gold pages of the 3,000 claims of [EVALUATION.md](EVALUATION.md#the-scaled-run), plus 3,835
+pages they link to), 132,359 chunks with their vectors, and the pages' categories and edit dates.
+A release file on GitHub holds the pages, the claims, the saved vectors and the page metadata. The
+load reads the saved vectors instead of running the embedding model, so it needs neither the
+FEVEROUS Wikipedia file nor a GPU.
+
+| | |
+|---|---|
+| Download | `wikilense_s1_v1.tar.gz`, 300,308,768 bytes, SHA-256 `86ad18f01ad98bfaf23b800181e9f76dc409bf9b0ce20ef606bcaea0e93e032c` (the Makefile checks it) |
+| Unpacked | 607,719,671 bytes in `data/scaled/wikilense_s1/` (git ignores it; the download is deleted after unpacking) |
+| The database on disk | 1,375,712,270 bytes in MariaDB's data volume; the free space fell by 1,418,092,544 bytes during the load. With the unpacked folder kept, about 2.03 GB in all |
+| Load time | 221.1 s for `make load-s1` on this laptop with the CPU capped at 50% (the ingest 215.35 s, of which 174.5 s inserts and the index build); the download time comes on top |
+
+After `make setup`, from the repository root:
+
+```
+make fetch-s1     # download, check the size and SHA-256, unpack into data/scaled/wikilense_s1/
+make load-s1      # load it into the database wikilense_s1 and check every count
+```
+
+`make load-s1` runs these steps in order (`make -n load-s1` prints them):
+
+1. `scripts/scaled_release.py check-empty` stops when `wikilense_s1` already holds tables, because
+   the ingest drops every table of its database. `make load-s1 REPLACE=1` replaces them.
+2. `scripts/scaled_stage2.py create-dbs` creates `wikilense_s0` and `wikilense_s1` and grants them
+   to the application user. `wikilense_s0` stays empty; only the full build below fills it.
+3. `scaled_stage2.py ingest` loads the folder with the saved vectors and builds the vector index.
+4. `scaled_stage2.py verify` compares the counts with `corpora.json`: 7,686 pages, 132,359 chunks,
+   19,149,694 chunk words, 3,000 claims and 8,408 evidence ids (8,408 with a page, 7,877 with a
+   text unit). A difference stops the load.
+5. `scripts/scaled_stage3.py load` and `verify` write the categories and edit dates and check them
+   against `page_meta_S1.jsonl`.
+
+The vectors are the ones the reported results were measured with, but the HNSW graph is built anew
+by each load, and graph builds differ a little. Twenty builds of these vectors found a gold page in
+the top 5 for 2,922 to 2,937 of the 3,000 claims ([build_variance.md](../results/scaled/run1/s1/build_variance.md));
+the reported run found 2,933. A test load from the release file found 2,934, and evidence recall@5
+was 2,256 of 3,000 against the reported 2,253 ([the test load](../results/scaled/release_check/README.md)).
+
+To query S1, name it in `WIKILENSE_DB_NAME`; a variable set in the shell takes precedence over
+`.env`:
+
+```
+WIKILENSE_DB_NAME=wikilense_s1 make serve                       # the web page on S1
+WIKILENSE_DB_NAME=wikilense_s1 .venv/bin/wikilense query "The Eiffel Tower is in Paris."
+WIKILENSE_DB_NAME=wikilense_s1 .venv/bin/wikilense eval --ef-search 100 --out /tmp/s1_eval --name s1
+```
+
+The database does not read `data/scaled/wikilense_s1/` after the load, so the folder can be
+deleted; `make fetch-s1` downloads it again.
+
 ## Reproduce the scaled run
 
 The scaled run ([EVALUATION.md](EVALUATION.md#the-scaled-run): 3,000 claims on the databases

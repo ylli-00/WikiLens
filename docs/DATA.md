@@ -199,8 +199,12 @@ are in [SETUP.md](SETUP.md), "Reproduce the scaled run"):
    code. Then rename the `.tmp` file to `claims_3000.jsonl` by hand (the build never writes the
    final file) and compare its SHA-256 with the one above.
 3. `scripts/scaled_stage2.py` with `create-dbs`, `embed` on S1, then `ingest` and `verify` per
-   database; both refuse any database but `wikilense_s0` and `wikilense_s1`.
+   database; both refuse any database but `wikilense_s0` and `wikilense_s1` (and the scratch
+   database `wikilense_s1_check` when given `--allow-check-database`).
 4. `scripts/scaled_stage3.py` with `fetch` on S1's pages, then `load` and `verify` per database.
+
+S1's folder, its vectors and its page metadata are also published as one release file, so that S1
+can be loaded without steps 1 to 3 ([SETUP.md](SETUP.md#get-the-scaled-database-s1)).
 
 FEVEROUS: Aly et al., 2021 (https://arxiv.org/abs/2106.05707); Wikipedia text under CC BY-SA 3.0,
 with the licences in [data/corpus/NOTICE.md](../data/corpus/NOTICE.md) and

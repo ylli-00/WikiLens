@@ -135,8 +135,9 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `make_env.py` | Writes `.env` from `.env.example` with two random passwords, once; never prints them or touches an existing file. | `.env.example` → `.env` |
 | `scaled_build.py` | The scaled run's data: picks the 3,000 claims (seeded, only claims whose evidence lands in a chunk) and the distractor pages, and writes the S0 and S1 corpus folders. | the FEVEROUS database (read only) |
 | `scaled_check.py` | Re-derives every rule of the build with separate code and compares the results. | writes only `SELFCHECK.md` |
-| `scaled_stage2.py` | Creates `wikilense_s0` and `wikilense_s1`, embeds every chunk text in saved parts, ingests each folder and checks the counts. | refuses any other database |
+| `scaled_stage2.py` | Creates `wikilense_s0` and `wikilense_s1`, embeds every chunk text in saved parts, ingests each folder and checks the counts. | refuses any other database (`wikilense_s1_check`, a scratch copy for testing a load, only with `--allow-check-database`) |
 | `scaled_stage3.py` | Each page's December 2020 revision, edit date and categories (resumable, with `fetch_page_meta.py`'s client), loaded so the four metadata filters work at scale. | MediaWiki API → a scaled database |
+| `scaled_release.py` | `make fetch-s1`: downloads S1's release file, checks its size and SHA-256 and unpacks it, folders and regular files only. `make load-s1`: stops first when the target database already holds tables. | release file → `data/scaled/wikilense_s1/` |
 | `scaled_filters.py` | Values for the four metadata filters by one rule: the chunks kept nearest to 50%, 5%, 0.5% and 0.05% of the table. | → the file `--filters` reads |
 | `scaled_timing.py` | The `scale` protocol of `run_experiments.py` (fast and slow statements) on every claim of a scaled database, at k = 5. | a scaled database |
 | `scaled_uncommitted.py` | The `uncommitted` group with a scaled database's vectors. | a scratch table in the test database |
@@ -159,11 +160,11 @@ personal details; `test_docs.py` checks the README, every link and anchor, and t
 | File | What it is for |
 |---|---|
 | `data/corpus/` | The committed demo corpus (pages, claims, page metadata, manifests) and `NOTICE.md`: the CC BY-SA 3.0 licence of its Wikipedia text and claims, which the code's MIT licence does not cover. `data/feverous/` holds the raw downloads, not committed. |
-| `data/scaled/` | `claims_3000.jsonl`, the scaled run's claims with their evidence sets, gold pages and gold evidence text, and `NOTICE.md`, its licence. |
+| `data/scaled/` | `claims_3000.jsonl`, the scaled run's claims with their evidence sets, gold pages and gold evidence text, and `NOTICE.md`, its licence. `make fetch-s1` unpacks S1's release file into `wikilense_s1/` here, which git ignores. |
 | `results/`, `results/scaled/` | The result files (JSON and Markdown) of the demo corpus and of the scaled run, each folder with its `SUMMARY.md`. |
 | `README.md` | One question and its answer on the first screen, then the findings, the data model, how MariaDB uses the index, what the approach gave and where it loses, setup, the method. |
 | `CLAUDE.md` | The project's rules for Claude Code sessions: the task, the benchmark facts, the environment, the rules for comments. |
-| `Makefile` | `make setup` (a Python check, `.env` with generated passwords, MariaDB, the venv, the ingest; `CPU=1` for the pinned CPU-only set), `test`, `lint`, `eval`, `serve`, `examples`, `experiments`, `down`; `make -n <target>` prints the commands. |
+| `Makefile` | `make setup` (a Python check, `.env` with generated passwords, MariaDB, the venv, the ingest; `CPU=1` for the pinned CPU-only set), `test`, `lint`, `eval`, `serve`, `examples`, `experiments`, `fetch-s1` and `load-s1` (the scaled database S1 from its release file), `down`; `make -n <target>` prints the commands. |
 | `docker-compose.yml`, `.env.example` | MariaDB 11.8 as `wikilense-mariadb` on `127.0.0.1:3306`, with a 512 MB HNSW cache and a health check; the template for the ignored `.env`. |
 | `pyproject.toml`, `requirements*` | The package, the `wikilense` command, pytest markers, ruff; version ranges, and exact versions in `requirements.lock` (the GPU build behind `results/`) and `requirements-cpu.lock` (CPU only, per-platform PyTorch lines). |
 | `.github/workflows/ci.yml` | On every push to `main` and every pull request: MariaDB 11.8 as a service, the CPU lock, ruff and the whole suite. |

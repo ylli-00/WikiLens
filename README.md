@@ -259,12 +259,12 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (675 tests), `make eval`, `make serve`, `make examples` (the ten
-examples of `sql/examples.sql`, no Python needed), `make experiments` (the protocol on the 100
-pages, with a GPU) and `make down`. `make eval` checks an install: on the 100
-pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
-in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs
-the 53.5 GB FEVEROUS Wikipedia, a GPU and hours ([its commands](docs/SETUP.md#reproduce-the-scaled-run)).
+Then `make test` (675 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
+an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
+in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs the 53.5 GB FEVEROUS
+Wikipedia, a GPU and hours ([its commands](docs/SETUP.md#reproduce-the-scaled-run)). Its database S1 loads without them:
+`make fetch-s1 load-s1` downloads a 300 MB release file and loads it (221.1 s on this laptop; [how](docs/SETUP.md#get-the-scaled-database-s1)).
 
 **Without a GPU** everything works; only the embedding is slower. The ingest took 230.0 s on this
 laptop's CPU against 21 s on its GPU, and a query embedding takes 18 ms against 4.6 ms. The SQL times
