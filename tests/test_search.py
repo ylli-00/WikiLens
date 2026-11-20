@@ -13,8 +13,10 @@ finds nothing else. The pure tests (statement text, argument validation) run wit
 from __future__ import annotations
 
 import contextlib
+import inspect
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -410,6 +412,132 @@ def test_ef_search_outside_the_server_range_is_refused_before_anything_is_set() 
             assert conn.value == good
 
 
+class TimedConn:
+    """A fake connection with the session variables ``max_statement_time`` and
+    ``mhnsw_ef_search``; every other statement is the search, which returns no rows or raises
+    ``fail``. ``log`` lists what ran, the search with the time limit it ran under."""
+
+    def __init__(self, limit: float = 0.0, fail: BaseException | None = None) -> None:
+        self.limit = limit
+        self.ef = 20
+        self.fail = fail
+        self.open = True
+        self.broken = False  # as after a lost connection: every statement raises InterfaceError
+        self.log: list[str] = []
+        self._row: tuple[Any, ...] = ()
+
+    def cursor(self) -> contextlib.nullcontext[TimedConn]:
+        return contextlib.nullcontext(self)
+
+    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
+        if self.broken:
+            raise pymysql.err.InterfaceError(0, "")
+        if sql == searchmod.STATEMENT_TIME_GET_SQL:
+            self._row = (self.limit,)
+            self.log.append("read limit")
+        elif sql == searchmod.STATEMENT_TIME_SET_SQL:
+            self.limit = params[0]
+            self.log.append(f"limit {params[0]}")
+        elif sql == "SELECT @@SESSION.mhnsw_ef_search":
+            self._row = (self.ef,)
+            self.log.append("read ef")
+        elif sql.startswith("SET SESSION mhnsw_ef_search"):
+            self.ef = params[0]
+            self.log.append(f"ef {params[0]}")
+        else:
+            self.log.append(f"search under {self.limit}")
+            if self.fail is not None:
+                raise self.fail
+
+    def fetchone(self) -> tuple[Any, ...]:
+        return self._row
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        return []
+
+
+STOPPED = pymysql.err.OperationalError(
+    searchmod.ER_STATEMENT_TIMEOUT, "Query execution was interrupted (max_statement_time exceeded)"
+)
+
+
+def test_search_sets_the_statement_time_limit_around_the_search_and_restores_it() -> None:
+    conn = TimedConn(limit=2.5)
+    assert search(conn, QUERY, k=3, ef_search=50, statement_seconds=5) == []  # type: ignore[arg-type]
+    assert conn.log == ["read limit", "limit 5", "read ef", "ef 50", "search under 5", "ef 20",
+                        "limit 2.5"]
+    assert (conn.limit, conn.ef) == (2.5, 20)
+
+
+@pytest.mark.parametrize("seconds", [None, 0])
+def test_search_without_a_statement_time_limit_leaves_the_session_alone(
+    seconds: float | None,
+) -> None:
+    """The evaluation and the measurement scripts pass nothing, so their statements run as
+    before: no extra statement, no limit."""
+    conn = TimedConn()
+    search(conn, QUERY, k=3, ef_search=None, statement_seconds=seconds)  # type: ignore[arg-type]
+    assert conn.log == ["search under 0.0"]
+    assert inspect.signature(search).parameters["statement_seconds"].default is None
+
+
+def test_a_stopped_search_raises_1969_and_the_limit_and_ef_search_are_restored() -> None:
+    conn = TimedConn(limit=0.0, fail=STOPPED)
+    with pytest.raises(pymysql.err.OperationalError) as raised:
+        search(conn, QUERY, k=3, ef_search=50, statement_seconds=5)  # type: ignore[arg-type]
+    assert raised.value is STOPPED and searchmod.is_statement_timeout(raised.value)
+    assert conn.log[-3:] == ["search under 5", "ef 20", "limit 0.0"]
+    assert (conn.limit, conn.ef) == (0.0, 20)
+
+
+@pytest.mark.parametrize("closes", [True, False])
+def test_statement_time_session_never_replaces_the_error_of_the_block(closes: bool) -> None:
+    conn = TimedConn()
+    failure = pymysql.err.OperationalError(2013, "Lost connection to MySQL server")
+    with pytest.raises(type(failure)) as raised, searchmod.statement_time_session(conn, 5):
+        conn.open = not closes
+        conn.broken = True
+        raise failure
+    assert raised.value is failure
+    assert conn.log == ["read limit", "limit 5"]  # nothing was, or could be, restored
+
+
+@pytest.mark.parametrize("bad", [-1, -0.5, float("nan"), float("inf"), True, "5"])
+def test_a_bad_statement_time_limit_is_refused_before_anything_is_set(bad: Any) -> None:
+    conn = TimedConn()
+    with pytest.raises(ValueError, match="statement_seconds"):
+        search(conn, QUERY, k=3, ef_search=None, statement_seconds=bad)  # type: ignore[arg-type]
+    assert conn.log == []
+
+
+def test_only_1969_is_a_stopped_search_and_its_message_names_the_limit() -> None:
+    assert searchmod.ER_STATEMENT_TIMEOUT == 1969
+    assert searchmod.is_statement_timeout(STOPPED)
+    for other in (pymysql.err.OperationalError(2013, "Lost connection"),
+                  pymysql.err.ProgrammingError(1969, "not an OperationalError"),
+                  pymysql.err.OperationalError(), RuntimeError(1969)):
+        assert not searchmod.is_statement_timeout(other)
+    assert searchmod.statement_stopped_message(5) == (
+        "The search was stopped after 5 s by MariaDB's max_statement_time, a guard against a "
+        "vector search that keeps searching when few rows pass its filters (see "
+        "docs/VECTOR_INDEX.md)."
+    )
+    assert "after 2.5 s" in searchmod.statement_stopped_message(2.5)
+    assert searchmod.STATEMENT_TIME_SET_SQL == "SET SESSION max_statement_time = %s"
+    assert searchmod.STATEMENT_TIME_GET_SQL == "SELECT @@SESSION.max_statement_time"
+
+
+def test_only_the_web_page_and_the_query_command_pass_a_statement_time_limit() -> None:
+    """The evaluation, the LLM retrieval and every script call search() without it, so their
+    timings and results are those of the statement alone."""
+    root = Path(searchmod.__file__).resolve().parents[1]
+    files = [*root.glob("wikilense/**/*.py"), *root.glob("scripts/*.py")]
+    using = {p.relative_to(root).as_posix() for p in files
+             if "statement_seconds" in p.read_text(encoding="utf-8")}
+    assert using == {"wikilense/config.py", "wikilense/search.py", "wikilense/web.py",
+                     "wikilense/cli.py"}
+
+
 def test_resolve_ef_search_takes_the_request_then_the_default_and_zero_is_the_server() -> None:
     assert searchmod.resolve_ef_search(None, 100) == 100
     assert searchmod.resolve_ef_search(40, 100) == 40
@@ -799,6 +927,32 @@ def test_ef_search_is_set_for_the_call_and_restored_even_when_the_query_raises(c
     with pytest.raises(pymysql.err.ProgrammingError):
         search(corpus, QUERY, k=2, ef_search=77)
     assert dbmod.get_session_var(corpus, "mhnsw_ef_search") == 33
+
+
+@pytest.mark.db
+def test_the_statement_time_limit_is_set_for_the_call_and_restored_on_the_server(corpus) -> None:
+    """The fixed statements run on MariaDB: the block runs under the limit, and the session's own
+    value comes back after the search, also when the search fails."""
+
+    def session_limit() -> float:
+        with corpus.cursor() as cur:
+            cur.execute(searchmod.STATEMENT_TIME_GET_SQL)
+            return float(cur.fetchone()[0])
+
+    with corpus.cursor() as cur:
+        cur.execute(searchmod.STATEMENT_TIME_SET_SQL, (2.5,))
+    assert session_limit() == 2.5
+    with searchmod.statement_time_session(corpus, 5):
+        assert session_limit() == 5.0
+    assert session_limit() == 2.5
+    assert _ids(search(corpus, QUERY, k=2, statement_seconds=5)) == [1, 2]
+    assert session_limit() == 2.5
+    with corpus.cursor() as cur:  # make the statement itself fail on the server
+        cur.execute("DROP TABLE chunk_sentence")
+        cur.execute("DROP TABLE chunk")
+    with pytest.raises(pymysql.err.ProgrammingError):
+        search(corpus, QUERY, k=2, statement_seconds=5)
+    assert session_limit() == 2.5
 
 
 @pytest.mark.db

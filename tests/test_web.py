@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import statistics
 from collections.abc import Sequence
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, get_args
@@ -342,6 +342,53 @@ def test_api_search_reports_a_missing_index_or_schema_as_503(
     assert resp.status_code == 503, resp.text
     assert expected in resp.json()["detail"]
     assert conn.closed
+
+
+def test_a_search_stopped_at_the_time_limit_is_504_with_a_plain_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conn = ClosingConnection()
+    monkeypatch.setattr(webmod.db, "connect", lambda settings=None, database=None: conn)
+    seen: list[Any] = []
+
+    def stopped_search(*args: Any, **kwargs: Any) -> list[Hit]:
+        seen.append(kwargs["statement_seconds"])
+        raise pymysql.err.OperationalError(
+            searchmod.ER_STATEMENT_TIMEOUT,
+            "Query execution was interrupted (max_statement_time exceeded)",
+        )
+
+    monkeypatch.setattr(webmod.search, "search", stopped_search)
+    settings = replace(OFFLINE_SETTINGS, statement_seconds=3)
+    client = TestClient(webmod.create_app(settings, embedder=FakeEmbedder()))
+    resp = client.get("/api/search", params={"q": "x", "category": "Rivers of Switzerland"})
+    assert resp.status_code == 504, resp.text
+    assert resp.json() == {"detail": searchmod.statement_stopped_message(3)}
+    assert "stopped after 3 s by MariaDB's max_statement_time" in resp.json()["detail"]
+    assert seen == [3] and conn.closed
+    responses = client.get(webmod.OPENAPI_URL).json()["paths"]["/api/search"]["get"]["responses"]
+    assert "max_statement_time" in responses["504"]["description"]
+
+
+def test_api_search_passes_the_statement_time_limit_of_the_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        webmod.db, "connect", lambda settings=None, database=None: ClosingConnection()
+    )
+    seen: list[Any] = []
+
+    def recording(*args: Any, **kwargs: Any) -> list[Hit]:
+        seen.append(kwargs["statement_seconds"])
+        raise pymysql.err.OperationalError(2013, "Lost connection to MySQL server")
+
+    monkeypatch.setattr(webmod.search, "search", recording)
+    for seconds in (OFFLINE_SETTINGS.statement_seconds, 0):
+        client = TestClient(webmod.create_app(replace(OFFLINE_SETTINGS, statement_seconds=seconds),
+                                              embedder=FakeEmbedder()))
+        with pytest.raises(pymysql.err.OperationalError):  # another error is not a 504
+            client.get("/api/search", params={"q": "x"})
+    assert seen == [5, 0]
 
 
 def test_a_query_model_of_the_wrong_dimension_is_503_not_422(

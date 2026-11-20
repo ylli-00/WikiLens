@@ -1,4 +1,5 @@
-"""Tests for the web page's live fact-check: ``wikilense.factcheck`` and ``/api/factcheck``.
+"""Tests for the web page's live fact-check and its copyable prompt: ``wikilense.factcheck``,
+``/api/factcheck`` and ``/api/prompt``.
 
 Covered: the setting (off by default; an API key on its own turns nothing on; where the key is
 read from), the experiment's record and its refusals (a changed prompt set, the wrong number of
@@ -6,7 +7,10 @@ runs, a missing file, a system prompt that does not judge as of December 2020), 
 runner builds from the passages, the citations in the reason, the reliability figures and the
 missing ones, the caveat when the reader's search differs from the experiment's, every way a call
 can end without a verdict, one model call per click, the page script's free-text rule, the
-question hint, the CLI check, and that the API key never leaves the backend.
+question hint, the CLI check, and that the API key never leaves the backend. The copyable prompt:
+the text is the experiment's request with its one changed sentence, it is built with the
+fact-check off and without a key or a call, for free text and picked claims, it says why when
+it cannot be built, and a search stopped at the time limit is a 504 on both routes.
 
 Everything here is pure. The backends are fakes, or the Claude Code CLI is a shell script in
 ``tmp_path`` that prints a canned login status and version; the real ``claude`` is never found
@@ -33,6 +37,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
+import pymysql
 import pytest
 from fastapi.testclient import TestClient
 
@@ -222,9 +227,11 @@ def make_client(
     checker: factcheck.FactChecker | None,
     settings: Settings = OFFLINE_SETTINGS,
     database: str | None = None,
+    copy_prompt: factcheck.CopyPrompt | None = None,
 ) -> TestClient:
-    """Return a TestClient of an app with the fake embedder and ``checker``, addressed to
-    127.0.0.1 like a browser on the server's own machine."""
+    """Return a TestClient of an app with the fake embedder, ``checker`` and ``copy_prompt``
+    (None: what the app loads by itself), addressed to 127.0.0.1 like a browser on the server's
+    own machine."""
     app = webmod.create_app(
         settings,
         embedder=FakeEmbedder(),
@@ -232,6 +239,7 @@ def make_client(
         warm_up=False,
         offer_s1=False,
         fact_checker=checker,
+        copy_prompt=copy_prompt,
     )
     return TestClient(app, base_url=LOCAL_URL)
 
@@ -375,11 +383,12 @@ def test_the_setting_is_off_by_default_and_refuses_an_unknown_value(
 def test_an_app_with_default_settings_shows_the_off_line_and_refuses_a_post(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    copy = factcheck.load_copy_prompt()  # the copy box's experiment, loaded whatever the setting
     for module, name in ((cli_backend, "ClaudeCliBackend"), (api_backend, "AnthropicApiBackend"),
                          (factcheck, "load_experiment"), (factcheck, "load_reliability")):
         monkeypatch.setattr(module, name, _forbidden(name))
     monkeypatch.setattr(api_backend, "load_api_key", _forbidden("load_api_key"))
-    client = make_client(None)
+    client = make_client(None, copy_prompt=copy)  # the live checker loads nothing
     checker = client.app.state.fact_checker
     assert checker.mode == "off" and not checker.enabled and checker.backend is None
 
@@ -1575,3 +1584,299 @@ def test_the_verdict_names_the_statement_it_checked(
     install_search(monkeypatch, make_hits(5))
     client = make_client(make_checker(FakeBackend(), experiment, reliability))
     assert post(client, q=f"  {STATEMENT}  ").json()["statement"] == STATEMENT
+
+
+# ---------------------------------------------------------------------------------------------
+# the copyable prompt: GET /api/prompt and the page's copy box (no key, no model call)
+# ---------------------------------------------------------------------------------------------
+
+#: The system prompt's last sentence and its plain replacement, written out here.
+TOOL_SENTENCE = (
+    'Answer with one StructuredOutput call: "result" holds "label" (exactly one of the three) and '
+    '"justification" (one sentence, at most 30 words: the deciding fact and the passages or '
+    "sources used, such as [2]). No other text."
+)
+PLAIN_SENTENCE = (
+    "Answer with the label (exactly one of SUPPORTS, REFUTES or NOT ENOUGH INFO) and one sentence "
+    "of justification, at most 30 words: the deciding fact and the passages or sources used, such "
+    "as [2]. No other text."
+)
+#: A made-up benchmark claim the stubbed catalog offers.
+CLAIM_ID = 7
+CLAIM_TEXT = "The Aare rises in the Bernese Alps."
+
+
+def two_passages() -> list[dict[str, Any]]:
+    """Return two passages in the runner's hit-dict form."""
+    return [
+        {"rank": 1, "chunk_id": 11, "page_id": 1, "title": "Aare", "section_path": "",
+         "chunk_ordinal": 0, "n_words": 5, "distance": 0.1, "text": "The Aare is a river."},
+        {"rank": 2, "chunk_id": 22, "page_id": 2, "title": "Bern",
+         "section_path": "Geography > Rivers", "chunk_ordinal": 3, "n_words": 5,
+         "distance": 0.2, "text": "Bern lies on the Aare."},
+    ]
+
+
+def install_claim(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the claim catalog with :data:`CLAIM_ID` and the marks of a picked claim."""
+    offered = SimpleNamespace(
+        claim=SimpleNamespace(text=CLAIM_TEXT),
+        details=lambda: {"id": CLAIM_ID, "text": CLAIM_TEXT, "label": "SUPPORTS"},
+    )
+    monkeypatch.setattr(
+        webmod, "catalog", lambda state, name: SimpleNamespace(claims={CLAIM_ID: offered})
+    )
+    monkeypatch.setattr(webmod.picker, "search_marks",
+                        lambda conn, claim, hits, k: ([{} for _ in hits], {"k": k}))
+
+
+def get_prompt(client: TestClient, **params: Any) -> Any:
+    """GET /api/prompt with ``params`` and no extra header."""
+    return client.get("/api/prompt", params=params)
+
+
+def test_the_two_sentences_are_the_ones_the_copy_route_names() -> None:
+    assert factcheck.TOOL_ANSWER_SENTENCE == TOOL_SENTENCE
+    assert factcheck.PLAIN_ANSWER_SENTENCE == PLAIN_SENTENCE
+
+
+def test_the_copy_text_is_the_experiments_request_with_one_sentence_changed(
+    experiment: factcheck.Experiment,
+) -> None:
+    passages = two_passages()
+    request = factcheck.experiment_request(experiment, STATEMENT, passages)
+    system_file = (prompts_module.PROMPTS_DIR / "fact_check_v1" / "system.txt").read_text(
+        encoding="utf-8")
+    assert request.system == system_file
+    assert system_file.count(TOOL_SENTENCE) == 1 and system_file.endswith(TOOL_SENTENCE + "\n")
+
+    text = factcheck.copy_prompt_text(experiment, STATEMENT, passages)
+    assert text == system_file.replace(TOOL_SENTENCE, PLAIN_SENTENCE) + "\n" + request.user_text
+    assert text.replace(PLAIN_SENTENCE, TOOL_SENTENCE) == system_file + "\n" + request.user_text
+    original = set(system_file.splitlines()) | set(request.user_text.splitlines())
+    assert [line for line in text.splitlines() if line not in original] == [PLAIN_SENTENCE]
+    assert text.endswith(
+        PLAIN_SENTENCE + "\n\n"
+        "EVIDENCE:\n"
+        "[1] Aare\nThe Aare is a river.\n\n"
+        "[2] Bern > Geography > Rivers\nBern lies on the Aare.\n\n"
+        "CLAIM: The Aare flows through Bern.\n"
+    )
+    assert "StructuredOutput" not in text
+    # the prompt set is the one the experiment ran: its hash is still the recorded one
+    assert prompts_module.load_prompt_set("fact_check_v1").prompt_hash == \
+        retrieved_run_record()["prompt_hash"] == experiment.prompt.prompt_hash
+
+
+def test_copyable_system_needs_the_tool_call_sentence_exactly_once() -> None:
+    assert factcheck.copyable_system("Label it. " + TOOL_SENTENCE + "\n") == \
+        "Label it. " + PLAIN_SENTENCE + "\n"
+    for system, count in (("Label it.", 0), (f"{TOOL_SENTENCE}\n{TOOL_SENTENCE}", 2)):
+        with pytest.raises(factcheck.FactCheckError, match=f"{count} times, not once"):
+            factcheck.copyable_system(system)
+
+
+def _system_with(runs: Path, prompts_dir: Path, new: str) -> None:
+    """Replace the tool-call sentence in the copied system prompt by ``new`` and record the new
+    hash, so that only the copy route's own check refuses the set."""
+    system = prompts_dir / "fact_check_v1" / "system.txt"
+    system.write_text(system.read_text(encoding="utf-8").replace(TOOL_SENTENCE, new),
+                      encoding="utf-8")
+    record = json.loads(runs.read_text(encoding="utf-8"))
+    _retrieved_original(record)["prompt_hash"] = prompts_module.load_prompt_set(
+        "fact_check_v1", prompts_dir).prompt_hash
+    runs.write_text(json.dumps(record), encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda runs, d: _system_with(runs, d, "Answer in one word."), "0 times, not once"),
+        (lambda runs, d: _system_with(runs, d, f"{TOOL_SENTENCE} {TOOL_SENTENCE}"),
+         "2 times, not once"),
+        (_change_system, "differs from the one the experiment ran"),
+        (_remove_record, "cannot read the experiment's record"),
+    ],
+    ids=["no tool-call sentence", "two of them", "changed system prompt", "missing record"],
+)
+def test_a_prompt_that_cannot_be_built_says_why_and_the_endpoint_answers_503(
+    monkeypatch: pytest.MonkeyPatch,
+    record_copy: tuple[Path, Path],
+    change: Callable[[Path, Path], None],
+    message: str,
+) -> None:
+    runs, prompts_dir = record_copy
+    change(runs, prompts_dir)
+    copy = factcheck.load_copy_prompt(runs, prompts_dir=prompts_dir)
+    assert copy.experiment is None and copy.unavailable is not None
+    assert message in copy.unavailable
+    stub = install_search(monkeypatch, make_hits(5))
+    resp = get_prompt(make_client(None, copy_prompt=copy), q=STATEMENT)
+    assert resp.status_code == 503
+    assert resp.json() == {
+        "detail": f"The prompt cannot be copied on this server: {copy.unavailable}"}
+    assert stub.searches == [] and stub.databases == []
+
+
+def test_a_runner_that_cannot_be_imported_leaves_the_copy_prompt_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = factcheck.importlib.import_module
+
+    def no_fcntl(name: str, *args: Any) -> Any:
+        if name == "wikilense.llm.runner":
+            raise ImportError("No module named 'fcntl'")
+        return real(name, *args)
+
+    monkeypatch.setattr(factcheck.importlib, "import_module", no_fcntl)
+    copy = factcheck.load_copy_prompt()
+    assert copy.experiment is None
+    assert "cannot be imported" in str(copy.unavailable) and "fcntl" in str(copy.unavailable)
+
+
+def test_the_prompt_works_with_the_fact_check_off_and_without_a_key_or_header(
+    monkeypatch: pytest.MonkeyPatch, experiment: factcheck.Experiment
+) -> None:
+    monkeypatch.setattr(api_backend, "load_api_key", _forbidden("load_api_key"))
+    hits = make_hits(7)
+    stub = install_search(monkeypatch, hits)
+    client = make_client(None)  # default settings: the live fact-check is off
+    assert client.app.state.fact_checker.mode == factcheck.OFF
+    assert client.get("/api/factcheck").json()["enabled"] is False
+    resp = get_prompt(client, q=f"  {STATEMENT}  ", k=7)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    passages = factcheck.passages_of(hits, experiment.k)
+    assert body["text"] == factcheck.copy_prompt_text(experiment, STATEMENT, passages)
+    assert body["statement"] == STATEMENT and body["claim_id"] is None
+    assert body["n_passages"] == experiment.k == 5
+    assert body["passages"] == [{k: p[k] for k in ("rank", "chunk_id", "title", "section_path")}
+                                for p in passages]
+    assert body["change_note"] == factcheck.COPY_CHANGE_NOTE
+    assert "one change" in body["change_note"] and "tool call" in body["change_note"]
+    assert body["figures_note"] == factcheck.copy_figures_note(experiment.model_name)
+    assert "measured with Haiku" in body["figures_note"] and "%" not in body["figures_note"]
+    assert body["answer_key_note"] is None
+    assert "reliability" not in body and "reliability_lines" not in body
+    assert body["database"] == OFFLINE_SETTINGS.db_name
+    assert body["prompt_id"] == experiment.prompt.prompt_id
+    assert body["prompt_hash"] == experiment.prompt.prompt_hash
+    assert set(body["timing_ms"]) == {"embed", "sql"}
+    assert [s["k"] for s in stub.searches] == [7]
+    assert stub.searches[0]["statement_seconds"] == OFFLINE_SETTINGS.statement_seconds
+
+
+def test_the_prompt_never_returns_a_key_and_makes_no_model_call(
+    monkeypatch: pytest.MonkeyPatch,
+    experiment: factcheck.Experiment,
+    reliability: factcheck.Reliability,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
+    install_search(monkeypatch, make_hits(5))
+    backend = FakeBackend()
+    checker = make_checker(backend, experiment, reliability, mode=factcheck.API,
+                           secrets=(FAKE_KEY,))
+    client = make_client(checker, settings=replace(OFFLINE_SETTINGS, factcheck="api"))
+    for params in ({"q": STATEMENT}, {"q": STATEMENT, "k": 3, "strategy": "overfetch"}):
+        resp = get_prompt(client, **params)
+        assert resp.status_code == 200, resp.text
+        assert FAKE_KEY not in resp.text and "sk-ant-" not in resp.text
+    assert backend.requests == []
+
+
+def test_a_picked_claim_puts_its_own_text_after_claim_and_names_the_answer_key(
+    monkeypatch: pytest.MonkeyPatch, experiment: factcheck.Experiment
+) -> None:
+    hits = make_hits(5)
+    install_search(monkeypatch, hits)
+    install_claim(monkeypatch)
+    resp = get_prompt(make_client(None), q=CLAIM_TEXT, claim_id=CLAIM_ID)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["statement"] == CLAIM_TEXT and body["claim_id"] == CLAIM_ID
+    assert body["text"] == factcheck.copy_prompt_text(
+        experiment, CLAIM_TEXT, factcheck.passages_of(hits, experiment.k))
+    assert body["text"].endswith(f"\n\nCLAIM: {CLAIM_TEXT}\n")
+    assert body["answer_key_note"] == factcheck.COPY_ANSWER_KEY_NOTE
+    assert "answer key is on this page" in body["answer_key_note"]
+
+
+def test_the_prompt_takes_the_fact_check_parameters_and_is_in_the_api_docs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert webmod.PROMPT_PARAMETER_NAMES == webmod.FACTCHECK_PARAMETER_NAMES
+    assert "claim_id" in webmod.PROMPT_PARAMETER_NAMES
+    stub = install_search(monkeypatch, make_hits(5))
+    client = make_client(None)
+    for extra in ({"repeat": 2}, {"sentences": 1}, {"statment": "x"}):
+        resp = get_prompt(client, q=STATEMENT, **extra)
+        assert resp.status_code == 400
+        assert next(iter(extra)) in resp.json()["detail"]
+    assert stub.searches == []
+    paths = client.get(webmod.OPENAPI_URL).json()["paths"]
+    listed = [p["name"] for p in paths["/api/prompt"]["get"]["parameters"]]
+    assert sorted(listed) == sorted(webmod.PROMPT_PARAMETER_NAMES)
+    assert "post" not in paths["/api/prompt"]
+    for path, method in (("/api/search", "get"), ("/api/prompt", "get"),
+                         ("/api/factcheck", "post")):
+        assert "max_statement_time" in paths[path][method]["responses"]["504"]["description"]
+
+
+def test_a_search_without_hits_gives_no_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_search(monkeypatch, [])
+    resp = get_prompt(make_client(None), q=STATEMENT)
+    assert resp.status_code == 422 and "no passages" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize("route", ["prompt", "factcheck"])
+def test_a_search_stopped_at_the_time_limit_is_504_on_the_routes_that_run_it_again(
+    monkeypatch: pytest.MonkeyPatch,
+    experiment: factcheck.Experiment,
+    reliability: factcheck.Reliability,
+    route: str,
+) -> None:
+    install_search(monkeypatch, make_hits(5))
+
+    def stopped(conn: Any, qvec: Any, **kwargs: Any) -> list[Hit]:
+        raise pymysql.err.OperationalError(
+            webmod.search.ER_STATEMENT_TIMEOUT,
+            "Query execution was interrupted (max_statement_time exceeded)",
+        )
+
+    monkeypatch.setattr(webmod.search, "search", stopped)
+    backend = FakeBackend()
+    client = make_client(make_checker(backend, experiment, reliability))
+    resp = get_prompt(client, q=STATEMENT) if route == "prompt" else post(client, q=STATEMENT)
+    assert resp.status_code == 504, resp.text
+    assert resp.json() == {
+        "detail": webmod.search.statement_stopped_message(OFFLINE_SETTINGS.statement_seconds)}
+    assert backend.requests == []
+
+
+def test_the_page_offers_the_copy_box_for_free_text_and_picked_claims_whatever_the_setting(
+) -> None:
+    page = webmod.render_index(OFFLINE_SETTINGS)
+    assert '<section id="cp-panel" hidden>' in page and "<summary>Copy the prompt</summary>" in page
+    assert '<textarea id="cp-text" readonly' in page
+    update = script_function("updateCopy")
+    for word in ("picked", "claim_id", "fc."):
+        assert word not in update  # shown for both kinds of search, whatever the fact-check
+    assert "cpPanel" not in script_function("updateFactcheck")
+    load = script_function("loadCopy")
+    deleted = re.search(
+        r"\[([^\]]*)\]\.forEach\(function \(name\) \{ params\.delete\(name\); \}\)", load
+    )
+    assert deleted is not None
+    assert set(re.findall(r"'(\w+)'", deleted.group(1))) == {"sentences", "repeat"}
+    assert "getJSON('/api/prompt?' + params.toString())" in load
+    assert "if (seq === cpSeq && lastBody !== null) renderCopy(body);" in load
+    assert "cpSeq++" in script_function("resetCopy")
+    assert page.count("/api/prompt?") == 1  # only when the box is opened
+    render = script_function("renderCopy")
+    assert "cpText.value = b.text;" in render
+    for note in ("b.change_note", "b.figures_note", "b.answer_key_note"):
+        assert note in render
+    assert "navigator.clipboard.writeText(cpText.value)" in page
+    assert "cpText.select();" in script_function("selectPrompt")
+    for site in ("chatgpt", "openai", "claude.ai", "gemini"):
+        assert site not in page.lower()

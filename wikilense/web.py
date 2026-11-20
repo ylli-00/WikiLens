@@ -62,6 +62,17 @@ Live fact-check (:mod:`wikilense.factcheck`), off unless ``WIKILENSE_FACTCHECK``
 with the LLM experiment's request: one call, timed apart from the search. It needs the header
 ``X-WikiLense-Factcheck: 1`` and refuses ``claim_id`` (free text only).
 
+Copy the prompt, whatever the fact-check setting: ``GET /api/prompt`` takes the same parameters,
+``claim_id`` included, runs the search again and returns the experiment's prompt with the
+statement (a picked claim's own text) and its first passages as one text to paste into a chat
+window, with its one change (the last sentence asks for a plain answer, not a tool call) and no
+reliability figures. It reads no key and makes no model call; the page shows it in a box with a
+"Copy" button, for free text and for picked claims.
+
+Every search runs under ``max_statement_time`` (``WIKILENSE_STATEMENT_SECONDS``, 0 for none): a
+search MariaDB stops at that limit (error 1969) is a 504 with a one-sentence ``detail``, on
+``/api/search`` and on the routes that run it again (``/api/prompt``, ``POST /api/factcheck``).
+
 Errors: invalid parameters are 422 (FastAPI validation, an inconsistent filter pair, a filter
 given with strategy ``none``, an argument ``search`` refuses, a database that is not offered, or
 a ``q`` that is not the picked claim's text), 404 (a claim that is not offered on the database)
@@ -91,7 +102,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from wikilense import __version__, db, factcheck, picker, search
-from wikilense.config import Settings, load_settings
+from wikilense.config import DEFAULT_STATEMENT_SECONDS, Settings, load_settings
 from wikilense.embedding import Embedder
 from wikilense.evaluate import latency_stats, read_ingest_meta
 from wikilense.search import EF_SEARCH_VARIABLE, STRATEGIES, Filters
@@ -274,6 +285,16 @@ INDEX_HTML = """<!DOCTYPE html>
   #fc-sources { margin-top: .5rem; font-size: .85rem; }
   #fc-sources ul { margin: .25rem 0; padding-left: 1.25rem; }
   #hits li.cited { outline: 2px solid var(--accent); outline-offset: .35rem; border-radius: .2rem; }
+  #cp-panel { margin: 1rem 0; padding: .75rem 1rem; background: var(--panel);
+              border: 1px solid var(--line); border-radius: .5rem; }
+  #cp-panel details { margin-top: 0; }
+  #cp-panel p { margin: .35rem 0; }
+  #cp-text { width: 100%; margin-top: .35rem; padding: .45rem .55rem; color: var(--fg);
+             background: var(--bg); border: 1px solid var(--line); border-radius: .35rem;
+             font: .85rem/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; resize: vertical; }
+  #cp-panel button { padding: .45rem 1rem; font: inherit; font-weight: 600; color: #fff;
+                     background: var(--accent); border: 0; border-radius: .35rem; cursor: pointer; }
+  #cp-notes { margin: .35rem 0; padding-left: 1.25rem; }
 </style>
 </head>
 <body>
@@ -375,6 +396,19 @@ __STRATEGY_OPTIONS__
     <details id="fc-sources"><summary>Where these figures come from</summary><ul id="fc-source-list"></ul></details>
   </div>
 </section>
+<section id="cp-panel" hidden>
+  <details id="cp-box"><summary>Copy the prompt</summary>
+    <p class="note">The LLM experiment's fact-check prompt with this statement and the first
+    passages below, as one text to paste into a chatbot yourself. It needs no key, and this page
+    sends nothing to a model.</p>
+    <p id="cp-status" role="status"></p>
+    <div id="cp-result" hidden>
+      <textarea id="cp-text" readonly rows="12" aria-label="the prompt to paste into a chatbot"></textarea>
+      <p><button type="button" id="cp-copy">Copy</button> <span class="meta" id="cp-copied" role="status"></span></p>
+      <ul class="note" id="cp-notes"></ul>
+    </div>
+  </details>
+</section>
 <ol id="hits"></ol>
 <details id="sql-box" hidden>
   <summary>SQL that ran and its EXPLAIN</summary>
@@ -395,7 +429,9 @@ documentation is left on so the API can be tried from the browser:
 Model load, query embedding and SQL time are reported separately in the status line. The live
 fact-check, when the server is set up for it, is <code>POST /api/factcheck</code> with the search's
 parameters (<code>GET /api/factcheck</code> says whether it is on); its model call is timed on its own,
-never in the search timing.</p>
+never in the search timing. "Copy the prompt" is <code>GET /api/prompt</code> with the same
+parameters (<code>claim_id</code> too): the experiment's prompt for the search, with no model call.
+A search that runs past the server's time limit is stopped by MariaDB and answered with 504.</p>
 </footer>
 
 <script>
@@ -435,6 +471,14 @@ never in the search timing.</p>
   var fcButton = document.getElementById('fc-button');
   var fcStatus = document.getElementById('fc-status');
   var fcResult = document.getElementById('fc-result');
+  var cpPanel = document.getElementById('cp-panel');
+  var cpBox = document.getElementById('cp-box');
+  var cpStatus = document.getElementById('cp-status');
+  var cpResult = document.getElementById('cp-result');
+  var cpText = document.getElementById('cp-text');
+  var cpCopy = document.getElementById('cp-copy');
+  var cpCopied = document.getElementById('cp-copied');
+  var cpNotes = document.getElementById('cp-notes');
 
   var databases = [];
   var examples = [];
@@ -447,6 +491,8 @@ never in the search timing.</p>
   var fc = null;          // GET /api/factcheck: whether the live fact-check is on
   var lastParams = null;  // the parameters of the search whose hits are on screen
   var fcSeq = 0;          // raised by every reset, so a reply for an older search is dropped
+  var cpSeq = 0;          // the same for the copy box
+  var cpLoaded = false;   // the copy box holds (or is fetching) the prompt of the search on screen
 
   function el(tag, cls, text) {
     var node = document.createElement(tag);
@@ -556,6 +602,7 @@ never in the search timing.</p>
     showFreeNote();
     renderClaimList();
     updateFactcheck();
+    updateCopy();
   }
 
   function formParams() {
@@ -591,6 +638,7 @@ never in the search timing.</p>
     }
     updateUrl(formParams());
     updateFactcheck();
+    updateCopy();
   }
 
   claimSearch.addEventListener('input', renderClaimList);
@@ -602,6 +650,7 @@ never in the search timing.</p>
   query.addEventListener('input', function () {
     if (picked && query.value !== picked.text) dropClaim();
     updateFactcheck();
+    updateCopy();
   });
 
   function loadClaims() {
@@ -768,6 +817,7 @@ never in the search timing.</p>
       '; embedding ' + t.embed.toFixed(1) + ' ms, ' + sql +
       '; mhnsw_ef_search ' + body.ef_search + ' (' + loaded + ')';
     updateFactcheck();
+    updateCopy();
   }
 
   form.addEventListener('submit', function (ev) {
@@ -780,6 +830,7 @@ never in the search timing.</p>
     claimBox.hidden = true;
     lastParams = null;
     resetFactcheck();
+    resetCopy();
     fetch('/api/search?' + params.toString()).then(function (resp) {
       return resp.json().then(function (body) {
         if (!resp.ok) {
@@ -806,6 +857,7 @@ never in the search timing.</p>
     lastBody = null;
     lastParams = null;
     resetFactcheck();
+    resetCopy();
     list.replaceChildren();
     box.hidden = true;
     claimBox.hidden = true;
@@ -962,6 +1014,80 @@ never in the search timing.</p>
     fc = body;
     updateFactcheck();
   }).catch(function () { /* an older server without the fact-check: nothing to show */ });
+
+  // --- copy the prompt: the experiment's prompt for the search on screen, for any chatbot -----
+  // Shown for free text and for a picked claim, whatever the fact-check setting. Opening the box
+  // asks the server for the text (GET /api/prompt runs the search again); nothing is sent to a
+  // model, and the text is shown in a read-only textarea, never as markup.
+
+  function resetCopy() {
+    cpSeq++;
+    cpLoaded = false;
+    cpBox.open = false;
+    cpResult.hidden = true;
+    cpStatus.textContent = '';
+    cpCopied.textContent = '';
+    updateCopy();
+  }
+
+  function updateCopy() {
+    cpPanel.hidden = !(lastBody !== null && lastParams !== null && lastBody.hits.length > 0 &&
+      query.value.trim() === (lastParams.get('q') || '').trim());
+  }
+
+  function renderCopy(b) {
+    cpText.value = b.text;
+    cpNotes.replaceChildren();
+    var notes = [b.change_note, b.figures_note];
+    if (b.answer_key_note) notes.push(b.answer_key_note);
+    if (!samePassages(b.passages)) {
+      notes.push('The search ran again and got other passages than the hits shown; the text ' +
+        'holds: ' + b.passages.map(function (p) {
+          return '[' + p.rank + '] ' + p.title + (p.section_path ? ' > ' + p.section_path : '');
+        }).join('; ') + '.');
+    }
+    notes.forEach(function (text) { cpNotes.appendChild(el('li', null, text)); });
+    cpStatus.textContent = (b.claim_id !== null ? 'Claim ' + b.claim_id : 'Your statement') +
+      ' with ' + b.n_passages + (b.n_passages === 1 ? ' passage' : ' passages') + ' from ' +
+      b.database + ': ' + fmt(b.text.length) + ' characters.';
+    cpResult.hidden = false;
+  }
+
+  function loadCopy() {
+    var params = new URLSearchParams(lastParams);
+    ['sentences', 'repeat'].forEach(function (name) { params.delete(name); });
+    var seq = cpSeq;
+    cpLoaded = true;
+    cpStatus.textContent = 'Building the prompt (the search runs again; no model call)...';
+    getJSON('/api/prompt?' + params.toString()).then(function (body) {
+      if (seq === cpSeq && lastBody !== null) renderCopy(body);
+    }).catch(function (err) {
+      if (seq !== cpSeq) return;
+      cpLoaded = false;
+      cpStatus.textContent = String(err.message || err);
+    });
+  }
+
+  cpBox.addEventListener('toggle', function () {
+    if (cpBox.open && !cpLoaded && lastParams !== null) loadCopy();
+  });
+
+  // The clipboard API needs a secure page (localhost counts); elsewhere the text is selected.
+  function selectPrompt() {
+    cpText.focus();
+    cpText.select();
+    cpCopied.textContent = 'The text is selected: press Ctrl+C (Cmd+C on a Mac) to copy it.';
+  }
+
+  cpCopy.addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cpText.value).then(function () {
+        cpCopied.textContent = 'Copied.';
+      }, selectPrompt);
+    } else {
+      selectPrompt();
+    }
+  });
 
   // --- a link with the form's parameters fills the form and runs the search ----------------
   // (/?q=...&k=3&category=..., /?database=...&claim_id=...&repeat=5), so a search can be
@@ -1559,9 +1685,17 @@ def api_search(
                         overfetch=overfetch,
                         ef_search=ef,
                         query_text=text,
+                        statement_seconds=settings.statement_seconds,
                     )
                 except (TypeError, ValueError) as exc:
                     raise HTTPException(status_code=422, detail=str(exc)) from exc
+                except pymysql.err.OperationalError as exc:
+                    if search.is_statement_timeout(exc):
+                        raise HTTPException(
+                            status_code=504,
+                            detail=search.statement_stopped_message(settings.statement_seconds),
+                        ) from exc
+                    raise
                 sql_times.append((time.perf_counter() - start) * 1000.0)
                 if not run_ids:
                     hits = run_hits
@@ -1859,6 +1993,42 @@ api_factcheck.__signature__ = inspect.signature(api_search).replace(  # type: ig
 )
 
 
+def api_prompt(request: Request, **params: Any) -> dict[str, Any]:
+    """Return the experiment's prompt for the search's statement and passages, to paste into a
+    chat window: no key, no model call.
+
+    The parameters are those of ``POST /api/factcheck`` (the signature is set below), with
+    ``claim_id`` allowed: a picked benchmark claim's own text is then the statement, and the
+    response says that the answer key is on the page. The search runs again through
+    :func:`api_search` (its errors are the same) and its first passages go into the text
+    (:meth:`factcheck.CopyPrompt.response`). 503 when the experiment could not be loaded at
+    start-up, 422 for a search without hits. The response holds ``text``, ``statement``,
+    ``n_passages`` and ``passages``, the notes on the one change and on the missing figures, the
+    database, ``claim_id`` and the search's ``timing_ms``.
+    """
+    state = request.app.state
+    source: factcheck.CopyPrompt = state.copy_prompt
+    if source.experiment is None:
+        raise HTTPException(status_code=503, detail=source.unavailable_detail())
+    body = api_search(request, **params)
+    claim = body.get("claim")
+    statement = str(claim["text"]) if claim else str(params["q"]).strip()
+    hits = [search.Hit(**hit) for hit in body["hits"]]
+    try:
+        result = source.response(statement, hits, picked_claim=claim is not None)
+    except factcheck.FactCheckRefused as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    result.update(
+        database=body.get("database") or demo_database(state),
+        claim_id=params.get("claim_id"),
+        timing_ms={"embed": body["timing_ms"]["embed"], "sql": body["timing_ms"]["sql"]},
+    )
+    return result
+
+
+api_prompt.__signature__ = api_factcheck.__signature__  # type: ignore[attr-defined]
+
+
 def _parameter_names(endpoint: Callable[..., Any]) -> tuple[str, ...]:
     """Return an endpoint's query parameter names, in signature order (``request`` excluded)."""
     return tuple(name for name in inspect.signature(endpoint).parameters if name != "request")
@@ -1869,6 +2039,18 @@ API_PARAMETER_NAMES: tuple[str, ...] = _parameter_names(api_search)
 API_PARAMETERS = frozenset(API_PARAMETER_NAMES)
 #: The query parameters ``POST /api/factcheck`` accepts.
 FACTCHECK_PARAMETER_NAMES: tuple[str, ...] = _parameter_names(api_factcheck)
+#: The query parameters ``GET /api/prompt`` accepts (the same).
+PROMPT_PARAMETER_NAMES: tuple[str, ...] = _parameter_names(api_prompt)
+
+#: The OpenAPI entry of a search stopped at its time limit, on every route that runs a search.
+SEARCH_STOPPED_RESPONSES: dict[int | str, dict[str, Any]] = {
+    504: {
+        "description": "The search was stopped by MariaDB's max_statement_time "
+        f"(WIKILENSE_STATEMENT_SECONDS, {DEFAULT_STATEMENT_SECONDS} s by default): a guard "
+        "against a vector search that keeps searching when few rows pass its filters; the "
+        "detail says so in one sentence"
+    },
+}
 
 
 def rejecting_unknown(names: Sequence[str]) -> Callable[[Request], None]:
@@ -1908,6 +2090,7 @@ def create_app(
     offer_s1: bool = True,
     claim_files: Sequence[Path] = picker.CLAIM_FILES,
     fact_checker: factcheck.FactChecker | None = None,
+    copy_prompt: factcheck.CopyPrompt | None = None,
 ) -> FastAPI:
     """Return the FastAPI app serving ``GET /`` (the page) and ``GET /api/search`` (JSON).
 
@@ -1923,7 +2106,8 @@ def create_app(
     (with their databases' ingest stamps) are kept on ``app.state``. The Swagger page (:data:`DOCS_URL`) and the schema
     (:data:`OPENAPI_URL`) are enabled. ``fact_checker`` defaults to
     ``factcheck.build_factchecker(settings)``, which is off unless ``settings.factcheck`` says
-    otherwise; tests pass one with a fake backend.
+    otherwise; tests pass one with a fake backend. ``copy_prompt`` (``GET /api/prompt``) defaults
+    to ``factcheck.load_copy_prompt()``, loaded whatever the fact-check setting is.
     """
     if settings is None:
         settings = load_settings()
@@ -1935,7 +2119,8 @@ def create_app(
         description=(
             "Semantic search over Wikipedia inside MariaDB: VEC_DISTANCE_COSINE on a VECTOR "
             "INDEX combined with SQL filters in the same statement. GET /api/search takes the "
-            "query and the filters; the page at / is a form over it."
+            "query and the filters; the page at / is a form over it. GET /api/prompt returns "
+            "the fact-check prompt with a search's passages, to paste into a chatbot."
         ),
         docs_url=DOCS_URL,
         openapi_url=OPENAPI_URL,
@@ -1953,6 +2138,9 @@ def create_app(
     app.state.fact_checker = (
         fact_checker if fact_checker is not None else factcheck.build_factchecker(settings)
     )
+    app.state.copy_prompt = (
+        copy_prompt if copy_prompt is not None else factcheck.load_copy_prompt()
+    )
     app.state.model_load_ms = round(warm_up_embedder(embedder), 3) if warm_up else None
     app.add_api_route("/", index, response_class=HTMLResponse, include_in_schema=False)
     app.add_api_route(
@@ -1961,6 +2149,7 @@ def create_app(
         methods=["GET"],
         dependencies=[Depends(_reject_unknown_query_params)],
         summary="Search the chunks",
+        responses=SEARCH_STOPPED_RESPONSES,
     )
     for path, endpoint, summary in (
         ("/api/databases", api_databases, "List the offered databases and the examples"),
@@ -1976,11 +2165,21 @@ def create_app(
             summary=summary,
         )
     app.add_api_route(
+        "/api/prompt",
+        api_prompt,
+        methods=["GET"],
+        dependencies=[Depends(rejecting_unknown(PROMPT_PARAMETER_NAMES))],
+        summary="Return the fact-check prompt with the search's passages, to paste into a chatbot "
+        "(no model call)",
+        responses=SEARCH_STOPPED_RESPONSES,
+    )
+    app.add_api_route(
         "/api/factcheck",
         api_factcheck,
         methods=["POST"],
         dependencies=[Depends(rejecting_unknown(FACTCHECK_PARAMETER_NAMES))],
         summary="Fact-check a typed statement with the passages of its search (one model call)",
         response_model=None,
+        responses=SEARCH_STOPPED_RESPONSES,
     )
     return app

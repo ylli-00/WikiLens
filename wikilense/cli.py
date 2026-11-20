@@ -11,8 +11,9 @@ every command that needs it.
 
 Exit codes: 0 success; 1 an expected failure (settings missing or out of range, server
 unreachable, database empty or without schema, ingest refused, model not loadable or of another
-dimension than ``chunk.embedding``, results that could not be written after the run), reported as
-one line on stderr without a traceback;
+dimension than ``chunk.embedding``, results that could not be written after the run, a ``query``
+search that MariaDB stopped at ``WIKILENSE_STATEMENT_SECONDS``), reported as one line on stderr
+without a traceback;
 2 bad arguments (including a filter given with ``--strategy none``, which would silently drop
 it, and an ``eval --out`` that cannot be a results directory); 130 interrupted. ``query`` writes its result to stdout (text, or JSON
 with ``--json``) and one timing line to stderr, so ``--json`` output can be piped. The timing
@@ -886,7 +887,9 @@ def cmd_query(args: argparse.Namespace) -> int:
 
     The database is checked (reachable, schema present, chunks present) before the model is
     loaded; the model is loaded with a warm-up call before the query is timed. Timing goes to
-    stderr so that stdout stays parseable with ``--json``.
+    stderr so that stdout stays parseable with ``--json``. The search runs under
+    ``settings.statement_seconds`` (``max_statement_time``); a search MariaDB stops there is a
+    ``CliError`` with :func:`search.statement_stopped_message`.
     """
     settings = load_settings()
     filters = _filters_from_args(args)
@@ -912,9 +915,15 @@ def cmd_query(args: argparse.Namespace) -> int:
                 overfetch=args.overfetch,
                 ef_search=ef_search,
                 query_text=args.text,
+                statement_seconds=settings.statement_seconds,
             )
         except (TypeError, ValueError) as exc:  # search() refused an argument
             raise CliError(str(exc), exit_code=EXIT_USAGE) from exc
+        except pymysql.err.OperationalError as exc:
+            if search.is_statement_timeout(exc):
+                message = search.statement_stopped_message(settings.statement_seconds)
+                raise CliError(message) from exc
+            raise
         sql_ms = (time.perf_counter() - start) * 1000.0
         ef_effective = (
             db.get_session_var(conn, search.EF_SEARCH_VARIABLE) if ef_search is None else ef_search

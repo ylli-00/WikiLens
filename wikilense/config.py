@@ -37,6 +37,11 @@ EF_SEARCH_SERVER = 0
 #: key in .env turns nothing on by itself; only this setting does.
 FACTCHECK_MODES = ("off", "subscription", "api")
 DEFAULT_FACTCHECK = "off"
+#: Seconds a search of the web page or of `wikilense query` may run before MariaDB stops it
+#: (``max_statement_time``, error 1969); 0 sets no limit. On 11.8.9 a vector search that fewer
+#: rows pass than its LIMIT can keep searching until the server runs out of memory
+#: (docs/VECTOR_INDEX.md). The evaluation and the measurement scripts set no limit.
+DEFAULT_STATEMENT_SECONDS = 5
 
 
 class SettingsError(ValueError):
@@ -63,6 +68,7 @@ class Settings:
     ef_search: int = DEFAULT_EF_SEARCH
     factcheck: str = DEFAULT_FACTCHECK
     claude_bin: str = ""
+    statement_seconds: int = DEFAULT_STATEMENT_SECONDS
 
 
 def _get_str(env: Mapping[str, str], name: str, default: str | None) -> str:
@@ -107,11 +113,13 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
     ``WIKILENSE_FACTCHECK`` (default ``off``) turns the web page's live fact-check on;
     ``WIKILENSE_CLAUDE_BIN`` names the Claude Code CLI it uses with ``subscription`` (empty: the
     ``CLAUDE_BIN`` variable, then ``claude`` on the PATH). Neither reads the API key.
+    ``WIKILENSE_STATEMENT_SECONDS`` (default ``DEFAULT_STATEMENT_SECONDS``, 0 for no limit) is the
+    time limit of the web page's and ``wikilense query``'s searches.
 
     Raises SettingsError, naming the variable, when a required one is missing, an integer
     variable is malformed, ``WIKILENSE_EF_SEARCH`` is neither 0 (the server's value) nor in
-    ``MIN_EF_SEARCH`` .. ``MAX_EF_SEARCH``, or ``WIKILENSE_FACTCHECK`` is not one of
-    ``FACTCHECK_MODES``.
+    ``MIN_EF_SEARCH`` .. ``MAX_EF_SEARCH``, ``WIKILENSE_FACTCHECK`` is not one of
+    ``FACTCHECK_MODES``, or ``WIKILENSE_STATEMENT_SECONDS`` is negative.
     """
     path = DEFAULT_ENV_FILE if env_file is None else Path(env_file)
     file_values: dict[str, str] = {}
@@ -131,6 +139,12 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         raise SettingsError(
             f"WIKILENSE_FACTCHECK must be one of {', '.join(FACTCHECK_MODES)}, got {factcheck!r}"
         )
+    statement_seconds = _get_int(env, "WIKILENSE_STATEMENT_SECONDS", DEFAULT_STATEMENT_SECONDS)
+    if statement_seconds < 0:
+        raise SettingsError(
+            "WIKILENSE_STATEMENT_SECONDS must be 0 (no limit) or a positive number of seconds, "
+            f"got {statement_seconds}"
+        )
     return Settings(
         db_host=_get_str(env, "WIKILENSE_DB_HOST", "127.0.0.1"),
         db_port=_get_int(env, "WIKILENSE_DB_PORT", 3306),
@@ -147,4 +161,5 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         ef_search=ef_search,
         factcheck=factcheck,
         claude_bin=_get_str(env, "WIKILENSE_CLAUDE_BIN", ""),
+        statement_seconds=statement_seconds,
     )

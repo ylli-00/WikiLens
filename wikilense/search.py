@@ -43,6 +43,7 @@ tie-break is applied in Python, because a second ``ORDER BY`` key after
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, fields
@@ -65,6 +66,13 @@ EF_SEARCH_VARIABLE = "mhnsw_ef_search"
 # "keep the server's value" in the CLI, the web API and WIKILENSE_EF_SEARCH) are defined in
 # config and imported above; ef_search_session refuses a value outside the range, because the
 # server would clamp it with only a warning and a caller would report a value that did not run.
+
+#: The statements of the search's time limit (``statement_time_session``): MariaDB's
+#: ``max_statement_time`` in seconds, 0 meaning no limit, read and set for the session only.
+STATEMENT_TIME_GET_SQL = "SELECT @@SESSION.max_statement_time"
+STATEMENT_TIME_SET_SQL = "SET SESSION max_statement_time = %s"
+#: MariaDB's error for a statement stopped at ``max_statement_time`` (ER_STATEMENT_TIMEOUT).
+ER_STATEMENT_TIMEOUT = 1969
 
 #: The strategies whose statement uses the ``overfetch`` factor (inner LIMIT ``k * overfetch``).
 OVERFETCH_STRATEGIES: frozenset[str] = frozenset({"overfetch", "rrf"})
@@ -621,6 +629,65 @@ def ef_search_session(conn: pymysql.Connection, ef_search: int | None) -> Iterat
         db.set_session_var(conn, EF_SEARCH_VARIABLE, previous)
 
 
+@contextmanager
+def statement_time_session(conn: pymysql.Connection, seconds: float | None) -> Iterator[None]:
+    """Set the session's ``max_statement_time`` to ``seconds`` inside the block, restore it after.
+
+    MariaDB stops a statement of the block that runs longer with error
+    :data:`ER_STATEMENT_TIMEOUT`. ``None`` or 0 leaves the session untouched. As in
+    :func:`ef_search_session`, the previous value is read first and written back when the block
+    ends, also when it raises; an error from the block is never replaced by one from the restoring
+    statement, and on a closed connection the restore is skipped. Yields None. Raises ValueError,
+    before anything is set, unless ``seconds`` is None or a finite number >= 0.
+    """
+    if seconds is not None and (
+        isinstance(seconds, bool)
+        or not isinstance(seconds, (int, float))
+        or not math.isfinite(seconds)
+        or seconds < 0
+    ):
+        raise ValueError(f"statement_seconds must be a number >= 0 or None, got {seconds!r}")
+    if not seconds:
+        yield
+        return
+    with conn.cursor() as cur:
+        cur.execute(STATEMENT_TIME_GET_SQL)
+        previous = float(cur.fetchone()[0])
+        cur.execute(STATEMENT_TIME_SET_SQL, (seconds,))
+
+    def restore() -> None:
+        with conn.cursor() as cur:
+            cur.execute(STATEMENT_TIME_SET_SQL, (previous,))
+
+    try:
+        yield
+    except BaseException:
+        if getattr(conn, "open", True):
+            with suppress(pymysql.err.Error):
+                restore()
+        raise
+    else:
+        restore()
+
+
+def is_statement_timeout(exc: BaseException) -> bool:
+    """Return True when ``exc`` is MariaDB's error for a statement stopped at its time limit."""
+    return (
+        isinstance(exc, pymysql.err.OperationalError)
+        and bool(exc.args)
+        and exc.args[0] == ER_STATEMENT_TIMEOUT
+    )
+
+
+def statement_stopped_message(seconds: float) -> str:
+    """Return the plain message for a search that MariaDB stopped after ``seconds``."""
+    return (
+        f"The search was stopped after {seconds:g} s by MariaDB's max_statement_time, a guard "
+        "against a vector search that keeps searching when few rows pass its filters (see "
+        "docs/VECTOR_INDEX.md)."
+    )
+
+
 # ---------------------------------------------------------------------------------------------
 # public query functions
 # ---------------------------------------------------------------------------------------------
@@ -635,6 +702,7 @@ def search(
     overfetch: int = 10,
     ef_search: int | None = None,
     query_text: str | None = None,
+    statement_seconds: float | None = None,
 ) -> list[Hit]:
     """Return up to ``k`` hits for ``qvec``, ordered by distance then chunk_id (``rrf``: by
     score descending, then chunk_id).
@@ -644,7 +712,12 @@ def search(
     for the ``overfetch`` and ``rrf`` strategies and is ignored otherwise. ``query_text`` is
     the text for the full-text half of ``rrf`` (required there, ignored otherwise).
     ``ef_search`` sets the session's ``mhnsw_ef_search`` for this call only and restores the
-    previous value afterwards, even when the statement fails. The ``inline`` and ``none``
+    previous value afterwards, even when the statement fails. ``statement_seconds`` sets the
+    session's ``max_statement_time`` the same way (:func:`statement_time_session`; None or 0
+    sets no limit): the web page and ``wikilense query`` pass ``WIKILENSE_STATEMENT_SECONDS``, the
+    evaluation and the measurement scripts pass nothing. A statement stopped at the limit raises
+    ``pymysql.err.OperationalError`` with :data:`ER_STATEMENT_TIMEOUT`
+    (:func:`is_statement_timeout`). The ``inline`` and ``none``
     strategies return exactly ``k`` hits when at least ``k`` chunks match; ``overfetch`` and
     ``rrf`` may return fewer. Nothing is committed. Raises ValueError / TypeError for invalid
     arguments and ``pymysql.err.Error`` from the server.
@@ -652,7 +725,11 @@ def search(
     sql, params = search_statement(qvec, k, filters, strategy, overfetch, query_text)
     if not sql:
         return []
-    with ef_search_session(conn, ef_search), conn.cursor() as cur:
+    with (
+        statement_time_session(conn, statement_seconds),
+        ef_search_session(conn, ef_search),
+        conn.cursor() as cur,
+    ):
         cur.execute(sql, params)
         rows = cur.fetchall()
     hits = [

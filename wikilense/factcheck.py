@@ -24,6 +24,14 @@ attempt, with no retry, so one click is one model call.
 server starts. A figure the file lacks is reported as missing, never filled in. The verdict's
 figure is the share of right answers among the experiment's answers with that verdict (its
 ``precision``), shown as a percentage with the file's rounding convention (one decimal, half up).
+
+**The copyable prompt** (:func:`copy_prompt_text`, :class:`CopyPrompt`) is the same request as
+one text to paste into a chat window, for free text and for picked benchmark claims, whatever the
+setting: it reads no key and makes no call. The experiment is loaded for it at start-up
+(:func:`load_copy_prompt`) even when the live fact-check is off. Its one change is the system
+prompt's last sentence (:data:`TOOL_ANSWER_SENTENCE`), which asks for a tool call that a chat
+window lacks; it becomes :data:`PLAIN_ANSWER_SENTENCE`. No reliability figures go with it: they
+were measured with the experiment's model and settings, not with another chatbot.
 """
 
 from __future__ import annotations
@@ -307,6 +315,137 @@ def experiment_request(
 def passages_of(hits: Sequence[Any], k: int) -> list[dict[str, Any]]:
     """Return the first ``k`` ``search.Hit`` objects as the runner's hit dicts, ranked from 1."""
     return [_hit_dict(rank, hit) for rank, hit in enumerate(hits[:k], 1)]
+
+
+def _passage_list(passages: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Return the rank, chunk id, title and section path of each passage, for a response."""
+    return [{k: p[k] for k in ("rank", "chunk_id", "title", "section_path")} for p in passages]
+
+
+# ---------------------------------------------------------------------------------------------
+# the copyable prompt: the same request as text, for any chat window
+# ---------------------------------------------------------------------------------------------
+
+#: The system prompt's last sentence. It asks for the answer schema's tool call, which a chat
+#: window does not have, so the copyable prompt replaces it with :data:`PLAIN_ANSWER_SENTENCE`.
+TOOL_ANSWER_SENTENCE = (
+    'Answer with one StructuredOutput call: "result" holds "label" (exactly one of the three) '
+    'and "justification" (one sentence, at most 30 words: the deciding fact and the passages or '
+    "sources used, such as [2]). No other text."
+)
+#: The same instruction in plain words: the only change from the experiment's text.
+PLAIN_ANSWER_SENTENCE = (
+    "Answer with the label (exactly one of SUPPORTS, REFUTES or NOT ENOUGH INFO) and one sentence "
+    "of justification, at most 30 words: the deciding fact and the passages or sources used, such "
+    "as [2]. No other text."
+)
+COPY_CHANGE_NOTE = (
+    "This is the experiment's prompt with one change: the last sentence asks for a plain answer "
+    "instead of a tool call, because a chat window has none."
+)
+COPY_ANSWER_KEY_NOTE = "The answer key is on this page, so you can compare."
+
+
+def copy_figures_note(model_name: str) -> str:
+    """Return the line that says why the copy box shows no reliability figures."""
+    return (f"No reliability figures here: they were measured with {model_name} through the "
+            "experiment's settings and do not cover another chatbot's answer.")
+
+
+def copyable_system(system: str) -> str:
+    """Return ``system`` with :data:`TOOL_ANSWER_SENTENCE` replaced by
+    :data:`PLAIN_ANSWER_SENTENCE`.
+
+    Raises :class:`FactCheckError` unless the sentence occurs exactly once, so a prompt set whose
+    wording moved is refused instead of pasted with a tool call or with two changes.
+    """
+    count = system.count(TOOL_ANSWER_SENTENCE)
+    if count != 1:
+        raise FactCheckError(
+            f"the system prompt holds its tool-call sentence {count} times, not once, so the "
+            "copyable prompt cannot replace it"
+        )
+    return system.replace(TOOL_ANSWER_SENTENCE, PLAIN_ANSWER_SENTENCE)
+
+
+def copy_prompt_text(
+    experiment: Experiment, statement: str, passages: Sequence[Mapping[str, Any]]
+) -> str:
+    """Return the text to paste into a chat window for ``statement`` with ``passages``.
+
+    It is the request :func:`experiment_request` builds: the system text with the one change of
+    :func:`copyable_system`, a blank line, then the user turn unchanged (the passages and the
+    claim). A chat window has no separate system field, so both go into one text.
+    """
+    request = experiment_request(experiment, statement, passages)
+    system = copyable_system(request.system)
+    if not system.endswith("\n"):
+        system += "\n"
+    return f"{system}\n{request.user_text}"
+
+
+@dataclass(frozen=True)
+class CopyPrompt:
+    """The experiment the copyable prompt is built from, or why there is none (``unavailable``).
+
+    It is loaded whatever ``WIKILENSE_FACTCHECK`` says: the copy reads no key and makes no call.
+    """
+
+    experiment: Experiment | None
+    unavailable: str | None = None
+
+    def unavailable_detail(self) -> str:
+        """Return why no prompt can be copied, in one sentence."""
+        return f"The prompt cannot be copied on this server: {self.unavailable}"
+
+    def response(self, statement: str, hits: Sequence[Any], picked_claim: bool) -> dict[str, Any]:
+        """Return the copy text for ``statement`` with the first passages of ``hits``, and the
+        notes that go with it.
+
+        ``hits`` are the search's ``search.Hit`` objects in rank order; the first ``experiment.k``
+        go into the text, as the fact-check sends them. ``picked_claim`` adds the note that the
+        answer key is on the page. Raises :class:`FactCheckRefused` with 503 when the experiment
+        is unavailable and with 422 when the search returned no passages.
+        """
+        if self.experiment is None:
+            raise FactCheckRefused(503, self.unavailable_detail())
+        exp = self.experiment
+        passages = passages_of(hits, exp.k)
+        if not passages:
+            raise FactCheckRefused(422, "the search returned no passages, so there is nothing to "
+                                        "put into the prompt")
+        return {
+            "text": copy_prompt_text(exp, statement, passages),
+            "statement": statement,
+            "n_passages": len(passages),
+            "passages": _passage_list(passages),
+            "change_note": COPY_CHANGE_NOTE,
+            "figures_note": copy_figures_note(exp.model_name),
+            "answer_key_note": COPY_ANSWER_KEY_NOTE if picked_claim else None,
+            "prompt_id": exp.prompt.prompt_id,
+            "prompt_hash": exp.prompt.prompt_hash,
+            "source": exp.source,
+        }
+
+
+def load_copy_prompt(path: Path = RUNS_FILE, prompts_dir: Path | None = None) -> CopyPrompt:
+    """Return the experiment for the copyable prompt; never raises for a setup problem.
+
+    Unavailable, with the reason, when :func:`load_experiment` refuses the record, when the system
+    prompt does not hold :data:`TOOL_ANSWER_SENTENCE` exactly once, or when the LLM runner, which
+    builds the request, cannot be imported (it needs ``fcntl``, which Windows lacks).
+    """
+    try:
+        experiment = load_experiment(path, prompts_dir)
+        copyable_system(experiment.prompt.system)
+    except FactCheckError as exc:
+        return CopyPrompt(None, str(exc))
+    try:
+        importlib.import_module("wikilense.llm.runner")
+    except ImportError as exc:
+        return CopyPrompt(None, f"the request is built by the LLM runner, which cannot be "
+                                f"imported on this system ({exc})")
+    return CopyPrompt(experiment)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -787,8 +926,7 @@ class FactChecker:
             "cited_unknown": unknown,
             "no_citation": NO_CITATION_TEXT if not cited else None,
             "reason_note": REASON_NOTE,
-            "passages": [{k: p[k] for k in ("rank", "chunk_id", "title", "section_path")}
-                         for p in passages],
+            "passages": _passage_list(passages),
             "reliability": self.reliability.as_json(),
             "reliability_lines": reliability_lines(self.reliability, res.label, exp.model_name,
                                                    exp.k),

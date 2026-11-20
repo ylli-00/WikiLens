@@ -1,7 +1,8 @@
 """Tests for wikilense.cli: argument parsing of every subcommand, the text and JSON output of
 ``query`` (with ``--sentences`` and ``--explain``), the timing line, the ``ef_search`` default,
 the error paths (server unreachable, empty database, missing schema, model not loadable, bad
-arguments, a filter with ``--strategy none``) and the exit codes.
+arguments, a filter with ``--strategy none``, a search stopped at the statement time limit) and
+the exit codes.
 
 The database, search, ingest, evaluate and embedding layers are replaced by fakes through
 monkeypatch, so no server and no model are needed; nothing here is marked ``db`` or ``slow``.
@@ -241,6 +242,7 @@ def fake_search(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         overfetch: int = 10,
         ef_search: int | None = None,
         query_text: str | None = None,
+        statement_seconds: float | None = None,
     ) -> list[Hit]:
         calls.update(
             conn=conn,
@@ -251,6 +253,7 @@ def fake_search(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             overfetch=overfetch,
             ef_search=ef_search,
             query_text=query_text,
+            statement_seconds=statement_seconds,
         )
         return HITS[:k]
 
@@ -663,6 +666,42 @@ def test_query_reports_other_database_errors_on_one_line(
     assert cli.main(["query", "x"]) == 1
     err = capsys.readouterr().err
     assert err == "wikilense: database error: You have an error in your SQL syntax (error 1064)\n"
+
+
+def test_query_runs_under_the_statement_time_limit_of_the_settings(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_db: FakeDatabase,
+    fake_embedder: FakeEmbedder,
+    fake_search: dict[str, Any],
+) -> None:
+    assert cli.main(["query", "x"]) == 0
+    assert fake_search["statement_seconds"] == SETTINGS.statement_seconds == 5
+    monkeypatch.setattr(cli, "load_settings", lambda: replace(SETTINGS, statement_seconds=0))
+    assert cli.main(["query", "x"]) == 0
+    assert fake_search["statement_seconds"] == 0  # search() then sets no limit
+
+
+def test_query_reports_a_search_stopped_at_the_time_limit_on_one_line(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    fake_db: FakeDatabase,
+    fake_embedder: FakeEmbedder,
+) -> None:
+    def stopped(*args: Any, **kwargs: Any) -> list[Hit]:
+        assert kwargs["statement_seconds"] == 7
+        raise pymysql.err.OperationalError(
+            search.ER_STATEMENT_TIMEOUT,
+            "Query execution was interrupted (max_statement_time exceeded)",
+        )
+
+    monkeypatch.setattr(cli.search, "search", stopped)
+    monkeypatch.setattr(cli, "load_settings", lambda: replace(SETTINGS, statement_seconds=7))
+    assert cli.main(["query", "x"]) == cli.EXIT_FAILURE
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == f"wikilense: {search.statement_stopped_message(7)}\n"
+    assert "stopped after 7 s by MariaDB's max_statement_time" in captured.err
+    assert fake_db.connections[-1].closed
 
 
 def test_query_with_a_model_of_the_wrong_dimension_is_a_setup_error_not_a_usage_error(

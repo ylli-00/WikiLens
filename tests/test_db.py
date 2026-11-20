@@ -16,7 +16,7 @@ import pymysql
 import pytest
 
 from wikilense import db as dbmod
-from wikilense.config import Settings, SettingsError, load_settings
+from wikilense.config import DEFAULT_STATEMENT_SECONDS, Settings, SettingsError, load_settings
 
 DIM = dbmod.VECTOR_DIM
 
@@ -147,6 +147,26 @@ def test_ef_search_outside_the_server_range_is_a_settings_error(
     for ok in ("0", "1", "10000"):
         env.write_text(f"WIKILENSE_DB_PASSWORD=x\nWIKILENSE_EF_SEARCH={ok}\n", encoding="utf-8")
         assert load_settings(env).ef_search == int(ok)
+
+
+def test_statement_seconds_defaults_to_five_and_zero_turns_the_limit_off(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _clear_wikilense_env(monkeypatch)
+    env = tmp_path / ".env"
+    env.write_text("WIKILENSE_DB_PASSWORD=x\n", encoding="utf-8")
+    assert load_settings(env).statement_seconds == DEFAULT_STATEMENT_SECONDS == 5
+    assert Settings(db_password="x").statement_seconds == DEFAULT_STATEMENT_SECONDS
+    for value, expected in (("0", 0), ("12", 12), ("", DEFAULT_STATEMENT_SECONDS)):
+        env.write_text(f"WIKILENSE_DB_PASSWORD=x\nWIKILENSE_STATEMENT_SECONDS={value}\n",
+                       encoding="utf-8")
+        assert load_settings(env).statement_seconds == expected, value
+    monkeypatch.setenv("WIKILENSE_STATEMENT_SECONDS", "3")  # the environment wins over .env
+    assert load_settings(env).statement_seconds == 3
+    for bad in ("-1", "2.5", "five"):
+        monkeypatch.setenv("WIKILENSE_STATEMENT_SECONDS", bad)
+        with pytest.raises(SettingsError, match="WIKILENSE_STATEMENT_SECONDS"):
+            load_settings(env)
 
 
 def test_repr_hides_password_and_settings_are_frozen() -> None:
