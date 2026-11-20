@@ -1059,7 +1059,7 @@
     "chunk_max_words": "240",
     "chunk_overlap_units": "1",
     "corpus_claims_sha256": "d29154f4cfe95ab5c2330f20ea05e2836fd2f23a9f4894b25fcc2c89e946297c",
-    "corpus_dir": "/home/ylli/Desktop/Projects/WikiLense/faq_followups_2026-11-20/s1_full/wikilense_s1/S1",
+    "corpus_dir": "(outside the repository) faq_followups_2026-11-20/s1_full/wikilense_s1/S1",
     "corpus_page_meta_sha256": "none",
     "corpus_pages_sha256": "d98f74eb80ef76e79d12ba932943407bcc2d75db658b2ae150ad275e0e53ff3a",
     "embedding_dim": "384",
