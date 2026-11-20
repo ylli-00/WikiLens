@@ -84,7 +84,7 @@ from fastapi.responses import HTMLResponse
 from wikilense import __version__, db, picker, search
 from wikilense.config import Settings, load_settings
 from wikilense.embedding import Embedder
-from wikilense.evaluate import latency_stats
+from wikilense.evaluate import latency_stats, read_ingest_meta
 from wikilense.search import EF_SEARCH_VARIABLE, STRATEGIES, Filters
 
 logger = logging.getLogger(__name__)
@@ -905,10 +905,21 @@ def warm_up_embedder(embedder: QueryEmbedder) -> float:
 
 
 # ---------------------------------------------------------------------------------------------
-# the database choice and the claim catalogs (cached on app.state, built under its lock)
+# the database choice and the claim catalogs
+#
+# Two things are kept on app.state, under its lock: the finding that S1 is loaded, and each
+# database's claim catalog. A catalog is kept with the database's ingest stamp
+# (``ingest_meta.ingested_at``) and used only while the stamp is unchanged. Every ingest drops the
+# tables first and writes ``ingest_meta`` last, so a completed ingest gives a new stamp, and a
+# database without one (an ingest still running) is never cached. A missing S1 is probed again
+# at every use. So a database ingested, or S1 loaded, while the server runs is seen at the next
+# request, without a restart. The database sizes are read at every use (a few milliseconds).
 # ---------------------------------------------------------------------------------------------
 
 _UNPROBED = object()
+
+#: The ``ingest_meta`` key whose value identifies one completed ingest of a database.
+INGEST_STAMP_KEY = "ingested_at"
 
 
 def demo_database(state: Any) -> str:
@@ -945,11 +956,15 @@ def probe_s1(settings: Settings) -> tuple[int, int] | None:
 
 
 def _s1_size(state: Any) -> tuple[int, int] | None:
-    """Return S1's size when the app offers it (probed once, then cached), else None."""
+    """Return S1's size from the probe when the app offers S1, else None.
+
+    A loaded S1 is remembered; a missing one is probed again at every use, so S1 loaded while
+    the server runs is offered at the next request.
+    """
     if not state.offer_s1 or demo_database(state) == SCALED_DATABASE:
         return None
     with state.lock:
-        if state.s1_probe is _UNPROBED:
+        if state.s1_probe is _UNPROBED or state.s1_probe is None:
             try:
                 state.s1_probe = probe_s1(state.settings)
             except pymysql.err.OperationalError as exc:
@@ -987,39 +1002,60 @@ def choose_database(state: Any, requested: str | None) -> str:
     )
 
 
-def catalog(state: Any, name: str) -> picker.Catalog:
-    """Return the claim catalog of an offered database, built at its first use and then cached.
+def ingest_stamp(conn: pymysql.Connection) -> str | None:
+    """Return the database's ingest stamp (``ingest_meta.ingested_at``), or None without one."""
+    try:
+        return read_ingest_meta(conn).get(INGEST_STAMP_KEY)
+    except pymysql.err.ProgrammingError as exc:
+        if _db_error_code(exc) == ER_NO_SUCH_TABLE:
+            return None
+        raise
 
-    The claim files are read once per app. The catalog reflects the database when it was built,
-    so a database ingested again needs a restart of the server.
+
+def catalog(state: Any, name: str) -> picker.Catalog:
+    """Return the claim catalog of an offered database, from the cache while its ingest is the same.
+
+    The catalog is read through a short connection of its own, so a search's connection still
+    starts its transaction with the search (docs/VECTOR_INDEX.md, MDEV-41321). It is cached with
+    the database's ingest stamp and built again when the stamp has changed; without a stamp it is
+    built for this use only. The claim files are read once per app.
     """
     with state.lock:
-        cached = state.catalogs.get(name)
-        if cached is not None:
-            return cached
-        if state.claims is None:
-            try:
-                state.claims = picker.read_claim_files(state.claim_files)
-            except picker.ClaimFileError as exc:
-                raise HTTPException(
-                    status_code=503, detail=f"the claim files cannot be read: {exc}"
-                ) from exc
         conn = _open_connection(state.settings, name)
         try:
-            try:
-                built = picker.build_catalog(conn, name, state.claims)
-            except pymysql.err.ProgrammingError as exc:
-                if _db_error_code(exc) == ER_NO_SUCH_TABLE:
-                    raise HTTPException(
-                        status_code=503,
-                        detail=f"the database {name} has no schema or an older one: run "
-                        "'wikilense ingest'",
-                    ) from exc
-                raise
+            stamp = ingest_stamp(conn)
+            cached = state.catalogs.get(name)
+            if cached is not None and stamp is not None and cached[0] == stamp:
+                return cached[1]
+            built = _build_catalog(state, name, conn)
         finally:
             conn.close()
-        state.catalogs[name] = built
+        if stamp is None:
+            state.catalogs.pop(name, None)
+        else:
+            state.catalogs[name] = (stamp, built)
         return built
+
+
+def _build_catalog(state: Any, name: str, conn: pymysql.Connection) -> picker.Catalog:
+    """Return a new catalog of ``name`` read through ``conn``; 503 for unreadable claim files or a
+    database without schema."""
+    if state.claims is None:
+        try:
+            state.claims = picker.read_claim_files(state.claim_files)
+        except picker.ClaimFileError as exc:
+            raise HTTPException(
+                status_code=503, detail=f"the claim files cannot be read: {exc}"
+            ) from exc
+    try:
+        return picker.build_catalog(conn, name, state.claims)
+    except pymysql.err.ProgrammingError as exc:
+        if _db_error_code(exc) == ER_NO_SUCH_TABLE:
+            raise HTTPException(
+                status_code=503,
+                detail=f"the database {name} has no schema or an older one: run 'wikilense ingest'",
+            ) from exc
+        raise
 
 
 @dataclass(frozen=True)
@@ -1039,26 +1075,20 @@ def database_label(name: str, n_pages: int, n_chunks: int) -> str:
 
 
 def database_size(state: Any, name: str) -> tuple[int, int]:
-    """Return ``(pages, chunks)`` of an offered database, read once and then cached."""
-    with state.lock:
-        cached = state.sizes.get(name)
-        if cached is not None:
-            return cached
-        conn = _open_connection(state.settings, name)
+    """Return ``(pages, chunks)`` of an offered database, read now (two counts, a few ms)."""
+    conn = _open_connection(state.settings, name)
+    try:
         try:
-            try:
-                size = picker.database_size(conn)
-            except pymysql.err.ProgrammingError as exc:
-                if _db_error_code(exc) == ER_NO_SUCH_TABLE:
-                    raise HTTPException(
-                        status_code=503,
-                        detail=f"the database {name} has no schema: run 'wikilense ingest'",
-                    ) from exc
-                raise
-        finally:
-            conn.close()
-        state.sizes[name] = size
-        return size
+            return picker.database_size(conn)
+        except pymysql.err.ProgrammingError as exc:
+            if _db_error_code(exc) == ER_NO_SUCH_TABLE:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"the database {name} has no schema: run 'wikilense ingest'",
+                ) from exc
+            raise
+    finally:
+        conn.close()
 
 
 def offered_databases(state: Any) -> list[DatabaseChoice]:
@@ -1080,7 +1110,8 @@ def prepare(app: FastAPI) -> list[str]:
     """Probe S1 and build every offered database's claim catalog now; return one line per database.
 
     ``wikilense serve`` calls this at start-up, so the membership check runs before the first
-    request; without it every catalog is built at its first use. An ``HTTPException`` (the
+    request; without it every catalog is built at its first use. A later ingest of a database,
+    or S1 loaded later, is picked up at the next request (see the section comment above). An ``HTTPException`` (the
     server, or a database without schema) propagates.
     """
     lines = []
@@ -1548,8 +1579,8 @@ def create_app(
     ``settings.db_name`` (the test suite passes ``settings.test_db_name``); it is the demo
     database of the selector. With ``offer_s1`` the selector also offers
     :data:`SCALED_DATABASE` when it is loaded; ``claim_files`` are the picker's claim files. The
-    settings, the embedder, the database name and the caches of the S1 probe and the claim
-    catalogs are kept on ``app.state``. The Swagger page (:data:`DOCS_URL`) and the schema
+    settings, the embedder, the database name, the S1 probe's finding and the claim catalogs
+    (with their databases' ingest stamps) are kept on ``app.state``. The Swagger page (:data:`DOCS_URL`) and the schema
     (:data:`OPENAPI_URL`) are enabled.
     """
     if settings is None:
@@ -1577,7 +1608,6 @@ def create_app(
     app.state.s1_probe = _UNPROBED
     app.state.claims = None
     app.state.catalogs = {}
-    app.state.sizes = {}
     app.state.model_load_ms = round(warm_up_embedder(embedder), 3) if warm_up else None
     app.add_api_route("/", index, response_class=HTMLResponse, include_in_schema=False)
     app.add_api_route(

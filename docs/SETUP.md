@@ -168,7 +168,7 @@ the reported run found 2,933. A test load from the release file found 2,934, and
 was 2,256 of 3,000 against the reported 2,253 ([the test load](../results/scaled/release_check/README.md)).
 
 The web page needs no setting: once S1 is loaded, `make serve` offers it in the page's database
-selector, next to the demo database. To query S1 from the command line, name it in
+selector, next to the demo database (a page already running shows it at the next reload). To query S1 from the command line, name it in
 `WIKILENSE_DB_NAME`; a variable set in the shell takes precedence over `.env`:
 
 ```

@@ -147,7 +147,9 @@ http://127.0.0.1:8000.
   [DESIGN.md](DESIGN.md#cli-and-web-clipy-webpy) has the details.
 - The database selector offers the demo database and, when it is loaded, the scaled database S1
   (`wikilense_s1`; [SETUP.md](SETUP.md#get-the-scaled-database-s1) has the download). The labels
-  give each one's size, read from the database.
+  give each one's size, read from the database. A database loaded or ingested again while the page
+  is running, such as S1 after `make load-s1` in another terminal, shows up at the next reload,
+  without restarting `make serve`.
 - "Repeat 5 times" runs the search statement five times on the same connection and shows the median
   SQL time and the range, because a single timing on a laptop can drift by tens of percent. The
   query is embedded once.

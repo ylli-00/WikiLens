@@ -453,7 +453,10 @@ evidence ([EXAMPLES.md](EXAMPLES.md) shows it).
   when every page its evidence cites is in `page` and every sentence or list item of it resolves to
   a `sentence` row; one whose pages are there but whose sentence does not resolve is left out and
   listed by `GET /api/claims`. A claim in both files is shown once, with both. The rule is checked
-  when `wikilense serve` starts.
+  when `wikilense serve` starts. The result is kept with the database's `ingest_meta.ingested_at`
+  and worked out again when that value changes: every ingest drops the tables first and writes
+  `ingest_meta` last, so a new ingest is seen at the next request and a running one is never
+  kept. A missing S1 is looked for again at each request, so S1 loaded later appears too.
 - The page offers at most two databases: the demo database and `wikilense_s1`, the latter only when
   it exists, has the schema and holds chunks. The `database` parameter accepts only these names, so
   the API never reaches another database, and each request opens its own connection to the chosen

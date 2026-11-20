@@ -1285,8 +1285,8 @@ def test_api_databases_with_s1_missing_shows_the_note(
     assert [d["name"] for d in body["databases"]] == [settings.test_db_name]
     resp = client.get("/api/search", params={"q": "x", "database": S1})
     assert resp.status_code == 422
-    assert connect.requested == [settings.test_db_name]  # the demo catalog only
-    assert len(probes) == 1  # probed once, then cached
+    assert connect.requested == [settings.test_db_name]  # the demo's size only
+    assert len(probes) == 3  # a missing S1 is probed again at every use (the 422 lists the offer)
     lines = webmod.prepare(client.app)
     assert lines == [
         (
@@ -1333,10 +1333,10 @@ def test_a_loaded_s1_is_offered_and_searched_on_its_own_connection(
 
     body = _claim_search(client, 101, k=3, database=S1)
     assert body["database"] == S1 and body["summary"]["gold_page_rank"] == 1
-    # the S1 catalog is built once, then the search opens its own connection
+    # a short connection for the catalog, then the search's own connection
     assert connect.requested == [settings.test_db_name, S1, S1, S1]
     _claim_search(client, 101, k=3, database=S1)
-    assert connect.requested == [settings.test_db_name, S1, S1, S1, S1]  # the catalog is cached
+    assert connect.requested == [settings.test_db_name, S1, S1, S1, S1, S1]
     claims = client.get("/api/claims", params={"database": S1}).json()
     assert claims["database"] == S1 and claims["own_files"] == [DEMO_FILE]
     pages = client.get("/api/pages", params={"database": S1}).json()
@@ -1345,7 +1345,7 @@ def test_a_loaded_s1_is_offered_and_searched_on_its_own_connection(
     resp = client.get("/api/claims", params={"database": "wikilense_s0"})
     assert resp.status_code == 422
     assert set(connect.requested) == {settings.test_db_name, S1}
-    assert len(probes) == 1
+    assert len(probes) == 1  # a loaded S1 is remembered
 
 
 # --- links -------------------------------------------------------------------------------------
@@ -1454,3 +1454,92 @@ def test_the_page_follows_a_database_switch_and_a_link_repeat_count() -> None:
     assert "in the link is not a whole number from 1 to" in page
     # without the database list a free-text link still runs, with its database for the API to check
     assert "if (wanted) dbSelect.replaceChildren(new Option(wanted, wanted));" in page
+
+
+def _set_ingest_stamp(conn: pymysql.Connection, stamp: str) -> None:
+    """Write ``ingest_meta.ingested_at`` as an ingest does at its end, and commit."""
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM ingest_meta WHERE `key` = %s", (webmod.INGEST_STAMP_KEY,))
+        cur.execute(
+            "INSERT INTO ingest_meta (`key`, `value`) VALUES (%s, %s)",
+            (webmod.INGEST_STAMP_KEY, stamp),
+        )
+    conn.commit()
+
+
+@pytest.mark.db
+def test_a_catalog_is_reused_until_the_database_is_ingested_again(
+    claim_client: TestClient, claim_corpus: pymysql.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The catalog is kept with the ingest stamp: the same stamp reuses it, a new stamp (a new
+    ingest) rebuilds it and the page sees the change without a restart; without a stamp (an
+    ingest still running) nothing is kept."""
+    builds: list[str] = []
+    real_build = webmod.picker.build_catalog
+
+    def counting(conn: Any, name: str, claims: Any) -> Any:
+        builds.append(name)
+        return real_build(conn, name, claims)
+
+    monkeypatch.setattr(webmod.picker, "build_catalog", counting)
+
+    def offered() -> list[int]:
+        return [c["id"] for c in claim_client.get("/api/claims").json()["claims"]]
+
+    # no stamp: built at every use
+    before = offered()
+    offered()
+    assert len(builds) == 2
+
+    _set_ingest_stamp(claim_corpus, "2026-01-01T00:00:00+00:00")
+    assert offered() == before
+    assert offered() == before
+    assert len(builds) == 3  # the same stamp: the cached catalog
+
+    # a new ingest with one claim fewer: the claim table no longer holds exactly the demo
+    # file's ids, so no claim file belongs to the database and the picker has nothing to offer
+    with claim_corpus.cursor() as cur:
+        cur.execute("DELETE FROM claim WHERE claim_id = %s", (before[0],))
+    claim_corpus.commit()
+    assert offered() == before  # the stamp has not changed yet: still the cached catalog
+    assert len(builds) == 3
+    _set_ingest_stamp(claim_corpus, "2026-01-02T00:00:00+00:00")
+    assert offered() == []
+    assert len(builds) == 4
+
+
+@pytest.mark.db
+def test_s1_loaded_while_the_server_runs_is_offered_at_the_next_request(
+    settings: Settings, claim_corpus: pymysql.Connection, claim_files: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loaded = False
+
+    def probe(s: Settings) -> tuple[int, int] | None:
+        return (7686, 132359) if loaded else None
+
+    monkeypatch.setattr(webmod, "probe_s1", probe)
+    monkeypatch.setattr(webmod.db, "connect", RecordingConnect(settings.test_db_name, redirect_s1=True))
+    client = _claim_app(settings, claim_files, offer_s1=True)
+    body = client.get("/api/databases").json()
+    assert [d["name"] for d in body["databases"]] == [settings.test_db_name]
+    assert body["s1_note"] == webmod.S1_MISSING_NOTE
+    loaded = True  # make load-s1 finished in another terminal
+    body = client.get("/api/databases").json()
+    assert [d["name"] for d in body["databases"]] == [settings.test_db_name, S1]
+    assert body["s1_note"] is None
+    assert client.get("/api/claims", params={"database": S1}).status_code == 200
+
+
+@pytest.mark.db
+def test_the_database_sizes_are_read_at_every_use(
+    claim_client: TestClient, claim_corpus: pymysql.Connection
+) -> None:
+    first = claim_client.get("/api/databases").json()["databases"][0]
+    dbmod.insert_rows(
+        claim_corpus, "page", dbmod.SCHEMA_COLUMNS["page"],
+        [(99, "Late page", 0, 0, 0, 0, 0, 0, 0, None, None)],
+    )
+    claim_corpus.commit()
+    second = claim_client.get("/api/databases").json()["databases"][0]
+    assert second["n_pages"] == first["n_pages"] + 1
