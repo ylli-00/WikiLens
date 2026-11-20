@@ -32,15 +32,15 @@ make setup
 - That is the whole path. `make setup` needs Docker, Python 3.10 or newer and `make`. It starts
   MariaDB 11.8 in a container, builds a virtual environment and loads the 100 Wikipedia pages
   committed here ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited.
-- The output is from a run in a fresh clone ([the record](results/fresh_clone_run.md)). That run
-  used `make setup CPU=1`, without the GPU packages, and took 4 minutes 45 seconds.
-  [Setup and platforms](#setup-and-platforms) has the details, also for a Mac.
+- The output is from a fresh clone with `make setup CPU=1` (no GPU packages), which took 4 minutes
+  45 seconds ([the record](results/fresh_clone_run.md); [setup and platforms](#setup-and-platforms), also for a Mac).
 - Put your own question between the quotes. The first number is the cosine distance. `--k 5`
   returns more passages, `--category`, `--min-words`, `--edited-since` and `--linked-from` filter
   them, `--explain` prints the SQL statement and MariaDB's plan, and `make serve` opens the same
   search as a web page at http://127.0.0.1:8000, with a claim picker, a database choice and examples.
 - [docs/EXAMPLES.md](docs/EXAMPLES.md) has the filtered queries, the hybrid with full-text search,
   every option, and ten examples for the `mariadb` client that need no Python.
+  It also has a question that only a filter answers, run without and with `--category`.
 
 ![The web page with a benchmark claim picked and its gold evidence marked](docs/img/web_page.png)
 
@@ -183,8 +183,10 @@ table and the method; the measurements are on S1 unless a line says otherwise.
   with a `DELETE` in that sequence the index returned no row at all, until the next committed write
   or `FLUSH TABLES`. No index search should run in a REPEATABLE READ transaction whose snapshot
   predates another connection's commit; no isolation level protects a later reader.
-- **Results are reproducible up to the graph build.** At the chosen settings twenty S1 builds found
-  2,922 to 2,937 gold pages; two builds agree on 2,838 to 2,907 of 3,000 hit lists ([builds](results/scaled/run1/s1/build_variance.md)).
+- **No hard cap, and a search that runs away** ([30 claims](results/scaled/run1/s1/hard_cap.md), [three versions](results/scaled/version_probe/version_probe.md)). A `WHERE` inside
+  the statement is not capped at `LIMIT`, as the documentation says it is. When fewer rows pass, 11.8.9 keeps searching: a threshold only 3 chunks meet ran to a 10 s `max_statement_time`
+  in 57 of 60 executions, and without a limit `mariadbd` grew until it was killed. 12.3.3 and 13.0.2 kept memory flat, and joined filters never ran away. The page and `wikilense query` stop a search after 5 s ([setting](docs/SETUP.md#afterwards)).
+- **Results are reproducible up to the graph build.** At the chosen settings twenty S1 builds found 2,922 to 2,937 gold pages; two builds agree on 2,838 to 2,907 of 3,000 hit lists ([builds](results/scaled/run1/s1/build_variance.md)).
 
 ## What the database-native approach gave
 
@@ -244,6 +246,7 @@ On the supported/refuted claims it is ahead of web search by 1.7 points (0.1 to 
 Most of the three-class gap is NOT ENOUGH INFO, a label FEVEROUS's annotators gave from December 2020 Wikipedia without outside
 knowledge: web search gives that answer least often and gets only 20.1% of the NOT ENOUGH INFO claims right. [docs/LLM_EXTENSION.md](docs/LLM_EXTENSION.md) has the rest.
 The web page can run this RAG check live on a typed statement, with the same prompt, when the server is [set up for it](docs/SETUP.md#turn-on-the-live-fact-check).
+Without that setup, its "Copy the prompt" box gives the same prompt with the passages to paste into any chatbot. It needs no key and makes no call, and it shows no reliability figures, since those were measured with Haiku ([the one change](docs/LLM_EXTENSION.md#14-on-the-web-page)).
 
 ## Setup and platforms
 
@@ -259,7 +262,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (860 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (910 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs the 53.5 GB FEVEROUS
@@ -268,8 +271,7 @@ Wikipedia, a GPU and hours ([its commands](docs/SETUP.md#reproduce-the-scaled-ru
 
 **Without a GPU** everything works; only the embedding is slower. The ingest took 230.0 s on this
 laptop's CPU against 21 s on its GPU, and a query embedding takes 18 ms against 4.6 ms. The SQL times
-do not change. `make setup CPU=1` installs pinned CPU-only packages: a 1.4 GB environment instead of
-5.8 GB. It needs Python 3.12 or newer.
+do not change. `make setup CPU=1` installs pinned CPU-only packages (1.4 GB instead of 5.8 GB; Python 3.12 or newer).
 
 | Platform | `make setup` | `make setup CPU=1` |
 |---|---|---|
@@ -298,8 +300,7 @@ The database measurements ([docs/VECTOR_INDEX.md](docs/VECTOR_INDEX.md)) time ea
 after one untimed run, the index cache in two passes per size, and the join order on a fixed sample
 of 200 claims, because by a [20-claim pilot](results/scaled/pilot/) all 3,000 would take about 100 hours. They ran once so far.
 
-The settings were chosen on the 75-claim development set over the 100-page corpus and kept for
-the scaled run:
+The settings were chosen on the 75-claim development set over the 100-page corpus and kept for the scaled run:
 
 | Parameter | Chosen | Why (evidence in [docs/EVALUATION.md](docs/EVALUATION.md#parameters-and-why)) |
 |---|---|---|
@@ -338,8 +339,7 @@ claims, and [results/](results/) every experiment as JSON and Markdown, the scal
 EVALUATION, DESIGN (every decision) and ARCHITECTURE (a beginner's guide to the code).
 [analysis/](analysis/) is the earlier FEVEROUS analysis that chose the benchmark, and
 [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
-860 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
-`mariadb:11.8.9` service on every push to `main` and pull request.
+910 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 

@@ -99,18 +99,18 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | File | What it is for | Reads / writes | Calls | Read first |
 |---|---|---|---|---|
 | `__init__.py` | Package marker and `__version__` (0.1.0), recorded in `ingest_meta` and every result. | - | - | - |
-| `config.py` | Every setting as a `WIKILENSE_*` variable from the environment or `.env`, with the defaults (240 words, overlap 1, the model and its pinned revision, `ef_search` 100). | reads `.env` | python-dotenv | `load_settings` |
+| `config.py` | Every setting as a `WIKILENSE_*` variable from the environment or `.env`, with the defaults (240 words, overlap 1, the model and its pinned revision, `ef_search` 100, the 5 s search time limit `WIKILENSE_STATEMENT_SECONDS`). | reads `.env` | python-dotenv | `load_settings` |
 | `corpus.py` | Reads `data/corpus/*.jsonl`, parses FEVEROUS element ids (`Aare_sentence_0` → page, type, key), holds the corpus selection rule. | the JSONL files | - | `select_corpus` |
 | `wikitext.py` | Parses a FEVEROUS page into one `TextUnit` per sentence and list item under its section headings; cleans markup (`[[target\|shown]]` → `shown`), finds hatnotes and links. | - | - | `parse_page` |
 | `chunking.py` | Groups a page's units into chunks (at most `max_words`, never across a section, one unit of overlap); `embedding_text` adds the `title > section path:` prefix. | - | `config`, `wikitext` | `chunk_units` |
 | `embedding.py` | `Embedder`: loads the model lazily (on the GPU when there is one) at its pinned revision; `embed_queries` prepends the BGE query instruction, `embed_passages` does not. | the Hugging Face model cache | `config`; sentence-transformers, torch | `Embedder.embed_queries` |
 | `db.py` | The MariaDB layer: `connect`, `apply_schema`, `insert_rows` with an allowlist of tables and columns (`SCHEMA_COLUMNS`), `vec_param` (the bytes of a `VECTOR`), the one allowed session variable, `EXPLAIN`. | the database; `sql/schema.sql` | `config`; PyMySQL | `insert_sql` |
 | `ingest.py` | `wikilense ingest`: checks settings and model, then seven steps (schema, pages, chunks with embeddings, links, `ANALYZE TABLE`, claims and evidence, `ingest_meta`), each committed when done. | `data/corpus/` → all eleven tables | `db`, `corpus`, `wikitext`, `chunking`, `embedding` | `_Ingest.run` |
-| `search.py` | The four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment, `ef_search` set per call and restored. | the database (read only) | `db`, `config` | `search_statement` |
+| `search.py` | The four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment, `ef_search` set per call and restored, and so is `max_statement_time` when the caller passes a time limit (the web page and `wikilense query` do). | the database (read only) | `db`, `config` | `search_statement` |
 | `evaluate.py` | Recall and latency: ground truth from `claim_evidence`, pure metric functions, one untimed and `repeats` timed passes per claim and k, the JSON and Markdown writer. | the database → `<out>/<name>.json/.md` | `db`, `search` | `evaluate` |
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`): argument checks, one-line errors, exit codes 0, 1, 2 and 130, the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
-| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings, and with `claim_id`, `database` or `repeat` also the claim's marks and summary, the database that answered and the repeated timings; `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `GET /api/factcheck` says whether the live fact-check is on and `POST /api/factcheck` runs it (the search again, then one model call); `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `factcheck`, `evaluate`, `embedding`; FastAPI | `api_search` |
-| `factcheck.py` | The page's live fact-check, off unless `WIKILENSE_FACTCHECK` is `subscription` or `api`: reads the LLM experiment's RAG run record and prompt set (refused if the hash differs), builds the request with the runner's `Runner.request`, makes one call per click through the CLI or API backend, splits the reason's citations, and reads the reliability figures from `results/llm/llm_results.json`. | `results/llm/runs.json`, `results/llm/llm_results.json`, `wikilense/llm/prompts/fact_check_v1/` | `llm.runner`, `llm.cli_backend`, `llm.api_backend`, `llm.claims`, `llm.retrieval` | `FactChecker.run` |
+| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings, and with `claim_id`, `database` or `repeat` also the claim's marks and summary, the database that answered and the repeated timings; `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `GET /api/factcheck` says whether the live fact-check is on and `POST /api/factcheck` runs it (the search again, then one model call); `GET /api/prompt` returns the copy box's text (the search again, no model call); a search MariaDB stops at the time limit is a 504; `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `factcheck`, `evaluate`, `embedding`; FastAPI | `api_search` |
+| `factcheck.py` | The page's live fact-check, off unless `WIKILENSE_FACTCHECK` is `subscription` or `api`: reads the LLM experiment's RAG run record and prompt set (refused if the hash differs), builds the request with the runner's `Runner.request`, makes one call per click through the CLI or API backend, splits the reason's citations, and reads the reliability figures from `results/llm/llm_results.json`. Also the copyable prompt, loaded whatever the setting: the same request as one text to paste into a chatbot, with its one changed sentence (a plain answer instead of the tool call). | `results/llm/runs.json`, `results/llm/llm_results.json`, `wikilense/llm/prompts/fact_check_v1/` | `llm.runner`, `llm.cli_backend`, `llm.api_backend`, `llm.claims`, `llm.retrieval` | `FactChecker.run` |
 | `picker.py` | The page's claim picker: reads both claim files, decides which claims a database offers (gold pages in `page`, gold sentences resolved by `ingest.resolve_element`), builds their ground truth with `evaluate.ground_truth_from_rows`, and computes a search's marks and summary with the evaluation's metric functions; the ready-made examples and the rule that chose them. | `data/corpus/claims.jsonl`, `data/scaled/claims_3000.jsonl`, the database (read only) | `corpus`, `evaluate`, `ingest`, `search` | `build_catalog` |
 
 `wikilense/llm/` is the package of the LLM fact-checker extension, with the `scripts/llm_*.py` scripts and the `tests/test_llm_*.py` tests; it is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
@@ -133,7 +133,7 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `run_experiments.py` | The protocol behind `results/`: groups `stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `scale` and `summary` (rebuilds `results/SUMMARY.md`). Root SQL goes through `docker exec`, the password in the environment only. | the main database, docker → `results/` |
 | `make_charts.py` | The README charts as SVG, with a dark variant. | `results/` → `docs/img/` |
 | `compare_separate_index.py` | Where the database-native search loses: MariaDB's statements against an exact NumPy scan of a copy of the vectors and, when installed, hnswlib (in no requirements file). Takes `--database`, `--k` and `--filters` (the `four_filters` case of a `scaled_filters.py` file), and more (`--help`). | the database (read only) → `results/separate_index.*` |
-| `measure_index_behaviour.py` | Five index behaviours its documentation does not describe: `forms`, `join_order`, `builds`, `cache`, `isolation` ([VECTOR_INDEX.md](VECTOR_INDEX.md)). Takes `--database`, `--k` and `--filters` (a `scaled_filters.py` file, for `join_order`), and more (`--help`). | the corpus database, scratch tables in the test database; `cache` sets a server variable and restores it → `results/` |
+| `measure_index_behaviour.py` | Six measured behaviours of the index, five that its documentation does not describe: `forms`, `join_order`, `builds`, `cache`, `isolation` ([VECTOR_INDEX.md](VECTOR_INDEX.md)), and `hard_cap`, the documentation's "hard cap" on a distance threshold (only with `--throwaway-server`, never against the project's server). Takes `--database`, `--k` and `--filters` (a `scaled_filters.py` file, for `join_order`), and more (`--help`). | the corpus database, scratch tables in the test database; `cache` sets a server variable and restores it → `results/` |
 | `make_env.py` | Writes `.env` from `.env.example` with two random passwords, once; never prints them or touches an existing file. | `.env.example` → `.env` |
 | `scaled_build.py` | The scaled run's data: picks the 3,000 claims (seeded, only claims whose evidence lands in a chunk) and the distractor pages, and writes the S0 and S1 corpus folders. | the FEVEROUS database (read only) |
 | `scaled_check.py` | Re-derives every rule of the build with separate code and compares the results. | writes only `SELFCHECK.md` |
@@ -201,7 +201,9 @@ wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
 
    `STRAIGHT_JOIN` makes MariaDB start from `chunk`, so the vector index drives the search.
 4. `ef_search_session` sets `mhnsw_ef_search` to 100 and puts the old value back in a `finally`
-   clause. The rows become `Hit` objects, sorted by distance, then chunk id.
+   clause; `statement_time_session` does the same for `max_statement_time` (5 s), so MariaDB stops
+   a search that runs away (error 1969, a one-line message). The rows become `Hit` objects, sorted
+   by distance, then chunk id.
 5. `--explain` runs `EXPLAIN` on the same statement: `chunk` is read through the vector index,
    `page` and `section` by primary key (`eq_ref`), and the heading test runs on the section row:
 
@@ -288,11 +290,11 @@ The reasons for the main choices:
 
 ## 7. Testing and CI
 
-There are 860 tests of three kinds, told apart by pytest markers.
+There are 910 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (743) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (792) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- `db` tests (111) need MariaDB and use only the test database (`wikilense_test`, reset per test);
+- `db` tests (112) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.
 - `slow` tests (6) load the real embedding model: `.venv/bin/python -m pytest -m slow`.
 

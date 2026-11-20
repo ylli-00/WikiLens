@@ -124,12 +124,19 @@ by git), `make serve` starts the web page, `make examples` runs the ten examples
 reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
 deletes the data volume.
 
+`wikilense query` and the web page stop a search after 5 s (`WIKILENSE_STATEMENT_SECONDS` in `.env`,
+0 for no limit) through MariaDB's `max_statement_time`, a guard against a vector search that keeps
+searching when few rows pass its filters ([VECTOR_INDEX.md](VECTOR_INDEX.md)); `wikilense eval`
+and the measurement scripts set no limit.
+
 ## Turn on the live fact-check
 
 The web page can show a "Fact-check" button under a free-text search. It sends the statement and
 its first 5 passages to Claude Haiku with the LLM experiment's prompt, and shows the verdict, the
 model's reason and how often that verdict was right in the experiment
-([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)). The button is off by default.
+([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)). The button is off by default. The
+"Copy the prompt" box under every search needs none of this: it shows the same prompt with the
+passages, to paste into a chatbot, and makes no call.
 
 One setting turns it on: `WIKILENSE_FACTCHECK`, in `.env` or the environment, set to
 `subscription` or `api`. Restart `make serve` after changing it. At start-up the server prints a

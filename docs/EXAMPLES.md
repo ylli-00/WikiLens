@@ -204,6 +204,10 @@ http://127.0.0.1:8000.
   not-enough-info claim, the supported claim with a filter that hides its gold page, a free-text
   question, and, on S1 only, a claim whose evidence needs two pages. The first five are the same on
   both databases, so you can switch and compare.
+- "Copy the prompt", under the results of any search, shows the LLM fact-check's prompt with the
+  statement (or the picked claim) and the first 5 passages as one text to paste into a chatbot,
+  with a "Copy" button. It needs no key and makes no model call. Its one change from the
+  experiment's prompt is in [LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page).
 
 Every search goes into the address bar, so a link reproduces it. For example
 [`/?database=wikilense&claim_id=36003&sentences=1`](http://127.0.0.1:8000/?database=wikilense&claim_id=36003&sentences=1)
@@ -217,7 +221,10 @@ that ran, its `explain` rows, the effective `ef_search` and `timing_ms`. With `c
 returns `claim`, `marks` (one per hit) and `summary`; these are computed after the timed statement,
 so `sql` and `timing_ms.sql` are the search alone. With `repeat` it returns `repeat` (every run's
 time, the median and the range), with `database` the database that answered. `GET /api/databases`,
-`/api/claims` and `/api/pages` list the choices, the claims and the page titles. Swagger is enabled
+`/api/claims` and `/api/pages` list the choices, the claims and the page titles. `GET /api/prompt`
+takes the search's parameters (without `sentences` and `repeat`) and returns the copy box's text.
+A search that runs past `WIKILENSE_STATEMENT_SECONDS` (5 s) is stopped by MariaDB and answered
+with 504 and a one-sentence message. Swagger is enabled
 at `/docs`, so the API can be tried from the browser. (The Swagger page is FastAPI's default and
 loads its script from a CDN, so it needs a network connection; the search page itself has no
 external assets.)

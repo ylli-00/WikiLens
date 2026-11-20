@@ -139,9 +139,10 @@ Settings come from `WIKILENSE_*` variables (the full list is in `.env.example` a
 `wikilense/config.py`). The ones that carry a decision are `WIKILENSE_CHUNK_MAX_WORDS` (240; see
 `results/SUMMARY.md` section 4), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_EF_SEARCH` (100,
 passed as `mhnsw_ef_search` per query, 1 to 10000; 0 keeps the server's session value, default 20;
-anything else is a `SettingsError`), and `WIKILENSE_TEST_DB_NAME` (the test suite resets that
-database, so `tests/conftest.py` refuses a name that equals the main database or does not end in
-`_test`). The index `M` (16; see `results/SUMMARY.md` section 3) is written literally in
+anything else is a `SettingsError`), `WIKILENSE_STATEMENT_SECONDS` (5, the time limit of the web
+page's and `wikilense query`'s searches; 0 for none; see "Search"), and `WIKILENSE_TEST_DB_NAME`
+(the test suite resets that database, so `tests/conftest.py` refuses a name that equals the main
+database or does not end in `_test`). The index `M` (16; see `results/SUMMARY.md` section 3) is written literally in
 `sql/schema.sql` (`db.VECTOR_INDEX_M`). It is not a setting, and `ingest_meta` records the `M` of
 the index that is in place.
 
@@ -238,6 +239,20 @@ The API (`Hit`, `Filters`, `search()`, `explain_search()`, `hit_sentences()`) is
   missing value takes `Settings.ef_search`, and 0 means the server's session value, in the CLI,
   the web page and the harness alike. Every SQL statement is a named module constant, so the
   README can quote it.
+- **A time limit on WikiLense's own searches.** On 11.8.9 a vector search that fewer rows pass
+  than its `LIMIT` can keep searching and grow `mariadbd` until it runs out of memory
+  (`docs/VECTOR_INDEX.md`). MariaDB's `max_statement_time` stops such a statement with error 1969
+  and the server keeps running. So `search(..., statement_seconds=N)` sets it for the session
+  around the search and restores the previous value, the same way as `ef_search`, and the web page
+  and `wikilense query` pass `WIKILENSE_STATEMENT_SECONDS` (default 5, 0 for none). A stopped
+  search is a plain message: 504 on the API, exit code 1 on the command line. Why 5 s: every
+  median we measured for the statement `wikilense query` runs is far below it. The slowest is
+  1,387.73 ms, on S1 when 66 chunks pass a category filter (`results/scaled/run1/s1/join_order.md`).
+  The evaluation, the LLM retrieval and the
+  measurement scripts pass no limit: the three statements of the guard would run inside their
+  timed part, and their results must stay those of the statement alone. The `hard_cap` part of
+  `scripts/measure_index_behaviour.py` sets its own limit, because there a stopped statement is
+  the result. The page's and the command's SQL time include those three short statements.
 
 Statement shapes and their reasons (`docs/VECTOR_INDEX.md`, "The statements"):
 
@@ -513,6 +528,26 @@ the statement and its first 5 passages to Haiku ([LLM_EXTENSION.md](LLM_EXTENSIO
     with the server and could send the header, but it still sends its own name as the host.
   - A server started with `--host 0.0.0.0` therefore offers the search to the network, but not
     the model calls.
+
+**The copyable prompt (`factcheck.py`, `web.py`).** A "Copy the prompt" box under every search,
+free text and picked claims alike, shows the fact-check's request as one text to paste into any
+chatbot, with a "Copy" button; `GET /api/prompt` returns the same text
+([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)).
+- It is on by default, with no setting. It sends nothing and costs nothing, so the reasons for
+  keeping the live button off do not apply. It is the one way a reader without a login or a key
+  sees the generation step. The server loads the experiment for it at start-up even when the live
+  fact-check is off; if that fails, the box says why and the endpoint answers 503.
+- It is the experiment's request with one change. `experiment_request` builds it, as for the
+  button. A chat window has no system field, so the system text comes first, then a blank line,
+  then the user turn unchanged. The system text's last sentence asks for a `StructuredOutput` tool
+  call, which a chat window does not have. It becomes the same instruction in plain words: the
+  label, exactly one of the three, and one sentence of at most 30 words. The code checks that the
+  old sentence occurs exactly once and offers no copy otherwise; `fact_check_v1` is never edited.
+- It works for picked claims too, unlike the button. There the claim's own text follows `CLAIM:`,
+  and the box says that the answer key is on the page, so a reader can check the chatbot against
+  it.
+- It shows no reliability figures. They were measured with Haiku through the experiment's
+  settings and its tool call, and say nothing about another chatbot's answer to the pasted text.
 
 ## Page metadata and the four filters
 

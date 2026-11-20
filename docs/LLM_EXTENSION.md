@@ -456,3 +456,32 @@ Where the figures stop applying:
   CLI version the page names both versions.
 - The button is for free text only. It is hidden while a benchmark claim is picked, because that
   claim's answer key is already on the page.
+
+Three ways to run the fact-check on what the page retrieved:
+1. Through a Claude subscription: the button, with `WIKILENSE_FACTCHECK=subscription` and the
+   Claude Code CLI's own login.
+2. Through the Anthropic API: the button, with `WIKILENSE_FACTCHECK=api` and the reader's own
+   `ANTHROPIC_API_KEY`, billed per token.
+3. Copy the prompt: a "Copy the prompt" box under every search, free text and picked claims
+   alike, whatever the setting. It shows the request as one text with a "Copy" button, to paste
+   into a chatbot. It needs no key and makes no call. `GET /api/prompt` returns the same text.
+
+The copied text is the request above with one change. A chat window has no system field, so the
+system prompt comes first, then a blank line, then the user turn exactly as the runner renders it
+(`EVIDENCE:` with the passages, then `CLAIM:`). The system prompt's last sentence asks for a tool
+call that a chat window does not have:
+
+> Answer with one StructuredOutput call: "result" holds "label" (exactly one of the three) and "justification" (one sentence, at most 30 words: the deciding fact and the passages or sources used, such as [2]). No other text.
+
+In the copy it reads:
+
+> Answer with the label (exactly one of SUPPORTS, REFUTES or NOT ENOUGH INFO) and one sentence of justification, at most 30 words: the deciding fact and the passages or sources used, such as [2]. No other text.
+
+The server checks that the first sentence occurs exactly once in `system.txt` and offers no copy
+otherwise; the prompt set itself is never edited. With a picked claim, the claim's own text
+follows `CLAIM:`, and the box says that the answer key is on the page, so the chatbot's label can
+be compared with it.
+
+The box shows no reliability figures. The figures above were measured with Haiku, through the
+experiment's settings and its tool call, so they do not cover another chatbot's answer to the
+pasted text.
