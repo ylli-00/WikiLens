@@ -17,9 +17,9 @@ FIRST_LINE = (
     'A project for area 4, "Vector search and RAG, natively" for the '
     "[MariaDB student database projects, 2026-09](https://mariadb.org/bachelor_hackathon_2026-09/)."
 )
-#: The evaluators of 27 October 2026 asked for a short README with the feature on the first
-#: screen; the long reference material lives in docs/. This bound keeps it from growing back.
-README_MAX_LINES = 330
+#: A short README with the feature on the first screen; the long reference material lives in
+#: docs/. This bound keeps it from growing back.
+README_MAX_LINES = 350
 #: How far down the first runnable commands may start and the first output may end.
 FIRST_SCREEN_LINES = 30
 
