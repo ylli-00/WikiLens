@@ -1,7 +1,7 @@
 # Examples: every way to query WikiLense
 
 The [README](../README.md) shows one question and its answer. This page has the rest: the
-vector index in `EXPLAIN`, the brief's four filters in one statement, the other filters, the
+vector index in `EXPLAIN`, the four metadata filters in one statement, the other filters, the
 full-text hybrid, the join back to sentences, every option, the web page and its API, and the
 SQL file that needs no Python. Every block is the output of the command above it on the
 committed corpus; where a block is shortened, the text says so.
@@ -36,11 +36,11 @@ EXPLAIN:
 
 The vector index is the `key` of the first row; `page` and `section` are joined by primary key.
 
-The model load happens once per process; the web server pays it once at start-up. The CLI's SQL time
+The model loads once per process, so the web server pays for it once, at start-up. The CLI's SQL time
 is one sample and includes the `mhnsw_ef_search` session round trips. The harness numbers under
 [Evaluation](EVALUATION.md) exclude them.
 
-This query combines the brief's four predicates in one statement. It asks for pages in a category,
+This query combines the four metadata predicates in one statement. It asks for pages in a category,
 longer than 1,000 words, edited since a date and linked from another page:
 
 ```
@@ -76,8 +76,8 @@ EXPLAIN:
 3 hits; model load 4679 ms, embedding 5.1 ms, SQL 4.3 ms (BAAI/bge-small-en-v1.5 on cuda, strategy inline, ef_search 100)
 ```
 
-(The EXPLAIN is trimmed to the columns that matter here.) The vector index drives the scan: `chunk`
-is read through `embedding`, ahead of everything else. Length and edit date are checked on the
+(The EXPLAIN is trimmed to the relevant columns.) The vector index drives the scan: `chunk` is read
+through `embedding`, ahead of everything else. Length and edit date are checked on the
 `page` row (`Using where`). The link and category filters are two small materialised tables
 (`<derived2>`, `<derived3>`), each looked up by `page_id`. The category name resolves through its
 unique index (`const`), and the pages of that category through `ix_page_category_category`.
@@ -131,7 +131,7 @@ that ran, its `explain` rows, the effective `ef_search` and `timing_ms`. Swagger
 its script from a CDN, so it needs a network connection; the search page itself has no external
 assets.)
 
-![The web page with the four filters of the brief](img/web_page.png)
+![The web page with the four metadata filters](img/web_page.png)
 
 [sql/examples.sql](../sql/examples.sql) has ten worked examples for the `mariadb` client alone (no
 Python, no model). They include the four-filter statement with its `EXPLAIN`, a page's categories
