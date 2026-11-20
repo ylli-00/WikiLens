@@ -145,7 +145,7 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `scaled_uncommitted.py` | The `uncommitted` group with a scaled database's vectors. | a scratch table in the test database |
 | `scaled_sentence_score.py` | The FEVEROUS-style evidence score: of the units in the top 10 chunks, the 5 sentences and 25 list items closest to the claim, and whether a whole gold set is among them. | a scaled database |
 | `scaled_page_coverage.py` | Page coverage as FEVEROUS reports it: the share of a claim's gold pages among the first 1, 2, 3, 5 and 10 distinct pages of its top 50 chunks. | a scaled database |
-| `scaled_breakdown.py` | Recall split by label, page count and challenge tag, and reweighted to FEVEROUS's mix of those groups. | result files, no database |
+| `scaled_breakdown.py` | Recall split by label, page count and challenge tag, and reweighted to FEVEROUS's mix of those groups; a label check per metric, and equal label weights per tag where recall differs by label. | result files, no database |
 | `scaled_summary.py` | Every table of the scaled run in one file, one column per run. | `results/scaled/` → `results/scaled/SUMMARY.md` |
 
 ### `tests/`
@@ -290,9 +290,9 @@ The reasons for the main choices:
 
 ## 7. Testing and CI
 
-There are 910 tests of three kinds, told apart by pytest markers.
+There are 917 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (792) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (799) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
 - `db` tests (112) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.
