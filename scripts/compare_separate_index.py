@@ -40,7 +40,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -49,8 +49,9 @@ from typing import Any
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+for entry in (str(REPO_ROOT), str(REPO_ROOT / "scripts")):  # scaled_filters for --filters
+    if entry not in sys.path:
+        sys.path.insert(0, entry)
 
 from wikilense import db, evaluate
 from wikilense import search as searchmod
@@ -223,9 +224,8 @@ def four_filter_pages(copy: Copy, filters: Filters) -> set[int]:
     if filters.min_words is not None:
         pages = {page for page in pages if copy.page_words[page] >= filters.min_words}
     if filters.edited_since is not None:
-        # page.last_edited holds naive UTC datetimes; a date means its midnight UTC.
-        day = filters.edited_since
-        since = datetime(day.year, day.month, day.day, tzinfo=timezone.utc).replace(tzinfo=None)
+        # page.last_edited holds naive UTC datetimes; the same reading as the SQL parameter.
+        since = searchmod._db_datetime(filters.edited_since)
         pages = {
             page for page in pages
             if copy.page_edited.get(page) is not None and copy.page_edited[page] >= since
@@ -425,7 +425,14 @@ def _single_blas_thread() -> int | None:
     return max(counts) if counts else None
 
 
-def run(conn: Any, embedder: Any, k: int, repeats: int, use_hnswlib: bool) -> dict[str, Any]:
+def run(
+    conn: Any,
+    embedder: Any,
+    k: int,
+    repeats: int,
+    use_hnswlib: bool,
+    cases: Sequence[FilterCase] = FILTER_CASES,
+) -> dict[str, Any]:
     """Run the whole comparison on the connected database and return the report as a dict."""
     truths = evaluate.load_ground_truth(conn)
     if not truths:
@@ -439,7 +446,9 @@ def run(conn: Any, embedder: Any, k: int, repeats: int, use_hnswlib: bool) -> di
     _quiet_torch()
     blas_threads_before = _single_blas_thread()
 
+    rss_before = rss_bytes()
     copy = export_copy(conn)
+    rss_after = rss_bytes()
     vectors64 = copy.vectors.astype(np.float64)
     row_numbers = np.arange(copy.n)
 
@@ -541,7 +550,7 @@ def run(conn: Any, embedder: Any, k: int, repeats: int, use_hnswlib: bool) -> di
 
         # --- with a filter ---------------------------------------------------------------
         filtered: dict[str, Any] = {}
-        for case in FILTER_CASES:
+        for case in cases:
             mask = copy_mask(copy, case)
             passing_copy = {int(value) for value in copy.chunk_ids[mask]}
             passing_sql = sql_passing_chunks(conn, case, copy.n, queries32[0])
@@ -595,6 +604,9 @@ def run(conn: Any, embedder: Any, k: int, repeats: int, use_hnswlib: bool) -> di
             "export_seconds": round(copy.export_seconds, 3),
             "rows_exported": copy.rows_exported,
             "vector_bytes": int(copy.vectors.nbytes),
+            "process_rss_bytes_before_export": rss_before,
+            "process_rss_bytes_after_export": rss_after,
+            "hnswlib_index_file_bytes": None if hnsw_info is None else hnsw_info["index_file_bytes"],
         },
         "unfiltered": unfiltered,
         "filtered": filtered,
@@ -614,8 +626,8 @@ NOTES = [
     ("MariaDB times are the wall-clock time of one search() call as the Python client sees it "
     "(the statement returns the hit rows with title, section path and text). mhnsw_ef_search is "
     "set once for the run, not per call. Because the methods take turns, every statement runs "
-    "with colder caches than in the evaluation harness, which repeats one statement in a block "
-    "(results/final_ef_100.md has 0.51 ms p50 for the bare k-NN statement). The times also move "
+    "with colder caches than in the evaluation harness, which repeats one statement in a block, "
+    "so its times are higher than the harness's for the same statement. The times also move "
     "between runs on this laptop (the repeat file shows by how much); read the ratios, not the "
     "last digit."),
     ("NumPy and hnswlib each use one thread per query, as one MariaDB query does."),
@@ -674,6 +686,15 @@ def to_markdown(report: dict[str, Any], name: str = DEFAULT_NAME) -> str:
         + "). A separate index has to repeat this, or apply every change twice, to stay current.",
         "",
     ]
+    if copy.get("process_rss_bytes_after_export") and copy.get("process_rss_bytes_before_export"):
+        grown = copy["process_rss_bytes_after_export"] - copy["process_rss_bytes_before_export"]
+        lines += [
+            (f"The process's resident memory grew by {grown:,} bytes during the export (from "
+            f"{copy['process_rss_bytes_before_export']:,} to "
+            f"{copy['process_rss_bytes_after_export']:,}): the copy with the Python objects "
+            "that hold its filter columns, and what the read left behind."),
+            "",
+        ]
     if hnsw is None:
         lines += ["hnswlib was not installed for this run, so its rows are missing.", ""]
     else:
@@ -709,6 +730,31 @@ def to_markdown(report: dict[str, Any], name: str = DEFAULT_NAME) -> str:
     return "\n".join(lines)
 
 
+def filter_cases(path: Path | None) -> tuple[FilterCase, ...]:
+    """The filter cases of a run: :data:`FILTER_CASES`, or with ``path`` (a file of
+    ``scripts/scaled_filters.py``) the History heading and that file's ``four_filters`` case."""
+    if path is None:
+        return FILTER_CASES
+    from scaled_filters import COMBINED, describe, load_cases
+
+    found = [filters for name, filters, _ in load_cases(path) if name == COMBINED]
+    if len(found) != 1:
+        raise SystemExit(f"{path} has no single {COMBINED!r} case")
+    values = describe(found[0])
+    label = ("the four filters: category '{category}', at least {min_words:,} words, edited "
+             "since {edited_since}, linked from '{linked_from}'").format(**values)
+    return (FILTER_CASES[0], FilterCase("four_filters", label, found[0]))
+
+
+def rss_bytes() -> int | None:
+    """Resident memory of this process now, from /proc (None where it does not exist)."""
+    try:
+        with open("/proc/self/statm", encoding="ascii") as fh:
+            return int(fh.read().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--k", type=int, default=DEFAULT_K, help="hits per query (default %(default)s)")
@@ -719,6 +765,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--name", default=DEFAULT_NAME, help="file stem (default %(default)s)")
     parser.add_argument("--no-hnswlib", action="store_true",
                         help="leave the hnswlib rows out even when hnswlib is installed")
+    parser.add_argument("--database", help="the corpus database (default: WIKILENSE_DB_NAME)")
+    parser.add_argument("--filters", type=Path,
+                        help="a scripts/scaled_filters.py file: its four_filters case replaces "
+                             "the 100-page one")
     args = parser.parse_args(argv)
     if args.k < 1 or args.repeats < 1:
         parser.error("--k and --repeats must be at least 1")
@@ -726,10 +776,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     from wikilense.cli import make_embedder
 
     settings = load_settings()
+    if args.database:
+        if args.database == settings.test_db_name:
+            parser.error("--database names the test database; compare on a corpus database")
+        settings = replace(settings, db_name=args.database)
+    out_default = Path(args.out).resolve() == (REPO_ROOT / "results").resolve()
+    if settings.db_name != type(settings).__dataclass_fields__["db_name"].default and out_default:
+        parser.error(f"{settings.db_name} is not the 100-page corpus: give --out a folder of "
+                     "its own, so the files in results/ are not overwritten")
+    cases = filter_cases(args.filters)
     embedder = make_embedder(settings)
     conn = db.connect(settings)
     try:
-        report = run(conn, embedder, args.k, args.repeats, use_hnswlib=not args.no_hnswlib)
+        report = run(conn, embedder, args.k, args.repeats, use_hnswlib=not args.no_hnswlib,
+                     cases=cases)
+        report["database"] = settings.db_name
     finally:
         conn.close()
     out_dir = Path(args.out)

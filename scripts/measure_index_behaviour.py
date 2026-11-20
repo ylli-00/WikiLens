@@ -62,11 +62,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 import time
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime, timezone
 from itertools import combinations, pairwise
 from pathlib import Path
@@ -105,6 +106,8 @@ FORM_PREDICATE_JOINED = (
     "WHERE chunk.n_words < %s ORDER BY VEC_DISTANCE_COSINE(chunk.embedding, %s) LIMIT %s"
 )
 JOIN_ORDER_REPEATS = 3
+#: The seed of ``--sample``: a fixed draw, so a rerun measures the same claims.
+SAMPLE_SEED = 20261119
 JOIN_ORDER_EF = 100
 #: The scan that every hit list is compared with: the statement as written, without the index.
 SCAN_FROM = ("FROM chunk ", "FROM chunk IGNORE INDEX (embedding) ")
@@ -118,13 +121,21 @@ PARTS: tuple[str, ...] = ("forms", "join_order", "builds", "cache", "isolation")
 CACHE_PASSES = 3
 CACHE_EF = 100
 MEBIBYTE = 1048576
-#: Cache sizes below the configured one, in MB: the server default first, then smaller.
+#: The default cache sizes of the ``cache`` part, in MB: the server default first, then smaller.
 CACHE_SIZES_MB: tuple[int, ...] = (16, 8, 4, 2, 1)
-#: One literal statement per size; a server variable cannot be a bound parameter here because
-#: the statement runs through the mariadb client inside the container.
-CACHE_SET_SQL: dict[int, str] = {
-    size: "SET GLOBAL mhnsw_max_cache_size = " + str(size * MEBIBYTE) for size in CACHE_SIZES_MB
-}
+
+
+def cache_set_sql(size_mb: int) -> str:
+    """The ``SET GLOBAL`` statement for a cache of ``size_mb`` megabytes.
+
+    A literal statement: a server variable cannot be a bound parameter here, because the
+    statement runs through the mariadb client inside the container. The size is an ``int``.
+    """
+    if isinstance(size_mb, bool) or not isinstance(size_mb, int) or size_mb < 1:
+        raise ValueError(f"cache size must be a positive int of megabytes, got {size_mb!r}")
+    return "SET GLOBAL mhnsw_max_cache_size = " + str(size_mb * MEBIBYTE)
+
+
 CACHE_GET_SQL = "SELECT @@GLOBAL.mhnsw_max_cache_size"
 CHUNK_FLUSH_SQL = "FLUSH TABLES chunk"
 
@@ -201,6 +212,17 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def sample_claims(truths: Sequence[Any], sample: int | None, seed: int = SAMPLE_SEED) -> list[Any]:
+    """``sample`` of ``truths`` drawn with ``random.Random(seed)``, in their original order;
+    all of them when ``sample`` is None or not smaller than their number."""
+    if sample is None or sample >= len(truths):
+        return list(truths)
+    if sample < 1:
+        raise ValueError(f"a sample needs at least one claim, got {sample}")
+    picked = sorted(random.Random(seed).sample(range(len(truths)), sample))
+    return [truths[i] for i in picked]
+
+
 def median(values: Sequence[float]) -> float:
     return float(np.median(np.asarray(values, dtype=np.float64)))
 
@@ -210,7 +232,7 @@ def median(values: Sequence[float]) -> float:
 # ---------------------------------------------------------------------------------------------
 
 
-def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, Any]:
+def measure_forms(settings: Settings, embedder: Any, repeats: int, k: int = K) -> dict[str, Any]:
     """Run the statement forms on the corpus database and return the report."""
     conn = db.connect(settings)
     try:
@@ -248,14 +270,14 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
             passing = np.flatnonzero(mask)
             case["passing_chunks"] = int(passing.shape[0])
             case["exact"] = [
-                separate.top_k(vectors, queries[i].astype(np.float64), ids, K, passing)
+                separate.top_k(vectors, queries[i].astype(np.float64), ids, k, passing)
                 for i in range(n_queries)
             ]
 
         def answer_of(case: dict[str, Any]) -> Callable[[int], list[int]]:
             def answer(i: int) -> list[int]:
                 vector = db.vec_param(queries[i])
-                params = (vector, K) if case["limit"] is None else (case["limit"], vector, K)
+                params = (vector, k) if case["limit"] is None else (case["limit"], vector, k)
                 with conn.cursor() as cur:
                     cur.execute(case["sql"], params)
                     return [int(row[0]) for row in cur.fetchall()]
@@ -268,7 +290,7 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
             with conn.cursor() as cur:
                 for i in range(n_queries):
                     vector = db.vec_param(queries[i])
-                    params = (vector, K) if case["limit"] is None else (case["limit"], vector, K)
+                    params = (vector, k) if case["limit"] is None else (case["limit"], vector, k)
                     cur.execute("ANALYZE " + case["sql"], params)
                     plan = cur.fetchall()
                     read.append(float(plan[0][9]))  # r_rows of the first table, chunk
@@ -277,7 +299,7 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
         def chunk_access(case: dict[str, Any]) -> str:
             """'<type> <key>' of the chunk row in EXPLAIN, for the first claim."""
             vector = db.vec_param(queries[0])
-            params = (vector, K) if case["limit"] is None else (case["limit"], vector, K)
+            params = (vector, k) if case["limit"] is None else (case["limit"], vector, k)
             row = next(r for r in db.explain(conn, case["sql"], params) if r["table"] == "chunk")
             return f"{row['type']} {row['key'] or 'no key'}"
 
@@ -300,7 +322,7 @@ def measure_forms(settings: Settings, embedder: Any, repeats: int) -> dict[str, 
                         "chunk_access": chunk_access(case),
                     })  # fmt: skip
         return {
-            "name": "statement_forms", "created_at": utc_now(), "k": K, "repeats": repeats,
+            "name": "statement_forms", "created_at": utc_now(), "k": k, "repeats": repeats,
             "n_queries": n_queries, "n_chunks": int(ids.shape[0]),
             **db.vector_index_info(conn),
             "results": results,
@@ -336,7 +358,7 @@ def forms_markdown(report: dict[str, Any]) -> str:
         f"{report['index_m']}, the {n} corpus claims as queries, k = {report['k']}, "
         f"{report['repeats']} timed passes after one untimed pass, the forms taking turns query "
         "by query. \"Equal to exact\" counts the claims whose hit list is, in order, NumPy's exact "
-        "top 10 of the chunks that pass the predicate. \"Rows read\" is the median over the claims "
+        f"top {report['k']} of the chunks that pass the predicate. \"Rows read\" is the median over the claims "
         "of `r_rows` for `chunk` in `ANALYZE`. \"Chunk access\" is the type and key of `chunk` in "
         "`EXPLAIN`. The `mhnsw_ef_search` values were run one after the other, so compare times "
         "inside one value."),
@@ -357,7 +379,7 @@ def forms_markdown(report: dict[str, Any]) -> str:
         "",
         ("- The bare statement is the HNSW search: it reads `LIMIT` rows. On the graph now in the "
         f"database its list was the exact one for {per_ef(bare, 'equal_to_exact')} of {n} claims. "
-        "Other builds of the graph differ (`results/build_variance.md`)."),
+        "Other builds of the graph differ (the `builds` part measures by how much)."),
         ("- A predicate on the indexed table itself does not stop that search at `LIMIT`: the "
         "server keeps taking rows from the index until `k` of them pass. "
         f"{sum(row['short'] for row in predicate)} of the {len(predicate) * n} answers were short "
@@ -455,21 +477,43 @@ def agreement(
             "swap_gap_max": gap, "not_ascending": not_ascending}
 
 
-def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[str, Any]:
-    """Run the filtered statement with its join order fixed and free; return the report."""
-    from run_experiments import PLANNER_CASES  # the same filters as results/planner_choices.md
+def measure_join_order(
+    settings: Settings,
+    embedder: Any,
+    repeats: int,
+    k: int = K,
+    cases: Sequence[tuple[str, searchmod.Filters, int | None]] | None = None,
+    sample: int | None = None,
+    seed: int = SAMPLE_SEED,
+    taking_turns: bool = True,
+) -> dict[str, Any]:
+    """Run the filtered statement with its join order fixed and free; return the report.
+
+    ``cases`` are ``(name, filters, expected passing chunks or None)``; the default is the
+    filters of the ``planner`` experiment (results/planner_choices.md). A case whose statement
+    keeps another number of chunks than expected stops the run. ``sample`` takes that many
+    claims, drawn with ``random.Random(seed)`` and kept in claim order, instead of all of them.
+    Without ``taking_turns`` each form is timed alone only.
+    """
+    if cases is None:
+        from run_experiments import PLANNER_CASES
+
+        cases = [(name, filters, None) for name, filters in PLANNER_CASES]
 
     conn = db.connect(settings)
     try:
         truths = evaluate.load_ground_truth(conn)
         if not truths:
             raise SystemExit("the claim table is empty: run 'wikilense ingest' first")
+        n_claims_total = len(truths)
+        truths = sample_claims(truths, sample, seed)
         queries = np.asarray(embedder.embed_queries([t.text for t in truths]), dtype=np.float32)
         separate._quiet_torch()
         n_queries = len(truths)
         with conn.cursor() as cur:
             cur.execute(CHUNK_COUNT_SQL)
             n_chunks = int(cur.fetchone()[0])
+
         def hits_of(sql: str, params: tuple[Any, ...]) -> list[tuple[int, float]]:
             """(chunk_id, distance) in the order the server returned the rows."""
             with conn.cursor() as cur:
@@ -479,10 +523,10 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
         results: list[dict[str, Any]] = []
         merged_tables: list[dict[str, Any]] = []
         with searchmod.ef_search_session(conn, JOIN_ORDER_EF):
-            for name, filters in PLANNER_CASES:
+            for name, filters, expected in cases:
                 statements: list[tuple[str, tuple[Any, ...], str, str]] = []
                 for query in queries:
-                    sql, params = searchmod.search_statement(query, K, filters, "inline")
+                    sql, params = searchmod.search_statement(query, k, filters, "inline")
                     statements.append((sql, params, free_order(sql), scan_form(sql)))
 
                 def answer_of(form: int, stmts: list = statements) -> Callable[[int], list[Any]]:
@@ -491,17 +535,24 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
                 scans = [hits_of(stmt[3], stmt[1]) for stmt in statements]
                 sql0, params0 = searchmod.search_statement(queries[0], n_chunks, filters, "inline")
                 passing = len(hits_of(scan_form(sql0), params0))
-                timed = separate.time_methods([answer_of(0), answer_of(2)], n_queries, repeats)
+                if expected is not None and passing != expected:
+                    raise SystemExit(f"filter {name!r}: the statement keeps {passing} chunks, "
+                                     f"the filter file says {expected}")
+                timed: list[Any] = (
+                    separate.time_methods([answer_of(0), answer_of(2)], n_queries, repeats)
+                    if taking_turns else [None, None]
+                )
                 # Each form alone as well: when the two take turns, a form that reads thousands
                 # of rows slows the other one's next run (measured: 2.2 against 2.6 ms).
                 alone = [
-                    separate.time_methods([answer_of(form)], n_queries, repeats)[0][0]
+                    separate.time_methods([answer_of(form)], n_queries, repeats)[0]
                     for form in (0, 2)
                 ]
                 row: dict[str, Any] = {"filter": name, "passing_chunks": passing}
-                for key, form, (samples, lists), own in zip(
+                for key, form, turn, (own, own_lists) in zip(
                     ("as_written", "free"), (0, 2), timed, alone, strict=True
                 ):
+                    lists = own_lists if turn is None else turn[1]
                     plans: Counter[str] = Counter()
                     read: list[float] = []
                     first_plan = [
@@ -515,14 +566,14 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
                             # r_rows is an average per loop: the product is a whole number
                             read.append(float(round(chunk_rows_read(json.loads(cur.fetchone()[0])))))
                     stats = evaluate.latency_stats(own)
-                    turns = evaluate.latency_stats(samples)
+                    turns = None if turn is None else evaluate.latency_stats(turn[0])
                     plan, plan_count = plans.most_common(1)[0]
                     row[key] = {
                         "plan": plan, "plan_count": plan_count, "plans": dict(plans),
                         "explain_first_claim": first_plan,
                         "chunk_rows_read_p50": median(read), "chunk_rows_read_max": max(read),
                         "p50_ms": round(stats.p50_ms, 3), "p95_ms": round(stats.p95_ms, 3),
-                        "p50_ms_taking_turns": round(turns.p50_ms, 3),
+                        "p50_ms_taking_turns": None if turns is None else round(turns.p50_ms, 3),
                         **agreement(lists, scans),
                     }  # fmt: skip
                 results.append(row)
@@ -545,7 +596,9 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
                     "lists_with_a_chunk_twice": duplicates,
                 })  # fmt: skip
         return {
-            "name": "join_order", "created_at": utc_now(), "k": K, "repeats": repeats,
+            "name": "join_order", "created_at": utc_now(), "k": k, "repeats": repeats,
+            "n_claims_total": n_claims_total, "sample": sample, "seed": seed if sample else None,
+            "taking_turns": taking_turns,
             "ef_search": JOIN_ORDER_EF, "n_queries": n_queries, "n_chunks": n_chunks,
             **db.vector_index_info(conn),
             "results": results,
@@ -553,7 +606,7 @@ def measure_join_order(settings: Settings, embedder: Any, repeats: int) -> dict[
             "filters": {
                 name: {key: (str(value) if isinstance(value, date) else value)
                        for key, value in asdict(filters).items() if value is not None}
-                for name, filters in PLANNER_CASES
+                for name, filters, _ in cases
             },
             "ingest_meta": evaluate.read_ingest_meta(conn),
             "machine": evaluate.machine_info(embedder), "versions": evaluate.versions_info(conn),
@@ -568,16 +621,32 @@ def join_order_markdown(report: dict[str, Any]) -> str:
 
     def cells(side: dict[str, Any]) -> str:
         plan = side["plan"] if side["plan_count"] == n else f"{side['plan']} ({side['plan_count']}/{n})"
+        turns = side.get("p50_ms_taking_turns")
         return (f"{plan} | {side['chunk_rows_read_p50']:.0f} | {side['p50_ms']:.2f} "
-                f"({side['p50_ms_taking_turns']:.2f}) | "
+                f"{'' if turns is None else f'({turns:.2f}) '}| "
                 f"{side['same_rows_as_scan']} / {side['same_order_as_scan']} |")
+
+    turns_on = report.get("taking_turns", True)
+    if report.get("sample"):
+        claims = (f"a random sample of {n} of the {report['n_claims_total']:,} corpus claims as "
+                  f"queries (`random.Random({report['seed']})`)")
+    else:
+        claims = f"the {n} corpus claims as queries"
+    turns_text = (
+        "In brackets is the same median when the two forms take turns query by query. Taking "
+        "turns guards against the machine drifting between two blocks, but a form that reads "
+        "thousands of rows slows down the other form's next run, so the bracketed time of the "
+        "faster form is the larger one."
+        if turns_on else "Each form was timed alone only, the two forms one after the other."
+    )
+    p50_head = "p50 ms (taking turns)" if turns_on else "p50 ms"
 
     lines = [
         "# The filtered statement with its join order fixed, and left to the optimizer",
         "",
         (f"Generated {report['created_at']} by `scripts/measure_index_behaviour.py join_order` on "
         f"MariaDB {report['versions']['mariadb']}: {report['n_chunks']:,} chunks, index M = "
-        f"{report['index_m']}, the {n} corpus claims as queries, k = {report['k']}, "
+        f"{report['index_m']}, {claims}, k = {report['k']}, "
         f"`mhnsw_ef_search` {report['ef_search']}. \"As written\" is the "
         "statement `wikilense query` runs: `STRAIGHT_JOIN`, `chunk` first. \"Free\" is the same "
         "text with every `STRAIGHT_JOIN` replaced by `JOIN`, so the optimizer picks the order. "
@@ -588,13 +657,10 @@ def join_order_markdown(report: dict[str, Any]) -> str:
         "order, as the same statement under `IGNORE INDEX (embedding)`, which reads and sorts "
         "every chunk. \"p50 ms\" is the median time of the statement and the fetch of its rows "
         f"(without the Python sort that `wikilense` adds) when the form runs alone: one untimed "
-        f"pass over the claims, then {report['repeats']} timed passes. In brackets is the same "
-        "median when the two forms take turns query by query. Taking turns guards against the "
-        "machine drifting between two blocks, but a form that reads thousands of rows slows down "
-        "the other form's next run, so the bracketed time of the faster form is the larger one."),
+        f"pass over the claims, then {report['repeats']} timed passes. " + turns_text),
         "",
-        ("| Filter | Chunks passing | As written: plan | Rows read | p50 ms (taking turns) "
-        "| Same rows / order | Free: plan | Rows read | p50 ms (taking turns) | Same rows / order |"),
+        (f"| Filter | Chunks passing | As written: plan | Rows read | {p50_head} "
+        f"| Same rows / order | Free: plan | Rows read | {p50_head} | Same rows / order |"),
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:
@@ -703,8 +769,18 @@ def identical_between_builds(builds: Sequence[Sequence[Sequence[int]]]) -> list[
     ]
 
 
-def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, Any]:
-    """Build the index ``builds`` times per M on a scratch table and search each build."""
+def measure_builds(
+    settings: Settings, embedder: Any, builds: int, k: int = K, ms: Sequence[int] | None = None
+) -> dict[str, Any]:
+    """Build the index ``builds`` times per M on a scratch table and search each build.
+
+    ``ms`` picks the values of ``M`` (each must be a key of ``BUILD_CREATE_SQL``); the default
+    is all of them.
+    """
+    ms = tuple(BUILD_CREATE_SQL) if ms is None else tuple(ms)
+    unknown = [m for m in ms if m not in BUILD_CREATE_SQL]
+    if unknown:
+        raise SystemExit(f"no scratch-table statement for M = {unknown}; choose from {sorted(BUILD_CREATE_SQL)}")
     if settings.test_db_name == settings.db_name:
         raise SystemExit("the builds experiment needs a test database other than the corpus")
     corpus = db.connect(settings)
@@ -731,20 +807,21 @@ def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, 
     separate._quiet_torch()
     everything = np.arange(ids.shape[0])
     exact = [
-        separate.top_k(vectors, queries[i].astype(np.float64), ids, K, everything)
+        separate.top_k(vectors, queries[i].astype(np.float64), ids, k, everything)
         for i in range(len(truths))
     ]
 
     def recalled(lists: Sequence[Sequence[int]]) -> int:
         return sum(
             1 for hits, truth in zip(lists, truths, strict=True)
-            if evaluate.article_recall_at_k([page_of[c] for c in hits], truth.gold_pages, K)
+            if evaluate.article_recall_at_k([page_of[c] for c in hits], truth.gold_pages, k)
         )
 
     conn = db.connect(settings, database=settings.test_db_name)
     results: list[dict[str, Any]] = []
     try:
-        for m, create_sql in BUILD_CREATE_SQL.items():
+        for m in ms:
+            create_sql = BUILD_CREATE_SQL[m]
             lists: dict[int, list[list[list[int]]]] = {ef: [] for ef in BUILD_EF}
             seconds: list[float] = []
             for _ in range(builds):
@@ -760,7 +837,7 @@ def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, 
                     with searchmod.ef_search_session(conn, ef), conn.cursor() as cur:
                         found = []
                         for query in queries:
-                            cur.execute(BUILD_KNN_SQL, (db.vec_param(query), K))
+                            cur.execute(BUILD_KNN_SQL, (db.vec_param(query), k))
                             found.append([int(row[0]) for row in cur.fetchall()])
                     lists[ef].append(found)
                 conn.commit()
@@ -778,7 +855,10 @@ def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, 
                                        for got, want in zip(found, exact, strict=True)]))
                         for found in per_build
                     ]),
-                    "identical_between_two_builds": spread(identical_between_builds(per_build)),
+                    # One build has no pair to compare.
+                    "identical_between_two_builds": (
+                        spread(identical_between_builds(per_build)) if builds > 1 else None
+                    ),
                     "build_seconds": spread(seconds),
                 })  # fmt: skip
         with conn.cursor() as cur:
@@ -787,7 +867,7 @@ def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, 
     finally:
         conn.close()
     return {
-        "name": "build_variance", "created_at": utc_now(), "k": K, "n_queries": len(truths),
+        "name": "build_variance", "created_at": utc_now(), "k": k, "ms": list(ms), "n_queries": len(truths),
         "n_chunks": int(ids.shape[0]), "builds": builds, "batch": BUILD_BATCH,
         "exact_article_recall": recalled(exact),
         "results": results, "ingest_meta": meta,
@@ -798,7 +878,9 @@ def measure_builds(settings: Settings, embedder: Any, builds: int) -> dict[str, 
 def builds_markdown(report: dict[str, Any]) -> str:
     n = report["n_queries"]
 
-    def whole(values: dict[str, float]) -> str:
+    def whole(values: dict[str, float] | None) -> str:
+        if values is None:
+            return "-"
         low, mid, high = values["min"], values["median"], values["max"]
         if low == high:
             return f"{low:g}"
@@ -815,11 +897,11 @@ def builds_markdown(report: dict[str, Any]) -> str:
         f"claims, k = {report['k']}, the bare statement. \"Article recall\" counts the claims "
         "with a gold page among the pages of the hits; NumPy's exact ranking of the same vectors "
         f"gives {report['exact_article_recall']} of {n}. \"Equal to exact\" counts the claims "
-        "whose hit list is NumPy's exact top 10 in order. \"Two builds agree\" counts, for each "
+        f"whose hit list is NumPy's exact top {report['k']} in order. \"Two builds agree\" counts, for each "
         "pair of builds, the claims with identical hit lists. Each cell is the smallest to the "
         "largest value over the builds (or pairs), one number when they are all the same."),
         "",
-        (f"| M | ef_search | Article recall@10, of {n} | Equal to exact, of {n} "
+        (f"| M | ef_search | Article recall@{report['k']}, of {n} | Equal to exact, of {n} "
         f"| Overlap with exact | Two builds agree, of {n} | Build, s |"),
         "|---|---|---|---|---|---|---|",
     ]
@@ -837,7 +919,7 @@ def builds_markdown(report: dict[str, Any]) -> str:
         "The statements (`M` is part of the table definition; the vector and `k` are bound):",
         "",
         "```sql",
-        *(sql + ";" for sql in BUILD_CREATE_SQL.values()),
+        *(BUILD_CREATE_SQL[m] + ";" for m in report.get("ms", BUILD_CREATE_SQL)),
         BUILD_INSERT_SQL + ";",
         BUILD_KNN_SQL + ";",
         "```",
@@ -851,12 +933,22 @@ def builds_markdown(report: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------------------------
 
 
-def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, Any]:
+def measure_cache(
+    settings: Settings,
+    embedder: Any,
+    passes: int,
+    k: int = K,
+    sizes_mb: Sequence[int] = CACHE_SIZES_MB,
+) -> dict[str, Any]:
     """Search with the index cache at several sizes; return the report.
 
-    The configured ``mhnsw_max_cache_size`` is read first and restored at the end, also when a
-    step fails.
+    ``sizes_mb`` are the sizes set after the configured one, in the order given; the smallest
+    is also measured once without reopening the table. The configured
+    ``mhnsw_max_cache_size`` is read first and restored at the end, also when a step fails.
     """
+    sizes_mb = tuple(int(size) for size in sizes_mb)
+    if not sizes_mb or min(sizes_mb) < 1:
+        raise SystemExit("the cache sizes must be whole megabytes, at least 1")
     import run_experiments  # the route to root inside the container
 
     try:
@@ -888,7 +980,7 @@ def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, A
     separate._quiet_torch()
     everything = np.arange(ids.shape[0])
     exact = [
-        separate.top_k(vectors, queries[i].astype(np.float64), ids, K, everything)
+        separate.top_k(vectors, queries[i].astype(np.float64), ids, k, everything)
         for i in range(len(truths))
     ]
 
@@ -904,7 +996,7 @@ def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, A
                         lists = []
                         for query in queries:
                             started = time.perf_counter()
-                            hits = searchmod.search(reader, query, k=K, strategy=strategy)
+                            hits = searchmod.search(reader, query, k=k, strategy=strategy)
                             times[strategy].append((time.perf_counter() - started) * 1000.0)
                             lists.append([hit.chunk_id for hit in hits])
                         found[strategy].append(lists)
@@ -923,7 +1015,7 @@ def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, A
                 "article_recall": [
                     sum(1 for hits, truth in zip(lists, truths, strict=True)
                         if evaluate.article_recall_at_k([page_of[c] for c in hits],
-                                                        truth.gold_pages, K))
+                                                        truth.gold_pages, k))
                     for lists in per_pass
                 ],
                 "overlap_with_exact": [
@@ -931,7 +1023,7 @@ def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, A
                                          for got, want in zip(lists, exact, strict=True)])), 4)
                     for lists in per_pass
                 ],
-                "short": [sum(1 for got in lists if len(got) < K) for lists in per_pass],
+                "short": [sum(1 for got in lists if len(got) < k) for lists in per_pass],
                 "identical_between_two_passes": identical_between_builds(per_pass),
                 "p50_ms": round(evaluate.latency_stats(times[strategy]).p50_ms, 3),
             })  # fmt: skip
@@ -941,11 +1033,11 @@ def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, A
     restored = None
     try:
         results += step("as configured", configured, reopened=False)
-        smallest = CACHE_SIZES_MB[-1]
-        server.root_sql(CACHE_SET_SQL[smallest])
+        smallest = min(sizes_mb)
+        server.root_sql(cache_set_sql(smallest))
         results += step(f"{smallest} MB, table not reopened", smallest * MEBIBYTE, reopened=False)
-        for size in CACHE_SIZES_MB:
-            server.root_sql(CACHE_SET_SQL[size])
+        for size in sizes_mb:
+            server.root_sql(cache_set_sql(size))
             server.root_sql(CHUNK_FLUSH_SQL, database=settings.db_name)
             results += step(f"{size} MB", size * MEBIBYTE, reopened=True)
     finally:
@@ -954,12 +1046,12 @@ def measure_cache(settings: Settings, embedder: Any, passes: int) -> dict[str, A
         restored = int(server.root_sql(CACHE_GET_SQL)[0][0])
     results += step("as configured, again", restored, reopened=True)
     return {
-        "name": "cache_size", "created_at": utc_now(), "k": K, "passes": passes,
+        "name": "cache_size", "created_at": utc_now(), "k": k, "sizes_mb": list(sizes_mb), "passes": passes,
         "ef_search": CACHE_EF, "n_queries": len(truths), "n_chunks": int(ids.shape[0]),
         "configured_cache_bytes": configured, "restored_cache_bytes": restored,
         "exact_article_recall": sum(
             1 for hits, truth in zip(exact, truths, strict=True)
-            if evaluate.article_recall_at_k([page_of[c] for c in hits], truth.gold_pages, K)
+            if evaluate.article_recall_at_k([page_of[c] for c in hits], truth.gold_pages, k)
         ),
         **index, "results": results, "ingest_meta": meta,
         "machine": evaluate.machine_info(embedder), "versions": versions,
@@ -987,10 +1079,10 @@ def cache_markdown(report: dict[str, Any]) -> str:
         f"claims are searched in {report['passes']} passes with the bare statement and with the "
         "joined one, through `wikilense.search.search`, which sorts the returned rows by "
         "distance and chunk id. \"Equal to exact\" counts, per pass, the claims whose hit list "
-        "is NumPy's exact top 10 in order. \"Two passes agree\" counts, for each pair of passes, "
+        f"is NumPy's exact top {report['k']} in order. \"Two passes agree\" counts, for each pair of passes, "
         "the claims with identical lists. The times are of the whole call."),
         "",
-        (f"| Cache | Statement | Equal to exact, of {n}, per pass | Article recall@10, of {n} "
+        (f"| Cache | Statement | Equal to exact, of {n}, per pass | Article recall@{report['k']}, of {n} "
         f"| Overlap with exact | Short | Two passes agree, of {n} | p50 ms |"),
         "|---|---|---|---|---|---|---|---|",
     ]
@@ -1010,7 +1102,7 @@ def cache_markdown(report: dict[str, Any]) -> str:
         "`wikilense/search.py`; the settings statements are:"),
         "",
         "```sql",
-        *(sql + ";" for sql in CACHE_SET_SQL.values()),
+        *(cache_set_sql(size) + ";" for size in report.get("sizes_mb", CACHE_SIZES_MB)),
         CHUNK_FLUSH_SQL + ";",
         "```",
         "",
@@ -1576,6 +1668,17 @@ def isolation_markdown(report: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------------------------
 
 
+def _positive_ints(text: str) -> tuple[int, ...]:
+    """Parse a comma-separated list of positive integers (an argparse type)."""
+    try:
+        values = tuple(int(part) for part in text.split(","))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"expected comma-separated integers, got {text!r}") from exc
+    if not values or min(values) < 1:
+        raise argparse.ArgumentTypeError(f"expected positive integers, got {text!r}")
+    return values
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("parts", nargs="*", metavar="PART",
@@ -1583,38 +1686,87 @@ def main(argv: Sequence[str] | None = None) -> int:
                              "(default: all)")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "results",
                         help="output directory (default: results/ in the repository)")
+    parser.add_argument("--database",
+                        help="the corpus database to measure (default: WIKILENSE_DB_NAME); the "
+                             "scratch tables of builds and isolation stay in the test database")
+    parser.add_argument("--k", type=int, default=K,
+                        help=f"hits per query for forms, join_order, builds and cache (default {K})")
+    parser.add_argument("--filters", type=Path,
+                        help="join_order: the filter cases of a scripts/scaled_filters.py file "
+                             "instead of the planner experiment's")
+    parser.add_argument("--cache-mb", type=_positive_ints, default=CACHE_SIZES_MB,
+                        help="cache: the sizes in MB, in the order to set them (default "
+                             + ",".join(str(size) for size in CACHE_SIZES_MB) + ")")
+    parser.add_argument("--repeats", type=int,
+                        help=f"timed passes per claim for forms ({FORMS_REPEATS}) and join_order "
+                             f"({JOIN_ORDER_REPEATS}), after one untimed pass")
+    parser.add_argument("--passes", type=int, default=CACHE_PASSES,
+                        help=f"cache: passes over the claims per size (default {CACHE_PASSES})")
+    parser.add_argument("--sample", type=int,
+                        help=f"join_order: a random sample of this many claims (seed {SAMPLE_SEED})")
+    parser.add_argument("--no-turns", action="store_true",
+                        help="join_order: time each form alone only, not also taking turns")
+    parser.add_argument("--builds", type=int, default=BUILDS,
+                        help=f"builds: graph builds per M (default {BUILDS})")
+    parser.add_argument("--build-m", type=_positive_ints, default=tuple(BUILD_CREATE_SQL),
+                        help="builds: the values of M (default "
+                             + ",".join(str(m) for m in BUILD_CREATE_SQL) + ")")
     args = parser.parse_args(argv)
     parts = args.parts or list(PARTS)
     unknown = [part for part in parts if part not in PARTS]
     if unknown:
         parser.error(f"unknown part(s) {unknown}; choose from {', '.join(PARTS)}")
+    optional = [value for value in (args.repeats, args.sample) if value is not None]
+    if min(args.k, args.builds, args.passes, *optional) < 1:
+        parser.error("--k, --builds, --passes, --repeats and --sample must be at least 1")
+    if args.passes < 2 and "cache" in (args.parts or PARTS):
+        parser.error("--passes must be at least 2: the cache part compares two passes")
     settings = load_settings()
+    if args.database:
+        if args.database == settings.test_db_name:
+            parser.error("--database names the test database; measure a corpus database")
+        settings = replace(settings, db_name=args.database)
+    if (settings.db_name != Settings.__dataclass_fields__["db_name"].default
+            and args.out.resolve() == (REPO_ROOT / "results").resolve()):
+        parser.error(f"{settings.db_name} is not the 100-page corpus: give --out a folder of "
+                     "its own, so the files in results/ are not overwritten")
+    cases = None
+    if args.filters is not None:
+        from scaled_filters import load_cases
+
+        cases = load_cases(args.filters)
     args.out.mkdir(parents=True, exist_ok=True)
     for part in dict.fromkeys(parts):
         started = time.perf_counter()
         if part == "forms":
             from wikilense.cli import make_embedder
 
-            report = measure_forms(settings, make_embedder(settings), FORMS_REPEATS)
+            report = measure_forms(settings, make_embedder(settings), args.repeats or FORMS_REPEATS,
+                                   k=args.k)
             text = forms_markdown(report)
         elif part == "join_order":
             from wikilense.cli import make_embedder
 
-            report = measure_join_order(settings, make_embedder(settings), JOIN_ORDER_REPEATS)
+            report = measure_join_order(settings, make_embedder(settings),
+                                        args.repeats or JOIN_ORDER_REPEATS, k=args.k, cases=cases,
+                                        sample=args.sample, taking_turns=not args.no_turns)
             text = join_order_markdown(report)
         elif part == "builds":
             from wikilense.cli import make_embedder
 
-            report = measure_builds(settings, make_embedder(settings), BUILDS)
+            report = measure_builds(settings, make_embedder(settings), args.builds, k=args.k,
+                                    ms=args.build_m)
             text = builds_markdown(report)
         elif part == "cache":
             from wikilense.cli import make_embedder
 
-            report = measure_cache(settings, make_embedder(settings), CACHE_PASSES)
+            report = measure_cache(settings, make_embedder(settings), args.passes, k=args.k,
+                                   sizes_mb=args.cache_mb)
             text = cache_markdown(report)
         else:
             report = measure_isolation(settings, ISOLATION_TRIALS, ISOLATION_CONTROL_TRIALS)
             text = isolation_markdown(report)
+        report["database"] = settings.db_name
         stem = report["name"]
         (args.out / f"{stem}.json").write_text(
             json.dumps(report, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8"

@@ -30,7 +30,7 @@ def test_every_statement_is_a_fixed_literal_with_bound_parameters(mib: Any) -> N
         mib.PROBE_FLUSH_SQL, mib.PROBE_EF_SQL, mib.LOCK_WAIT_SQL, mib.SERVER_STATE_SQL, *mib.ISOLATION_LEVELS.values(),
         mib.BUILD_DROP_SQL, mib.BUILD_INSERT_SQL, mib.BUILD_KNN_SQL, mib.CHUNK_PAGE_EXPORT_SQL,
         *mib.BUILD_CREATE_SQL.values(),
-        mib.CACHE_GET_SQL, mib.CHUNK_FLUSH_SQL, *mib.CACHE_SET_SQL.values(),
+        mib.CACHE_GET_SQL, mib.CHUNK_FLUSH_SQL, *(mib.cache_set_sql(size) for size in mib.CACHE_SIZES_MB),
     ]
     for statement in statements:
         assert "{" not in statement and "%(" not in statement, statement
@@ -230,10 +230,14 @@ def test_the_build_tables_differ_in_m_only_and_copy_the_chunk_index(mib: Any) ->
 
 def test_the_cache_statements_set_whole_megabytes_from_the_default_down(mib: Any) -> None:
     assert mib.CACHE_SIZES_MB == (16, 8, 4, 2, 1)
-    assert mib.CACHE_SET_SQL[16] == "SET GLOBAL mhnsw_max_cache_size = 16777216"  # the default
-    assert mib.CACHE_SET_SQL[1] == "SET GLOBAL mhnsw_max_cache_size = 1048576"  # the minimum
-    for size, statement in mib.CACHE_SET_SQL.items():
-        assert statement.endswith(f" = {size * 1024 * 1024}")
+    assert mib.cache_set_sql(16) == "SET GLOBAL mhnsw_max_cache_size = 16777216"  # the default
+    assert mib.cache_set_sql(1) == "SET GLOBAL mhnsw_max_cache_size = 1048576"  # the minimum
+    for size in (*mib.CACHE_SIZES_MB, 192, 512):
+        assert mib.cache_set_sql(size).endswith(f" = {size * 1024 * 1024}")
+    # The size is written into the statement, so only a positive int is accepted.
+    for bad in (0, -1, 1.5, "16", True):
+        with pytest.raises(ValueError):
+            mib.cache_set_sql(bad)
     assert mib.CHUNK_FLUSH_SQL == "FLUSH TABLES chunk"
 
 
@@ -379,3 +383,33 @@ def test_the_isolation_report_states_what_was_seen_and_what_cleared_it(mib: Any)
     assert "After `FLUSH TABLES`" not in without_docker
     # no conclusion about the stored index without the measurement behind it
     assert "the index as stored was right" not in without_docker
+
+
+def test_a_claim_sample_is_a_fixed_draw_in_claim_order(mib: Any) -> None:
+    claims = list(range(100, 130))
+    first = mib.sample_claims(claims, 10, seed=5)
+    assert first == mib.sample_claims(claims, 10, seed=5)  # the same draw every run
+    assert first == sorted(first) and len(set(first)) == 10 and set(first) <= set(claims)
+    assert mib.sample_claims(claims, 10, seed=6) != first
+    assert mib.sample_claims(claims, None) == claims
+    assert mib.sample_claims(claims, 99) == claims  # not smaller than the population: all
+    with pytest.raises(ValueError):
+        mib.sample_claims(claims, 0)
+
+
+def test_the_builds_report_of_a_single_build_has_no_agreement_between_builds(mib: Any) -> None:
+    one = {"min": 74, "median": 74, "max": 74}
+    report = {
+        "name": "build_variance", "created_at": "2026-11-19T00:00:00+00:00", "k": 5,
+        "n_queries": 75, "n_chunks": 4598, "builds": 1, "batch": 500, "exact_article_recall": 74,
+        "ms": [16], "versions": {"mariadb": "11.8.9"},
+        "results": [
+            {"m": 16, "ef_search": 100, "builds": 1, "article_recall": one, "equal_to_exact": one,
+             "overlap_with_exact": {"min": 0.99, "median": 0.99, "max": 0.99},
+             "identical_between_two_builds": None,
+             "build_seconds": {"min": 1.5, "median": 1.5, "max": 1.5}},
+        ],
+    }
+    text = mib.builds_markdown(report)
+    assert "| 16 | 100 | 74 | 74 | 0.990 to 0.990 | - | 1.5 to 1.5 |" in text
+    assert mib.BUILD_CREATE_SQL[16] + ";" in text and mib.BUILD_CREATE_SQL[6] + ";" not in text

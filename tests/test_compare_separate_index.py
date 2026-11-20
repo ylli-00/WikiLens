@@ -235,3 +235,38 @@ def test_the_export_statements_take_no_parameters(compare: Any) -> None:
     for statement in (compare.EXPORT_CHUNKS_SQL, compare.EXPORT_PAGES_SQL,
                       compare.EXPORT_CATEGORIES_SQL, compare.EXPORT_LINKS_SQL):
         assert statement.startswith("SELECT ") and "%" not in statement and "{" not in statement
+
+
+def test_four_filter_pages_keeps_the_time_of_a_datetime_threshold(compare: Any) -> None:
+    copy = _copy(compare)
+    # Page 1 was edited at midnight on 2020-12-05: a threshold one second later drops it, as
+    # the SQL statement does; a date threshold on that day keeps it.
+    later = datetime(2020, 12, 5, 0, 0, 1, tzinfo=timezone.utc).replace(tzinfo=None)
+    assert compare.four_filter_pages(copy, Filters(edited_since=later)) == set()
+    assert compare.four_filter_pages(copy, Filters(edited_since=date(2020, 12, 5))) == {1}
+    aware = datetime(2020, 12, 5, 1, 0, 0, tzinfo=timezone.utc)
+    assert compare.four_filter_pages(copy, Filters(edited_since=aware)) == set()
+
+
+def test_filter_cases_take_the_four_filters_from_a_filter_file(compare: Any, tmp_path: Any) -> None:
+    import json
+
+    assert compare.filter_cases(None) == compare.FILTER_CASES
+    path = tmp_path / "filters.json"
+    path.write_text(json.dumps({"cases": [
+        {"name": "none", "filters": {}, "passing_chunks": 6},
+        {"name": "four_filters", "passing_chunks": 2, "filters": {
+            "category": "States", "min_words": 1000, "edited_since": "2020-12-01T12:30:00",
+            "linked_from": "Asia"}},
+    ]}), encoding="utf-8")
+    history, four = compare.filter_cases(path)
+    assert history == compare.FILTER_CASES[0]
+    assert four.key == "four_filters"
+    assert four.filters == Filters(category="States", min_words=1000,
+                                   edited_since=datetime(2020, 12, 1, 12, 30, tzinfo=timezone.utc).replace(tzinfo=None),
+                                   linked_from="Asia")
+    assert "1,000 words" in four.label and "2020-12-01T12:30:00" in four.label
+    path.write_text(json.dumps({"cases": [{"name": "none", "filters": {}, "passing_chunks": 6}]}),
+                    encoding="utf-8")
+    with pytest.raises(SystemExit):
+        compare.filter_cases(path)

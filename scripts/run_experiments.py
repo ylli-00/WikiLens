@@ -1539,7 +1539,11 @@ def group_restore(ctx: Context) -> None:
 
 
 def _probe_overlaps(
-    conn: pymysql.Connection, queries: np.ndarray, exact: list[set[int]], efs: Sequence[int]
+    conn: pymysql.Connection,
+    queries: np.ndarray,
+    exact: list[set[int]],
+    efs: Sequence[int],
+    k: int = UNCOMMITTED_K,
 ) -> dict[str, dict[str, float]]:
     """Search ``uncommitted_probe`` for every query at each ef; return per ef the mean and the
     minimum overlap of the k ids with the exact top k, and the p50 / p95 statement time (ms)."""
@@ -1551,10 +1555,10 @@ def _probe_overlaps(
         for query, truth in zip(queries, exact):
             with conn.cursor() as cur:
                 start = time.perf_counter()
-                cur.execute(UNCOMMITTED_KNN_SQL, (db.vec_param(query), UNCOMMITTED_K))
+                cur.execute(UNCOMMITTED_KNN_SQL, (db.vec_param(query), k))
                 found = {int(row[0]) for row in cur.fetchall()}
                 times.append((time.perf_counter() - start) * 1000)
-            overlaps.append(len(found & truth) / UNCOMMITTED_K)
+            overlaps.append(len(found & truth) / k)
         out[str(ef)] = {
             "mean_overlap": round(float(np.mean(overlaps)), 4),
             "min_overlap": round(float(min(overlaps)), 4),
@@ -1573,7 +1577,7 @@ def _fill_probe(conn: pymysql.Connection, vectors: np.ndarray) -> None:
 
 
 def measure_uncommitted(
-    conn: pymysql.Connection, vectors: np.ndarray, queries: np.ndarray
+    conn: pymysql.Connection, vectors: np.ndarray, queries: np.ndarray, k: int = UNCOMMITTED_K
 ) -> dict[str, Any]:
     """One build: fill a fresh ``uncommitted_probe`` in a transaction, search it before COMMIT,
     roll back, fill it again, COMMIT and search again. Each state gets one untimed warm-up pass
@@ -1584,15 +1588,15 @@ def measure_uncommitted(
     exact = []
     for query in queries:
         q = query.astype(np.float64) / np.linalg.norm(query)
-        exact.append({int(i) + 1 for i in np.argsort(1.0 - unit @ q)[:UNCOMMITTED_K]})
+        exact.append({int(i) + 1 for i in np.argsort(1.0 - unit @ q)[:k]})
     with conn.cursor() as cur:
         cur.execute(UNCOMMITTED_DROP_SQL)
         cur.execute(UNCOMMITTED_CREATE_SQL)  # DDL commits: the transaction starts after it
     start = time.perf_counter()
     _fill_probe(conn, vectors)
     insert_uncommitted = time.perf_counter() - start
-    _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS[:1])  # untimed warm-up pass
-    before = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS)
+    _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS[:1], k)  # untimed warm-up pass
+    before = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS, k)
     conn.rollback()
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM uncommitted_probe")
@@ -1601,8 +1605,8 @@ def measure_uncommitted(
     _fill_probe(conn, vectors)
     conn.commit()
     insert_committed = time.perf_counter() - start
-    _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS[:1])  # untimed warm-up pass
-    after = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS)
+    _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS[:1], k)  # untimed warm-up pass
+    after = _probe_overlaps(conn, queries, exact, UNCOMMITTED_EFS, k)
     return {
         "rows": len(vectors), "queries": len(queries),
         "rows_left_after_rollback": left,
@@ -1679,13 +1683,15 @@ def uncommitted_rows(data: dict[str, Any]) -> list[list[Any]]:
     return rows
 
 
-def uncommitted_markdown(data: dict[str, Any]) -> str:
-    """The per-run Markdown file of the uncommitted group."""
+def uncommitted_markdown(
+    data: dict[str, Any], source: str = "`scripts/run_experiments.py uncommitted`"
+) -> str:
+    """The per-run Markdown file of the uncommitted group; ``source`` names what wrote it."""
     lines = [
         f"# {data['name']}",
         "",
         (
-            f"Created {data['created_at']} by `scripts/run_experiments.py uncommitted` on MariaDB "
+            f"Created {data['created_at']} by {source} on MariaDB "
             f"{data['mariadb_version']}. A scratch table with the chunk table's vector column and "
             "index (VECTOR(384), M=16, cosine) is filled inside one transaction and searched with "
             f"`ORDER BY VEC_DISTANCE_COSINE(embedding, ?) LIMIT {data['k']}` before COMMIT; the "
@@ -1700,8 +1706,8 @@ def uncommitted_markdown(data: dict[str, Any]) -> str:
         lines.append(f"- `{name}`: {dataset['label']}.")
     lines += [
         "",
-        md_table(("data", "state", "ef", "mean overlap@10 (builds)", "worst query", "p50 ms"),
-                 uncommitted_rows(data)),
+        md_table(("data", "state", "ef", f"mean overlap@{data['k']} (builds)", "worst query",
+                  "p50 ms"), uncommitted_rows(data)),
         "",
     ]
     for name, dataset in data["datasets"].items():
@@ -2173,7 +2179,10 @@ def summary_markdown(out_dir: Path) -> str:
         "the claims whose 20 hit chunk ids equal, in order, those of the exact ranking (the "
         "inline statement without filters, which does not depend on the HNSW graph)."
     )
-    parts: list[str] = ["# WikiLense experiments: summary", "", intro, ""]
+    scaled = ("This file is the record of `make experiments` on the 100-page demo corpus. The scaled "
+              "run (3,000 claims on two larger corpora) has its own files and summary in "
+              "[scaled/](scaled/) ([scaled/SUMMARY.md](scaled/SUMMARY.md)).")
+    parts: list[str] = ["# WikiLense experiments: summary", "", intro, "", scaled, ""]
     if header is not None:
         parts += [
             "## Machine and versions",
