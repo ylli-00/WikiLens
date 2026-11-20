@@ -166,11 +166,14 @@ wrong-dimension vector.
   `VEC_DISTANCE_COSINE`. PyMySQL 1.2.3 and later send `_binary X'<hex>'` by themselves. Versions
   1.2.0 to 1.2.2 do so only on a connection opened with `binary_prefix=True`, which `db.connect`
   sets for every version. `VEC_FromText(?)` with a JSON list and `UNHEX(?)` work everywhere. A
-  query vector of the wrong dimension returns `NULL` distances, silently.
+  query vector of the wrong dimension returns `NULL` distances, silently. MariaDB knows this:
+  [MDEV-35192](https://jira.mariadb.org/browse/MDEV-35192) was closed as documented.
 - A chunk inserted inside a transaction is visible to the index in the same connection, and gone
   after `ROLLBACK`. Another connection sees it only after `COMMIT`. `UPDATE` of an embedding
   changes the distance at once, `DELETE` removes it from the results, and deleting a page cascades
-  to its vectors. There is no synchronisation job and no second store. `sql/examples.sql`
+  to its vectors. There is no synchronisation job and no second store. One open report,
+  [MDEV-41227](https://jira.mariadb.org/browse/MDEV-41227), has rows become unreachable through a cosine vector index after
+  `ON DELETE CASCADE`. Our ingest builds the tables fresh and never cascades while measuring. `sql/examples.sql`
   (example 8) shows it from the `mariadb` client.
 - Every build of the HNSW graph is a different approximation; "The same vectors, built several
   times" measures the spread. Within one server process the results are deterministic while the
@@ -447,7 +450,8 @@ gold page for 2,943 claims.
 On the demo corpus the same holds at a smaller scale: with 8 MB or less for its 13.0 MB graph the
 hit lists were exact for only 57 to 67 of 75 claims, bare or joined (`results/cache_size.md`). So
 size `mhnsw_max_cache_size` with room above the graph's file: 512 MB holds S1's graph three times
-over.
+over. [MDEV-41649](https://jira.mariadb.org/browse/MDEV-41649) asks MariaDB for a larger default, for speed; the loss of recall
+below the graph's size is not in it.
 
 ## Isolation levels, and a reader that leaves the index stale
 
@@ -629,6 +633,18 @@ change with the graph build (and how much, over twenty builds per `M` on S1) and
 across a restart; the loss of
 exactness and of repeatability when the graph does not fit in `mhnsw_max_cache_size`; the stale
 index after a REPEATABLE READ reader.
+
+We searched MariaDB's JIRA for these on 2026-11-20. The stale index is
+[MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321), and the `NULL` distances are [MDEV-35192](https://jira.mariadb.org/browse/MDEV-35192).
+[MDEV-35768](https://jira.mariadb.org/browse/MDEV-35768) fixed the lost index for views and derived tables in 11.7.2.
+We found no ticket for these three:
+
+- the semi-join of `IN (subquery)`;
+- the tie-breaking `ORDER BY` key;
+- the lower recall over uncommitted rows.
+
+[MDEV-36869](https://jira.mariadb.org/browse/MDEV-36869), closed as not a bug, says the graph's cache cannot reproduce InnoDB's
+transactional semantics exactly.
 
 Two facts about the index come from its author's description, not from our measurements
 ([MariaDB Vector: How it works, part II](https://mariadb.org/mariadb-vector-how-it-works-part-ii/)

@@ -93,6 +93,53 @@ $ wikilense query "football club league titles" --k 3 --linked-from "AFC Ajax"
  1. 0.2935  Juventus F.C. > Honours  [chunk_id 4074, 214 words]
 ```
 
+Sometimes a filter is what finds the answer. Asked without one, the question below gets three
+passages from the page on Alexander the Great, and none of them names a country. The question says
+"UN member state", so `--category` can say it too. With it, all three hits are from Afghanistan,
+whose text says that Alexander invaded the region. The hit texts are cut here, after their first
+lines:
+
+```
+$ wikilense query "Which UN member state did Alexander the Great invade?" --k 3
+ 1. 0.2536  Alexander the Great  [chunk_id 265, 235 words]
+ 2. 0.2775  Alexander the Great  [chunk_id 266, 190 words]
+ 3. 0.3091  Alexander the Great > Conquest of the Persian Empire > Asia Minor  [chunk_id 283, 234 words]
+
+$ wikilense query "Which UN member state did Alexander the Great invade?" --k 3 \
+    --category "Member states of the United Nations"
+ 1. 0.3365  Afghanistan  [chunk_id 924, 223 words]
+    The region, then known as "Ariana", fell to Achaemenid Persians in the 6th century BCE, who
+    conquered the areas to their east as far as the Indus River. Alexander the Great invaded the
+    region in the 4th century BCE, ...
+ 2. 0.3630  Afghanistan > History > Prehistory and antiquity > Zoroastrianism and Hellenic era  [chunk_id 931, 224 words]
+ 3. 0.3718  Afghanistan > History  [chunk_id 928, 192 words]
+```
+
+The same search also shows why the filter belongs inside the statement.
+- The category keeps 695 of the 4,598 chunks (10 of the 100 pages).
+- The 14 chunks nearest the question all belong to Alexander the Great. Afghanistan's three chunks
+  are at exact ranks 15, 24 and 30.
+- The bounded strategy `overfetch` takes the index's first `k × overfetch` rows and filters them
+  afterwards. So it comes back short until that list reaches rank 30, and when it finds nothing it
+  says only `no hits`.
+- `inline`, the default, puts the filter in the statement and fills all three rows.
+
+```
+$ wikilense query "Which UN member state did Alexander the Great invade?" --k 3 \
+    --category "Member states of the United Nations" --strategy overfetch --overfetch 3
+no hits
+```
+
+| strategy | rows of the 3 asked for |
+|---|---|
+| `overfetch 1`, `2` and `3` (3, 6 and 9 rows from the index) | 0 |
+| `overfetch 5` (15 rows) | 1 |
+| `overfetch 10` (30 rows) | 3 |
+| `inline` | 3 |
+
+[VECTOR_INDEX.md](VECTOR_INDEX.md#what-we-measured) has the same comparison over 3,000 claims,
+with what each strategy costs.
+
 The hybrid strategy fuses the vector ranking with a `FULLTEXT` `MATCH ... AGAINST` ranking by
 reciprocal rank fusion, in one statement with three CTEs (the vector list, the full-text list and
 their fusion):
