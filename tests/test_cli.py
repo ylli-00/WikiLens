@@ -1197,9 +1197,17 @@ def test_serve_checks_the_database_builds_the_app_and_runs_uvicorn(
         created.append({"settings": settings, "embedder": embedder, "database": database})
         return sentinel
 
+    prepared: list[Any] = []
+
+    def prepare(app: Any) -> list[str]:
+        prepared.append(app)
+        return ["Demo: 3 pages, 42 chunks (wikilense); claim file: none"]
+
     monkeypatch.setattr(web, "create_app", create_app)
+    monkeypatch.setattr(web, "prepare", prepare)
     monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: runs.append((app, kwargs)))
     assert cli.main(["serve", "--port", "9999"]) == 0
+    assert prepared == [sentinel]  # the database choice and the claim catalogs, at start-up
     assert created == [{"settings": SETTINGS, "embedder": fake_embedder, "database": None}]
     assert runs == [(sentinel, {"host": "127.0.0.1", "port": 9999, "log_level": "info"})]
     assert fake_embedder.queries == []  # the warm-up is create_app's job (faked here)
@@ -1208,9 +1216,21 @@ def test_serve_checks_the_database_builds_the_app_and_runs_uvicorn(
     assert "model loaded in 1200 ms" in err
     assert "http://127.0.0.1:9999/" in err and "42 chunks" in err
     assert f"http://127.0.0.1:9999{web.DOCS_URL}" in err
+    assert "database choice: Demo: 3 pages, 42 chunks (wikilense); claim file: none" in err
 
     assert cli.main(["serve", "--host", "0.0.0.0"]) == 0
     assert runs[1][1] == {"host": "0.0.0.0", "port": 8000, "log_level": "info"}
+
+    # a failure of the start-up check is reported and left to the first request; serve still runs
+    from fastapi import HTTPException
+
+    def failing(app: Any) -> list[str]:
+        raise HTTPException(status_code=503, detail="the claim files cannot be read: x")
+
+    monkeypatch.setattr(web, "prepare", failing)
+    capsys.readouterr()
+    assert cli.main(["serve"]) == 0 and len(runs) == 3
+    assert "claim picker not ready: the claim files cannot be read: x" in capsys.readouterr().err
 
 
 def test_serve_fails_fast_when_the_server_is_unreachable(

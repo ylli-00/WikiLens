@@ -998,9 +998,11 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     ``web.create_app`` embeds a warm-up text so that the first request's timing excludes the
     model load; the load time it measured is printed. A model that cannot be loaded is
-    reported as one line.
+    reported as one line. ``web.prepare`` then probes the scaled database S1 and builds the claim
+    picker's catalog of every offered database, and prints one line per database.
     """
     import uvicorn
+    from fastapi import HTTPException
 
     from wikilense import web
 
@@ -1022,6 +1024,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
         f"(API docs at http://{args.host}:{args.port}{web.DOCS_URL})",
         file=sys.stderr,
     )
+    # The database choice and the claim picker's membership check run now, not at the first
+    # request; a failure here leaves them to the first request, which reports it.
+    try:
+        for line in web.prepare(app):
+            print(f"database choice: {line}", file=sys.stderr)
+    except HTTPException as exc:
+        print(f"database choice and claim picker not ready: {exc.detail}", file=sys.stderr)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return EXIT_OK
 
