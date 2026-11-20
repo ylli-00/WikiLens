@@ -148,7 +148,7 @@ wrong-dimension vector.
   - **The documentation's subquery form.** It read exactly its inner `LIMIT` rows, in about 1 ms,
     and came back short in 0 to 6 of 60 executions, where the index missed a qualifying chunk.
   - **Without a time limit**, such a statement grew `mariadbd` until it ran out of memory: to the
-    2 GB cap in about 20 s in a throwaway container, and to 7.6 GB on the development machine's
+    2 GB cap in about 20 s in a throwaway container, and to 7.2 GB on the development machine's
     server, where the kernel's OOM killer stopped it.
   - **Other versions and the guard.** 12.3.3 and 13.0.2 kept their memory flat on the same data.
     `max_statement_time` stops the search ("A search that runs away" below). The web page and
@@ -619,7 +619,7 @@ with its script and logs):
   them in 1.51 and 1.71 s.
 - **The next run was killed.** It grew `mariadbd` to the 2 GB cap in 20 to 22 s, and the kernel
   killed the server. The logs record this for that threshold, on the same connection and on a
-  fresh one, and once for `WHERE w < x` with 5 rows passing.
+  fresh one, and once for `WHERE w < x` with 6 rows passing.
 - **With random vectors** the same statements took up to 16.55 s and 1,311 MiB, came back short,
   and gave the memory back.
 - **With `max_statement_time` = 10** the threshold statement was stopped at 10.0 s (error 1969),
@@ -629,11 +629,13 @@ with its script and logs):
 - Nothing ran away: memory peaked at 552 MiB or less.
 - The threshold statement returned its 3 rows every time: 6.85 and 5.47 s on the first run, then
   0.63 to 1.69 s.
-- `WHERE w < x` returned 0 or 1 of the 5 rows that pass. That is the short answer the
+- `WHERE w < x` returned 0 or 1 of the 6 rows that pass. That is the short answer the
   documentation describes.
 
 **Status.** We found no MariaDB ticket for this; we searched JIRA on 2026-11-20. Its nearest
-relatives are [MDEV-33412](https://jira.mariadb.org/browse/MDEV-33412) and
+relatives are [MDEV-40916](https://jira.mariadb.org/browse/MDEV-40916) (in review for 13.2: the
+search allocates memory for every neighbour it rejects),
+[MDEV-33412](https://jira.mariadb.org/browse/MDEV-33412) and
 [MDEV-35032](https://jira.mariadb.org/browse/MDEV-35032).
 
 **What to do on 11.8.9.**

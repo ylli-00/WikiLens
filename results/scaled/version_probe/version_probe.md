@@ -22,8 +22,8 @@ t (id INT PRIMARY KEY, w INT NOT NULL, v VECTOR(384) NOT NULL, VECTOR INDEX (v) 
 **The cases** (`capprobe.py`, a fresh connection per case unless "repeat"):
 - `threshold_n3`: `WHERE VEC_DISTANCE_COSINE(v, q) < t`, with `t` halfway between the 3rd and 4th exact distance, so 3 rows qualify.
 - `threshold_n10`, `threshold_n30`: the same with 10 and 30 rows qualifying.
-- `predicate_w_5`: `WHERE w < x` with 5 rows passing.
-- `predicate_w_100`: the same with 100 rows passing.
+- `predicate_w_5`: `WHERE w < x`, with `x` one more than the 5th smallest `w`: at least 5 rows pass. On the table of S1 vectors 6 pass, because the 5th and 6th smallest `w` are equal.
+- `predicate_w_100`: the same for the 100th smallest `w` (102 rows pass on the table of S1 vectors).
 
 Memory is the container's cgroup `memory.current`, sampled every 0.1 s. Each log file's lines are in the order they ran; a `marker` line starts a new setup.
 
@@ -68,5 +68,5 @@ Same data and cases:
   - 12.3.3: 3 rows in 6.85 s on its first run, then 0.81 to 1.69 s;
   - 13.0.2: 3 rows in 5.47 s, then 0.63 to 1.16 s;
   - 4 repeats on one connection each, plus three query vectors.
-- **`predicate_w_5`:** 0 or 1 of the 5 passing rows, in 0.59 to 1.49 s.
+- **`predicate_w_5`:** 0 or 1 of the 6 passing rows, in 0.59 to 1.49 s.
 - **Memory:** peaks of 482 to 552 MiB. Nothing was killed.
