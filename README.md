@@ -230,6 +230,21 @@ vector store.
    of 27 to 28 ([the cache](docs/VECTOR_INDEX.md#the-index-cache-below-and-above-the-graph)). The
    lower recall over uncommitted rows and the stale index are not in the documentation we read.
 
+## Extension: an LLM fact-checker
+
+Does a small model, Claude Haiku 5.5, judge a FEVEROUS claim better when it reads the top 5 chunks of the `inline` statement on S1
+(RAG), and does that help more than letting it search the web? Each of the 3,000 claims was judged four ways ([the setup](docs/LLM_EXTENSION.md#2-the-setup)):
+
+| accuracy | no passages | web search | RAG | gold passages |
+|---|---|---|---|---|
+| three classes (3,000 claims) | 45.2% | 61.3% | 70.9% | 72.9% |
+| supported/refuted only (2,000 claims) | 35.3% | 81.9% | 83.6% | 82.9% |
+
+On three classes RAG is ahead of web search by 9.6 points (95% interval 8.0 to 11.2), and the gold passages are ahead of RAG by 2.0 (0.7 to 3.3).
+On the supported/refuted claims it is ahead of web search by 1.7 points (0.1 to 3.3), a little above two rerun standard deviations (1.3), and level with gold.
+Most of the three-class gap is NOT ENOUGH INFO, a label FEVEROUS's annotators gave from December 2020 Wikipedia without outside
+knowledge: web search gives that answer least often and gets only 20.1% of the NOT ENOUGH INFO claims right. [docs/LLM_EXTENSION.md](docs/LLM_EXTENSION.md) has the rest.
+
 ## Setup and platforms
 
 `make setup` does four things, each of which you can run by hand ([docs/SETUP.md](docs/SETUP.md)):
@@ -244,7 +259,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (634 tests), `make eval`, `make serve`, `make examples` (the ten
+Then `make test` (647 tests), `make eval`, `make serve`, `make examples` (the ten
 examples of `sql/examples.sql`, no Python needed), `make experiments` (the protocol on the 100
 pages, with a GPU) and `make down`. `make eval` checks an install: on the 100
 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
@@ -302,16 +317,16 @@ the scaled run:
 - Tables and captions are not indexed, so only claims with a text-only evidence set were picked:
   43,957 of FEVEROUS's 79,181 train and dev claims (56%) have none
   ([the count](results/scaled/data/text_only_count.json)).
-- The corpora stop at 132,359 chunks, on one server, with one client. FEVEROUS's own retriever
-  searches 5.4 million pages ([the paper](https://arxiv.org/abs/2106.05707)), so our scores cannot
-  be compared with the paper's.
+- The corpora stop at 132,359 chunks, on one server, with one client. FEVEROUS's own retriever searches 5.4 million pages
+  ([the paper](https://arxiv.org/abs/2106.05707)), so our scores cannot be compared with the paper's, and the embedding model was
+  fine-tuned on FEVER over Wikipedia, so recall on other text is probably lower ([the caveat](docs/EVALUATION.md#the-embedding-models-training-data)).
 - The database measurements have one run, unlike the recall and latency above, and the join order
   covers 200 of the 3,000 claims; a rerun adds a column to [SUMMARY.md](results/scaled/SUMMARY.md).
 - Categories are the explicit `[[Category:...]]` links of each page's December 2020 revision, and
   edit dates are that revision's timestamp ([docs/DATA.md](docs/DATA.md)).
-- Generation is out of scope here: the project and its ground truth measure retrieval. An LLM
-  fact-checker that reads the retrieved passages is an extension in `wikilense/llm/`, documented
-  separately.
+- No free text is generated: the project and its ground truth measure retrieval, and the LLM
+  fact-checker ([above](#extension-an-llm-fact-checker), in `wikilense/llm/`) returns a verdict with a
+  one-sentence justification and is scored on the verdict only.
 
 ## Repository
 
@@ -323,13 +338,13 @@ claims, and [results/](results/) every experiment as JSON and Markdown, the scal
 EVALUATION, DESIGN (every decision) and ARCHITECTURE (a beginner's guide to the code).
 [analysis/](analysis/) is the earlier FEVEROUS analysis that chose the benchmark, and
 [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
-634 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
+647 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
 `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 
 Ylli Rada, Constructor University, Databases and Web Services course. Code, experiments and
 documentation were produced with Claude Code (Anthropic), directed by the author. The code is under
-the MIT licence ([LICENSE](LICENSE)). The Wikipedia text and the FEVEROUS claims in `data/corpus/`
-and `data/scaled/` keep their own licence, CC BY-SA 3.0 ([data/corpus/NOTICE.md](data/corpus/NOTICE.md));
-FEVEROUS is Aly et al., 2021 (https://arxiv.org/abs/2106.05707).
+the MIT licence ([LICENSE](LICENSE)). The Wikipedia text and FEVEROUS material in `data/corpus/`, `data/scaled/`, the per-claim
+files of `results/` and `analysis/feverous/feverous_claims.csv` keep their own licence, CC BY-SA 3.0
+([data/corpus/NOTICE.md](data/corpus/NOTICE.md)); FEVEROUS is Aly et al., 2021 (https://arxiv.org/abs/2106.05707).
