@@ -1,0 +1,1096 @@
+{
+  "name": "hard_cap",
+  "created_at": "2026-11-20T16:53:18+00:00",
+  "k": 10,
+  "ef_search": 100,
+  "time_limit_s": 10,
+  "server": {
+    "version": "11.8.9-MariaDB-ubu2404",
+    "port": 3308
+  },
+  "repeats": 1,
+  "n_claims_total": 3000,
+  "sample": 30,
+  "seed": 20261119,
+  "n_queries": 30,
+  "n_chunks": 132359,
+  "index_m": 16,
+  "index_distance": "cosine",
+  "threshold_ns": [
+    3,
+    10,
+    30
+  ],
+  "inner_limits": [
+    10,
+    100
+  ],
+  "tie_margin": 1e-06,
+  "target_shares": [
+    0.005,
+    0.0005
+  ],
+  "word_limits": [
+    {
+      "target_share": 0.005,
+      "words_below": 4,
+      "passing_chunks": 694,
+      "passing_share": 0.005243
+    },
+    {
+      "target_share": 0.0005,
+      "words_below": 2,
+      "passing_chunks": 133,
+      "passing_share": 0.001005
+    }
+  ],
+  "finished": true,
+  "stopped_early": null,
+  "cases_total": 13,
+  "cases_done": 13,
+  "server_losses": 0,
+  "reconnects": 0,
+  "threshold_check": {
+    "per_n": [
+      {
+        "n": 3,
+        "claims_with_threshold": 30,
+        "left_out_ties": 0,
+        "scan_finished": 30,
+        "server_count_equal_n": 30,
+        "server_counts_other": []
+      },
+      {
+        "n": 10,
+        "claims_with_threshold": 30,
+        "left_out_ties": 0,
+        "scan_finished": 30,
+        "server_count_equal_n": 30,
+        "server_counts_other": []
+      },
+      {
+        "n": 30,
+        "claims_with_threshold": 30,
+        "left_out_ties": 0,
+        "scan_finished": 30,
+        "server_count_equal_n": 30,
+        "server_counts_other": []
+      }
+    ],
+    "scan": {
+      "complete": 30,
+      "stopped": 0,
+      "server lost": 0,
+      "not run": 0,
+      "no threshold": 0
+    },
+    "server_numpy_distance_gap_max": 7.588136596847761e-08
+  },
+  "claims": [
+    {
+      "claim_id": 1786,
+      "thresholds": {
+        "3": 0.1734661852282503,
+        "10": 0.24314338901415428,
+        "30": 0.2747471527315505
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 2309,
+      "thresholds": {
+        "3": 0.2487437504185222,
+        "10": 0.2908372549238783,
+        "30": 0.31730893493925794
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 4524,
+      "thresholds": {
+        "3": 0.28032421322723566,
+        "10": 0.3590068568777623,
+        "30": 0.3830372772661223
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 5341,
+      "thresholds": {
+        "3": 0.3206320184881329,
+        "10": 0.3370612499259984,
+        "30": 0.3686501380784699
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 5674,
+      "thresholds": {
+        "3": 0.22651279250098488,
+        "10": 0.31968493769463746,
+        "30": 0.37064691849471143
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 19127,
+      "thresholds": {
+        "3": 0.3080572400396578,
+        "10": 0.36156908839107893,
+        "30": 0.41896434436462854
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 23481,
+      "thresholds": {
+        "3": 0.20810143057127706,
+        "10": 0.3880888349308109,
+        "30": 0.41126410504582606
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 28642,
+      "thresholds": {
+        "3": 0.34285162232345257,
+        "10": 0.35953303584991386,
+        "30": 0.37950487042158576
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 32142,
+      "thresholds": {
+        "3": 0.23306896179191194,
+        "10": 0.3134194719757136,
+        "30": 0.33548522588838786
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 33367,
+      "thresholds": {
+        "3": 0.17011692012103458,
+        "10": 0.24998143840168968,
+        "30": 0.3046461662740104
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 35266,
+      "thresholds": {
+        "3": 0.2801260147362052,
+        "10": 0.3248730690325034,
+        "30": 0.42229957454511835
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 38635,
+      "thresholds": {
+        "3": 0.2694598644152659,
+        "10": 0.37124384980642244,
+        "30": 0.4000870944078079
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 43073,
+      "thresholds": {
+        "3": 0.24686989841123685,
+        "10": 0.2622841182161395,
+        "30": 0.2910692045528485
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 52354,
+      "thresholds": {
+        "3": 0.25065442940455485,
+        "10": 0.3160179737010907,
+        "30": 0.34369523319527867
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 59661,
+      "thresholds": {
+        "3": 0.31916428837785493,
+        "10": 0.33182105623546637,
+        "30": 0.3554433969519784
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 60611,
+      "thresholds": {
+        "3": 0.38093202970408346,
+        "10": 0.3901502317988883,
+        "30": 0.40782737751034814
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 64657,
+      "thresholds": {
+        "3": 0.18770944664396688,
+        "10": 0.34711185810146267,
+        "30": 0.37504012717281
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 65964,
+      "thresholds": {
+        "3": 0.23431745786515262,
+        "10": 0.27113246680828806,
+        "30": 0.30544386341022156
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 71132,
+      "thresholds": {
+        "3": 0.2212338044202083,
+        "10": 0.3435372770760369,
+        "30": 0.36545589449144344
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 72318,
+      "thresholds": {
+        "3": 0.15325793226281692,
+        "10": 0.1724349603748529,
+        "30": 0.22000527704255612
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 72756,
+      "thresholds": {
+        "3": 0.281022351423671,
+        "10": 0.3355351292998223,
+        "30": 0.38131254344426585
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 77902,
+      "thresholds": {
+        "3": 0.30289765014205894,
+        "10": 0.42645881135135894,
+        "30": 0.4399145122687861
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 78100,
+      "thresholds": {
+        "3": 0.314599495284625,
+        "10": 0.36093591358994104,
+        "30": 0.39226920295566015
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 78337,
+      "thresholds": {
+        "3": 0.16387336309424505,
+        "10": 0.24741798223972244,
+        "30": 0.28728253587377905
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 86842,
+      "thresholds": {
+        "3": 0.2917633808160889,
+        "10": 0.3176597057108987,
+        "30": 0.3279332496026693
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 88917,
+      "thresholds": {
+        "3": 0.4152216167070677,
+        "10": 0.43812684174755984,
+        "30": 0.4539272667291549
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 90821,
+      "thresholds": {
+        "3": 0.39192350736518977,
+        "10": 0.4221000717925016,
+        "30": 0.435004372070554
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 92413,
+      "thresholds": {
+        "3": 0.3374290086046961,
+        "10": 0.3710602844792858,
+        "30": 0.39805638786803965
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 93694,
+      "thresholds": {
+        "3": 0.32982218863324153,
+        "10": 0.3712185948975005,
+        "30": 0.39503621078836115
+      },
+      "scan": "complete"
+    },
+    {
+      "claim_id": 94984,
+      "thresholds": {
+        "3": 0.20282042781364606,
+        "10": 0.3220833181838474,
+        "30": 0.35312305880976175
+      },
+      "scan": "complete"
+    }
+  ],
+  "results": [
+    {
+      "case": "threshold_3",
+      "kind": "threshold",
+      "label": "WHERE distance < threshold, n = 3",
+      "n": 3,
+      "inner_limit": null,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 3,
+      "executions": 60,
+      "complete": 3,
+      "short": 0,
+      "stopped": 57,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 3,
+      "rows_returned": {
+        "3": 3
+      },
+      "equal_to_exact": 3,
+      "same_set_as_exact": 3,
+      "analyze": {
+        "complete": 0,
+        "skipped": 30,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": null,
+      "chunk_rows_read_max": null,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    {
+      "case": "threshold_10",
+      "kind": "threshold",
+      "label": "WHERE distance < threshold, n = 10",
+      "n": 10,
+      "inner_limit": null,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 54,
+      "short": 0,
+      "stopped": 6,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 27,
+      "rows_returned": {
+        "10": 27
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 27,
+        "skipped": 3,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 10.0,
+      "chunk_rows_read_max": 10.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 27,
+      "p50_ms": 1.184,
+      "p95_ms": 2.195
+    },
+    {
+      "case": "threshold_30",
+      "kind": "threshold",
+      "label": "WHERE distance < threshold, n = 30",
+      "n": 30,
+      "inner_limit": null,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 60,
+      "short": 0,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 30
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 10.0,
+      "chunk_rows_read_max": 10.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 1.079,
+      "p95_ms": 1.546
+    },
+    {
+      "case": "subquery_10_3",
+      "kind": "subquery",
+      "label": "inner LIMIT 10, n = 3",
+      "n": 3,
+      "inner_limit": 10,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 3,
+      "executions": 60,
+      "complete": 58,
+      "short": 2,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "3": 29,
+        "2": 1
+      },
+      "equal_to_exact": 29,
+      "same_set_as_exact": 29,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 10.0,
+      "chunk_rows_read_max": 10.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 1.039,
+      "p95_ms": 1.61
+    },
+    {
+      "case": "subquery_10_10",
+      "kind": "subquery",
+      "label": "inner LIMIT 10, n = 10",
+      "n": 10,
+      "inner_limit": 10,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 54,
+      "short": 6,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 27,
+        "9": 2,
+        "8": 1
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 10.0,
+      "chunk_rows_read_max": 10.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 0.926,
+      "p95_ms": 1.551
+    },
+    {
+      "case": "subquery_10_30",
+      "kind": "subquery",
+      "label": "inner LIMIT 10, n = 30",
+      "n": 30,
+      "inner_limit": 10,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 60,
+      "short": 0,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 30
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 10.0,
+      "chunk_rows_read_max": 10.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 0.902,
+      "p95_ms": 1.596
+    },
+    {
+      "case": "subquery_100_3",
+      "kind": "subquery",
+      "label": "inner LIMIT 100, n = 3",
+      "n": 3,
+      "inner_limit": 100,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 3,
+      "executions": 60,
+      "complete": 58,
+      "short": 2,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "3": 29,
+        "2": 1
+      },
+      "equal_to_exact": 29,
+      "same_set_as_exact": 29,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 100.0,
+      "chunk_rows_read_max": 100.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 1.316,
+      "p95_ms": 2.147
+    },
+    {
+      "case": "subquery_100_10",
+      "kind": "subquery",
+      "label": "inner LIMIT 100, n = 10",
+      "n": 10,
+      "inner_limit": 100,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 54,
+      "short": 6,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 27,
+        "9": 2,
+        "8": 1
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 100.0,
+      "chunk_rows_read_max": 100.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 1.024,
+      "p95_ms": 1.608
+    },
+    {
+      "case": "subquery_100_30",
+      "kind": "subquery",
+      "label": "inner LIMIT 100, n = 30",
+      "n": 30,
+      "inner_limit": 100,
+      "words_below": null,
+      "joined": false,
+      "passing_chunks": null,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 60,
+      "short": 0,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 30
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 100.0,
+      "chunk_rows_read_max": 100.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 1.034,
+      "p95_ms": 1.726
+    },
+    {
+      "case": "predicate_4",
+      "kind": "predicate",
+      "label": "WHERE chunk.n_words < 4",
+      "n": null,
+      "inner_limit": null,
+      "words_below": 4,
+      "joined": false,
+      "passing_chunks": 694,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 56,
+      "short": 0,
+      "stopped": 4,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 28,
+      "rows_returned": {
+        "10": 28
+      },
+      "equal_to_exact": 17,
+      "same_set_as_exact": 17,
+      "analyze": {
+        "complete": 28,
+        "skipped": 2,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 3344.0,
+      "chunk_rows_read_max": 7609.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 28,
+      "p50_ms": 1357.449,
+      "p95_ms": 5260.054
+    },
+    {
+      "case": "predicate_4_joined",
+      "kind": "predicate",
+      "label": "WHERE chunk.n_words < 4, joined to page",
+      "n": null,
+      "inner_limit": null,
+      "words_below": 4,
+      "joined": true,
+      "passing_chunks": 694,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 60,
+      "short": 0,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 30
+      },
+      "equal_to_exact": 27,
+      "same_set_as_exact": 27,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 3354.0,
+      "chunk_rows_read_max": 14451.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 31.574,
+      "p95_ms": 644.573
+    },
+    {
+      "case": "predicate_2",
+      "kind": "predicate",
+      "label": "WHERE chunk.n_words < 2",
+      "n": null,
+      "inner_limit": null,
+      "words_below": 2,
+      "joined": false,
+      "passing_chunks": 133,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 28,
+      "short": 0,
+      "stopped": 32,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 14,
+      "rows_returned": {
+        "10": 14
+      },
+      "equal_to_exact": 9,
+      "same_set_as_exact": 9,
+      "analyze": {
+        "complete": 14,
+        "skipped": 16,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 5245.5,
+      "chunk_rows_read_max": 12237.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 14,
+      "p50_ms": 2389.484,
+      "p95_ms": 7500.171
+    },
+    {
+      "case": "predicate_2_joined",
+      "kind": "predicate",
+      "label": "WHERE chunk.n_words < 2, joined to page",
+      "n": null,
+      "inner_limit": null,
+      "words_below": 2,
+      "joined": true,
+      "passing_chunks": 133,
+      "claims": 30,
+      "claims_run": 30,
+      "expected_rows": 10,
+      "executions": 60,
+      "complete": 60,
+      "short": 0,
+      "stopped": 0,
+      "server_lost": 0,
+      "not_run": 0,
+      "answered": 30,
+      "rows_returned": {
+        "10": 30
+      },
+      "equal_to_exact": 29,
+      "same_set_as_exact": 30,
+      "analyze": {
+        "complete": 30,
+        "skipped": 0,
+        "stopped": 0,
+        "server lost": 0
+      },
+      "chunk_rows_read_p50": 11811.0,
+      "chunk_rows_read_max": 32688.0,
+      "chunk_access": "index embedding",
+      "chunk_access_count": 30,
+      "plans": {
+        "index embedding": 30
+      },
+      "timed_executions": 30,
+      "p50_ms": 654.142,
+      "p95_ms": 1929.979
+    }
+  ],
+  "explain_first_claim": {
+    "threshold_3": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      }
+    ],
+    "threshold_10": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      }
+    ],
+    "threshold_30": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      }
+    ],
+    "subquery_10_3": [
+      {
+        "table": "<derived2>",
+        "type": "ALL",
+        "key": null,
+        "Extra": "Using where; Using filesort"
+      },
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": ""
+      }
+    ],
+    "subquery_10_10": [
+      {
+        "table": "<derived2>",
+        "type": "ALL",
+        "key": null,
+        "Extra": "Using where; Using filesort"
+      },
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": ""
+      }
+    ],
+    "subquery_10_30": [
+      {
+        "table": "<derived2>",
+        "type": "ALL",
+        "key": null,
+        "Extra": "Using where; Using filesort"
+      },
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": ""
+      }
+    ],
+    "subquery_100_3": [
+      {
+        "table": "<derived2>",
+        "type": "ALL",
+        "key": null,
+        "Extra": "Using where; Using filesort"
+      },
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": ""
+      }
+    ],
+    "subquery_100_10": [
+      {
+        "table": "<derived2>",
+        "type": "ALL",
+        "key": null,
+        "Extra": "Using where; Using filesort"
+      },
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": ""
+      }
+    ],
+    "subquery_100_30": [
+      {
+        "table": "<derived2>",
+        "type": "ALL",
+        "key": null,
+        "Extra": "Using where; Using filesort"
+      },
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": ""
+      }
+    ],
+    "predicate_4": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      }
+    ],
+    "predicate_4_joined": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      },
+      {
+        "table": "page",
+        "type": "eq_ref",
+        "key": "PRIMARY",
+        "Extra": ""
+      }
+    ],
+    "predicate_2": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      }
+    ],
+    "predicate_2_joined": [
+      {
+        "table": "chunk",
+        "type": "index",
+        "key": "embedding",
+        "Extra": "Using where"
+      },
+      {
+        "table": "page",
+        "type": "eq_ref",
+        "key": "PRIMARY",
+        "Extra": ""
+      }
+    ]
+  },
+  "ingest_meta": {
+    "analyze_seconds": "0.164",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "d29154f4cfe95ab5c2330f20ea05e2836fd2f23a9f4894b25fcc2c89e946297c",
+    "corpus_dir": "/home/ylli/Desktop/Projects/WikiLense/faq_followups_2026-11-20/s1_full/wikilense_s1/S1",
+    "corpus_page_meta_sha256": "none",
+    "corpus_pages_sha256": "d98f74eb80ef76e79d12ba932943407bcc2d75db658b2ae150ad275e0e53ff3a",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-11-20T16:43:26+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "25471",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 14.7,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.16",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  },
+  "database": "wikilense_s1"
+}

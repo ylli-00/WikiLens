@@ -2473,8 +2473,13 @@ def hard_cap_markdown(report: dict[str, Any]) -> str:
                    f"{k} chunk rows from the index at {', '.join(by_n(row) for row in over)}: it "
                    "went on taking rows from the index after the first `LIMIT` of them.")
         elif measured(threshold):
-            cap = (f"No claim read more than `LIMIT` = {k} chunk rows: the threshold was applied "
-                   "to at most `LIMIT` rows from the index.")
+            cap = ("Of the claims with their rows read measured, none read more than `LIMIT` = "
+                   f"{k} chunk rows ({', '.join(by_n(row) for row in measured(threshold))}).")
+            unmeasured = [row for row in threshold if row["chunk_rows_read_max"] is None]
+            if unmeasured:
+                cap += (f" At {', '.join(by_n(row) for row in unmeasured)} no claim has its rows "
+                        "read measured: each had an execution stopped at the time limit or a lost "
+                        "server, and `ANALYZE` was not run for it.")
         else:
             cap = "No claim had its rows read measured."
         lines.append(

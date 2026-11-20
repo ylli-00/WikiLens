@@ -581,8 +581,11 @@ def test_the_hard_cap_report_is_written_from_the_numbers(mib: Any) -> None:
             "| 4 |") in text
     assert ("| WHERE chunk.n_words < 3 | 70 | 4 | 10 | 8 | 0 | 0 | 0 | 10 (4) | 3/4 | 3/4 "
             "| 1800 (4100) | index embedding | 4 |") in text
-    # The threshold rows never read more than LIMIT rows; the predicate row did.
-    assert "No claim read more than `LIMIT` = 10 chunk rows: the threshold was applied" in text
+    # The measured threshold rows never read more than LIMIT rows; the predicate row did. The
+    # text states only that, for the rows measured, and draws no conclusion beyond them.
+    assert ("Of the claims with their rows read measured, none read more than `LIMIT` = 10 chunk "
+            "rows (") in text
+    assert "the threshold was applied" not in text
     assert "Short answers, of the executions: 0/8 at n = 3, 2/6 at n = 10" in text
     assert "equal to the exact list, of the claims with rows: 4/4 at n = 3, 2/3 at n = 10." in text
     assert "`EXPLAIN` gives `chunk` `index embedding` for every claim" in text

@@ -132,6 +132,27 @@ wrong-dimension vector.
   | `overfetch 10` | 2,472 | 1.63 ms | 2,425 | 1.87 ms |
   | `inline` | 0 | 16.49 ms | 0 | 26.59 ms |
 
+- A search that fewer rows pass than `LIMIT` is not capped on 11.8.9, and it can run away. The
+  `hard_cap` part of `scripts/measure_index_behaviour.py` ran 30 claims at k = 10 in a throwaway copy
+  of S1, with a 2 GB memory cap and a 10 s `max_statement_time`
+  ([results/scaled/run1/s1/hard_cap.md](../results/scaled/run1/s1/hard_cap.md)).
+  - **A distance threshold inside the statement.**
+    - 30 chunks meet it: all 60 executions returned 10 rows (p50 1.08 ms).
+    - Exactly 10 meet it: 54 returned them (p50 1.18 ms), 6 ran to the time limit.
+    - Only 3 meet it: 57 of 60 executions ran to the time limit.
+  - **A predicate on `chunk` itself.**
+    - 694 chunks passing (0.52%): p50 1,357.45 ms, p95 5,260.05 ms, stopped in 4 of 60.
+    - 133 chunks passing (0.10%): p50 2,389.48 ms, stopped in 32 of 60.
+    - The same predicates joined to `page` were never stopped (p50 31.57 and 654.14 ms).
+    - No answer that came back was short.
+  - **The documentation's subquery form.** It read exactly its inner `LIMIT` rows, in about 1 ms,
+    and came back short in 0 to 6 of 60 executions, where the index missed a qualifying chunk.
+  - **Without a time limit**, such a statement grew `mariadbd` until it ran out of memory: to the
+    2 GB cap in about 20 s in a throwaway container, and to 7.6 GB on the development machine's
+    server, where the kernel's OOM killer stopped it.
+  - **Other versions and the guard.** 12.3.3 and 13.0.2 kept their memory flat on the same data.
+    `max_statement_time` stops the search ("A search that runs away" below). The web page and
+    `wikilense query` set it to 5 s; their filters are joins.
 - The optimizer chooses per filter whether to keep the index, from its estimate of how many rows
   pass; "The join order we fix" below has the plans under 18 filter levels.
 - Join order matters:
@@ -583,6 +604,44 @@ claims, k = 5, the methods taking turns query by query, one timed pass):
   include evaluating the filter in Python inside every query (for the History heading, a match over
   the 132,359 headings), so they are an upper bound for a separate index with its own filter index.
 
+## A search that runs away
+
+**The setup.** The statements of the bullet above ran once more in throwaway containers of the
+official images, each with a 2 GB memory cap
+([results/scaled/version_probe/version_probe.md](../results/scaled/version_probe/version_probe.md),
+with its script and logs):
+- a table of the 132,359 S1 vectors;
+- one claim's query vector;
+- `LIMIT` 10.
+
+**On 11.8.9.**
+- **The first run after a server start was fast.** A distance threshold that 3 rows meet returned
+  them in 1.51 and 1.71 s.
+- **The next run was killed.** It grew `mariadbd` to the 2 GB cap in 20 to 22 s, and the kernel
+  killed the server. The logs record this for that threshold, on the same connection and on a
+  fresh one, and once for `WHERE w < x` with 5 rows passing.
+- **With random vectors** the same statements took up to 16.55 s and 1,311 MiB, came back short,
+  and gave the memory back.
+- **With `max_statement_time` = 10** the threshold statement was stopped at 10.0 s (error 1969),
+  at 1.3 and 1.5 GB, and the server stayed up.
+
+**On 12.3.3 and 13.0.2.**
+- Nothing ran away: memory peaked at 552 MiB or less.
+- The threshold statement returned its 3 rows every time: 6.85 and 5.47 s on the first run, then
+  0.63 to 1.69 s.
+- `WHERE w < x` returned 0 or 1 of the 5 rows that pass. That is the short answer the
+  documentation describes.
+
+**Status.** We found no MariaDB ticket for this; we searched JIRA on 2026-11-20. Its nearest
+relatives are [MDEV-33412](https://jira.mariadb.org/browse/MDEV-33412) and
+[MDEV-35032](https://jira.mariadb.org/browse/MDEV-35032).
+
+**What to do on 11.8.9.**
+- Give vector searches a `max_statement_time`.
+- Size the server's memory with room.
+- Filter through a join: in our measurements the join stopped none of 120 executions, where the
+  predicate on the indexed table itself stopped 36.
+
 ## MariaDB and a dedicated vector store, from their documentation
 
 What the README's "Where this approach loses" item 4 summarises, with the sources:
@@ -623,6 +682,7 @@ and each statement tried on the 11.8.9 container:
 | `M` from 3 to 200, default 6; `mhnsw_ef_search` from 1 to 10000, default 20; `mhnsw_max_cache_size` default 16 MB | the same values in `information_schema.SYSTEM_VARIABLES` (a test reads them) |
 | `INFORMATION_SCHEMA.VECTOR_INDEXES` exists from MariaDB 13.1 | the table does not exist in 11.8.9, which is why the graph size was read from the tablespace file |
 | "Concurrent reads/writes and all transaction isolation levels are supported" | we measured two things it does not mention: the lower recall over a transaction's own uncommitted rows, and the index left stale by a REPEATABLE READ reader ("Isolation levels" above) |
+| "The `LIMIT` is a hard cap on how many rows the index returns *before* the threshold is applied", and "(Adding the `WHERE` directly to an `ORDER BY ... LIMIT` query also uses the index, but with the same hard cap.)" (read on 2026-11-20) | holds for the subquery form, which reads exactly its inner `LIMIT` rows. Not on 11.8.9 for a `WHERE` inside the statement: the search goes on until `LIMIT` rows pass, and when fewer qualify it runs until it is stopped or out of memory ("A search that runs away" above). On 12.3.3 and 13.0.2 a very selective filter comes back short instead |
 
 Not in the reference, and measured here: the second `ORDER BY` key and the `IN (subquery)` that
 lose the index; the exact ranking of the joined statement without a filter, and its nearly exact
@@ -632,7 +692,8 @@ filter's own table over the vector index when the join order is left free; the h
 change with the graph build (and how much, over twenty builds per `M` on S1) and, for `M=6`,
 across a restart; the loss of
 exactness and of repeatability when the graph does not fit in `mhnsw_max_cache_size`; the stale
-index after a REPEATABLE READ reader.
+index after a REPEATABLE READ reader; a search that fewer rows pass than `LIMIT`, which runs away on
+11.8.9.
 
 We searched MariaDB's JIRA for these on 2026-11-20. The stale index is
 [MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321), and the `NULL` distances are [MDEV-35192](https://jira.mariadb.org/browse/MDEV-35192).
