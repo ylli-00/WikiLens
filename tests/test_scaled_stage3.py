@@ -81,8 +81,29 @@ def test_rows_number_categories_in_first_seen_order():
                     "categories": 2, "page_category_rows": 3, "pages_with_a_category": 2}
 
 
-@pytest.mark.parametrize("name", ["wikilense", "wikilense_test", "wikilense_s2", "other"])
+@pytest.mark.parametrize("name", ["wikilense", "wikilense_test", "wikilense_s2", "other",
+                                  "wikilense_s1_check"])
 def test_only_the_two_scaled_databases(name):
     with pytest.raises(stage3.Stage3Error):
         stage3.check_database(name)
     assert stage3.check_database("wikilense_s1") == "wikilense_s1"
+
+
+@pytest.mark.parametrize("name", ["wikilense", "wikilense_test", "wikilense_s2", "other"])
+def test_the_option_accepts_the_check_database_and_nothing_else(name):
+    assert stage3.check_database("wikilense_s1_check", allow_check=True) == "wikilense_s1_check"
+    with pytest.raises(stage3.Stage3Error):
+        stage3.check_database(name, allow_check=True)
+
+
+def test_the_check_database_without_the_option_stops_before_any_connection(monkeypatch):
+    def no_connect(*args, **kwargs):
+        raise AssertionError("connected")
+
+    monkeypatch.setattr("wikilense.db.connect", no_connect)
+    assert stage3.main(["load", "--database", "wikilense_s1_check", "--meta", "x.jsonl"]) == 2
+
+
+def test_both_scripts_name_the_same_check_database():
+    text = (REPO_ROOT / "scripts" / "scaled_stage2.py").read_text(encoding="utf-8")
+    assert f'CHECK_DATABASE = "{stage3.CHECK_DATABASE}"' in text

@@ -43,6 +43,38 @@ def test_the_two_new_databases_are_accepted(s2: Any, name: str) -> None:
     assert s2.check_database(settings(name)) == name
 
 
+def test_the_check_database_is_refused_without_the_option(s2: Any) -> None:
+    with pytest.raises(s2.Stage2Error, match="refusing database"):
+        s2.check_database(settings("wikilense_s1_check"))
+
+
+@pytest.mark.parametrize("name", ["wikilense", "wikilense_test", "wikilense_s1_check_test", "other"])
+def test_the_option_accepts_the_check_database_and_nothing_else(s2: Any, name: str) -> None:
+    assert s2.check_database(settings("wikilense_s1_check"), allow_check=True) == "wikilense_s1_check"
+    with pytest.raises(s2.Stage2Error, match="refusing database"):
+        s2.check_database(settings(name), allow_check=True)
+
+
+def test_the_check_database_takes_the_s1_folder(s2: Any) -> None:
+    assert s2.folder_suffix("wikilense_s1_check") == "s1"
+    assert s2.folder_suffix("wikilense_s1") == "s1"
+    assert s2.folder_suffix("wikilense_s0") == "s0"
+
+
+def test_the_check_statements_create_and_grant_only_the_check_database(s2: Any) -> None:
+    assert s2.CHECK_CREATE_STATEMENTS == (
+        "CREATE DATABASE wikilense_s1_check",
+        "GRANT ALL PRIVILEGES ON wikilense_s1_check.* TO 'wikilense'@'%'",
+    )
+
+
+def test_root_sql_refuses_the_check_database_without_the_option(
+        s2: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(s2.ROOT_PASSWORD_VARIABLE, "dummy")
+    with pytest.raises(s2.Stage2Error, match="not allowed"):
+        s2.root_sql("SELECT 1", database="wikilense_s1_check")
+
+
 def test_the_root_statements_are_exactly_these_four(s2: Any) -> None:
     assert s2.CREATE_STATEMENTS == (
         "CREATE DATABASE wikilense_s0",

@@ -17,7 +17,8 @@ scaled databases as on the 100-page one. Subcommands:
             the order the pages first name them, pages in ``page_id`` order). One transaction:
             the three tables are cleared and refilled, so a second load gives the same rows.
             Only ``wikilense_s0`` or ``wikilense_s1``; never the 100-page ``wikilense`` and never
-            a ``*_test`` database.
+            a ``*_test`` database. ``--allow-check-database`` also accepts
+            ``wikilense_s1_check``, the scratch database of a test load of S1.
     verify  the database's metadata counts against the file.
 
 S1 holds every page of S0, so S1's pages are fetched once and the same file is loaded into both
@@ -48,6 +49,8 @@ from wikilense.config import REPO_ROOT, load_settings
 from wikilense.corpus import load_page_meta, nfc
 
 ALLOWED_DATABASES = ("wikilense_s0", "wikilense_s1")
+#: The scratch database of a test load of S1, accepted only with --allow-check-database.
+CHECK_DATABASE = "wikilense_s1_check"
 MAX_ERRORS_IN_A_ROW = 20
 PROGRESS_EVERY = 50
 FETCH_SCRIPT = REPO_ROOT / "scripts" / "fetch_page_meta.py"
@@ -71,10 +74,12 @@ def fetch_module() -> Any:
     return module
 
 
-def check_database(name: str) -> str:
-    """Return ``name`` when it is one of ALLOWED_DATABASES; else raise (the 100-page and test DBs first)."""
-    if name == "wikilense" or name.endswith("_test") or name not in ALLOWED_DATABASES:
-        raise Stage3Error(f"refusing database {name!r}: only {ALLOWED_DATABASES}")
+def check_database(name: str, allow_check: bool = False) -> str:
+    """Return ``name`` when it is one of ALLOWED_DATABASES (or CHECK_DATABASE with
+    ``allow_check``); else raise (the 100-page and test DBs first)."""
+    allowed = ALLOWED_DATABASES + ((CHECK_DATABASE,) if allow_check else ())
+    if name == "wikilense" or name.endswith("_test") or name not in allowed:
+        raise Stage3Error(f"refusing database {name!r}: only {allowed}")
     return name
 
 
@@ -246,8 +251,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     f.add_argument("--limit", type=int, default=None, help="at most N new pages (a trial)")
     for name in ("load", "verify"):
         s = sub.add_parser(name)
-        s.add_argument("--database", required=True, choices=ALLOWED_DATABASES)
+        s.add_argument("--database", required=True, choices=ALLOWED_DATABASES + (CHECK_DATABASE,))
         s.add_argument("--meta", required=True, type=Path, help="the fetched page_meta JSONL")
+        s.add_argument("--allow-check-database", action="store_true",
+                       help=f"accept --database {CHECK_DATABASE}, the scratch database of a "
+                            "test load")
     return p.parse_args(argv)
 
 
@@ -270,7 +278,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     from wikilense import db
 
-    database = check_database(args.database)
+    try:
+        database = check_database(args.database, args.allow_check_database)
+    except Stage3Error as exc:
+        log(f"STOPPED: {exc}")
+        return 2
     meta = load_page_meta(args.meta)
     conn = db.connect(load_settings(), database=database)
     try:

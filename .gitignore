@@ -18,3 +18,9 @@ data/feverous/
 results/*.tmp
 results/baseline.json
 results/baseline.md
+
+# The scaled database's release file and its unpacked folder (make fetch-s1)
+data/scaled/wikilense_s1/
+data/scaled/wikilense_s1.partial/
+data/scaled/wikilense_s1.tar.gz
+data/scaled/wikilense_s1.tar.gz.part

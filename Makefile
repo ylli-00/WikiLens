@@ -10,6 +10,9 @@
 #   make serve        the web query page on http://127.0.0.1:8000
 #   make examples     the ten examples of sql/examples.sql through the mariadb client (no Python)
 #   make experiments  the whole experiment protocol (scripts/run_experiments.py all)
+#   make fetch-s1     download the scaled database's release file, check its SHA-256, unpack it
+#                     into data/scaled/wikilense_s1/ (docs/SETUP.md, "Get the scaled database")
+#   make load-s1      load that folder into the database wikilense_s1 (no GPU, no FEVEROUS file)
 #   make down         stop the MariaDB container (the data volume is kept)
 #
 # Docker Compose is called as `docker compose`; when the docker group is only reachable through
@@ -33,8 +36,24 @@ PY_MIN  := 3.10
 ifneq ($(filter %.lock,$(REQS)),)
 PY_MIN  := 3.12
 endif
+# The scaled database S1 as a release file: the 7,686 pages, the claims, the saved vectors and the
+# page metadata, so that `make load-s1` needs neither the FEVEROUS file nor a GPU. The size and
+# SHA-256 are those of the published file; `make fetch-s1` refuses any other bytes.
+S1_URL    ?=
+S1_SHA256 := 86ad18f01ad98bfaf23b800181e9f76dc409bf9b0ce20ef606bcaea0e93e032c
+S1_BYTES  := 300308768
+S1_DIR    ?= data/scaled/wikilense_s1
+# `make load-s1 S1_CHECK=1` loads into the scratch database wikilense_s1_check instead, to test
+# the load on a machine whose wikilense_s1 must stay as it is.
+S1_DB     := wikilense_s1
+S1_FLAGS  :=
+ifeq ($(S1_CHECK),1)
+S1_DB     := wikilense_s1_check
+S1_FLAGS  := --allow-check-database
+endif
 
-.PHONY: setup check-python check-env venv test lint eval serve examples experiments down
+.PHONY: setup check-python check-env venv test lint eval serve examples experiments fetch-s1 \
+	load-s1 down
 
 # --- setup -----------------------------------------------------------------------------------
 
@@ -97,6 +116,24 @@ examples:
 
 experiments:
 	$(VENV)/bin/python scripts/run_experiments.py all
+
+# --- the scaled database S1 ------------------------------------------------------------------
+
+fetch-s1:
+	$(VENV)/bin/python scripts/scaled_release.py fetch --url "$(S1_URL)" --sha256 $(S1_SHA256) --bytes $(S1_BYTES) --dest $(S1_DIR)
+
+# The load drops every table of its database, so it first stops when that database already holds
+# tables; REPLACE=1 skips the check. Then the databases, the ingest with the saved vectors (no
+# model), the count check against corpora.json, and the categories and edit dates.
+load-s1:
+ifneq ($(REPLACE),1)
+	$(VENV)/bin/python scripts/scaled_release.py check-empty --database $(S1_DB)
+endif
+	$(VENV)/bin/python scripts/scaled_stage2.py create-dbs $(S1_FLAGS)
+	WIKILENSE_DB_NAME=$(S1_DB) $(VENV)/bin/python scripts/scaled_stage2.py ingest --corpus-dir $(S1_DIR)/S1 --vectors-dir $(S1_DIR)/vectors --out $(S1_DIR)/ingest_S1.json $(S1_FLAGS)
+	WIKILENSE_DB_NAME=$(S1_DB) $(VENV)/bin/python scripts/scaled_stage2.py verify --corpus-dir $(S1_DIR)/S1 --corpora-json $(S1_DIR)/corpora.json $(S1_FLAGS)
+	$(VENV)/bin/python scripts/scaled_stage3.py load --database $(S1_DB) --meta $(S1_DIR)/page_meta_S1.jsonl $(S1_FLAGS)
+	$(VENV)/bin/python scripts/scaled_stage3.py verify --database $(S1_DB) --meta $(S1_DIR)/page_meta_S1.jsonl $(S1_FLAGS)
 
 # --- teardown --------------------------------------------------------------------------------
 

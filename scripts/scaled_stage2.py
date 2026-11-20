@@ -20,6 +20,11 @@ settings' chunk parameters, ``embedding_text`` with the title prefix); ``embed``
 SHA-256 against the one ``scripts/scaled_build.py corpora`` recorded. ``ingest`` and ``verify``
 stop unless WIKILENSE_DB_NAME is wikilense_s0 or wikilense_s1: never the 100-page database
 ``wikilense`` and never a ``*_test`` database (the ingest drops every table of its target).
+
+``--allow-check-database`` (``create-dbs``, ``ingest``, ``verify``) also accepts
+``wikilense_s1_check``, a scratch database for testing the S1 load from the release file
+(``make load-s1 S1_CHECK=1``) without touching ``wikilense_s1``; ``create-dbs`` then creates only
+that database. Without the option the name is refused like any other.
 """
 
 from __future__ import annotations
@@ -52,6 +57,12 @@ CREATE_STATEMENTS = (
     "GRANT ALL PRIVILEGES ON wikilense_s1.* TO 'wikilense'@'%'",
 )
 SHOW_DATABASES_SQL = "SHOW DATABASES LIKE 'wikilense_s_'"
+#: The scratch database of a test load of S1, accepted only with --allow-check-database.
+CHECK_DATABASE = "wikilense_s1_check"
+CHECK_CREATE_STATEMENTS = (
+    "CREATE DATABASE wikilense_s1_check",
+    "GRANT ALL PRIVILEGES ON wikilense_s1_check.* TO 'wikilense'@'%'",
+)
 #: The hidden InnoDB tablespace(s) of the vector index, as scripts/run_experiments.py reads them.
 HIDDEN_TABLESPACE_SQL = (
     "SELECT name, file_size FROM information_schema.innodb_sys_tablespaces "
@@ -79,17 +90,29 @@ def log(message: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
-def check_database(settings: Settings) -> str:
-    """Return ``settings.db_name`` when it is one of ALLOWED_DATABASES; else raise.
+def allowed_databases(allow_check: bool = False) -> tuple[str, ...]:
+    """Return ALLOWED_DATABASES, plus CHECK_DATABASE when ``allow_check``."""
+    return ALLOWED_DATABASES + ((CHECK_DATABASE,) if allow_check else ())
+
+
+def check_database(settings: Settings, allow_check: bool = False) -> str:
+    """Return ``settings.db_name`` when it is one of ``allowed_databases(allow_check)``; else raise.
 
     The 100-page database ``wikilense`` and every ``*_test`` database are refused by name first.
     """
     name = settings.db_name
-    if name == "wikilense" or name.endswith("_test") or name not in ALLOWED_DATABASES:
+    allowed = allowed_databases(allow_check)
+    if name == "wikilense" or name.endswith("_test") or name not in allowed:
         raise Stage2Error(
-            f"refusing database {name!r}: set WIKILENSE_DB_NAME to one of {ALLOWED_DATABASES}"
+            f"refusing database {name!r}: set WIKILENSE_DB_NAME to one of {allowed}"
         )
     return name
+
+
+def folder_suffix(name: str) -> str:
+    """Return the corpus folder (lower case) that belongs in database ``name``: ``s1`` for
+    ``wikilense_s1`` and for CHECK_DATABASE, ``s0`` for ``wikilense_s0``."""
+    return "s1" if name == CHECK_DATABASE else name.rsplit("_", 1)[1]
 
 
 def chunk_texts(pages_path: Path, settings: Settings) -> Iterator[str]:
@@ -197,13 +220,14 @@ class CachedEmbedder:
         return np.stack([self._cache[t] for t in texts]).astype(np.float32, copy=False)
 
 
-def root_sql(sql: str, database: str | None = None) -> list[list[str]]:
+def root_sql(sql: str, database: str | None = None,
+             allow_check: bool = False) -> list[list[str]]:
     """Run one statement as root in the container; rows as lists of strings."""
     password = os.environ.get(ROOT_PASSWORD_VARIABLE) or dotenv_values(DEFAULT_ENV_FILE).get(
         ROOT_PASSWORD_VARIABLE)
     if not password:
         raise Stage2Error(f"{ROOT_PASSWORD_VARIABLE} is not set in .env or the environment")
-    if database is not None and database not in ALLOWED_DATABASES:
+    if database is not None and database not in allowed_databases(allow_check):
         raise Stage2Error(f"root_sql on {database!r} is not allowed")
     proc = subprocess.run(
         ["docker", "exec", "-e", "MYSQL_PWD", CONTAINER, "mariadb", "-uroot", "--batch",
@@ -219,7 +243,16 @@ def root_sql(sql: str, database: str | None = None) -> list[list[str]]:
 
 
 def run_create(args: argparse.Namespace) -> int:
-    """Create the two databases and grant them, unless they exist."""
+    """Create the two databases and grant them, unless they exist (with
+    --allow-check-database: only CHECK_DATABASE)."""
+    if args.allow_check_database:
+        if CHECK_DATABASE in {row[0] for row in root_sql("SHOW DATABASES")}:
+            log(f"already present: {CHECK_DATABASE}; nothing created")
+            return 0
+        for statement in CHECK_CREATE_STATEMENTS:
+            root_sql(statement)
+            log(statement)
+        return 0
     existing = {row[0] for row in root_sql(SHOW_DATABASES_SQL)}
     if existing & set(ALLOWED_DATABASES):
         log(f"already present: {sorted(existing)}; nothing created")
@@ -289,9 +322,9 @@ def run_ingest(args: argparse.Namespace) -> int:
     from wikilense.ingest import run_ingest as ingest
 
     settings = load_settings()
-    name = check_database(settings)
+    name = check_database(settings, args.allow_check_database)
     folder = Path(args.corpus_dir)
-    if folder.name.lower() != name.rsplit("_", 1)[1]:
+    if folder.name.lower() != folder_suffix(name):
         raise Stage2Error(f"folder {folder.name} does not belong in database {name}")
     cache, model = load_vectors(Path(args.vectors_dir))
     log(f"{len(cache):,} saved vectors ({model}); ingest {folder} into {name}")
@@ -300,7 +333,7 @@ def run_ingest(args: argparse.Namespace) -> int:
     report = ingest(settings, corpus_dir=folder, reset=True, embedder=embedder,
                     batch_size=BATCH_SIZE, use_prefix=True, progress=False)
     wall = time.perf_counter() - start
-    graph = root_sql(HIDDEN_TABLESPACE_SQL, database=name)
+    graph = root_sql(HIDDEN_TABLESPACE_SQL, database=name, allow_check=args.allow_check_database)
     result = {"database": name, "folder": folder.name, "wall_seconds": round(wall, 1),
               "report": report.counts(), "seconds": {k: round(v, 2) for k, v in report.seconds.items()},
               "graph_tablespaces": [{"name": r[0], "file_size": int(r[1])} for r in graph],
@@ -314,7 +347,7 @@ def run_ingest(args: argparse.Namespace) -> int:
 def run_verify(args: argparse.Namespace) -> int:
     """Compare the database's counts with corpora.json; exit 1 on a difference."""
     settings = load_settings()
-    name = check_database(settings)
+    name = check_database(settings, args.allow_check_database)
     folder = Path(args.corpus_dir)
     want = json.loads(Path(args.corpora_json).read_text(encoding="utf-8"))[folder.name]
     got = db_counts(settings)
@@ -335,9 +368,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Return the parsed command line."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
     sub = parser.add_subparsers(dest="step", required=True)
-    sub.add_parser("create-dbs")
+    check_help = f"also accept {CHECK_DATABASE}, the scratch database of a test load"
+    sub.add_parser("create-dbs").add_argument(
+        "--allow-check-database", action="store_true",
+        help=f"create only {CHECK_DATABASE}, the scratch database of a test load")
     for step in ("embed", "ingest", "verify"):
         p = sub.add_parser(step)
+        if step in ("ingest", "verify"):
+            p.add_argument("--allow-check-database", action="store_true", help=check_help)
         p.add_argument("--corpus-dir", required=True, type=Path)
         if step in ("embed", "ingest"):
             p.add_argument("--vectors-dir", required=True, type=Path)
