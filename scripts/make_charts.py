@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Draw the README charts from the JSON files in results/ as self-contained SVG files.
 
-Five charts, written to docs/img/ (standard library only, no plotting package):
+Seven charts, written to docs/img/ (standard library only, no plotting package):
+
+- ``llm_accuracy.svg``: accuracy of the four LLM conditions with Wilson 95% intervals, on three
+  classes and on the supported/refuted claims, as dots with interval lines in two panels on one
+  scale (``results/llm/llm_results.json``).
+- ``llm_f1.svg``: F1 of the supported and refuted labels for the four LLM conditions, a heatmap
+  on one sequential colour scale with the F1 and its interval in each cell (same file).
 
 - ``scaled_recall_at_k.svg``: article and evidence recall at k of the scaled run on S0 and S1
   (``results/scaled/eval/s0_full_run1.json`` and ``s1_full_run1.json``), one line each.
@@ -26,6 +32,7 @@ Usage (from the project root): python3 scripts/make_charts.py [--results results
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -361,7 +368,137 @@ def scaled_recall_at_k(data):
     return svg.render()
 
 
+#: The LLM conditions in the order of every LLM table and chart.
+LLM_CONDITIONS = (("no_retrieval", "no passages"), ("web", "web search"), ("retrieved", "RAG"),
+                  ("gold", "gold passages"))
+
+
+def llm_accuracy(data):
+    """Dot-and-interval chart: accuracy of the four LLM conditions with Wilson 95% intervals,
+    three classes (left panel) and supported/refuted only (right panel), one x scale."""
+    panels = [
+        ("three classes", data["three_class"]["conditions"], data["three_class"]["conditions"]
+         ["retrieved"]["accuracy"]["n"]),
+        ("supported/refuted only", data["supported_refuted"]["conditions"],
+         data["supported_refuted"]["n"]),
+    ]
+    height = 300
+    svg = Svg(
+        height,
+        "LLM fact-checker accuracy, Claude Haiku 5.5",
+        "Dot: accuracy; line: 95% Wilson interval (results/llm/llm_results.json)",
+        "Accuracy with 95% intervals. " + " ".join(
+            f"{title} ({n:,} claims): " + "; ".join(
+                f"{name} {conds[c]['accuracy']['pct']}% ({conds[c]['accuracy']['wilson_pct'][0]}"
+                f" to {conds[c]['accuracy']['wilson_pct'][1]})" for c, name in LLM_CONDITIONS) + "."
+            for title, conds, n in panels),
+    )
+    lo, hi = 30, 90
+    label_w, gap, top, row_h = 100, 40, 100, 40
+    panel_w = (WIDTH - 24 - label_w - gap - 24) / 2
+    for p, (title, conds, n) in enumerate(panels):
+        x0 = 24 + label_w + p * (panel_w + gap)
+
+        def sx(value, x0=x0):
+            return x0 + (value - lo) / (hi - lo) * panel_w
+
+        bottom = top + row_h * len(LLM_CONDITIONS)
+        svg.text(x0, top - 20, f"{title} ({n:,} claims)", "label")
+        for tick in range(lo, hi + 1, 10):
+            svg.line(sx(tick), top - 6, sx(tick), bottom, "axis" if tick == lo else "grid")
+            svg.text(sx(tick), bottom + 18, f"{tick}%", "tick", "middle")
+        for i, (cond, name) in enumerate(LLM_CONDITIONS):
+            y = top + row_h * i + row_h / 2
+            acc = conds[cond]["accuracy"]
+            a, (w_lo, w_hi) = 100 * acc["acc"], (100 * v for v in acc["wilson"])
+            if p == 0:
+                svg.text(24 + label_w - 12, y, name, "label", "end", "middle")
+            svg.add(f'<path d="M{sx(w_lo):.1f},{y - 6:.1f} V{y + 6:.1f} M{sx(w_lo):.1f},{y:.1f} '
+                    f'H{sx(w_hi):.1f} M{sx(w_hi):.1f},{y - 6:.1f} V{y + 6:.1f}" '
+                    f'class="line line1" style="stroke-width: 2.5"/>')
+            svg.add(f'<circle class="dot s1" cx="{sx(a):.1f}" cy="{y:.1f}" r="4">'
+                    f"<title>{escape(name)}: {acc['pct']}% ({acc['wilson_pct'][0]} to "
+                    f"{acc['wilson_pct'][1]}), {acc['right']:,} of {acc['n']:,}</title></circle>")
+            svg.text(sx(w_hi) + 8, y, f"{acc['pct']}%", "label", "start", "middle")
+    return svg.render()
+
+
+#: Sequential blue steps (light to dark) of the F1 heatmap, and their dark-mode steps (near the
+#: dark surface for low values); text on a cell switches to white where the fill is dark.
+HEAT_LIGHT = ("#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#1c5cab", "#184f95")
+HEAT_DARK = ("#0d366b", "#104281", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4")
+HEAT_WHITE_TEXT_LIGHT = frozenset({3, 4, 5, 6})
+HEAT_WHITE_TEXT_DARK = frozenset({0, 1, 2, 3})
+
+
+def _heat_style():
+    rules = []
+    for i, (light, dark) in enumerate(zip(HEAT_LIGHT, HEAT_DARK)):
+        ink_l = "#ffffff" if i in HEAT_WHITE_TEXT_LIGHT else "#0b0b0b"
+        ink_d = "#ffffff" if i in HEAT_WHITE_TEXT_DARK else "#0b0b0b"
+        rules.append((f".h{i} {{ fill: {light}; }} .ht{i} {{ fill: {ink_l}; }}",
+                      f".h{i} {{ fill: {dark}; }} .ht{i} {{ fill: {ink_d}; }}"))
+    return ("<style>" + " ".join(r[0] for r in rules)
+            + " @media (prefers-color-scheme: dark) { " + " ".join(r[1] for r in rules)
+            + " }</style>")
+
+
+def llm_f1(data):
+    """Heatmap: F1 of SUPPORTS and REFUTES on the supported/refuted claims for the four LLM
+    conditions, one colour scale, the F1 and its bootstrap 95% interval printed in each cell."""
+    conds = data["supported_refuted"]["conditions"]
+    labels = (("SUPPORTS", "supported"), ("REFUTES", "refuted"))
+    values = [conds[c]["per_label"][label]["f1"] * 100 for c, _ in LLM_CONDITIONS
+              for label, _ in labels]
+    lo, hi = math.floor(min(values) / 5) * 5, math.ceil(max(values) / 5) * 5
+    boot = data["conventions"]["bootstrap_resamples"]
+    height = 340
+    svg = Svg(
+        height,
+        "F1 per label, supported and refuted claims",
+        f"{data['supported_refuted']['n']:,} claims; F1 and paired-bootstrap 95% interval "
+        f"({boot:,} resamples) in each cell (results/llm/llm_results.json)",
+        "F1 per label. " + "; ".join(
+            f"{name}: " + ", ".join(
+                f"{short} {conds[c]['per_label'][label]['f1_pct']} "
+                f"({conds[c]['per_label'][label]['f1_bootstrap_pct'][0]} to "
+                f"{conds[c]['per_label'][label]['f1_bootstrap_pct'][1]})"
+                for label, short in labels)
+            for c, name in LLM_CONDITIONS) + ".",
+    )
+    svg.add(_heat_style())
+    label_w, top, cell_w, cell_h, gap = 132, 96, 190, 40, 2
+    x0 = 24 + label_w
+    for j, (_, short) in enumerate(labels):
+        svg.text(x0 + j * (cell_w + gap) + cell_w / 2, top - 12, f"F1, {short} label", "label",
+                 "middle")
+    steps = len(HEAT_LIGHT)
+    for i, (cond, name) in enumerate(LLM_CONDITIONS):
+        y = top + i * (cell_h + gap)
+        svg.text(x0 - 12, y + cell_h / 2, name, "label", "end", "middle")
+        for j, (label, short) in enumerate(labels):
+            e = conds[cond]["per_label"][label]
+            step = min(steps - 1, int((e["f1"] * 100 - lo) / (hi - lo) * steps))
+            x = x0 + j * (cell_w + gap)
+            text = f"{e['f1_pct']} ({e['f1_bootstrap_pct'][0]}–{e['f1_bootstrap_pct'][1]})"
+            svg.add(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_w}" height="{cell_h}" rx="4" '
+                    f'class="h{step}"><title>{escape(name)}, {short}: F1 {escape(text)}; '
+                    f"precision {e['precision_pct']}, recall {e['recall_pct']}</title></rect>")
+            svg.text(x + cell_w / 2, y + cell_h / 2, text, f"label ht{step}", "middle", "middle")
+    # the colour scale
+    sy = top + len(LLM_CONDITIONS) * (cell_h + gap) + 18
+    sw = 2 * cell_w + gap
+    for s in range(steps):
+        svg.add(f'<rect x="{x0 + s * sw / steps:.1f}" y="{sy:.1f}" width="{sw / steps - 2:.1f}" '
+                f'height="10" rx="2" class="h{s}"/>')
+    svg.text(x0, sy + 26, f"F1 {lo}", "tick", "start")
+    svg.text(x0 + sw, sy + 26, f"{hi}", "tick", "end")
+    return svg.render()
+
+
 CHARTS = (
+    ("llm/llm_results.json", "llm_accuracy.svg", llm_accuracy),
+    ("llm/llm_results.json", "llm_f1.svg", llm_f1),
     (("scaled/eval/s0_full_run1.json", "scaled/eval/s1_full_run1.json"), "scaled_recall_at_k.svg",
      scaled_recall_at_k),
     ("final_ef_100.json", "recall_at_k.svg", recall_at_k),

@@ -56,9 +56,34 @@ SCALE = {
 }  # fmt: skip
 
 
+def _llm_condition(acc: float, f1s: float, f1r: float) -> dict:
+    def entry(value: float) -> dict:
+        return {"acc": value, "wilson": [value - 0.02, value + 0.02], "pct": f"{100 * value:.1f}",
+                "wilson_pct": [f"{100 * value - 2:.1f}", f"{100 * value + 2:.1f}"],
+                "right": round(value * 2000), "n": 2000}
+
+    def label(f1: float) -> dict:
+        return {"f1": f1, "f1_pct": f"{100 * f1:.1f}", "f1_bootstrap_pct": ["1.0", "2.0"],
+                "precision_pct": "90.0", "recall_pct": "80.0"}
+
+    return {"accuracy": entry(acc), "per_label": {"SUPPORTS": label(f1s), "REFUTES": label(f1r)}}
+
+
+LLM = {
+    "conventions": {"bootstrap_resamples": 10_000},
+    "three_class": {"conditions": {c: _llm_condition(a, 0.5, 0.5) for c, a in (
+        ("no_retrieval", 0.45), ("web", 0.61), ("retrieved", 0.71), ("gold", 0.73))}},
+    "supported_refuted": {"n": 2000, "conditions": {c: _llm_condition(a, s, r) for c, a, s, r in (
+        ("no_retrieval", 0.35, 0.435, 0.539), ("web", 0.82, 0.839, 0.844),
+        ("retrieved", 0.84, 0.882, 0.856), ("gold", 0.83, 0.905, 0.851))}},
+}
+
+
 @pytest.mark.parametrize(
     ("draw", "data", "title"),
     [
+        ("llm_accuracy", LLM, "LLM fact-checker accuracy"),
+        ("llm_f1", LLM, "F1 per label"),
         ("recall_at_k", HEADLINE, "Recall at k"),
         ("uncommitted_recall", UNCOMMITTED, "has not committed"),
         ("planner_rows", PLANNER, "Chunk rows read"),
