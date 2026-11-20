@@ -1,7 +1,7 @@
 """Ingest pipeline: corpus files -> page, section, sentence, link, claim tables -> chunks -> embeddings.
 
-``run_ingest`` is the single entry point (docs/DESIGN.md, "Ingest (ingest.py), contract for
-phase 2"). Before anything in the database is touched it refuses the test database
+``run_ingest`` is the single entry point (docs/DESIGN.md, "Ingest (`ingest.py`)"). Before
+anything in the database is touched it refuses the test database
 (``settings.test_db_name``), chunk settings out of range, an embedding model that cannot be
 loaded or whose dimension is not ``settings.vector_dim``, and a malformed ``page_meta.jsonl``, so
 a mistake in ``.env`` or in that file never costs the ingest that is in place. (``pages.jsonl``
