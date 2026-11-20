@@ -296,3 +296,20 @@ scaled run; they were not re-measured at scale. The filter strategy has a scaled
 | `mhnsw_ef_search` | 100 per query (server default 20) | on the final ingest hit lists identical to the exact ranking for 74 of 75 claims against 65 at 20, for 0.51 ms instead of 0.45 ms at k=10 (section 7) |
 | Strategy with filters | `inline`; `overfetch` when latency matters more than a full result | on the 3,000 claims under the History filter, `inline` fills all 5 rows for every claim at 16.49 ms (S0) and 26.59 ms (S1), and `overfetch 10` takes 1.63 and 1.87 ms but comes back short for 2,472 and 2,425 of them ([results/scaled/timing/](../results/scaled/timing/)) |
 | Index cache | 512 MB (`--mhnsw-max-cache-size`) | the graph must fit, with room: on S1 (a 156.0 MB graph) every count at 192 and 256 MB equals the one at 512 MB, while at 160 MB the joined statement is exact for 2,725 to 2,734 of 3,000 claims and takes 351.45 ms instead of 27.53, and at the 16 MB default the bare search finds a gold page for 2,658 claims instead of 2,933 ([results/scaled/run1/s1/cache_size.md](../results/scaled/run1/s1/cache_size.md)); on the demo corpus, 8 MB or less for its 13.0 MB graph left 57 to 67 of 75 lists exact (`results/cache_size.md`) |
+
+### The embedding model's training data
+
+The English BGE models were trained on Wikipedia text and fine-tuned on FEVER, an older
+fact-checking set built on Wikipedia: "We first finetune on unsupervised datasets including
+datasets like Wikipedia, CC-net, StackExchange, Reddit, S2orc, and datasets from
+sentence-transformers. We then further fine-tune on supervised datasets including NLI (Gao et al.,
+2021c), FEVER (Thorne et al., 2018), NQ (Kwiatkowski et al., 2019), HotpotQA (Yang et al., 2018),
+Quora, StackExchange Duplicates and MEDI (Su et al., 2022)." (Xiao et al., C-Pack,
+[arXiv 2309.07597v2](https://arxiv.org/pdf/2309.07597v2), Appendix C; FEVEROUS is not listed, the
+paper does not name v1.5, and the
+[model card of `bge-small-en-v1.5`](https://huggingface.co/BAAI/bge-small-en-v1.5) names no
+training data). So retrieval here runs on familiar ground: the model knows the task and the text,
+which is not the same as having seen our test claims, and recall on text it was not trained on is
+probably lower than the recall above. The database comparisons (vector index against exact
+search, the filters, the statement forms, the cache, the timings) are unaffected, because both
+sides of each comparison use the same embeddings.
