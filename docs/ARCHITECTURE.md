@@ -278,9 +278,9 @@ The reasons for the main choices:
 
 ## 7. Testing and CI
 
-There are 647 tests of three kinds, told apart by pytest markers.
+There are 642 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (563) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (558) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
 - `db` tests (78) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.

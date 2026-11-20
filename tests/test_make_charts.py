@@ -23,36 +23,11 @@ def charts() -> Any:
     return module
 
 
-def _cell(overlap: float) -> dict[str, float]:
-    return {"mean_overlap": overlap, "min_overlap": overlap, "p50_ms": 0.2, "p95_ms": 0.3}
-
-
 HEADLINE = {
     "n_claims": 75, "n_evidence_claims": 66,
     "per_k": [{"k": k, "article_recall": a, "article_hits": int(a * 75),
                "evidence_recall": e, "evidence_hits": int(e * 66)}
               for k, a, e in ((1, 0.84, 0.59), (3, 0.99, 0.79), (20, 0.99, 0.98))],
-}  # fmt: skip
-UNCOMMITTED = {
-    "k": 10, "builds": 1, "efs": [20, 100],
-    "datasets": {name: {"label": name, "builds": [{
-        "rows": 1000, "uncommitted": {"20": _cell(0.6), "100": _cell(0.65)},
-        "committed": {"20": _cell(0.8), "100": _cell(0.99)}}]} for name in ("chunks", "random")},
-}  # fmt: skip
-PLANNER = {
-    "k": 10, "n_chunks": 4598,
-    "cases": {
-        "none": {"r_rows_p50": 10.0, "index_plans": 75, "queries": 75},
-        "edited_before_2020_06_01": {"r_rows_p50": 4598.0, "index_plans": 0, "queries": 75},
-    },
-}
-
-
-SCALE = {
-    "k": 10, "ef_search": 100,
-    "sizes": [{"chunks": n, "hnsw": {"sql_ms_p50": h}, "exact": {"sql_ms_p50": e},
-               "history_inline": {"sql_ms_p50": f}}
-              for n, h, e, f in ((4598, 0.5, 2.2, 3.0), (26700, 0.7, 9.0, 12.0))],
 }  # fmt: skip
 
 
@@ -85,9 +60,6 @@ LLM = {
         ("llm_accuracy", LLM, "LLM fact-checker accuracy"),
         ("llm_f1", LLM, "F1 per label"),
         ("recall_at_k", HEADLINE, "Recall at k"),
-        ("uncommitted_recall", UNCOMMITTED, "has not committed"),
-        ("planner_rows", PLANNER, "Chunk rows read"),
-        ("scale_cost", SCALE, "chunk table grows"),
     ],
 )
 def test_each_chart_is_valid_svg_with_a_title_and_a_description(
@@ -102,12 +74,6 @@ def test_each_chart_is_valid_svg_with_a_title_and_a_description(
     assert "prefers-color-scheme: dark" in svg  # a dark variant, not an automatic flip
 
 
-def test_planner_bars_are_coloured_by_the_plan_and_dates_are_dashed(charts: Any) -> None:
-    svg = charts.planner_rows(PLANNER)
-    assert svg.count('<path class="s1"') == 1 and svg.count('<path class="s2"') == 1
-    assert "edited before 2020-06-01" in svg and ">4,000<" in svg
-
-
 def test_main_skips_missing_results_and_writes_the_rest(
     charts: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -115,11 +81,7 @@ def test_main_skips_missing_results_and_writes_the_rest(
     out = tmp_path / "img"
     assert charts.main(["--results", str(tmp_path), "--out", str(out)]) == 0
     assert sorted(p.name for p in out.iterdir()) == ["recall_at_k.svg"]
-    assert "skipped uncommitted_recall.svg" in capsys.readouterr().err
-
-
-def test_scale_axis_tops_are_round(charts: Any) -> None:
-    assert [charts._nice_max(v) for v in (0.7, 3.0, 9.0, 12.0, 47.0)] == [1.0, 5.0, 10.0, 20.0, 50.0]
+    assert "skipped scaled_recall_at_k.svg" in capsys.readouterr().err
 
 
 def _scaled_run(n_chunks: int, shift: float) -> dict[str, Any]:
