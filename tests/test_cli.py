@@ -889,7 +889,7 @@ def test_init_db_applies_the_schema_and_closes_the_connection(
 
 def _deny_access(settings: Settings | None = None, database: str | None = None) -> Any:
     raise pymysql.err.OperationalError(
-        1045, "Access denied for user 'wikilense'@'172.18.0.1' (using password: YES)"
+        1045, "Access denied for user 'wikilense'@'localhost' (using password: YES)"
     )
 
 

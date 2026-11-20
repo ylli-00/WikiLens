@@ -304,9 +304,8 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
   stated with its reason and its evidence, not with who took it.
 - No personal details in tracked files. The author's name appears only in the README's Team
   section and `LICENSE`; the GitHub account only as part of the repository URL. No email
-  addresses, no home-directory or Windows user paths, and no IP addresses other than `127.0.0.1`,
-  `0.0.0.0` and the addresses Docker assigns inside its own network (in recorded output). A
-  User-Agent names the repository URL only.
+  addresses, no home-directory or Windows user paths, and no IP addresses other than `127.0.0.1`
+  and `0.0.0.0`. A User-Agent names the repository URL only.
 - Files that are data or whose bytes are hashed into a run record (`data/corpus/`,
   `results/*.json`, the prompt sets under `wikilense/llm/prompts/`) are not edited for wording; a
   problem there is reported instead.

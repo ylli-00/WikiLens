@@ -42,10 +42,8 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 #: Email domains reserved for examples (RFC 2606).
 EXAMPLE_DOMAINS = ("example.org", "example.com", "example.net")
-#: IP addresses allowed: loopback, "every interface", and the private range Docker draws its
-#: networks from (its addresses appear in recorded MariaDB error messages).
+#: IP addresses allowed: loopback and "every interface".
 ALLOWED_IPS = frozenset({"127.0.0.1", "0.0.0.0"})
-DOCKER_RANGE = ipaddress.ip_network("172.16.0.0/12")
 
 
 def allowed(rule: str, text: str) -> bool:
@@ -55,10 +53,10 @@ def allowed(rule: str, text: str) -> bool:
         return any(domain == d or domain.endswith("." + d) for d in EXAMPLE_DOMAINS)
     if rule == "IP address":
         try:
-            address = ipaddress.ip_address(text)
+            ipaddress.ip_address(text)
         except ValueError:  # an octet over 255: a version number, not an address
             return True
-        return text in ALLOWED_IPS or address in DOCKER_RANGE
+        return text in ALLOWED_IPS
     return False
 
 
@@ -105,7 +103,7 @@ def test_the_patterns_catch_the_excluded_forms_and_let_the_allowed_ones_pass() -
     for text in caught:
         assert findings_in_text(text), text
     passing = [
-        "readable by its owner only", "127.0.0.1:3306", "0.0.0.0", "'wikilense'@'172.18.0.1'",
+        "readable by its owner only", "127.0.0.1:3306", "0.0.0.0", "'wikilense'@'localhost'",
         "someone@example.org", "~/.cache/huggingface", "nvidia-cufft==12.0.0.61",
         "@pytest.mark.db", "'wikilense'@'%'", "CLI 2.1.322", "the decision rule",
     ]

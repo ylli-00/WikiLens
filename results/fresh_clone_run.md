@@ -125,10 +125,11 @@ not have (`explain=true`) was refused with 400 and the list of the parameters it
 ## A `.env` that does not fit the data volume
 
 With the volume in place, `.env` was deleted and `make setup CPU=1` run again. It wrote a new
-`.env` with new passwords, and the ingest stopped with one line:
+`.env` with new passwords, and the ingest stopped with one line. The address Docker assigned to
+the connection inside its own network is replaced by `<host>`:
 
 ```
-wikilense: database error: Access denied for user 'wikilense'@'172.18.0.1' (using password: YES) (error 1045); the password in .env is not the one this MariaDB data volume was created with: put that password back in .env, or delete the volume with 'docker compose down -v' (this deletes the database) and run 'make setup' again
+wikilense: database error: Access denied for user 'wikilense'@'<host>' (using password: YES) (error 1045); the password in .env is not the one this MariaDB data volume was created with: put that password back in .env, or delete the volume with 'docker compose down -v' (this deletes the database) and run 'make setup' again
 ```
 
 ## Not run
