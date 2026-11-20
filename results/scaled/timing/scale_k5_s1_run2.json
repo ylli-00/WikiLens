@@ -1,0 +1,37 @@
+{
+ "database": "wikilense_s1",
+ "k": 5,
+ "repeats": 3,
+ "ef_search": 100,
+ "heading_filter": "%History%",
+ "n_claims": 3000,
+ "n_chunks": 132359,
+ "cpu_max_perf_pct": 50,
+ "seconds": 725.7,
+ "finished_at": "2026-11-15T04:21:53+01:00",
+ "statements": {
+  "hnsw": {
+   "sql_ms_p50": 1.683,
+   "sql_ms_p95": 2.692,
+   "short_results": 0,
+   "article_hits_at_10": 2933
+  },
+  "exact": {
+   "sql_ms_p50": 25.786,
+   "sql_ms_p95": 29.655,
+   "short_results": 0,
+   "article_hits_at_10": 2943
+  },
+  "history_inline": {
+   "sql_ms_p50": 26.612,
+   "sql_ms_p95": 30.365,
+   "short_results": 0
+  },
+  "history_overfetch10": {
+   "sql_ms_p50": 1.869,
+   "sql_ms_p95": 2.891,
+   "short_results": 2425
+  },
+  "identical_hnsw_exact": 2911
+ }
+}

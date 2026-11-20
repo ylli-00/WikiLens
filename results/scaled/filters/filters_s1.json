@@ -1,0 +1,195 @@
+{
+ "database": "wikilense_s1",
+ "created_at": "2026-11-19T19:24:06+00:00",
+ "n_chunks": 132359,
+ "n_pages": 7686,
+ "targets": [
+  0.5,
+  0.05,
+  0.005,
+  0.0005
+ ],
+ "cases": [
+  {
+   "name": "none",
+   "filter": null,
+   "target_share": null,
+   "filters": {},
+   "passing_chunks": 132359,
+   "passing_share": 1.0
+  },
+  {
+   "name": "length_50pct",
+   "filter": "length",
+   "target_share": 0.5,
+   "filters": {
+    "min_words": 5214
+   },
+   "passing_chunks": 66171,
+   "passing_share": 0.499936
+  },
+  {
+   "name": "length_5pct",
+   "filter": "length",
+   "target_share": 0.05,
+   "filters": {
+    "min_words": 14929
+   },
+   "passing_chunks": 6616,
+   "passing_share": 0.049985
+  },
+  {
+   "name": "length_0.5pct",
+   "filter": "length",
+   "target_share": 0.005,
+   "filters": {
+    "min_words": 20112
+   },
+   "passing_chunks": 626,
+   "passing_share": 0.00473
+  },
+  {
+   "name": "length_0.05pct",
+   "filter": "length",
+   "target_share": 0.0005,
+   "filters": {
+    "min_words": 23132
+   },
+   "passing_chunks": 139,
+   "passing_share": 0.00105
+  },
+  {
+   "name": "edited_50pct",
+   "filter": "edited",
+   "target_share": 0.5,
+   "filters": {
+    "edited_since": "2020-12-21T15:34:08"
+   },
+   "passing_chunks": 66208,
+   "passing_share": 0.500215
+  },
+  {
+   "name": "edited_5pct",
+   "filter": "edited",
+   "target_share": 0.05,
+   "filters": {
+    "edited_since": "2020-12-31T08:42:11"
+   },
+   "passing_chunks": 6599,
+   "passing_share": 0.049857
+  },
+  {
+   "name": "edited_0.5pct",
+   "filter": "edited",
+   "target_share": 0.005,
+   "filters": {
+    "edited_since": "2020-12-31T22:30:26"
+   },
+   "passing_chunks": 660,
+   "passing_share": 0.004986
+  },
+  {
+   "name": "edited_0.05pct",
+   "filter": "edited",
+   "target_share": 0.0005,
+   "filters": {
+    "edited_since": "2020-12-31T23:59:17"
+   },
+   "passing_chunks": 77,
+   "passing_share": 0.000582
+  },
+  {
+   "name": "category_50pct",
+   "filter": "category",
+   "target_share": 0.5,
+   "filters": {
+    "category": "Living people"
+   },
+   "passing_chunks": 9267,
+   "passing_share": 0.070014
+  },
+  {
+   "name": "category_5pct",
+   "filter": "category",
+   "target_share": 0.05,
+   "filters": {
+    "category": "Member states of the United Nations"
+   },
+   "passing_chunks": 7313,
+   "passing_share": 0.055251
+  },
+  {
+   "name": "category_0.5pct",
+   "filter": "category",
+   "target_share": 0.005,
+   "filters": {
+    "category": "American male film actors"
+   },
+   "passing_chunks": 660,
+   "passing_share": 0.004986
+  },
+  {
+   "name": "category_0.05pct",
+   "filter": "category",
+   "target_share": 0.0005,
+   "filters": {
+    "category": "1821 establishments in North America"
+   },
+   "passing_chunks": 66,
+   "passing_share": 0.000499
+  },
+  {
+   "name": "linked_50pct",
+   "filter": "linked",
+   "target_share": 0.5,
+   "filters": {
+    "linked_from": "List of sovereign states"
+   },
+   "passing_chunks": 8203,
+   "passing_share": 0.061975
+  },
+  {
+   "name": "linked_5pct",
+   "filter": "linked",
+   "target_share": 0.05,
+   "filters": {
+    "linked_from": "United Kingdom"
+   },
+   "passing_chunks": 6698,
+   "passing_share": 0.050605
+  },
+  {
+   "name": "linked_0.5pct",
+   "filter": "linked",
+   "target_share": 0.005,
+   "filters": {
+    "linked_from": "Jean-Paul Sartre"
+   },
+   "passing_chunks": 662,
+   "passing_share": 0.005002
+  },
+  {
+   "name": "linked_0.05pct",
+   "filter": "linked",
+   "target_share": 0.0005,
+   "filters": {
+    "linked_from": "1930 Nicaraguan parliamentary election"
+   },
+   "passing_chunks": 66,
+   "passing_share": 0.000499
+  },
+  {
+   "name": "four_filters",
+   "filter": "four_filters",
+   "target_share": null,
+   "filters": {
+    "category": "Member states of the United Nations",
+    "min_words": 5214,
+    "edited_since": "2020-12-21T15:34:08",
+    "linked_from": "Legality of cannabis"
+   },
+   "passing_chunks": 3107,
+   "passing_share": 0.023474
+  }
+ ]
+}

@@ -1,0 +1,209 @@
+{
+ "rule": {
+  "walk": "sorted(gold) shuffled with random.Random(7)",
+  "links": "wikitext.extract_links, duplicates kept; ties by first mention",
+  "skip_order": [
+   "gold",
+   "taken",
+   "missing"
+  ]
+ },
+ "gold_articles": 3851,
+ "gold_missing_from_db": [],
+ "pages": 3835,
+ "gold_without_usable_link": [
+  {
+   "title": "RAPGEF1",
+   "n_links": 3,
+   "n_distinct": 3,
+   "skipped": {
+    "gold": 1,
+    "taken": 1,
+    "missing": 1
+   }
+  },
+  {
+   "title": "RAD9A",
+   "n_links": 3,
+   "n_distinct": 3,
+   "skipped": {
+    "gold": 1,
+    "taken": 1,
+    "missing": 1
+   }
+  },
+  {
+   "title": "List of West Bengal districts ranked by literacy rate",
+   "n_links": 5,
+   "n_distinct": 4,
+   "skipped": {
+    "missing": 2,
+    "taken": 2
+   }
+  },
+  {
+   "title": "Vertical resistance",
+   "n_links": 2,
+   "n_distinct": 2,
+   "skipped": {
+    "missing": 2
+   }
+  },
+  {
+   "title": "Hongze",
+   "n_links": 2,
+   "n_distinct": 2,
+   "skipped": {
+    "missing": 2
+   }
+  },
+  {
+   "title": "Teldenia alba",
+   "n_links": 11,
+   "n_distinct": 10,
+   "skipped": {
+    "taken": 7,
+    "gold": 3
+   }
+  },
+  {
+   "title": "Yang Tianyong",
+   "n_links": 2,
+   "n_distinct": 1,
+   "skipped": {
+    "missing": 1
+   }
+  },
+  {
+   "title": "Xigong District",
+   "n_links": 6,
+   "n_distinct": 6,
+   "skipped": {
+    "gold": 1,
+    "taken": 3,
+    "missing": 2
+   }
+  },
+  {
+   "title": "Francesca Melandri",
+   "n_links": 3,
+   "n_distinct": 3,
+   "skipped": {
+    "gold": 3
+   }
+  },
+  {
+   "title": "Eddie Blay",
+   "n_links": 4,
+   "n_distinct": 4,
+   "skipped": {
+    "gold": 4
+   }
+  },
+  {
+   "title": "RAD17",
+   "n_links": 3,
+   "n_distinct": 3,
+   "skipped": {
+    "gold": 1,
+    "taken": 1,
+    "missing": 1
+   }
+  },
+  {
+   "title": "Chiman Saparaiya",
+   "n_links": 2,
+   "n_distinct": 2,
+   "skipped": {
+    "taken": 1,
+    "missing": 1
+   }
+  },
+  {
+   "title": "DAB2",
+   "n_links": 3,
+   "n_distinct": 3,
+   "skipped": {
+    "gold": 1,
+    "taken": 1,
+    "missing": 1
+   }
+  },
+  {
+   "title": "Talk, Talk, Talk",
+   "n_links": 1,
+   "n_distinct": 1,
+   "skipped": {
+    "gold": 1
+   }
+  },
+  {
+   "title": "Ditrigona candida",
+   "n_links": 12,
+   "n_distinct": 11,
+   "skipped": {
+    "taken": 8,
+    "gold": 3
+   }
+  },
+  {
+   "title": "Czechoslovak Ocean Shipping",
+   "n_links": 2,
+   "n_distinct": 2,
+   "skipped": {
+    "taken": 1,
+    "gold": 1
+   }
+  }
+ ],
+ "rank_taken": {
+  "0": 2567,
+  "1": 748,
+  "2": 279,
+  "3": 103,
+  "4": 52,
+  "5": 25,
+  "6": 27,
+  "7": 12,
+  "8": 7,
+  "9": 6,
+  "10": 6,
+  "11": 1,
+  "13": 1,
+  "16": 1
+ },
+ "skips": {
+  "gold": 551,
+  "taken": 1123,
+  "missing": 790
+ },
+ "times_linked_of_taken": {
+  "1": 811,
+  "2": 1161,
+  "3": 797,
+  "4": 389,
+  "5": 193,
+  "6": 147,
+  "7": 84,
+  "8": 54,
+  "9": 35,
+  "10": 164
+ },
+ "gold_links_per_article": {
+  "n": 3851,
+  "median": 35.0,
+  "mean": 92.84,
+  "p90": 236.0,
+  "min": 1,
+  "max": 7039,
+  "sum": 357532
+ },
+ "distinct_titles_checked_in_db": 4492,
+ "distinct_titles_missing_from_db": 657,
+ "seconds": 9.1,
+ "db_reads": {
+  "pages": 3851,
+  "exists": 4492
+ },
+ "claims_sha256": "905cf1281d01e310702e820121864ac96ab0c07d5e857c24ad2d1314f532ab8a"
+}

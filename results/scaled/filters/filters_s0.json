@@ -1,0 +1,185 @@
+{
+ "database": "wikilense_s0",
+ "created_at": "2026-11-19T19:24:06+00:00",
+ "n_chunks": 43134,
+ "n_pages": 3851,
+ "targets": [
+  0.5,
+  0.05,
+  0.005,
+  0.0005
+ ],
+ "cases": [
+  {
+   "name": "none",
+   "filter": null,
+   "target_share": null,
+   "filters": {},
+   "passing_chunks": 43134,
+   "passing_share": 1.0
+  },
+  {
+   "name": "length_50pct",
+   "filter": "length",
+   "target_share": 0.5,
+   "filters": {
+    "min_words": 3359
+   },
+   "passing_chunks": 21570,
+   "passing_share": 0.50007
+  },
+  {
+   "name": "length_5pct",
+   "filter": "length",
+   "target_share": 0.05,
+   "filters": {
+    "min_words": 13542
+   },
+   "passing_chunks": 2166,
+   "passing_share": 0.050216
+  },
+  {
+   "name": "length_0.5pct",
+   "filter": "length",
+   "target_share": 0.005,
+   "filters": {
+    "min_words": 20112
+   },
+   "passing_chunks": 256,
+   "passing_share": 0.005935
+  },
+  {
+   "name": "length_0.05pct",
+   "filter": "length",
+   "target_share": 0.0005,
+   "filters": {
+    "min_words": 23132
+   },
+   "passing_chunks": 139,
+   "passing_share": 0.003223
+  },
+  {
+   "name": "edited_50pct",
+   "filter": "edited",
+   "target_share": 0.5,
+   "filters": {
+    "edited_since": "2020-12-18T02:38:12"
+   },
+   "passing_chunks": 21578,
+   "passing_share": 0.500255
+  },
+  {
+   "name": "edited_5pct",
+   "filter": "edited",
+   "target_share": 0.05,
+   "filters": {
+    "edited_since": "2020-12-31T01:41:51"
+   },
+   "passing_chunks": 2124,
+   "passing_share": 0.049242
+  },
+  {
+   "name": "edited_0.5pct",
+   "filter": "edited",
+   "target_share": 0.005,
+   "filters": {
+    "edited_since": "2020-12-31T21:03:02"
+   },
+   "passing_chunks": 219,
+   "passing_share": 0.005077
+  },
+  {
+   "name": "edited_0.05pct",
+   "filter": "edited",
+   "target_share": 0.0005,
+   "filters": {
+    "edited_since": "2020-12-31T23:58:53"
+   },
+   "passing_chunks": 34,
+   "passing_share": 0.000788
+  },
+  {
+   "name": "category_50pct",
+   "filter": "category",
+   "target_share": 0.5,
+   "filters": {
+    "category": "Living people"
+   },
+   "passing_chunks": 5081,
+   "passing_share": 0.117796
+  },
+  {
+   "name": "category_5pct",
+   "filter": "category",
+   "target_share": 0.05,
+   "filters": {
+    "category": "Articles containing video clips"
+   },
+   "passing_chunks": 1857,
+   "passing_share": 0.043052
+  },
+  {
+   "name": "category_0.5pct",
+   "filter": "category",
+   "target_share": 0.005,
+   "filters": {
+    "category": "American film producers"
+   },
+   "passing_chunks": 215,
+   "passing_share": 0.004984
+  },
+  {
+   "name": "category_0.05pct",
+   "filter": "category",
+   "target_share": 0.0005,
+   "filters": {
+    "category": "1608 births"
+   },
+   "passing_chunks": 22,
+   "passing_share": 0.00051
+  },
+  {
+   "name": "linked_50pct",
+   "filter": "linked",
+   "target_share": 0.5,
+   "filters": {
+    "linked_from": "List of countries by maternal mortality ratio"
+   },
+   "passing_chunks": 1629,
+   "passing_share": 0.037766
+  },
+  {
+   "name": "linked_0.5pct",
+   "filter": "linked",
+   "target_share": 0.005,
+   "filters": {
+    "linked_from": "ABC Records"
+   },
+   "passing_chunks": 216,
+   "passing_share": 0.005008
+  },
+  {
+   "name": "linked_0.05pct",
+   "filter": "linked",
+   "target_share": 0.0005,
+   "filters": {
+    "linked_from": "30th New York State Legislature"
+   },
+   "passing_chunks": 22,
+   "passing_share": 0.00051
+  },
+  {
+   "name": "four_filters",
+   "filter": "four_filters",
+   "target_share": null,
+   "filters": {
+    "category": "Member states of the United Nations",
+    "min_words": 3359,
+    "edited_since": "2020-12-18T02:38:12",
+    "linked_from": "List of countries by maternal mortality ratio"
+   },
+   "passing_chunks": 824,
+   "passing_share": 0.019103
+  }
+ ]
+}

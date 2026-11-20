@@ -1,0 +1,43 @@
+{
+ "database": "wikilense_s0",
+ "folder": "S0",
+ "wall_seconds": 54.7,
+ "report": {
+  "n_pages": 3851,
+  "n_sections": 35571,
+  "n_sentences": 284302,
+  "n_units_empty": 1603,
+  "n_units_hatnote": 6117,
+  "n_chunks": 43134,
+  "n_links": 357532,
+  "n_links_resolved": 11413,
+  "n_links_skipped": 0,
+  "n_claims": 3000,
+  "n_evidence": 8408,
+  "n_evidence_page_resolved": 8408,
+  "n_evidence_sentence_resolved": 7877,
+  "n_pages_with_meta": 0,
+  "n_categories": 0,
+  "n_page_categories": 0
+ },
+ "seconds": {
+  "schema": 0.08,
+  "parse": 9.3,
+  "embed": 0.15,
+  "load": 43.59,
+  "resolve": 0.37,
+  "analyze": 0.04,
+  "total": 54.6
+ },
+ "graph_tablespaces": [
+  {
+   "name": "wikilense_s0/chunk#i#04",
+   "file_size": 58720256
+  }
+ ],
+ "graph_bytes": 58720256,
+ "embedding": {
+  "model_name": "BAAI/bge-small-en-v1.5",
+  "revision_label": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+ }
+}

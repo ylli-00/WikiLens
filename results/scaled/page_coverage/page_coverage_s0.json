@@ -1,0 +1,73 @@
+{
+ "database": "wikilense_s0",
+ "n_chunks": 50,
+ "ef_search": 100,
+ "strategy": "none",
+ "pages": [
+  1,
+  2,
+  3,
+  5,
+  10
+ ],
+ "definition": "FEVEROUS baseline eval_doc_retriever.page_coverage: per claim |gold pages in the first p predicted pages| / |gold pages|, gold pages pooled over all evidence sets; mean over claims",
+ "finished_at": "2026-11-15T03:13:35+01:00",
+ "claims": 3000,
+ "without_gold_pages": 0,
+ "all": {
+  "n": 3000,
+  "p1": {
+   "coverage": 0.8106,
+   "complete": 0.6717,
+   "fewer_than_p_pages": 0
+  },
+  "p2": {
+   "coverage": 0.9231,
+   "complete": 0.8607,
+   "fewer_than_p_pages": 1
+  },
+  "p3": {
+   "coverage": 0.9479,
+   "complete": 0.9073,
+   "fewer_than_p_pages": 9
+  },
+  "p5": {
+   "coverage": 0.9599,
+   "complete": 0.929,
+   "fewer_than_p_pages": 41
+  },
+  "p10": {
+   "coverage": 0.967,
+   "complete": 0.9417,
+   "fewer_than_p_pages": 212
+  }
+ },
+ "supports_refutes": {
+  "n": 2000,
+  "p1": {
+   "coverage": 0.8304,
+   "complete": 0.6875,
+   "fewer_than_p_pages": 0
+  },
+  "p2": {
+   "coverage": 0.9364,
+   "complete": 0.876,
+   "fewer_than_p_pages": 1
+  },
+  "p3": {
+   "coverage": 0.9584,
+   "complete": 0.92,
+   "fewer_than_p_pages": 6
+  },
+  "p5": {
+   "coverage": 0.9681,
+   "complete": 0.9375,
+   "fewer_than_p_pages": 23
+  },
+  "p10": {
+   "coverage": 0.9748,
+   "complete": 0.95,
+   "fewer_than_p_pages": 109
+  }
+ }
+}

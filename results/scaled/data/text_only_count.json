@@ -1,0 +1,9 @@
+{
+ "files": [
+  "feverous_train_challenges.jsonl",
+  "feverous_dev_challenges.jsonl"
+ ],
+ "claims": 79181,
+ "no_text_only_set": 43957,
+ "share": 0.5551
+}

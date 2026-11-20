@@ -1,0 +1,247 @@
+{
+ "params": {
+  "database": "wikilense_s0",
+  "k": 10,
+  "strategy": "none",
+  "ef_search": 100,
+  "n_sentences": 5,
+  "n_items": 25,
+  "batch_size": 256,
+  "embedding_model": "BAAI/bge-small-en-v1.5",
+  "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+  "device": "cuda",
+  "claims_file": "data/scaled/claims_3000.jsonl",
+  "n_units": 133007,
+  "n_chunks": 20627,
+  "embed_seconds": 90.9,
+  "mean_candidates": 66.22966666666666,
+  "candidates_hist": {
+   "16": 1,
+   "19": 3,
+   "21": 2,
+   "23": 2,
+   "25": 1,
+   "26": 2,
+   "28": 5,
+   "29": 2,
+   "30": 3,
+   "31": 12,
+   "32": 2,
+   "33": 14,
+   "34": 18,
+   "35": 4,
+   "36": 5,
+   "37": 15,
+   "38": 16,
+   "39": 11,
+   "40": 18,
+   "41": 26,
+   "42": 25,
+   "43": 24,
+   "44": 28,
+   "45": 42,
+   "46": 38,
+   "47": 50,
+   "48": 47,
+   "49": 48,
+   "50": 52,
+   "51": 38,
+   "52": 47,
+   "53": 55,
+   "54": 61,
+   "55": 53,
+   "56": 62,
+   "57": 60,
+   "58": 75,
+   "59": 69,
+   "60": 83,
+   "61": 75,
+   "62": 88,
+   "63": 59,
+   "64": 78,
+   "65": 74,
+   "66": 73,
+   "67": 76,
+   "68": 84,
+   "69": 72,
+   "70": 75,
+   "71": 82,
+   "72": 74,
+   "73": 70,
+   "74": 67,
+   "75": 70,
+   "76": 54,
+   "77": 49,
+   "78": 50,
+   "79": 58,
+   "80": 53,
+   "81": 38,
+   "82": 33,
+   "83": 34,
+   "84": 31,
+   "85": 28,
+   "86": 34,
+   "87": 25,
+   "88": 31,
+   "89": 31,
+   "90": 16,
+   "91": 20,
+   "92": 22,
+   "93": 13,
+   "94": 14,
+   "95": 14,
+   "96": 11,
+   "97": 10,
+   "98": 7,
+   "99": 12,
+   "100": 6,
+   "101": 4,
+   "102": 6,
+   "103": 1,
+   "104": 5,
+   "105": 3,
+   "106": 6,
+   "107": 3,
+   "108": 3,
+   "109": 3,
+   "110": 1,
+   "112": 2,
+   "113": 2,
+   "115": 4,
+   "116": 1,
+   "117": 3,
+   "118": 1,
+   "119": 2,
+   "120": 1,
+   "121": 2,
+   "122": 2,
+   "125": 1,
+   "130": 1,
+   "137": 2,
+   "139": 2,
+   "149": 1,
+   "150": 2,
+   "160": 2,
+   "170": 1,
+   "181": 1,
+   "193": 1,
+   "243": 1
+  },
+  "total_seconds": 107.3,
+  "finished_at": "2026-11-15T03:10:38+01:00"
+ },
+ "overall": {
+  "claims": 3000,
+  "eligible": 3000,
+  "in_top_chunks": {
+   "hits": 2558,
+   "rate": 0.8527
+  },
+  "found_embed": {
+   "hits": 1637,
+   "rate": 0.5457
+  },
+  "found_chunk_order": {
+   "hits": 1239,
+   "rate": 0.413
+  }
+ },
+ "groups": {
+  "SUPPORTS / single": {
+   "claims": 700,
+   "eligible": 700,
+   "in_top_chunks": {
+    "hits": 689,
+    "rate": 0.9843
+   },
+   "found_embed": {
+    "hits": 525,
+    "rate": 0.75
+   },
+   "found_chunk_order": {
+    "hits": 379,
+    "rate": 0.5414
+   }
+  },
+  "SUPPORTS / needs2": {
+   "claims": 300,
+   "eligible": 300,
+   "in_top_chunks": {
+    "hits": 236,
+    "rate": 0.7867
+   },
+   "found_embed": {
+    "hits": 84,
+    "rate": 0.28
+   },
+   "found_chunk_order": {
+    "hits": 26,
+    "rate": 0.0867
+   }
+  },
+  "REFUTES / single": {
+   "claims": 700,
+   "eligible": 700,
+   "in_top_chunks": {
+    "hits": 690,
+    "rate": 0.9857
+   },
+   "found_embed": {
+    "hits": 538,
+    "rate": 0.7686
+   },
+   "found_chunk_order": {
+    "hits": 474,
+    "rate": 0.6771
+   }
+  },
+  "REFUTES / needs2": {
+   "claims": 300,
+   "eligible": 300,
+   "in_top_chunks": {
+    "hits": 140,
+    "rate": 0.4667
+   },
+   "found_embed": {
+    "hits": 27,
+    "rate": 0.09
+   },
+   "found_chunk_order": {
+    "hits": 21,
+    "rate": 0.07
+   }
+  },
+  "NOT ENOUGH INFO / single": {
+   "claims": 700,
+   "eligible": 700,
+   "in_top_chunks": {
+    "hits": 640,
+    "rate": 0.9143
+   },
+   "found_embed": {
+    "hits": 431,
+    "rate": 0.6157
+   },
+   "found_chunk_order": {
+    "hits": 331,
+    "rate": 0.4729
+   }
+  },
+  "NOT ENOUGH INFO / needs2": {
+   "claims": 300,
+   "eligible": 300,
+   "in_top_chunks": {
+    "hits": 163,
+    "rate": 0.5433
+   },
+   "found_embed": {
+    "hits": 32,
+    "rate": 0.1067
+   },
+   "found_chunk_order": {
+    "hits": 8,
+    "rate": 0.0267
+   }
+  }
+ }
+}

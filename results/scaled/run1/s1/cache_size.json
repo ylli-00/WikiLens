@@ -1,0 +1,532 @@
+{
+  "name": "cache_size",
+  "created_at": "2026-11-20T03:09:56+00:00",
+  "k": 5,
+  "sizes_mb": [
+    256,
+    192,
+    160,
+    128,
+    64,
+    16
+  ],
+  "passes": 2,
+  "ef_search": 100,
+  "n_queries": 3000,
+  "n_chunks": 132359,
+  "configured_cache_bytes": 536870912,
+  "restored_cache_bytes": 536870912,
+  "exact_article_recall": 2943,
+  "index_m": 16,
+  "index_distance": "cosine",
+  "results": [
+    {
+      "cache": "as configured",
+      "cache_bytes": 536870912,
+      "table_reopened": false,
+      "statement": "bare",
+      "equal_to_exact": [
+        2917,
+        2917
+      ],
+      "article_recall": [
+        2933,
+        2933
+      ],
+      "overlap_with_exact": [
+        0.9933,
+        0.9933
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        3000
+      ],
+      "p50_ms": 2.561
+    },
+    {
+      "cache": "as configured",
+      "cache_bytes": 536870912,
+      "table_reopened": false,
+      "statement": "joined",
+      "equal_to_exact": [
+        3000,
+        3000
+      ],
+      "article_recall": [
+        2943,
+        2943
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        3000
+      ],
+      "p50_ms": 28.425
+    },
+    {
+      "cache": "16 MB, table not reopened",
+      "cache_bytes": 16777216,
+      "table_reopened": false,
+      "statement": "bare",
+      "equal_to_exact": [
+        2151,
+        2162
+      ],
+      "article_recall": [
+        2657,
+        2658
+      ],
+      "overlap_with_exact": [
+        0.8645,
+        0.8649
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2487
+      ],
+      "p50_ms": 17.71
+    },
+    {
+      "cache": "16 MB, table not reopened",
+      "cache_bytes": 16777216,
+      "table_reopened": false,
+      "statement": "joined",
+      "equal_to_exact": [
+        2314,
+        2311
+      ],
+      "article_recall": [
+        2694,
+        2691
+      ],
+      "overlap_with_exact": [
+        0.8807,
+        0.8801
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2867
+      ],
+      "p50_ms": 21.996
+    },
+    {
+      "cache": "256 MB",
+      "cache_bytes": 268435456,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2902,
+        2911
+      ],
+      "article_recall": [
+        2931,
+        2933
+      ],
+      "overlap_with_exact": [
+        0.9919,
+        0.9929
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2990
+      ],
+      "p50_ms": 2.368
+    },
+    {
+      "cache": "256 MB",
+      "cache_bytes": 268435456,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        3000,
+        3000
+      ],
+      "article_recall": [
+        2943,
+        2943
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        3000
+      ],
+      "p50_ms": 27.198
+    },
+    {
+      "cache": "192 MB",
+      "cache_bytes": 201326592,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2902,
+        2911
+      ],
+      "article_recall": [
+        2931,
+        2933
+      ],
+      "overlap_with_exact": [
+        0.9919,
+        0.9929
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2990
+      ],
+      "p50_ms": 2.272
+    },
+    {
+      "cache": "192 MB",
+      "cache_bytes": 201326592,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        3000,
+        3000
+      ],
+      "article_recall": [
+        2943,
+        2943
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        3000
+      ],
+      "p50_ms": 27.528
+    },
+    {
+      "cache": "160 MB",
+      "cache_bytes": 167772160,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2819,
+        2823
+      ],
+      "article_recall": [
+        2910,
+        2911
+      ],
+      "overlap_with_exact": [
+        0.9809,
+        0.9809
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2932
+      ],
+      "p50_ms": 25.208
+    },
+    {
+      "cache": "160 MB",
+      "cache_bytes": 167772160,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        2734,
+        2725
+      ],
+      "article_recall": [
+        2840,
+        2840
+      ],
+      "overlap_with_exact": [
+        0.9533,
+        0.9536
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2729
+      ],
+      "p50_ms": 351.448
+    },
+    {
+      "cache": "128 MB",
+      "cache_bytes": 134217728,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2722,
+        2724
+      ],
+      "article_recall": [
+        2874,
+        2875
+      ],
+      "overlap_with_exact": [
+        0.9653,
+        0.9654
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2990
+      ],
+      "p50_ms": 39.404
+    },
+    {
+      "cache": "128 MB",
+      "cache_bytes": 134217728,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        2440,
+        2436
+      ],
+      "article_recall": [
+        2750,
+        2743
+      ],
+      "overlap_with_exact": [
+        0.9041,
+        0.9026
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2971
+      ],
+      "p50_ms": 493.338
+    },
+    {
+      "cache": "64 MB",
+      "cache_bytes": 67108864,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2561,
+        2548
+      ],
+      "article_recall": [
+        2798,
+        2807
+      ],
+      "overlap_with_exact": [
+        0.9329,
+        0.9333
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2650
+      ],
+      "p50_ms": 35.2
+    },
+    {
+      "cache": "64 MB",
+      "cache_bytes": 67108864,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        2283,
+        2275
+      ],
+      "article_recall": [
+        2685,
+        2690
+      ],
+      "overlap_with_exact": [
+        0.8744,
+        0.8724
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2291
+      ],
+      "p50_ms": 166.268
+    },
+    {
+      "cache": "16 MB",
+      "cache_bytes": 16777216,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2163,
+        2162
+      ],
+      "article_recall": [
+        2658,
+        2658
+      ],
+      "overlap_with_exact": [
+        0.8649,
+        0.8649
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2999
+      ],
+      "p50_ms": 16.544
+    },
+    {
+      "cache": "16 MB",
+      "cache_bytes": 16777216,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        2314,
+        2312
+      ],
+      "article_recall": [
+        2695,
+        2690
+      ],
+      "overlap_with_exact": [
+        0.8809,
+        0.8795
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2824
+      ],
+      "p50_ms": 21.916
+    },
+    {
+      "cache": "as configured, again",
+      "cache_bytes": 536870912,
+      "table_reopened": true,
+      "statement": "bare",
+      "equal_to_exact": [
+        2902,
+        2911
+      ],
+      "article_recall": [
+        2931,
+        2933
+      ],
+      "overlap_with_exact": [
+        0.9919,
+        0.9929
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        2990
+      ],
+      "p50_ms": 2.144
+    },
+    {
+      "cache": "as configured, again",
+      "cache_bytes": 536870912,
+      "table_reopened": true,
+      "statement": "joined",
+      "equal_to_exact": [
+        3000,
+        3000
+      ],
+      "article_recall": [
+        2943,
+        2943
+      ],
+      "overlap_with_exact": [
+        1.0,
+        1.0
+      ],
+      "short": [
+        0,
+        0
+      ],
+      "identical_between_two_passes": [
+        3000
+      ],
+      "p50_ms": 27.31
+    }
+  ],
+  "ingest_meta": {
+    "analyze_seconds": "0.063",
+    "analyze_tables": "chunk,page,section,link,category,page_category",
+    "chunk_max_words": "240",
+    "chunk_overlap_units": "1",
+    "corpus_claims_sha256": "d29154f4cfe95ab5c2330f20ea05e2836fd2f23a9f4894b25fcc2c89e946297c",
+    "corpus_dir": "(outside the repository) scaled_data/S1",
+    "corpus_page_meta_sha256": "none",
+    "corpus_pages_sha256": "d98f74eb80ef76e79d12ba932943407bcc2d75db658b2ae150ad275e0e53ff3a",
+    "embedding_dim": "384",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_prefix": "true",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "hatnote_pattern": "^(?:(?:Main articles?|See also|Further information|For other uses|Not to be confused with)[:,]|For (?!example\\b|instance\\b)[^.]{0,80}?, see |Not to be confused with |This (?:article|page) is about |\"[^\"]{1,120}\" redirects here)",
+    "index_distance": "cosine",
+    "index_m": "16",
+    "ingested_at": "2026-11-12T02:17:26+00:00",
+    "mariadb_version": "11.8.9-MariaDB-ubu2404",
+    "n_units_hatnote": "25471",
+    "wikilense_version": "0.1.0"
+  },
+  "machine": {
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.43",
+    "architecture": "x86_64",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "cpu_count": 20,
+    "memory_gb": 14.7,
+    "embedding_device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "versions": {
+    "python": "3.12.16",
+    "wikilense": "0.1.0",
+    "mariadb": "11.8.9-MariaDB-ubu2404",
+    "PyMySQL": "1.2.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.0",
+    "sentence-transformers": "6.0.1"
+  },
+  "database": "wikilense_s1"
+}

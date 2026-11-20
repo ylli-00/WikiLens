@@ -1,0 +1,292 @@
+{
+ "inputs": {
+  "claims_per_split": {
+   "train": 71291,
+   "dev": 7890
+  }
+ },
+ "rule": {
+  "seed": 20261111,
+  "per_group": {
+   "single": 700,
+   "needs2": 300
+  },
+  "labels": [
+   "SUPPORTS",
+   "REFUTES",
+   "NOT ENOUGH INFO"
+  ],
+  "chunking": {
+   "max_words": 240,
+   "overlap_units": 1
+  }
+ },
+ "pool": {
+  "SUPPORTS": {
+   "single": {
+    "claims": 33853,
+    "with_text_only_set": 14059,
+    "eligible": 14059,
+    "findable": 14036,
+    "unfindable": 23,
+    "picked": 700,
+    "spare": 13336
+   },
+   "needs2": {
+    "claims": 11529,
+    "with_text_only_set": 4215,
+    "eligible": 4215,
+    "findable": 4178,
+    "unfindable": 37,
+    "picked": 300,
+    "spare": 3878
+   }
+  },
+  "REFUTES": {
+   "single": {
+    "claims": 28852,
+    "with_text_only_set": 14319,
+    "eligible": 14319,
+    "findable": 14298,
+    "unfindable": 21,
+    "picked": 700,
+    "spare": 13598
+   },
+   "needs2": {
+    "claims": 1494,
+    "with_text_only_set": 633,
+    "eligible": 633,
+    "findable": 623,
+    "unfindable": 10,
+    "picked": 300,
+    "spare": 323
+   }
+  },
+  "NOT ENOUGH INFO": {
+   "single": {
+    "claims": 2050,
+    "with_text_only_set": 1158,
+    "eligible": 1158,
+    "findable": 1147,
+    "unfindable": 11,
+    "picked": 700,
+    "spare": 447
+   },
+   "needs2": {
+    "claims": 677,
+    "with_text_only_set": 324,
+    "eligible": 324,
+    "findable": 314,
+    "unfindable": 10,
+    "picked": 300,
+    "spare": 14
+   }
+  }
+ },
+ "other_kinds": {
+  "SUPPORTS": {
+   "either": {
+    "claims": 361,
+    "with_text_only_set": 229
+   },
+   "none": {
+    "claims": 0,
+    "with_text_only_set": 0
+   }
+  },
+  "REFUTES": {
+   "either": {
+    "claims": 350,
+    "with_text_only_set": 276
+   },
+   "none": {
+    "claims": 0,
+    "with_text_only_set": 0
+   }
+  },
+  "NOT ENOUGH INFO": {
+   "either": {
+    "claims": 15,
+    "with_text_only_set": 11
+   },
+   "none": {
+    "claims": 0,
+    "with_text_only_set": 0
+   }
+  }
+ },
+ "unfindable_claims_by_reason": {
+  "SUPPORTS": {
+   "single": {
+    "hatnote": 23
+   },
+   "needs2": {
+    "hatnote": 37
+   }
+  },
+  "REFUTES": {
+   "single": {
+    "hatnote": 21
+   },
+   "needs2": {
+    "hatnote": 10
+   }
+  },
+  "NOT ENOUGH INFO": {
+   "single": {
+    "hatnote": 11
+   },
+   "needs2": {
+    "hatnote": 10
+   }
+  }
+ },
+ "unfindable_elements_by_reason": {
+  "hatnote": 124
+ },
+ "candidate_pages": {
+  "pages_needed": 22266,
+  "pages_read": 22266,
+  "pages_missing_from_db": 0,
+  "pages_title_differs": 0,
+  "examples_missing": [],
+  "examples_title_differs": [],
+  "elements_needed": 51410,
+  "elements_in_a_chunk": 51286
+ },
+ "picked": {
+  "n": 3000,
+  "groups": {
+   "SUPPORTS": {
+    "single": 700,
+    "needs2": 300
+   },
+   "REFUTES": {
+    "single": 700,
+    "needs2": 300
+   },
+   "NOT ENOUGH INFO": {
+    "single": 700,
+    "needs2": 300
+   }
+  },
+  "split": {
+   "SUPPORTS / single": {
+    "dev": 75,
+    "train": 625
+   },
+   "SUPPORTS / needs2": {
+    "dev": 23,
+    "train": 277
+   },
+   "REFUTES / single": {
+    "dev": 84,
+    "train": 616
+   },
+   "REFUTES / needs2": {
+    "dev": 39,
+    "train": 261
+   },
+   "NOT ENOUGH INFO / single": {
+    "dev": 138,
+    "train": 562
+   },
+   "NOT ENOUGH INFO / needs2": {
+    "dev": 63,
+    "train": 237
+   }
+  },
+  "split_total": {
+   "dev": 422,
+   "train": 2578
+  },
+  "challenge": {
+   "SUPPORTS / single": {
+    "Other": 574,
+    "Multi-hop Reasoning": 53,
+    "Entity Disambiguation": 31,
+    "Combining Tables and Text": 20,
+    "Search terms not in claim": 16,
+    "Numerical Reasoning": 6
+   },
+   "SUPPORTS / needs2": {
+    "Multi-hop Reasoning": 266,
+    "Other": 28,
+    "Entity Disambiguation": 3,
+    "Search terms not in claim": 2,
+    "Combining Tables and Text": 1
+   },
+   "REFUTES / single": {
+    "Other": 614,
+    "Numerical Reasoning": 34,
+    "Entity Disambiguation": 26,
+    "Search terms not in claim": 9,
+    "Combining Tables and Text": 9,
+    "Multi-hop Reasoning": 8
+   },
+   "REFUTES / needs2": {
+    "Multi-hop Reasoning": 161,
+    "Other": 95,
+    "Entity Disambiguation": 20,
+    "Numerical Reasoning": 17,
+    "Search terms not in claim": 6,
+    "Combining Tables and Text": 1
+   },
+   "NOT ENOUGH INFO / single": {
+    "Other": 516,
+    "Search terms not in claim": 77,
+    "Multi-hop Reasoning": 51,
+    "Entity Disambiguation": 46,
+    "Numerical Reasoning": 9,
+    "Combining Tables and Text": 1
+   },
+   "NOT ENOUGH INFO / needs2": {
+    "Multi-hop Reasoning": 170,
+    "Other": 79,
+    "Entity Disambiguation": 25,
+    "Search terms not in claim": 21,
+    "Numerical Reasoning": 5
+   }
+  },
+  "challenge_total": {
+   "Other": 1906,
+   "Multi-hop Reasoning": 709,
+   "Entity Disambiguation": 151,
+   "Search terms not in claim": 131,
+   "Numerical Reasoning": 71,
+   "Combining Tables and Text": 32
+  },
+  "needs2_gold_pages_per_claim": {
+   "2": 772,
+   "3": 103,
+   "4": 15,
+   "5+": 10
+  },
+  "evidence_sets_per_claim": {
+   "1": 2824,
+   "2": 152,
+   "3": 24
+  },
+  "findable_sets_per_claim": {
+   "1": 2975,
+   "2": 21,
+   "3": 4
+  },
+  "claims_with_a_table_set": 154,
+  "claim_text_not_nfc": [],
+  "gold_evidence_elements": 7739
+ },
+ "gold_pages": {
+  "n": 3851,
+  "in_a_gold_set": 3845,
+  "in_a_text_only_set": 3849,
+  "only_in_sets_with_tables": 2,
+  "missing_from_db": [],
+  "with_underscore": 0
+ },
+ "seconds": 108.4,
+ "db_reads": {
+  "pages": 22266,
+  "exists": 1
+ }
+}

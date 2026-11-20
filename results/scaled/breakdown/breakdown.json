@@ -1,0 +1,468 @@
+{
+ "created_at": "2026-11-19T21:39:55+00:00",
+ "inputs": {
+  "claims": "data/scaled/claims_3000.jsonl",
+  "FEVEROUS table": "analysis/feverous/feverous_claims.csv",
+  "eval S0": "results/scaled/eval/s0_full_run1.json",
+  "eval S1": "results/scaled/eval/s1_full_run1.json",
+  "sentences S0": "results/scaled/sentence_score/s0/claims.jsonl",
+  "sentences S1": "results/scaled/sentence_score/s1/claims.jsonl"
+ },
+ "weights": {
+  "n_rows": 79181,
+  "all": {
+   "total": 78840,
+   "groups": {
+    "SUPPORTS|single": {
+     "count": 33981,
+     "weight": 0.43101217656012175
+    },
+    "SUPPORTS|needs2": {
+     "count": 11529,
+     "weight": 0.14623287671232876
+    },
+    "REFUTES|single": {
+     "count": 29100,
+     "weight": 0.3691019786910198
+    },
+    "REFUTES|needs2": {
+     "count": 1494,
+     "weight": 0.018949771689497717
+    },
+    "NOT ENOUGH INFO|single": {
+     "count": 2059,
+     "weight": 0.026116184677828513
+    },
+    "NOT ENOUGH INFO|needs2": {
+     "count": 677,
+     "weight": 0.00858701166920345
+    }
+   }
+  },
+  "text": {
+   "total": 34480,
+   "groups": {
+    "SUPPORTS|single": {
+     "count": 13988,
+     "weight": 0.4056844547563805
+    },
+    "SUPPORTS|needs2": {
+     "count": 4067,
+     "weight": 0.1179524361948956
+    },
+    "REFUTES|single": {
+     "count": 14453,
+     "weight": 0.4191705336426914
+    },
+    "REFUTES|needs2": {
+     "count": 584,
+     "weight": 0.016937354988399073
+    },
+    "NOT ENOUGH INFO|single": {
+     "count": 1125,
+     "weight": 0.03262761020881671
+    },
+    "NOT ENOUGH INFO|needs2": {
+     "count": 263,
+     "weight": 0.007627610208816705
+    }
+   }
+  }
+ },
+ "databases": {
+  "S0": {
+   "metrics": [
+    "article@1",
+    "article@3",
+    "article@5",
+    "article@10",
+    "article@20",
+    "evidence@1",
+    "evidence@3",
+    "evidence@5",
+    "evidence@10",
+    "evidence@20",
+    "complete_set_top10_chunks",
+    "feverous_style"
+   ],
+   "overall": {
+    "n": 3000,
+    "article@1": 0.965,
+    "article@3": 0.979,
+    "article@5": 0.9836666666666667,
+    "article@10": 0.9863333333333333,
+    "article@20": 0.9903333333333333,
+    "evidence@1": 0.44566666666666666,
+    "evidence@3": 0.7026666666666667,
+    "evidence@5": 0.7803333333333333,
+    "evidence@10": 0.8526666666666667,
+    "evidence@20": 0.8926666666666667,
+    "complete_set_top10_chunks": 0.8526666666666667,
+    "feverous_style": 0.5456666666666666
+   },
+   "groups": {
+    "SUPPORTS|single": {
+     "n": 700,
+     "article@1": 0.9928571428571429,
+     "article@3": 0.9942857142857143,
+     "article@5": 0.9942857142857143,
+     "article@10": 0.9957142857142857,
+     "article@20": 0.9971428571428571,
+     "evidence@1": 0.6614285714285715,
+     "evidence@3": 0.9314285714285714,
+     "evidence@5": 0.96,
+     "evidence@10": 0.9842857142857143,
+     "evidence@20": 0.9928571428571429,
+     "complete_set_top10_chunks": 0.9842857142857143,
+     "feverous_style": 0.75
+    },
+    "SUPPORTS|needs2": {
+     "n": 300,
+     "article@1": 0.9966666666666667,
+     "article@3": 1.0,
+     "article@5": 1.0,
+     "article@10": 1.0,
+     "article@20": 1.0,
+     "evidence@1": 0.0,
+     "evidence@3": 0.4633333333333333,
+     "evidence@5": 0.6333333333333333,
+     "evidence@10": 0.7866666666666666,
+     "evidence@20": 0.8833333333333333,
+     "complete_set_top10_chunks": 0.7866666666666666,
+     "feverous_style": 0.28
+    },
+    "REFUTES|single": {
+     "n": 700,
+     "article@1": 0.9714285714285714,
+     "article@3": 0.9885714285714285,
+     "article@5": 0.9928571428571429,
+     "article@10": 0.9928571428571429,
+     "article@20": 0.9957142857142857,
+     "evidence@1": 0.7171428571428572,
+     "evidence@3": 0.9242857142857143,
+     "evidence@5": 0.9557142857142857,
+     "evidence@10": 0.9857142857142858,
+     "evidence@20": 0.9857142857142858,
+     "complete_set_top10_chunks": 0.9857142857142858,
+     "feverous_style": 0.7685714285714286
+    },
+    "REFUTES|needs2": {
+     "n": 300,
+     "article@1": 0.98,
+     "article@3": 0.99,
+     "article@5": 0.9933333333333333,
+     "article@10": 1.0,
+     "article@20": 1.0,
+     "evidence@1": 0.0,
+     "evidence@3": 0.21333333333333335,
+     "evidence@5": 0.32666666666666666,
+     "evidence@10": 0.4666666666666667,
+     "evidence@20": 0.56,
+     "complete_set_top10_chunks": 0.4666666666666667,
+     "feverous_style": 0.09
+    },
+    "NOT ENOUGH INFO|single": {
+     "n": 700,
+     "article@1": 0.9142857142857143,
+     "article@3": 0.9414285714285714,
+     "article@5": 0.95,
+     "article@10": 0.9542857142857143,
+     "article@20": 0.9671428571428572,
+     "evidence@1": 0.5314285714285715,
+     "evidence@3": 0.7871428571428571,
+     "evidence@5": 0.8657142857142858,
+     "evidence@10": 0.9142857142857143,
+     "evidence@20": 0.9442857142857143,
+     "complete_set_top10_chunks": 0.9142857142857143,
+     "feverous_style": 0.6157142857142858
+    },
+    "NOT ENOUGH INFO|needs2": {
+     "n": 300,
+     "article@1": 0.9566666666666667,
+     "article@3": 0.9766666666666667,
+     "article@5": 0.99,
+     "article@10": 0.9966666666666667,
+     "article@20": 0.9966666666666667,
+     "evidence@1": 0.0,
+     "evidence@3": 0.18333333333333332,
+     "evidence@5": 0.35333333333333333,
+     "evidence@10": 0.5433333333333333,
+     "evidence@20": 0.6633333333333333,
+     "complete_set_top10_chunks": 0.5433333333333333,
+     "feverous_style": 0.10666666666666667
+    }
+   },
+   "tags": {
+    "Other": {
+     "n": 1906,
+     "article@5": 0.9905561385099685,
+     "evidence@5": 0.8866736621196223,
+     "complete_set_top10_chunks": 0.9291710388247639,
+     "feverous_style": 0.6689401888772298
+    },
+    "Multi-hop Reasoning": {
+     "n": 709,
+     "article@5": 0.997179125528914,
+     "evidence@5": 0.5176304654442877,
+     "complete_set_top10_chunks": 0.6727785613540197,
+     "feverous_style": 0.22284908321579688
+    },
+    "Entity Disambiguation": {
+     "n": 151,
+     "article@5": 0.9205298013245033,
+     "evidence@5": 0.6688741721854304,
+     "complete_set_top10_chunks": 0.7483443708609272,
+     "feverous_style": 0.44370860927152317
+    },
+    "Search terms not in claim": {
+     "n": 131,
+     "article@5": 0.8854961832061069,
+     "evidence@5": 0.732824427480916,
+     "complete_set_top10_chunks": 0.7862595419847328,
+     "feverous_style": 0.5190839694656488
+    },
+    "Numerical Reasoning": {
+     "n": 71,
+     "article@5": 0.971830985915493,
+     "evidence@5": 0.7887323943661971,
+     "complete_set_top10_chunks": 0.8732394366197183,
+     "feverous_style": 0.6056338028169014
+    },
+    "Combining Tables and Text": {
+     "n": 32,
+     "article@5": 1.0,
+     "evidence@5": 0.96875,
+     "complete_set_top10_chunks": 1.0,
+     "feverous_style": 0.8125
+    }
+   },
+   "reweighted": {
+    "all": {
+     "article@1": 0.9828984984658501,
+     "article@3": 0.9913992413809765,
+     "article@5": 0.9933826194100167,
+     "article@10": 0.9942938561523036,
+     "article@20": 0.9962999444323645,
+     "evidence@1": 0.5636615025005436,
+     "evidence@3": 0.8365413797685487,
+     "evidence@5": 0.890975369041579,
+     "evidence@10": 0.9404912420574522,
+     "evidence@20": 0.9619040491894374,
+     "complete_set_top10_chunks": 0.9404912420574522,
+     "feverous_style": 0.6665871083085695
+    },
+    "text": {
+     "article@1": 0.9812668489669649,
+     "article@3": 0.9906328858689647,
+     "article@5": 0.9928671555629213,
+     "article@10": 0.9937503038338305,
+     "article@20": 0.9959469809965749,
+     "evidence@1": 0.5862756877693073,
+     "evidence@3": 0.850645011600928,
+     "evidence@5": 0.9012416998121755,
+     "evidence@10": 0.9471604380731411,
+     "evidence@20": 0.9655147635620374,
+     "complete_set_top10_chunks": 0.9471604380731411,
+     "feverous_style": 0.6818797784775162
+    }
+   }
+  },
+  "S1": {
+   "metrics": [
+    "article@1",
+    "article@3",
+    "article@5",
+    "article@10",
+    "article@20",
+    "evidence@1",
+    "evidence@3",
+    "evidence@5",
+    "evidence@10",
+    "evidence@20",
+    "complete_set_top10_chunks",
+    "feverous_style"
+   ],
+   "overall": {
+    "n": 3000,
+    "article@1": 0.938,
+    "article@3": 0.9703333333333334,
+    "article@5": 0.9776666666666667,
+    "article@10": 0.9823333333333333,
+    "article@20": 0.9856666666666667,
+    "evidence@1": 0.43433333333333335,
+    "evidence@3": 0.6806666666666666,
+    "evidence@5": 0.751,
+    "evidence@10": 0.8263333333333334,
+    "evidence@20": 0.8696666666666667,
+    "complete_set_top10_chunks": 0.8253333333333334,
+    "feverous_style": 0.5293333333333333
+   },
+   "groups": {
+    "SUPPORTS|single": {
+     "n": 700,
+     "article@1": 0.9842857142857143,
+     "article@3": 0.9942857142857143,
+     "article@5": 0.9942857142857143,
+     "article@10": 0.9957142857142857,
+     "article@20": 0.9971428571428571,
+     "evidence@1": 0.6542857142857142,
+     "evidence@3": 0.9214285714285714,
+     "evidence@5": 0.9557142857142857,
+     "evidence@10": 0.9814285714285714,
+     "evidence@20": 0.9914285714285714,
+     "complete_set_top10_chunks": 0.9814285714285714,
+     "feverous_style": 0.7385714285714285
+    },
+    "SUPPORTS|needs2": {
+     "n": 300,
+     "article@1": 0.9766666666666667,
+     "article@3": 0.9966666666666667,
+     "article@5": 1.0,
+     "article@10": 1.0,
+     "article@20": 1.0,
+     "evidence@1": 0.0,
+     "evidence@3": 0.41,
+     "evidence@5": 0.5533333333333333,
+     "evidence@10": 0.7366666666666667,
+     "evidence@20": 0.8366666666666667,
+     "complete_set_top10_chunks": 0.7366666666666667,
+     "feverous_style": 0.26
+    },
+    "REFUTES|single": {
+     "n": 700,
+     "article@1": 0.9442857142857143,
+     "article@3": 0.9785714285714285,
+     "article@5": 0.9857142857142858,
+     "article@10": 0.9885714285714285,
+     "article@20": 0.9914285714285714,
+     "evidence@1": 0.6971428571428572,
+     "evidence@3": 0.9114285714285715,
+     "evidence@5": 0.94,
+     "evidence@10": 0.9771428571428571,
+     "evidence@20": 0.9828571428571429,
+     "complete_set_top10_chunks": 0.9742857142857143,
+     "feverous_style": 0.7471428571428571
+    },
+    "REFUTES|needs2": {
+     "n": 300,
+     "article@1": 0.9466666666666667,
+     "article@3": 0.9833333333333333,
+     "article@5": 0.99,
+     "article@10": 0.9933333333333333,
+     "article@20": 0.9966666666666667,
+     "evidence@1": 0.0,
+     "evidence@3": 0.16666666666666666,
+     "evidence@5": 0.2866666666666667,
+     "evidence@10": 0.4066666666666667,
+     "evidence@20": 0.5033333333333333,
+     "complete_set_top10_chunks": 0.4066666666666667,
+     "feverous_style": 0.08
+    },
+    "NOT ENOUGH INFO|single": {
+     "n": 700,
+     "article@1": 0.8757142857142857,
+     "article@3": 0.9257142857142857,
+     "article@5": 0.9357142857142857,
+     "article@10": 0.9457142857142857,
+     "article@20": 0.9528571428571428,
+     "evidence@1": 0.51,
+     "evidence@3": 0.7614285714285715,
+     "evidence@5": 0.8328571428571429,
+     "evidence@10": 0.8914285714285715,
+     "evidence@20": 0.9214285714285714,
+     "complete_set_top10_chunks": 0.89,
+     "feverous_style": 0.5928571428571429
+    },
+    "NOT ENOUGH INFO|needs2": {
+     "n": 300,
+     "article@1": 0.9133333333333333,
+     "article@3": 0.96,
+     "article@5": 0.9833333333333333,
+     "article@10": 0.9933333333333333,
+     "article@20": 0.9966666666666667,
+     "evidence@1": 0.0,
+     "evidence@3": 0.17666666666666667,
+     "evidence@5": 0.30333333333333334,
+     "evidence@10": 0.47,
+     "evidence@20": 0.6,
+     "complete_set_top10_chunks": 0.47,
+     "feverous_style": 0.10333333333333333
+    }
+   },
+   "tags": {
+    "Other": {
+     "n": 1906,
+     "article@5": 0.9858342077649528,
+     "evidence@5": 0.8677859391395593,
+     "complete_set_top10_chunks": 0.9102833158447009,
+     "feverous_style": 0.6516264428121721
+    },
+    "Multi-hop Reasoning": {
+     "n": 709,
+     "article@5": 0.9929478138222849,
+     "evidence@5": 0.4682651622002821,
+     "complete_set_top10_chunks": 0.6220028208744711,
+     "feverous_style": 0.21015514809590974
+    },
+    "Entity Disambiguation": {
+     "n": 151,
+     "article@5": 0.8807947019867549,
+     "evidence@5": 0.6158940397350994,
+     "complete_set_top10_chunks": 0.7086092715231788,
+     "feverous_style": 0.4105960264900662
+    },
+    "Search terms not in claim": {
+     "n": 131,
+     "article@5": 0.8854961832061069,
+     "evidence@5": 0.6870229007633588,
+     "complete_set_top10_chunks": 0.7633587786259542,
+     "feverous_style": 0.5038167938931297
+    },
+    "Numerical Reasoning": {
+     "n": 71,
+     "article@5": 0.971830985915493,
+     "evidence@5": 0.7464788732394366,
+     "complete_set_top10_chunks": 0.8591549295774648,
+     "feverous_style": 0.6056338028169014
+    },
+    "Combining Tables and Text": {
+     "n": 32,
+     "article@5": 1.0,
+     "evidence@5": 0.96875,
+     "complete_set_top10_chunks": 1.0,
+     "feverous_style": 0.8125
+    }
+   },
+   "reweighted": {
+    "all": {
+     "article@1": 0.9642498671208717,
+     "article@3": 0.9865409328114807,
+     "article@5": 0.9902526757024473,
+     "article@10": 0.9923331823343239,
+     "article@20": 0.9942818245512309,
+     "evidence@1": 0.5526411719939117,
+     "evidence@3": 0.8180734459181948,
+     "evidence@5": 0.8695839252494504,
+     "evidence@10": 0.9264207617598028,
+     "evidence@20": 0.951194933681235,
+     "complete_set_top10_chunks": 0.9253288758425745,
+     "feverous_style": 0.6500122067599237
+    },
+    "text": {
+     "article@1": 0.9618994171914707,
+     "article@3": 0.9852952436194895,
+     "article@5": 0.9892996630206607,
+     "article@10": 0.9915358523920008,
+     "article@20": 0.9936279692851618,
+     "evidence@1": 0.5742953679151475,
+     "evidence@3": 0.8332277786984863,
+     "evidence@5": 0.8813489669649762,
+     "evidence@10": 0.9341894542039554,
+     "evidence@20": 0.9560444978455419,
+     "complete_set_top10_chunks": 0.9329452132361065,
+     "feverous_style": 0.6649615373991824
+    }
+   }
+  }
+ }
+}
