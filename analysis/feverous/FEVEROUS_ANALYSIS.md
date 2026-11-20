@@ -53,7 +53,7 @@ Wikilense ground-truth assessment, using data downloaded on 2026-09-16.
   - (b) the claim has at least one sentence-only set with 2+ pages
   - (c) an NEI claim with at least one non-empty evidence set
 - **Percentages:** claim tables use claims as the denominator, set tables use evidence sets, and the lead table uses gold sentences (as labelled).
-- **Tier (from the brief):** 5 = 10,000+; 4 = 5,000–9,999; 3 = 2,000–4,999; 2 = 500–1,999; 1 = 1–499; 0 = none.
+- **Tier:** 5 = 10,000+; 4 = 5,000–9,999; 3 = 2,000–4,999; 2 = 500–1,999; 1 = 1–499; 0 = none.
 
 ## 4. Results
 
@@ -206,7 +206,7 @@ The tag's definition covers "two or more sections **or** articles", which may ex
 
 ## 5. Mismatches and format notes
 
-1. **Who assigns the challenge tag.** The brief says the claim writer assigns it. In the paper, the released `challenge` counts are the "Verification Challenges", chosen by the verifier.
+1. **Who assigns the challenge tag.** The analysis request said the claim writer assigns it. In the paper, the released `challenge` counts are the "Verification Challenges", chosen by the verifier.
    - Table 5 caption (v3): "Top: Expected verification challenges, selected during claim generation. Bottom: Verification challenges, selected by annotator after a claim was verified." All twelve train/dev tag counts in 4.1 match the bottom half.
    - The writer's `expected_challenge` (for example Multi-hop 17,248 train / 1,871 dev in Table 5) is listed in paper Sec 7.1 but is **not in the released files**: every record has exactly the six keys in the script's "Format checks". Comparing the writer's tag with page counts is therefore not determinable.
    - The "two or more sections or articles" definition is from Sec 3.1.1. The verification guidelines word it as "several pages/sections will be required for verification".
@@ -220,7 +220,7 @@ The tag's definition covers "two or more sections **or** articles", which may ex
 4. **Element id format.**
    - The fever.ai page says the data "contains 5 fields" but lists 6, and the files have 6.
    - Its example shows `evidence` as a single object, but in the files it is always a list of 1–3 sets.
-   - The pattern `[PAGE ID]_[EVIDENCE TYPE]_[NUMBER ID]`, which your brief also uses, implies one number. Cells and header cells carry 3 numbers, items 2, and sentences and captions 1 (0 exceptions). This does not affect the page rule (0 disagreements), so the analysis went ahead.
+   - The pattern `[PAGE ID]_[EVIDENCE TYPE]_[NUMBER ID]`, as the FEVEROUS documentation writes it, implies one number. Cells and header cells carry 3 numbers, items 2, and sentences and captions 1 (0 exceptions). This does not affect the page rule (0 disagreements), so the analysis went ahead.
 5. **Header line.** Line 1 of each file is a record with all six fields empty and must be skipped, as the official reader does.
 6. **annotator_operations:**
    - `time` and `value` are strings.
@@ -250,7 +250,7 @@ The tag's definition covers "two or more sections **or** articles", which may ex
 - **Paragraph units.** Not determinable from the annotations: evidence ids contain only the five element types, but page structure lives in the DB.
 - **Claim writer's challenge tag against page counts.** Not determinable, because `expected_challenge` is not in the released files (section 5, item 1).
 - **Why the verifier's Multi-hop tag and page counts disagree.** Only the annotation-context proxy (Appendix A.3) is available.
-- **Test split.** Not analysed; it is unlabelled and was skipped per the brief.
+- **Test split.** Not analysed; it is unlabelled.
 
 ## 7. Quality-assurance subset (duplicate-annotated samples)
 
