@@ -418,6 +418,8 @@ The web page (`make serve`) can run the RAG fact-check live on a statement the r
 off unless the server is set up for it ([SETUP.md](SETUP.md#turn-on-the-live-fact-check)). Until
 then the page has one line saying how to turn it on, and no button.
 
+![The fact-check panel after a real check on the demo database: the statement, the verdict, Haiku's reason with its passage links, and the figures with their limits](img/web_factcheck.png)
+
 What it sends is the RAG condition's request, unchanged:
 - the system prompt, the user template and the schema of `fact_check_v1`, with Haiku at effort
   high;
