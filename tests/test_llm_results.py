@@ -131,3 +131,123 @@ def test_two_sd_rule_takes_the_larger_sd_and_flags_small_gaps() -> None:
     assert rag_gold["two_sd"] == pytest.approx(2 * math.sqrt(2) * math.sqrt(0.04 / 4000))
     assert rag_gold["below_two_sd"] is False
     assert lr.two_sd_rule({}, {"missing": "x"}) == {"missing": "x"}
+
+
+def test_newcombe_matches_the_published_example() -> None:
+    # Newcombe (1998), 56/70 against 48/80: method 10 gives 0.0524 to 0.3339.
+    diff, lo, hi = lr.newcombe(56, 70, 48, 80)
+    assert diff == pytest.approx(0.2)
+    assert (lo, hi) == pytest.approx((0.0524, 0.3339), abs=1e-4)
+    assert all(math.isnan(x) for x in lr.newcombe(1, 0, 1, 2))
+
+
+def test_resample_within_keeps_every_stratum_and_repeats_for_a_seed() -> None:
+    strata = np.array([0, 0, 1, 1, 1, 2, 2, 0])
+    first = next(lr.resample_within(strata, 5))
+    assert first.shape == (lr.BLOCK, len(strata))
+    assert (strata[first] == strata).all()
+    assert np.array_equal(first, next(lr.resample_within(strata, 5)))
+    assert not np.array_equal(first, next(lr.resample_within(strata, 6)))
+
+
+def test_read_claim_tags_checks_the_sha256(tmp_path) -> None:
+    path = tmp_path / "claims.jsonl"
+    path.write_text('{"id": 3, "challenge": "Other"}\n\n{"id": 7, "challenge": "Multi-hop Reasoning"}\n',
+                    encoding="utf-8")
+    digest = lr.hashlib.sha256(path.read_bytes()).hexdigest()
+    assert lr.read_claim_tags(path, digest) == {3: "Other", 7: "Multi-hop Reasoning"}
+    with pytest.raises(SystemExit, match="SHA-256"):
+        lr.read_claim_tags(path, "0" * 64)
+
+
+def _mh_table(cells: list[tuple[str, str, str, dict[str, int]]]) -> tuple[dict, dict]:
+    """A per-claim table from (label, kind, tag, {condition: right}) cells, and the tags."""
+    table: dict = {c: {} for c in lr.CONDITIONS}
+    tags = {}
+    for cid, (label, kind, tag, right) in enumerate(cells):
+        tags[cid] = tag
+        for c in lr.CONDITIONS:
+            table[c][cid] = {"label": label, "kind": kind, "answer": label if right[c] else "x",
+                             "right": right[c]}
+    return table, tags
+
+
+def test_multihop_kinds_pairs_coverage_and_tags_on_a_hand_made_table() -> None:
+    # Two claims in each (label, kind, tag) cell. Gold is always right, no passages never;
+    # RAG misses every supported claim on two or more pages, web every refuted one-page claim.
+    cells, flags = [], {}
+    for label in lr.SIDES:
+        for kind in lr.KINDS:
+            for tag in (lr.MULTIHOP_TAG, lr.OTHER_TAG):
+                for j in range(2):
+                    right = {"gold": 1, "no_retrieval": 0,
+                             "retrieved": int(not (label == "SUPPORTS" and kind == "needs2")),
+                             "web": int(not (label == "REFUTES" and kind == "single"))}
+                    flags[len(cells)] = (1, int(kind == "single" or j == 0))
+                    cells.append((label, kind, tag, right))
+    for _ in range(2):   # NOT ENOUGH INFO claims are left out but count in the order of the tags
+        flags[len(cells)] = (1, 1)
+        cells.append(("NOT ENOUGH INFO", "single", lr.OTHER_TAG, dict.fromkeys(lr.CONDITIONS, 1)))
+    table, tags = _mh_table(cells)
+    # Claims 0 and 4 are supported (one article, two or more), 16 is NOT ENOUGH INFO.
+    out = lr.multihop(table, sorted(tags), tags, flags, repeat_ids=frozenset({0, 4, 16}))
+    assert out["n"] == 16 and out["tag_order"] == [lr.OTHER_TAG, lr.MULTIHOP_TAG]
+    assert out["repeats_per_kind"] == {"single": 1, "needs2": 1}
+    assert out["meanings"] == {"two_or_more_articles": 8, "multi_hop_reasoning_tag": 8, "both": 4,
+                               "both_per_label": {"SUPPORTS": 2, "REFUTES": 2}}
+    k = out["kinds"]
+    rag = k["accuracy"]["retrieved"]
+    assert rag["needs2"]["SUPPORTS"]["right"] == 0 and rag["needs2"]["REFUTES"]["right"] == 4
+    # Every cell is constant, so a resample that stays inside the strata never moves a figure.
+    assert rag["needs2"]["equal_weight"]["point"] == 0.5
+    assert rag["needs2"]["equal_weight"]["bootstrap"] == [0.5, 0.5]
+    gap = k["gap_one_minus_two"]["retrieved"]
+    assert gap["SUPPORTS"]["difference"] == 1.0 and gap["REFUTES"]["level"] is True
+    assert gap["equal_weight"]["point"] == 0.5 and gap["equal_weight"]["level"] is False
+    paired = k["paired"]["needs2"]["retrieved-gold"]
+    assert (paired["SUPPORTS"]["b_only_first_right"], paired["SUPPORTS"]["c_only_second_right"]) == (0, 4)
+    assert paired["SUPPORTS"]["mcnemar_p"] == pytest.approx(0.125)
+    assert paired["equal_weight"]["point"] == -0.5
+    change = k["paired_change_two_minus_one"]
+    assert change["retrieved-gold"]["equal_weight"]["point"] == -0.5
+    assert change["retrieved-web"]["equal_weight"]["point"] == -1.0
+    assert change["retrieved-web"]["SUPPORTS"]["point"] == -1.0
+    assert change["retrieved-web"]["REFUTES"]["point"] == -1.0
+    cov = out["coverage"]
+    assert cov["needs2"]["gold_set_in_top5"]["SUPPORTS"]["pct"] == "50.0"
+    assert cov["needs2"]["rag_set_in_minus_not"]["equal_weight"]["point"] == 0.0
+    assert cov["single"]["rag_when_set_not_in_top5"]["equal_weight"] is None
+    assert set(cov["single"]["rag_set_in_minus_not"]) == {"equal_weight"}
+    tag = out["tags"][lr.MULTIHOP_TAG]
+    assert tag["n"] == 8 and tag["small"] is True
+    assert tag["n_per_label"] == {"SUPPORTS": 4, "REFUTES": 4}
+    assert tag["counts"]["REFUTES"] == {"single": 2, "needs2": 2}
+    mvo = out["multihop_vs_other"]
+    assert mvo["accuracy"]["all"]["retrieved"][lr.MULTIHOP_TAG]["equal_weight"]["point"] == 0.75
+    assert mvo["accuracy"]["needs2"]["web"][lr.OTHER_TAG]["equal_weight"]["point"] == 1.0
+    assert mvo["gap"]["single"]["retrieved"]["equal_weight"]["point"] == 0.0
+    assert mvo["rag_minus_gold"][lr.MULTIHOP_TAG]["equal_weight"]["point"] == -0.25
+    assert mvo["rag_minus_gold_difference"]["equal_weight"]["point"] == 0.0
+    text = "\n".join(lr.multihop_lines(out))
+    assert "## 6. Multi-hop claims" in text and "not computable" in text
+
+
+def test_multihop_weights_the_two_labels_equally_and_flags_a_missing_label() -> None:
+    def right(r: int) -> dict[str, int]:
+        return dict.fromkeys(lr.CONDITIONS, r)
+
+    cells = [("SUPPORTS", "single", "Numerical Reasoning", right(1)),
+             ("SUPPORTS", "single", "Numerical Reasoning", right(1)),
+             ("SUPPORTS", "single", "Numerical Reasoning", right(0)),
+             ("REFUTES", "single", "Numerical Reasoning", right(0)),
+             ("SUPPORTS", "single", "Search terms not in claim", right(1)),
+             ("SUPPORTS", "needs2", lr.OTHER_TAG, right(1)),
+             ("REFUTES", "needs2", lr.OTHER_TAG, right(0))]
+    table, tags = _mh_table(cells)
+    out = lr.multihop(table, sorted(tags), tags, dict.fromkeys(tags, (1, 1)))
+    numerical = out["tags"]["Numerical Reasoning"]["accuracy"]["gold"]
+    # 2 of 3 supported and 0 of 1 refuted: equal weight 1/3, where the plain share is 2/4.
+    assert numerical["equal_weight"]["point"] == pytest.approx(1 / 3)
+    assert numerical["equal_weight"]["point_pct"] == "33.3"
+    assert out["tags"]["Search terms not in claim"]["accuracy"]["gold"]["equal_weight"] is None
+    assert out["multihop_vs_other"] is None

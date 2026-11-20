@@ -18,7 +18,15 @@ and writes one JSON and one Markdown file with:
 1. recall in the six groups (label x one article or two or more), at k 1, 3, 5, 10, 20, and the
    two evidence scores of the sentence file;
 2. recall per FEVEROUS challenge tag, at k = 5, and the two evidence scores;
-3. the overall numbers as measured and reweighted to FEVEROUS's mix of the six groups.
+3. the overall numbers as measured and reweighted to FEVEROUS's mix of the six groups;
+4. the label check: per database, metric (article@5, evidence@5, the FEVEROUS-style score) and
+   kind, every pair of labels compared with Newcombe's 95% interval. The kinds hold 700 or 300
+   claims per label, so a difference there is a label effect, not a mix effect. A metric
+   differs by label when any pair's interval excludes 0, in either kind. Only for those
+   metrics come equal-weight figures: per challenge tag the mean of the tag's per-label rates,
+   a third each, and Multi-hop Reasoning against Other, overall and within each kind. Their
+   intervals are the paired bootstrap of ``scripts/llm_results.py`` (claims resampled within
+   each label and tag, or label, tag and kind), with its seed for the 3,000 claims.
 
 The weights
     Population: every row of ``feverous_claims.csv`` (train + dev). A claim is in group
@@ -44,13 +52,17 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib.util
 import json
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
+from itertools import combinations
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CSV = REPO_ROOT / "analysis" / "feverous" / "feverous_claims.csv"
@@ -60,6 +72,23 @@ KIND_LABEL = {"single": "one article", "needs2": "two or more"}
 KS: tuple[int, ...] = (1, 3, 5, 10, 20)
 TAG_K = 5
 TEXT_MODALITIES = frozenset({"sentence-only", "list-only"})
+#: The metrics of the label check, and the two tags compared after it.
+CHECK_METRICS: tuple[str, ...] = (f"article@{TAG_K}", f"evidence@{TAG_K}", "feverous_style")
+MULTIHOP_TAG, OTHER_TAG = "Multi-hop Reasoning", "Other"
+#: Tags with fewer claims than this get their numbers but no conclusions.
+SMALL_TAG = 100
+
+
+def _stats_module() -> Any:
+    """``scripts/llm_results.py`` as a module, for its intervals and its bootstrap."""
+    spec = importlib.util.spec_from_file_location("llm_results",
+                                                  Path(__file__).with_name("llm_results.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+STATS = _stats_module()
 
 
 def csv_kind(min_pages: int, max_pages: int) -> str | None:
@@ -100,9 +129,9 @@ def rate(values: Sequence[bool]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
-def measure(claims: dict[int, dict[str, Any]], per_claim: list[dict[str, Any]],
-            sentences: dict[int, dict[str, Any]] | None) -> dict[str, Any]:
-    """Per group and per tag: claim counts and rates; ``claims`` is keyed by FEVEROUS id."""
+def claim_rows(claims: dict[int, dict[str, Any]], per_claim: list[dict[str, Any]],
+               sentences: dict[int, dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """One row per claim: its group (``label|kind``), challenge tag and every metric (bool)."""
     rows = []
     for item in per_claim:
         claim = claims[int(item["claim_id"])]
@@ -119,6 +148,13 @@ def measure(claims: dict[int, dict[str, Any]], per_claim: list[dict[str, Any]],
             row["complete_set_top10_chunks"] = bool(found["in_top_chunks"])
             row["feverous_style"] = bool(found["found_embed"])
         rows.append(row)
+    return rows
+
+
+def measure(claims: dict[int, dict[str, Any]], per_claim: list[dict[str, Any]],
+            sentences: dict[int, dict[str, Any]] | None) -> dict[str, Any]:
+    """Per group and per tag: claim counts and rates; ``claims`` is keyed by FEVEROUS id."""
+    rows = claim_rows(claims, per_claim, sentences)
     metrics = [key for key in rows[0] if key not in ("group", "challenge")]
 
     def summarise(selected: list[dict[str, Any]], keys: Sequence[str]) -> dict[str, Any]:
@@ -143,6 +179,116 @@ def measure(claims: dict[int, dict[str, Any]], per_claim: list[dict[str, Any]],
 
 def reweight(groups: dict[str, Any], weights: dict[str, Any], metric: str) -> float:
     return sum(weights["groups"][g]["weight"] * groups[g][metric] for g in weights["groups"])
+
+
+def _rate_entry(hits: int, n: int) -> dict[str, Any]:
+    lo, hi = STATS.wilson(hits, n)
+    return {"hits": hits, "n": n, "rate": hits / n if n else None,
+            "wilson": None if n == 0 else [lo, hi]}
+
+
+def _diff_entry(first: tuple[int, int], second: tuple[int, int]) -> dict[str, Any]:
+    """Two rates on different claims, first minus second, with Newcombe's interval."""
+    diff, lo, hi = STATS.newcombe(*first, *second)
+    known = not np.isnan(lo)
+    return {"first": _rate_entry(*first), "second": _rate_entry(*second),
+            "difference": diff if known else None, "interval": [lo, hi] if known else None,
+            "excludes_zero": (not lo <= 0 <= hi) if known else None}
+
+
+def _boot_entry(point: float, values: np.ndarray, gap: bool = False) -> dict[str, Any]:
+    lo, hi = (float(x) for x in np.percentile(values, [2.5, 97.5]))
+    out: dict[str, Any] = {"point": point, "bootstrap": [lo, hi]}
+    if gap:
+        out["excludes_zero"] = not lo <= 0 <= hi
+    return out
+
+
+def label_weighting(rows: list[dict[str, Any]], seed: int) -> dict[str, Any]:
+    """Item 4 for one database (see the module docstring): the label check, and for the metrics
+    that differ by label the equal-weight figures per tag and for Multi-hop Reasoning against
+    Other. A tag without claims of some label has no equal-weight figure (None)."""
+    n = len(rows)
+    labels = np.array([LABELS.index(r["group"].split("|")[0]) for r in rows])
+    kinds = np.array([KINDS.index(r["group"].split("|")[1]) for r in rows])
+    order = Counter(r["challenge"] for r in rows)
+    tags = sorted(order, key=lambda t: (-order[t], t))
+    tag = np.array([tags.index(r["challenge"]) for r in rows])
+    values = {m: np.array([int(r[m]) for r in rows]) for m in CHECK_METRICS}
+
+    def counts(metric: str, mask: np.ndarray) -> tuple[int, int]:
+        return int(values[metric][mask].sum()), int(mask.sum())
+
+    check: dict[str, Any] = {}
+    for m in CHECK_METRICS:
+        check[m] = {}
+        for ki, kind in enumerate(KINDS):
+            in_kind = kinds == ki
+            check[m][kind] = {
+                f"{a}|{b}": _diff_entry(counts(m, in_kind & (labels == ai)),
+                                        counts(m, in_kind & (labels == bi)))
+                for (ai, a), (bi, b) in combinations(enumerate(LABELS), 2)}
+    differs = {m: any(e["excludes_zero"] for per_kind in check[m].values()
+                      for e in per_kind.values()) for m in CHECK_METRICS}
+    weighted = [m for m in CHECK_METRICS if differs[m]]
+    out: dict[str, Any] = {"check": check, "differs": differs, "weighted": weighted,
+                           "tag_order": tags, "tags": {}, "multihop_vs_other": None}
+    if not weighted:
+        return out
+
+    def nonempty(masks: dict) -> dict:
+        return {key: mask for key, mask in masks.items() if mask.any()}
+
+    def ew_values(boot: dict, metric: str, *key: Any) -> np.ndarray:
+        return sum(boot[(metric, (label, *key))] for label in LABELS) / len(LABELS)
+
+    def equal_weight(metric: str, mask: np.ndarray, boot: dict, *key: Any) -> dict[str, Any]:
+        per = {label: _rate_entry(*counts(metric, mask & (labels == li)))
+               for li, label in enumerate(LABELS)}
+        computable = all(per[label]["n"] for label in LABELS)
+        return {"plain": _rate_entry(*counts(metric, mask)), "per_label": per,
+                "equal_weight": (_boot_entry(sum(per[label]["rate"] for label in LABELS) / 3,
+                                             ew_values(boot, metric, *key))
+                                 if computable else None)}
+
+    tmasks = {(label, t): (labels == li) & (tag == ti)
+              for li, label in enumerate(LABELS) for ti, t in enumerate(tags)}
+    weighted_values = {m: values[m] for m in weighted}
+    tboot = STATS.boot_means(weighted_values, nonempty(tmasks), labels * len(tags) + tag, seed)
+    for ti, t in enumerate(tags):
+        in_tag = tag == ti
+        out["tags"][t] = {
+            "n": int(in_tag.sum()), "small": bool(in_tag.sum() < SMALL_TAG),
+            "per_label_n": {label: int(tmasks[(label, t)].sum()) for label in LABELS},
+            "metrics": {m: equal_weight(m, in_tag, tboot, t) for m in weighted}}
+    if MULTIHOP_TAG not in tags or OTHER_TAG not in tags:
+        return out
+    pair = (MULTIHOP_TAG, OTHER_TAG)
+    dmasks = {(label, t, kind): tmasks[(label, t)] & (kinds == ki)
+              for label in LABELS for t in pair for ki, kind in enumerate(KINDS)}
+    dboot = STATS.boot_means(weighted_values, nonempty(dmasks),
+                             (labels * len(tags) + tag) * 2 + kinds, seed)
+    mvo: dict[str, Any] = {}
+    for m in weighted:
+        mvo[m] = {}
+        for scope in ("all", *KINDS):
+            in_scope = np.ones(n, dtype=bool) if scope == "all" else kinds == KINDS.index(scope)
+            boot, key = (tboot, ()) if scope == "all" else (dboot, (scope,))
+            per_tag = {t: equal_weight(m, in_scope & (tag == tags.index(t)), boot, t, *key)
+                       for t in pair}
+            first, second = (per_tag[t] for t in pair)
+            gap_ew = None
+            if first["equal_weight"] and second["equal_weight"]:
+                gap_ew = _boot_entry(
+                    first["equal_weight"]["point"] - second["equal_weight"]["point"],
+                    ew_values(boot, m, pair[0], *key) - ew_values(boot, m, pair[1], *key), gap=True)
+            mvo[m][scope] = {
+                **per_tag,
+                "gap_plain": _diff_entry((first["plain"]["hits"], first["plain"]["n"]),
+                                         (second["plain"]["hits"], second["plain"]["n"])),
+                "gap_equal_weight": gap_ew}
+    out["multihop_vs_other"] = mvo
+    return out
 
 
 def pairs(values: Sequence[str]) -> dict[str, Path]:
@@ -219,7 +365,106 @@ def to_markdown(report: dict[str, Any]) -> str:
             lines.append(f"| {tag} | {values['n']} | "
                          + " | ".join(fmt(values[k]) for k in tag_keys) + " |")
         lines.append("")
+    if "label_weighting" in report:
+        lines += label_markdown(report["label_weighting"])
     return "\n".join(lines)
+
+
+def _with_wilson(e: dict[str, Any]) -> str:
+    if not e["n"]:
+        return "-"
+    return f"{e['rate']:.3f} ({e['wilson'][0]:.3f}–{e['wilson'][1]:.3f})"
+
+
+def _with_boot(e: dict[str, Any] | None, gap: bool = False) -> str:
+    if e is None:
+        return "not computable"
+    lo, hi = e["bootstrap"]
+    return f"{e['point']:.3f} ({lo:.3f} to {hi:.3f})" if gap else f"{e['point']:.3f} ({lo:.3f}–{hi:.3f})"
+
+
+def _with_newcombe(e: dict[str, Any]) -> str:
+    if e["difference"] is None:
+        return "not computable"
+    return f"{e['difference']:.3f} ({e['interval'][0]:.3f} to {e['interval'][1]:.3f})"
+
+
+def label_markdown(lw: dict[str, Any]) -> list[str]:
+    """The Markdown section of item 4."""
+    short = {"SUPPORTS": "S", "REFUTES": "R", "NOT ENOUGH INFO": "NEI"}
+    lines = [
+        "## Label check and equal-weight figures", "",
+        ("Does the search do worse on some labels than on others? All three labels stay in, as "
+         "everywhere in this file. Step 1 compares, per database, metric and kind, every pair of "
+         "labels with Newcombe's 95% interval (from the two Wilson intervals). Within a kind every "
+         "label has 700 or 300 claims, so a difference there is a label effect, not a mix effect. "
+         "A metric differs by label when any pair's interval excludes 0, in either kind. Step 2, "
+         "only for those metrics: the equal-weight figure of a group is the mean of its "
+         "SUPPORTS, REFUTES and NOT ENOUGH INFO rates, a third each, so that the group's label "
+         "mix does not move it; a group without claims of some label has none (\"not "
+         "computable\"). Its interval is a paired bootstrap "
+         f"({lw['bootstrap']['resamples']:,} resamples, seed {lw['bootstrap']['seed']}, the "
+         "claims resampled within each label and tag, or label, tag and kind). Tags with fewer "
+         f"than {lw['small_tag_below']} claims get their numbers but no conclusions."),
+        "", f"### Step 1: the three labels within each kind (k = {TAG_K})", "",
+        "| Database | Metric | Kind | Pair | First | Second | Difference (95% interval) | Excludes 0 |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for name, data in lw["databases"].items():
+        for m in lw["metrics"]:
+            for kind in KINDS:
+                for pair, e in data["check"][m][kind].items():
+                    a, b = pair.split("|")
+                    lines.append(
+                        f"| {name} | {m} | {KIND_LABEL[kind]} | {short[a]} − {short[b]} | "
+                        f"{_with_wilson(e['first'])} | {_with_wilson(e['second'])} | "
+                        f"{_with_newcombe(e)} | {'yes' if e['excludes_zero'] else 'no'} |")
+    lines.append("")
+    for name, data in lw["databases"].items():
+        kept = [m for m in lw["metrics"] if not data["differs"][m]]
+        lines.append(f"{name}: differs by label: {', '.join(data['weighted']) or 'none'}. "
+                     + ("Left unweighted, because no pair's interval excludes 0 in either kind: "
+                        + ", ".join(kept) + "." if kept else "No metric is left unweighted."))
+        lines.append("")
+    for name, data in lw["databases"].items():
+        weighted = data["weighted"]
+        if not weighted:
+            continue
+        lines += [f"### Step 2, {name}: equal-weight figures per challenge tag (k = {TAG_K})", "",
+                  "| Challenge tag | n (S / R / NEI) | " + " | ".join(
+                      f"{m} | {m}, equal weight" for m in weighted) + " |",
+                  "|---|---|" + "---|---|" * len(weighted)]
+        for t in data["tag_order"]:
+            e = data["tags"][t]
+            counts = " / ".join(str(e["per_label_n"][label]) for label in LABELS)
+            note = f" (fewer than {lw['small_tag_below']})" if e["small"] else ""
+            lines.append(f"| {t}{note} | {e['n']} ({counts}) | " + " | ".join(
+                f"{fmt(e['metrics'][m]['plain']['rate'])} | "
+                f"{_with_boot(e['metrics'][m]['equal_weight'])}" for m in weighted) + " |")
+        mvo = data["multihop_vs_other"]
+        if mvo:
+            lines += ["", f"### Step 2, {name}: {MULTIHOP_TAG} against {OTHER_TAG}", "",
+                      (f"Plain: the share of the tag's claims, Wilson interval, gap with Newcombe's "
+                       f"interval. Equal weight: bootstrap. The gaps are {MULTIHOP_TAG} minus "
+                       f"{OTHER_TAG}."), "",
+                      (f"| Metric | Claims | {MULTIHOP_TAG}, n (S / R / NEI) | {OTHER_TAG}, n | "
+                       f"{MULTIHOP_TAG} | {OTHER_TAG} | Gap | {MULTIHOP_TAG}, equal weight | "
+                       f"{OTHER_TAG}, equal weight | Gap, equal weight |"),
+                      "|---|---|---|---|---|---|---|---|---|---|"]
+            for m in weighted:
+                for scope in ("all", *KINDS):
+                    e = mvo[m][scope]
+                    first, second = e[MULTIHOP_TAG], e[OTHER_TAG]
+                    sizes = [f"{x['plain']['n']} ({' / '.join(str(x['per_label'][label]['n']) for label in LABELS)})"
+                             for x in (first, second)]
+                    lines.append(
+                        f"| {m} | {'all' if scope == 'all' else KIND_LABEL[scope]} | {sizes[0]} | "
+                        f"{sizes[1]} | {_with_wilson(first['plain'])} | "
+                        f"{_with_wilson(second['plain'])} | {_with_newcombe(e['gap_plain'])} | "
+                        f"{_with_boot(first['equal_weight'])} | {_with_boot(second['equal_weight'])} "
+                        f"| {_with_boot(e['gap_equal_weight'], gap=True)} |")
+        lines.append("")
+    return lines
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -238,7 +483,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             claims[int(claim["id"])] = claim
     with args.feverous_csv.open(encoding="utf-8", newline="") as fh:
         weights = feverous_weights(csv.DictReader(fh))
-    databases = {}
+    databases, label_check = {}, {}
+    seed = STATS.SEEDS["all"]
     for name, path in evals.items():
         per_claim = json.loads(path.read_text(encoding="utf-8"))["claims"]
         sentences = None
@@ -249,6 +495,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         data["reweighted"] = {wname: {m: reweight(data["groups"], weights[wname], m)
                                       for m in data["metrics"]} for wname in ("all", "text")}
         databases[name] = data
+        if all(m in data["metrics"] for m in CHECK_METRICS):
+            label_check[name] = label_weighting(claim_rows(claims, per_claim, sentences), seed)
 
     def shown(path: Path) -> str:
         """The input's name relative to the repository, or its last two parts."""
@@ -264,6 +512,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                    **{f"sentences {n}": shown(p) for n, p in sentence_files.items()}},
         "weights": weights, "databases": databases,
     }
+    if label_check:
+        report["label_weighting"] = {
+            "metrics": list(CHECK_METRICS),
+            "rule": "a metric differs by label when, within either kind, some pair of labels has a "
+                    "Newcombe 95% interval that excludes 0; only those metrics get equal-weight "
+                    "figures (the mean of the three per-label rates)",
+            "bootstrap": {"resamples": STATS.BOOTSTRAP_RESAMPLES, "seed": seed,
+                          "strata": "label x tag, or label x tag x kind"},
+            "small_tag_below": SMALL_TAG, "databases": label_check}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
     args.out.with_suffix(".md").write_text(to_markdown(report), encoding="utf-8")
