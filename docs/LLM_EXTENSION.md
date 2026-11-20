@@ -155,14 +155,16 @@ So the label means "the annotator did not settle it from Wikipedia under these r
 answer does not exist". A model that is allowed outside knowledge can be marked wrong for a
 correct verdict, when it finds the answer outside Wikipedia or finds what the annotator missed.
 
-**The audit.** An earlier review took 100 wrong answers on NOT ENOUGH INFO claims (40 gold, 40
-RAG, 20 no passages, drawn at random with a fixed seed). In 16 of the 40 gold cases and 16 of the
-40 RAG cases (and 4 of the 20 no-passage cases) its main reason was "The FEVEROUS label looks
-doubtful: the text Haiku saw settles the claim the way Haiku said". This is a reviewed sample,
-not a measurement over all claims, and the cases were rated by Claude Opus 5.5 agents, not by a
-person: two rated each case independently, they agreed on the main reason in 94 of 100, and a
-third agent settled the 9 cases where they disagreed. No person has checked their ratings, so how
-often a person would agree with them is not known.
+**The audit.** On some claims labelled NOT ENOUGH INFO, Haiku answered SUPPORTS or REFUTES, and
+those answers count as wrong. Claude Opus 5.5 agents reviewed 100 of them (40 gold, 40 RAG, 20 no
+passages, drawn at random with a fixed seed) and named the main reason for each. In 16 of the 40
+gold cases and 16 of the 40 RAG cases, that reason was a doubtful label: the text Haiku saw does
+settle the claim, the way Haiku answered. In those cases Haiku may have been right and the label
+wrong. (For the no-passage cases the agents judged from the annotators' evidence: 4 of 20.) Two
+agents rated each case without seeing each other's ratings and agreed on the main reason in 94 of
+100. A third agent settled those 6 cases and 3 more where they disagreed on another rating. This
+is a sample, not a count over all claims, and no person has checked the ratings, so how often a
+person would agree with them is not known.
 
 ## 5. The supported and refuted claims
 
