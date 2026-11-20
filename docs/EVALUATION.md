@@ -123,10 +123,32 @@ the tag; recall per tag at k = 5 (same file):
 | Numerical Reasoning (71) | 0.972 | 0.789 | 0.606 | 0.972 | 0.746 | 0.606 |
 | Combining Tables and Text (32) | 1.000 | 0.969 | 0.812 | 1.000 | 0.969 | 0.812 |
 
+The search does worse on some labels than on others, for all three metrics on both databases
+([the label check](../results/scaled/breakdown/breakdown.md#label-check-and-equal-weight-figures)).
+Comparing the labels among claims with the same page count (700 or 300 claims per label), NOT
+ENOUGH INFO claims on one page are found less often (article@5 on S1 0.936 against 0.994 and
+0.986), and on two or more pages supported claims get their whole evidence far more often than the
+others (evidence@5 on S1 0.553 against 0.287 and 0.303). So a tag's figure also depends on its
+label mix. The next table gives each tag's equal-weight figure, the mean of its three per-label
+rates (intervals in the same file):
+
+| challenge tag (S / R / NEI), equal weight | S0 article@5 | S0 evidence@5 | S0 FEVEROUS-style | S1 article@5 | S1 evidence@5 | S1 FEVEROUS-style |
+|---|---|---|---|---|---|---|
+| Other (602 / 709 / 595) | 0.990 | 0.887 | 0.668 | 0.986 | 0.868 | 0.651 |
+| Multi-hop Reasoning (319 / 169 / 221) | 0.997 | 0.482 | 0.197 | 0.992 | 0.435 | 0.186 |
+| Entity Disambiguation (34 / 46 / 71) | 0.941 | 0.722 | 0.475 | 0.905 | 0.672 | 0.447 |
+| Search terms not in claim (18 / 15 / 98) | 0.930 | 0.809 | 0.609 | 0.930 | 0.770 | 0.583 |
+| Numerical Reasoning (6 / 51 / 14) | 0.938 | 0.818 | 0.584 | 0.938 | 0.799 | 0.584 |
+| Combining Tables and Text (21 / 10 / 1) | 1.000 | 0.984 | 0.552 | 1.000 | 0.984 | 0.552 |
+
 The two tags about finding the page are where the page is missed most: Entity Disambiguation
-(0.881 on S1) and Search terms not in claim (0.885). Multi-hop Reasoning finds the page but not
-the whole evidence (0.468 on S1). The 32 claims tagged Combining Tables and Text all have a
-text-only evidence set too, which is why they are in the pick.
+(0.881 on S1, 0.905 with equal weights) and Search terms not in claim (0.885 and 0.930). Multi-hop
+Reasoning finds the page but not the whole evidence (0.468 on S1, 0.435 with equal weights). Most
+of that comes from its page count: 597 of its 709 claims need two or more pages, and on those its
+equal-weight evidence@5 on S1 is level with Other's (0.374 against 0.389, gap −0.016, −0.103 to
+0.069). On its 112 one-page claims it is lower (gap −0.062, −0.116 to −0.011). The 32 claims tagged Combining Tables
+and Text all have a text-only evidence set too, which is why they are in the pick. Numerical
+Reasoning (71) and Combining Tables and Text (32) are too small for conclusions.
 
 ### Reweighted to FEVEROUS's mix
 

@@ -283,16 +283,58 @@ pair of runs, the SDs for both claim counts and the accuracy differences between
 
 ## 8. Where it fails
 
-- **Claims that need two or more articles.** RAG is right on 72.8% of the one-article claims and
-  66.6% of the others (85.4% against 79.3% on the supported/refuted ones). Gold drops in the same
-  way (74.4% against 69.3%), so the second article is hard for the model, not only for retrieval.
-  On refuted claims that need two or more articles all three of web search, RAG and gold reach
-  only 73.0% to 73.7%.
+- **Multi-hop claims (two or more articles).** RAG is right on 72.8% of the one-article claims and
+  66.6% of the others (85.4% against 79.3% on the supported/refuted ones, 6.1 points apart, 95%
+  interval 2.4 to 9.9). Gold drops too (74.4% against 69.3%), clearly so on the refuted claims,
+  and RAG stays level with gold in both groups, so the second article is hard for the model as
+  well as for retrieval ([Multi-hop claims and RAG](#multi-hop-claims-and-rag) below). On refuted
+  claims that need two or more articles all three of web search, RAG and gold reach only 73.0% to
+  73.7%.
 - **Claims where retrieval missed.** For 2,943 of the 3,000 claims (98.1%) a gold page is among the
   five passages; RAG is right on 71.2% of those and on 57.9% of the other 57. On the
   supported/refuted claims the split is sharper: 83.9% against 30.8% (4 of 13). When every page of
   the shown gold set is among the passages (2,534 claims, 84.5%), RAG is right on 71.7%, against
   66.3% when it is not.
+
+### Multi-hop claims and RAG
+
+Here only the supported and refuted claims count, as in section 5, each label weighted one half so
+that a group's label mix cannot make it look easier or harder; for the one-article and
+two-or-more groups (700 + 700 and 300 + 300 claims) that changes nothing. Equal-weight figures and
+gaps get paired bootstrap intervals, with the claims resampled within each label and group, and a
+gap within one label Newcombe's interval
+([LLM_RESULTS.md, section 6](../results/llm/LLM_RESULTS.md#6-multi-hop-claims-supported-and-refuted-claims-equal-weight) has every number).
+
+- **Two meanings.** In 600 claims every evidence set spans two or more articles; 488 carry the
+  Multi-hop Reasoning tag, the main difficulty named by the annotator who verified them; 427 are both.
+- **Does RAG do worse on them?** Yes, by 6.1 points (79.3% against 85.4%, 2.4 to 9.9), all on the
+  refuted claims (13.1, 7.7 to 18.9; on supported ones −1.0, −5.5 to 4.1).
+- **Retrieval or the model?** Gold drops 3.6 points (−0.0 to 7.3, so only just level; refuted 9.0,
+  3.5 to 14.9), and RAG's gap to gold does not clearly change (−2.5, −5.6 to 0.6). The passages
+  held every page of the gold set for 99.3% of the one-article claims and 54.8% of the others, and
+  on those others RAG is level with and without the whole set (−0.6, −7.3 to 6.2). Whether
+  they held the gold sentences was not measured. [EVALUATION.md](EVALUATION.md#feverouss-challenge-tags)
+  has the search on its own per tag, from the bare index query.
+- **Does RAG still help?** Over no passages, by 51.9 points (49.2 to 54.6) on one article and 40.0
+  (35.8 to 44.2) on two or more, a smaller lead (−11.9, −16.9 to −6.9). Against web search it is
+  level in both groups (1.1, −0.7 to 2.9; 3.0, 0.0 to 6.0), with no clear change (1.9, −1.6 to 5.5).
+
+| tag (supported + refuted claims), equal weight | no passages | web search | RAG | gold |
+|---|---|---|---|---|
+| Other (602 + 709) | 34.0% | 83.1% | 85.4% | 83.5% |
+| Multi-hop Reasoning (319 + 169) | 38.7% | 77.8% | 79.4% | 81.4% |
+| Entity Disambiguation (34 + 46) | 32.9% | 77.0% | 77.7% | 77.0% |
+| Search terms not in claim (18 + 15) | 27.8% | 81.1% | 87.8% | 75.6% |
+| Numerical Reasoning (6 + 51) | 27.0% | 72.1% | 83.8% | 86.8% |
+| Combining Tables and Text (21 + 10) | 49.0% | 80.5% | 68.3% | 70.7% |
+
+RAG is 6.0 points (1.6 to 10.2) less accurate on Multi-hop Reasoning than on Other, but the two tags
+are level within each group (one article 0.5, −6.1 to 6.5; two or more 1.9, −7.0 to 11.6), and 427
+of the tag's 488 claims need two or more articles.
+
+**Limits.** One run (the repeats hold only 90 supported/refuted claims on two or more articles), so
+these gaps have no rerun SD of their own. NOT ENOUGH INFO is left out by choice, the tags were not
+balanced, and the last four tags have fewer than 100 claims here, too few for conclusions.
 
 ## 9. The web condition
 
@@ -400,7 +442,8 @@ The runner stops at 80% of the five-hour or the weekly usage window (`--stop-fiv
 `--stop-weekly`) and resumes when the same command is run again. RAG needs the S1 database
 (`wikilense_s1`, [SETUP.md](SETUP.md#reproduce-the-scaled-run)); its passages are cached per claim
 in the runs folder. `table` also takes `--nei-audit` and `--web-audit` with the audit files, whose
-counts sections 4 and 9 cite; `stats` reads only the files in `results/llm/` and `results/scaled/`.
+counts sections 4 and 9 cite; `stats` reads the files in `results/llm/` and `results/scaled/` and,
+for the challenge tags of section 8, `data/scaled/claims_3000.jsonl`, after checking its SHA-256.
 The repeats of section 7 ran the same three commands with `--claims` set to a file of the 450
 picked lines of `claims_3000.jsonl`, unchanged, the six groups in alphabetical order of label and
 `kind` and each group in the hash order (sha256
