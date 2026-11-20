@@ -1,0 +1,1352 @@
+{
+ "runs": [
+  {
+   "run_folder": "haiku_high_fact_check_v1_noret_gold",
+   "conditions": [
+    "no_retrieval",
+    "gold"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_v1",
+   "prompt_hash": "901ae52a9a15c12196a66988b1176a68da54078140d5f4ad78ec44e7c5a1a984",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-12T03:00:34+01:00",
+     "ended_at": "2026-11-12T04:17:34+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.8,
+      "weekly": 0.8
+     },
+     "counts": {
+      "ok": 6000
+     }
+    }
+   ],
+   "rows_in_file": 6000,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": "wikilense",
+    "k": 5,
+    "strategy": "inline",
+    "ef_search": 100,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "device": "cpu",
+    "n_chunks_at_start": null
+   },
+   "web": null,
+   "window_five_hour": {
+    "used": 0.11,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1794456000,
+      "first": 0.57,
+      "highest": 0.68,
+      "readings": 6000
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.0,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1794459600,
+      "first": 0.61,
+      "highest": 0.61,
+      "readings": 6000
+     }
+    ]
+   },
+   "per_condition": {
+    "no_retrieval": {
+     "calls": 3000,
+     "attempts": {
+      "1": 3000
+     },
+     "seconds_final_attempt": {
+      "median": 4.186,
+      "p95": 8.292,
+      "max": 22.239
+     },
+     "seconds_all_attempts": {
+      "median": 4.186,
+      "p95": 8.293,
+      "max": 22.239
+     },
+     "tokens_sum": {
+      "prompt_tokens": 5069111,
+      "cache_read_tokens": 2861049,
+      "cache_creation_tokens": 2201898,
+      "input_tokens_uncached": 6164,
+      "output_tokens": 2656432,
+      "thinking_tokens": 2208045
+     },
+     "tokens_median": {
+      "prompt_tokens": 1617.0,
+      "cache_read_tokens": 901.0,
+      "cache_creation_tokens": 714.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 787.0,
+      "thinking_tokens": 636.0
+     }
+    },
+    "gold": {
+     "calls": 3000,
+     "attempts": {
+      "1": 3000
+     },
+     "seconds_final_attempt": {
+      "median": 2.557,
+      "p95": 6.154,
+      "max": 13.415
+     },
+     "seconds_all_attempts": {
+      "median": 2.558,
+      "p95": 6.154,
+      "max": 13.415
+     },
+     "tokens_sum": {
+      "prompt_tokens": 5532364,
+      "cache_read_tokens": 2902067,
+      "cache_creation_tokens": 2624089,
+      "input_tokens_uncached": 6208,
+      "output_tokens": 1613496,
+      "thinking_tokens": 1164435
+     },
+     "tokens_median": {
+      "prompt_tokens": 1737.0,
+      "cache_read_tokens": 901.0,
+      "cache_creation_tokens": 834.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 426.0,
+      "thinking_tokens": 275.5
+     }
+    }
+   },
+   "run": "original"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_v1_retrieved",
+   "conditions": [
+    "retrieved"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_v1",
+   "prompt_hash": "901ae52a9a15c12196a66988b1176a68da54078140d5f4ad78ec44e7c5a1a984",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-12T04:19:41+01:00",
+     "ended_at": "2026-11-12T04:48:22+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.8,
+      "weekly": 0.8
+     },
+     "counts": {
+      "ok": 3000
+     }
+    }
+   ],
+   "rows_in_file": 3000,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": "wikilense_s1",
+    "k": 5,
+    "strategy": "inline",
+    "ef_search": 100,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "device": "cpu",
+    "n_chunks_at_start": 132359
+   },
+   "web": null,
+   "window_five_hour": {
+    "used": 0.05,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1794456000,
+      "first": 0.67,
+      "highest": 0.72,
+      "readings": 3000
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.01,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1794459600,
+      "first": 0.61,
+      "highest": 0.62,
+      "readings": 3000
+     }
+    ]
+   },
+   "per_condition": {
+    "retrieved": {
+     "calls": 3000,
+     "attempts": {
+      "1": 3000
+     },
+     "seconds_final_attempt": {
+      "median": 2.3194999999999997,
+      "p95": 5.688,
+      "max": 16.484
+     },
+     "seconds_all_attempts": {
+      "median": 2.3194999999999997,
+      "p95": 5.688,
+      "max": 16.485
+     },
+     "tokens_sum": {
+      "prompt_tokens": 9766910,
+      "cache_read_tokens": 2984263,
+      "cache_creation_tokens": 6776481,
+      "input_tokens_uncached": 6166,
+      "output_tokens": 1480127,
+      "thinking_tokens": 1026052
+     },
+     "tokens_median": {
+      "prompt_tokens": 3170.0,
+      "cache_read_tokens": 901.0,
+      "cache_creation_tokens": 2263.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 380.0,
+      "thinking_tokens": 227.0
+     }
+    }
+   },
+   "run": "original"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_web_v1_web",
+   "conditions": [
+    "web"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_web_v1",
+   "prompt_hash": "68b9d45dc5d0e6db5d5b6892be545d10685d73b92fd177fcdaa925dbacf419d2",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-15T13:00:12+01:00",
+     "ended_at": "2026-11-15T13:17:50+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 130,
+     "stop_reason": "signal 15",
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.8,
+      "weekly": 0.8
+     },
+     "counts": {
+      "ok": 238,
+      "error": 5
+     }
+    },
+    {
+     "started_at": "2026-11-15T13:18:21+01:00",
+     "ended_at": "2026-11-15T13:28:48+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 130,
+     "stop_reason": "signal 2",
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.8,
+      "weekly": 0.8
+     },
+     "counts": {
+      "ok": 154,
+      "error": 5
+     }
+    },
+    {
+     "started_at": "2026-11-16T02:44:02+01:00",
+     "ended_at": "2026-11-16T02:51:14+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 130,
+     "stop_reason": "signal 2",
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.8,
+      "weekly": 0.8
+     },
+     "counts": {
+      "ok": 101,
+      "error": 5
+     }
+    },
+    {
+     "started_at": "2026-11-16T02:53:23+01:00",
+     "ended_at": "2026-11-16T06:01:48+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.8,
+      "weekly": 0.8
+     },
+     "counts": {
+      "ok": 2507
+     }
+    }
+   ],
+   "rows_in_file": 3015,
+   "rows_not_final": 15,
+   "retrieval": {
+    "database": null,
+    "k": null,
+    "strategy": null,
+    "ef_search": null,
+    "embedding_model": null,
+    "embedding_revision": null,
+    "device": null,
+    "n_chunks_at_start": null
+   },
+   "web": {
+    "tools": [
+     "WebSearch",
+     "WebFetch"
+    ],
+    "deny_hosts": [
+     "fever.ai",
+     "*.fever.ai",
+     "zenodo.org",
+     "*.zenodo.org",
+     "github.com",
+     "*.github.com",
+     "*.github.io",
+     "githubusercontent.com",
+     "*.githubusercontent.com",
+     "huggingface.co",
+     "*.huggingface.co",
+     "hf.co",
+     "*.hf.co",
+     "kaggle.com",
+     "*.kaggle.com",
+     "paperswithcode.com",
+     "*.paperswithcode.com"
+    ],
+    "deny_hosts_sha256": "f69d1dcb8d078f5923ab46297618233141e6264f93a635caec90bafd31087269",
+    "max_turns": 20,
+    "timeout_s": 200.0
+   },
+   "window_five_hour": {
+    "used": 0.6,
+    "windows": 3,
+    "segments": [
+     {
+      "resets_at": 1794760800,
+      "first": 0.02,
+      "highest": 0.1,
+      "readings": 398
+     },
+     {
+      "resets_at": 1794796800,
+      "first": 0.08,
+      "highest": 0.23,
+      "readings": 785
+     },
+     {
+      "resets_at": 1794814800,
+      "first": 0.0,
+      "highest": 0.37,
+      "readings": 1828
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.09,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795064400,
+      "first": 0.55,
+      "highest": 0.64,
+      "readings": 3011
+     }
+    ]
+   },
+   "per_condition": {
+    "web": {
+     "calls": 3000,
+     "attempts": {
+      "1": 2999,
+      "2": 1
+     },
+     "seconds_final_attempt": {
+      "median": 18.1755,
+      "p95": 46.084,
+      "max": 183.21
+     },
+     "seconds_all_attempts": {
+      "median": 18.1765,
+      "p95": 46.085,
+      "max": 308.837
+     },
+     "tokens_sum": {
+      "prompt_tokens": 165580936,
+      "cache_read_tokens": 21490371,
+      "cache_creation_tokens": 9900670,
+      "input_tokens_uncached": 134189895,
+      "output_tokens": 13957898,
+      "thinking_tokens": 8955072
+     },
+     "tokens_median": {
+      "prompt_tokens": 44725.5,
+      "cache_read_tokens": 3921.0,
+      "cache_creation_tokens": 2949.0,
+      "input_tokens_uncached": 35528.5,
+      "output_tokens": 3890.0,
+      "thinking_tokens": 2405.0
+     },
+     "web": {
+      "searches_sum": 3965,
+      "fetches_sum": 4265,
+      "denied_sum": 4,
+      "turns_median": 4.0,
+      "claims_without_a_tool_call": 228
+     }
+    }
+   },
+   "run": "original"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_v1_noret_gold_rep450_r1",
+   "conditions": [
+    "no_retrieval",
+    "gold"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_v1",
+   "prompt_hash": "901ae52a9a15c12196a66988b1176a68da54078140d5f4ad78ec44e7c5a1a984",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-20T09:19:49+01:00",
+     "ended_at": "2026-11-20T09:33:43+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 900
+     }
+    }
+   ],
+   "rows_in_file": 900,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": "wikilense",
+    "k": 5,
+    "strategy": "inline",
+    "ef_search": 100,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "device": "cpu",
+    "n_chunks_at_start": null
+   },
+   "web": null,
+   "window_five_hour": {
+    "used": 0.06,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795165200,
+      "first": 0.12,
+      "highest": 0.18,
+      "readings": 900
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.01,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795669200,
+      "first": 0.14,
+      "highest": 0.15,
+      "readings": 900
+     }
+    ]
+   },
+   "per_condition": {
+    "no_retrieval": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 4.618,
+      "p95": 8.902,
+      "max": 13.543
+     },
+     "seconds_all_attempts": {
+      "median": 4.618,
+      "p95": 8.902,
+      "max": 13.543
+     },
+     "tokens_sum": {
+      "prompt_tokens": 767571,
+      "cache_read_tokens": 429748,
+      "cache_creation_tokens": 336895,
+      "input_tokens_uncached": 928,
+      "output_tokens": 373636,
+      "thinking_tokens": 305836
+     },
+     "tokens_median": {
+      "prompt_tokens": 1617.0,
+      "cache_read_tokens": 901.0,
+      "cache_creation_tokens": 714.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 712.5,
+      "thinking_tokens": 567.5
+     }
+    },
+    "gold": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 3.4524999999999997,
+      "p95": 7.228,
+      "max": 16.466
+     },
+     "seconds_all_attempts": {
+      "median": 3.4535,
+      "p95": 7.228,
+      "max": 16.467
+     },
+     "tokens_sum": {
+      "prompt_tokens": 831537,
+      "cache_read_tokens": 435774,
+      "cache_creation_tokens": 394831,
+      "input_tokens_uncached": 932,
+      "output_tokens": 259021,
+      "thinking_tokens": 190976
+     },
+     "tokens_median": {
+      "prompt_tokens": 1735.5,
+      "cache_read_tokens": 901.0,
+      "cache_creation_tokens": 832.5,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 455.0,
+      "thinking_tokens": 304.5
+     }
+    }
+   },
+   "run": "r1"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_v1_retrieved_rep450_r1",
+   "conditions": [
+    "retrieved"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_v1",
+   "prompt_hash": "901ae52a9a15c12196a66988b1176a68da54078140d5f4ad78ec44e7c5a1a984",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-20T09:33:46+01:00",
+     "ended_at": "2026-11-20T09:39:29+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 450
+     }
+    }
+   ],
+   "rows_in_file": 450,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": "wikilense_s1",
+    "k": 5,
+    "strategy": "inline",
+    "ef_search": 100,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "device": "cpu",
+    "n_chunks_at_start": 132359
+   },
+   "web": null,
+   "window_five_hour": {
+    "used": 0.02,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795165200,
+      "first": 0.18,
+      "highest": 0.2,
+      "readings": 450
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.0,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795669200,
+      "first": 0.15,
+      "highest": 0.15,
+      "readings": 450
+     }
+    ]
+   },
+   "per_condition": {
+    "retrieved": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 3.083,
+      "p95": 7.647,
+      "max": 15.135
+     },
+     "seconds_all_attempts": {
+      "median": 3.0835,
+      "p95": 7.647,
+      "max": 15.135
+     },
+     "tokens_sum": {
+      "prompt_tokens": 1493019,
+      "cache_read_tokens": 468202,
+      "cache_creation_tokens": 1023881,
+      "input_tokens_uncached": 936,
+      "output_tokens": 235471,
+      "thinking_tokens": 166088
+     },
+     "tokens_median": {
+      "prompt_tokens": 3170.5,
+      "cache_read_tokens": 901.0,
+      "cache_creation_tokens": 2267.5,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 387.0,
+      "thinking_tokens": 240.0
+     }
+    }
+   },
+   "run": "r1"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_web_v1_web_rep450_r1",
+   "conditions": [
+    "web"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_web_v1",
+   "prompt_hash": "68b9d45dc5d0e6db5d5b6892be545d10685d73b92fd177fcdaa925dbacf419d2",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-20T09:39:31+01:00",
+     "ended_at": "2026-11-20T10:15:29+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 450
+     }
+    }
+   ],
+   "rows_in_file": 450,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": null,
+    "k": null,
+    "strategy": null,
+    "ef_search": null,
+    "embedding_model": null,
+    "embedding_revision": null,
+    "device": null,
+    "n_chunks_at_start": null
+   },
+   "web": {
+    "tools": [
+     "WebSearch",
+     "WebFetch"
+    ],
+    "deny_hosts": [
+     "fever.ai",
+     "*.fever.ai",
+     "zenodo.org",
+     "*.zenodo.org",
+     "github.com",
+     "*.github.com",
+     "*.github.io",
+     "githubusercontent.com",
+     "*.githubusercontent.com",
+     "huggingface.co",
+     "*.huggingface.co",
+     "hf.co",
+     "*.hf.co",
+     "kaggle.com",
+     "*.kaggle.com",
+     "paperswithcode.com",
+     "*.paperswithcode.com"
+    ],
+    "deny_hosts_sha256": "f69d1dcb8d078f5923ab46297618233141e6264f93a635caec90bafd31087269",
+    "max_turns": 20,
+    "timeout_s": 200.0
+   },
+   "window_five_hour": {
+    "used": 0.11,
+    "windows": 2,
+    "segments": [
+     {
+      "resets_at": 1795165200,
+      "first": 0.2,
+      "highest": 0.27,
+      "readings": 250
+     },
+     {
+      "resets_at": 1795183200,
+      "first": 0.0,
+      "highest": 0.04,
+      "readings": 200
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.01,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795669200,
+      "first": 0.15,
+      "highest": 0.16,
+      "readings": 450
+     }
+    ]
+   },
+   "per_condition": {
+    "web": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 19.003999999999998,
+      "p95": 52.848,
+      "max": 181.675
+     },
+     "seconds_all_attempts": {
+      "median": 19.0045,
+      "p95": 52.849,
+      "max": 181.677
+     },
+     "tokens_sum": {
+      "prompt_tokens": 25477566,
+      "cache_read_tokens": 3533545,
+      "cache_creation_tokens": 1512248,
+      "input_tokens_uncached": 20431773,
+      "output_tokens": 2228171,
+      "thinking_tokens": 1455484
+     },
+     "tokens_median": {
+      "prompt_tokens": 45120.0,
+      "cache_read_tokens": 3926.5,
+      "cache_creation_tokens": 2979.5,
+      "input_tokens_uncached": 34440.0,
+      "output_tokens": 4040.0,
+      "thinking_tokens": 2549.5
+     },
+     "web": {
+      "searches_sum": 597,
+      "fetches_sum": 686,
+      "denied_sum": 1,
+      "turns_median": 4.0,
+      "claims_without_a_tool_call": 29
+     }
+    }
+   },
+   "run": "r1"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_v1_noret_gold_rep450_r2",
+   "conditions": [
+    "no_retrieval",
+    "gold"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_v1",
+   "prompt_hash": "901ae52a9a15c12196a66988b1176a68da54078140d5f4ad78ec44e7c5a1a984",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-20T10:15:31+01:00",
+     "ended_at": "2026-11-20T10:29:20+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 900
+     }
+    }
+   ],
+   "rows_in_file": 900,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": "wikilense",
+    "k": 5,
+    "strategy": "inline",
+    "ef_search": 100,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "device": "cpu",
+    "n_chunks_at_start": null
+   },
+   "web": null,
+   "window_five_hour": {
+    "used": 0.01,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795183200,
+      "first": 0.04,
+      "highest": 0.05,
+      "readings": 900
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.0,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795669200,
+      "first": 0.16,
+      "highest": 0.16,
+      "readings": 900
+     }
+    ]
+   },
+   "per_condition": {
+    "no_retrieval": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 4.71,
+      "p95": 8.907,
+      "max": 16.099
+     },
+     "seconds_all_attempts": {
+      "median": 4.7105,
+      "p95": 8.907,
+      "max": 16.099
+     },
+     "tokens_sum": {
+      "prompt_tokens": 769608,
+      "cache_read_tokens": 758876,
+      "cache_creation_tokens": 9800,
+      "input_tokens_uncached": 932,
+      "output_tokens": 375873,
+      "thinking_tokens": 308065
+     },
+     "tokens_median": {
+      "prompt_tokens": 1617.0,
+      "cache_read_tokens": 1615.0,
+      "cache_creation_tokens": 0.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 713.5,
+      "thinking_tokens": 563.0
+     }
+    },
+    "gold": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 3.4074999999999998,
+      "p95": 7.268,
+      "max": 14.25
+     },
+     "seconds_all_attempts": {
+      "median": 3.4074999999999998,
+      "p95": 7.268,
+      "max": 14.25
+     },
+     "tokens_sum": {
+      "prompt_tokens": 811535,
+      "cache_read_tokens": 806151,
+      "cache_creation_tokens": 4466,
+      "input_tokens_uncached": 918,
+      "output_tokens": 253032,
+      "thinking_tokens": 186154
+     },
+     "tokens_median": {
+      "prompt_tokens": 1733.0,
+      "cache_read_tokens": 1731.0,
+      "cache_creation_tokens": 0.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 444.0,
+      "thinking_tokens": 290.0
+     }
+    }
+   },
+   "run": "r2"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_v1_retrieved_rep450_r2",
+   "conditions": [
+    "retrieved"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_v1",
+   "prompt_hash": "901ae52a9a15c12196a66988b1176a68da54078140d5f4ad78ec44e7c5a1a984",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-20T10:29:22+01:00",
+     "ended_at": "2026-11-20T10:35:00+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 450
+     }
+    }
+   ],
+   "rows_in_file": 450,
+   "rows_not_final": 0,
+   "retrieval": {
+    "database": "wikilense_s1",
+    "k": 5,
+    "strategy": "inline",
+    "ef_search": 100,
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "device": "cpu",
+    "n_chunks_at_start": 132359
+   },
+   "web": null,
+   "window_five_hour": {
+    "used": 0.0,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795183200,
+      "first": 0.05,
+      "highest": 0.05,
+      "readings": 450
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.0,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795669200,
+      "first": 0.16,
+      "highest": 0.16,
+      "readings": 450
+     }
+    ]
+   },
+   "per_condition": {
+    "retrieved": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 3.1,
+      "p95": 7.332,
+      "max": 12.385
+     },
+     "seconds_all_attempts": {
+      "median": 3.1,
+      "p95": 7.332,
+      "max": 12.385
+     },
+     "tokens_sum": {
+      "prompt_tokens": 1493040,
+      "cache_read_tokens": 1482779,
+      "cache_creation_tokens": 9325,
+      "input_tokens_uncached": 936,
+      "output_tokens": 230942,
+      "thinking_tokens": 161846
+     },
+     "tokens_median": {
+      "prompt_tokens": 3163.0,
+      "cache_read_tokens": 3161.0,
+      "cache_creation_tokens": 0.0,
+      "input_tokens_uncached": 2.0,
+      "output_tokens": 392.5,
+      "thinking_tokens": 233.5
+     }
+    }
+   },
+   "run": "r2"
+  },
+  {
+   "run_folder": "haiku_high_fact_check_web_v1_web_rep450_r2",
+   "conditions": [
+    "web"
+   ],
+   "model": [
+    "claude-haiku-5-5"
+   ],
+   "effort": "high",
+   "prompt_id": "fact_check_web_v1",
+   "prompt_hash": "68b9d45dc5d0e6db5d5b6892be545d10685d73b92fd177fcdaa925dbacf419d2",
+   "backend": "claude_cli_subscription",
+   "cli_version": "2.1.322 (Claude Code)",
+   "cli_binary_sha256": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478",
+   "invocations": [
+    {
+     "started_at": "2026-11-20T10:35:01+01:00",
+     "ended_at": "2026-11-20T11:10:20+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 1,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 449,
+      "error": 1
+     }
+    },
+    {
+     "started_at": "2026-11-20T11:11:22+01:00",
+     "ended_at": "2026-11-20T11:14:35+01:00",
+     "backend_version": "2.1.322 (Claude Code)",
+     "exit_code": 0,
+     "stop_reason": null,
+     "workers": 5,
+     "thresholds": {
+      "five_hour": 0.9,
+      "weekly": 1.01
+     },
+     "counts": {
+      "ok": 1
+     }
+    }
+   ],
+   "rows_in_file": 451,
+   "rows_not_final": 1,
+   "retrieval": {
+    "database": null,
+    "k": null,
+    "strategy": null,
+    "ef_search": null,
+    "embedding_model": null,
+    "embedding_revision": null,
+    "device": null,
+    "n_chunks_at_start": null
+   },
+   "web": {
+    "tools": [
+     "WebSearch",
+     "WebFetch"
+    ],
+    "deny_hosts": [
+     "fever.ai",
+     "*.fever.ai",
+     "zenodo.org",
+     "*.zenodo.org",
+     "github.com",
+     "*.github.com",
+     "*.github.io",
+     "githubusercontent.com",
+     "*.githubusercontent.com",
+     "huggingface.co",
+     "*.huggingface.co",
+     "hf.co",
+     "*.hf.co",
+     "kaggle.com",
+     "*.kaggle.com",
+     "paperswithcode.com",
+     "*.paperswithcode.com"
+    ],
+    "deny_hosts_sha256": "f69d1dcb8d078f5923ab46297618233141e6264f93a635caec90bafd31087269",
+    "max_turns": 20,
+    "timeout_s": 200.0
+   },
+   "window_five_hour": {
+    "used": 0.09,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795183200,
+      "first": 0.05,
+      "highest": 0.14,
+      "readings": 451
+     }
+    ]
+   },
+   "window_seven_day": {
+    "used": 0.01,
+    "windows": 1,
+    "segments": [
+     {
+      "resets_at": 1795669200,
+      "first": 0.16,
+      "highest": 0.17,
+      "readings": 451
+     }
+    ]
+   },
+   "per_condition": {
+    "web": {
+     "calls": 450,
+     "attempts": {
+      "1": 450
+     },
+     "seconds_final_attempt": {
+      "median": 18.6575,
+      "p95": 48.15,
+      "max": 193.22
+     },
+     "seconds_all_attempts": {
+      "median": 18.658,
+      "p95": 48.151,
+      "max": 193.221
+     },
+     "tokens_sum": {
+      "prompt_tokens": 24666245,
+      "cache_read_tokens": 3570361,
+      "cache_creation_tokens": 1183292,
+      "input_tokens_uncached": 19912592,
+      "output_tokens": 2176902,
+      "thinking_tokens": 1412411
+     },
+     "tokens_median": {
+      "prompt_tokens": 45438.0,
+      "cache_read_tokens": 4661.0,
+      "cache_creation_tokens": 2329.0,
+      "input_tokens_uncached": 35090.5,
+      "output_tokens": 4035.5,
+      "thinking_tokens": 2443.5
+     },
+     "web": {
+      "searches_sum": 606,
+      "fetches_sum": 629,
+      "denied_sum": 1,
+      "turns_median": 4.0,
+      "claims_without_a_tool_call": 28
+     }
+    }
+   },
+   "run": "r2"
+  }
+ ],
+ "user_text_check": {
+  "r1/no_retrieval": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r1/gold": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r1/retrieved": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r1/web": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r2/no_retrieval": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r2/gold": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r2/retrieved": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  },
+  "r2/web": {
+   "rows": 450,
+   "mismatches": 0,
+   "mismatched_claims": []
+  }
+ },
+ "no_passages_nei_justifications": {
+  "nei_answers": 1765,
+  "contain_no_evidence": 1763,
+  "contain_cannot_confirm": 1036,
+  "rule": "case-insensitive substring of the justification"
+ },
+ "earlier_analyses": {
+  "nei_audit": {
+   "stats": {
+    "cases": 100,
+    "both_rated": 100,
+    "agree_error_type": 94,
+    "agree_settle": 93,
+    "agree_defensible": 93,
+    "adjudicated": 9,
+    "finals": 100
+   },
+   "by_condition": {
+    "gold": {
+     "cases": 40,
+     "error": {
+      "feverous_label_doubtful": 16,
+      "memory_fill": 10,
+      "over_inference": 9,
+      "strict_wording": 4,
+      "other": 1
+     },
+     "settle": {
+      "no": 22,
+      "yes_refutes": 8,
+      "yes_supports": 7,
+      "unsure": 3
+     }
+    },
+    "no_retrieval": {
+     "cases": 20,
+     "error": {
+      "memory_fill": 13,
+      "feverous_label_doubtful": 4,
+      "unverified_part_ignored": 3
+     },
+     "settle": {
+      "no": 15,
+      "yes_refutes": 4,
+      "unsure": 1
+     }
+    },
+    "retrieved": {
+     "cases": 40,
+     "error": {
+      "feverous_label_doubtful": 16,
+      "over_inference": 11,
+      "memory_fill": 9,
+      "unverified_part_ignored": 2,
+      "strict_wording": 1,
+      "misread": 1
+     },
+     "settle": {
+      "no": 23,
+      "yes_refutes": 8,
+      "yes_supports": 6,
+      "unsure": 3
+     }
+    }
+   }
+  },
+  "web_audit": {
+   "audited_at": "2026-11-16T06:02:24+01:00",
+   "web_rows": 3000,
+   "web_search_calls": 3965,
+   "web_fetch_calls": 4265,
+   "denied_calls": 4,
+   "flagged_rows": 35,
+   "fetches_en_wikipedia": 3744,
+   "top_fetched_hosts": {
+    "en.wikipedia.org": 3744,
+    "web.archive.org": 15,
+    "pmc.ncbi.nlm.nih.gov": 10,
+    "zookeys.pensoft.net": 10,
+    "www.wikidata.org": 9,
+    "de.wikipedia.org": 8,
+    "sv.wikipedia.org": 6,
+    "en.wikisource.org": 5
+   }
+  }
+ }
+}
