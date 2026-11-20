@@ -32,6 +32,11 @@ MAX_EF_SEARCH = 10000
 #: The ef_search value that means "leave the server's session value alone": WIKILENSE_EF_SEARCH=0,
 #: --ef-search 0 on the command line, ef_search=0 in the web API.
 EF_SEARCH_SERVER = 0
+#: The values of WIKILENSE_FACTCHECK, the web page's live fact-check (wikilense.factcheck): off,
+#: or on through the Claude Code CLI's own login, or through the Anthropic API with a key. An API
+#: key in .env turns nothing on by itself; only this setting does.
+FACTCHECK_MODES = ("off", "subscription", "api")
+DEFAULT_FACTCHECK = "off"
 
 
 class SettingsError(ValueError):
@@ -56,6 +61,8 @@ class Settings:
     chunk_overlap_units: int = DEFAULT_CHUNK_OVERLAP_UNITS
     vector_dim: int = DEFAULT_VECTOR_DIM
     ef_search: int = DEFAULT_EF_SEARCH
+    factcheck: str = DEFAULT_FACTCHECK
+    claude_bin: str = ""
 
 
 def _get_str(env: Mapping[str, str], name: str, default: str | None) -> str:
@@ -97,9 +104,14 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
     to the values in ``.env.example`` and docs/DESIGN.md. ``WIKILENSE_TEST_DB_NAME`` defaults to
     the database name plus ``_test``.
 
+    ``WIKILENSE_FACTCHECK`` (default ``off``) turns the web page's live fact-check on;
+    ``WIKILENSE_CLAUDE_BIN`` names the Claude Code CLI it uses with ``subscription`` (empty: the
+    ``CLAUDE_BIN`` variable, then ``claude`` on the PATH). Neither reads the API key.
+
     Raises SettingsError, naming the variable, when a required one is missing, an integer
-    variable is malformed, or ``WIKILENSE_EF_SEARCH`` is neither 0 (the server's value) nor in
-    ``MIN_EF_SEARCH`` .. ``MAX_EF_SEARCH``.
+    variable is malformed, ``WIKILENSE_EF_SEARCH`` is neither 0 (the server's value) nor in
+    ``MIN_EF_SEARCH`` .. ``MAX_EF_SEARCH``, or ``WIKILENSE_FACTCHECK`` is not one of
+    ``FACTCHECK_MODES``.
     """
     path = DEFAULT_ENV_FILE if env_file is None else Path(env_file)
     file_values: dict[str, str] = {}
@@ -113,6 +125,11 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         raise SettingsError(
             f"WIKILENSE_EF_SEARCH must be {EF_SEARCH_SERVER} (keep the server's value) or from "
             f"{MIN_EF_SEARCH} to {MAX_EF_SEARCH}, got {ef_search}"
+        )
+    factcheck = _get_str(env, "WIKILENSE_FACTCHECK", DEFAULT_FACTCHECK).strip().lower()
+    if factcheck not in FACTCHECK_MODES:
+        raise SettingsError(
+            f"WIKILENSE_FACTCHECK must be one of {', '.join(FACTCHECK_MODES)}, got {factcheck!r}"
         )
     return Settings(
         db_host=_get_str(env, "WIKILENSE_DB_HOST", "127.0.0.1"),
@@ -128,4 +145,6 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         ),
         vector_dim=_get_int(env, "WIKILENSE_VECTOR_DIM", DEFAULT_VECTOR_DIM),
         ef_search=ef_search,
+        factcheck=factcheck,
+        claude_bin=_get_str(env, "WIKILENSE_CLAUDE_BIN", ""),
     )

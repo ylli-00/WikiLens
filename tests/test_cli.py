@@ -1187,9 +1187,11 @@ def test_serve_checks_the_database_builds_the_app_and_runs_uvicorn(
 ) -> None:
     import uvicorn
 
-    from wikilense import web
+    from wikilense import factcheck, web
 
-    sentinel = SimpleNamespace(state=SimpleNamespace(model_load_ms=1200.0))
+    sentinel = SimpleNamespace(
+        state=SimpleNamespace(model_load_ms=1200.0, fact_checker=factcheck.FactChecker())
+    )
     created: list[dict[str, Any]] = []
     runs: list[tuple[Any, dict[str, Any]]] = []
 
@@ -1217,6 +1219,7 @@ def test_serve_checks_the_database_builds_the_app_and_runs_uvicorn(
     assert "http://127.0.0.1:9999/" in err and "42 chunks" in err
     assert f"http://127.0.0.1:9999{web.DOCS_URL}" in err
     assert "database choice: Demo: 3 pages, 42 chunks (wikilense); claim file: none" in err
+    assert "fact-check: off (WIKILENSE_FACTCHECK=subscription or api turns it on)" in err
 
     assert cli.main(["serve", "--host", "0.0.0.0"]) == 0
     assert runs[1][1] == {"host": "0.0.0.0", "port": 8000, "log_level": "info"}

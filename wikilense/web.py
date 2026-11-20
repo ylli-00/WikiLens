@@ -54,6 +54,14 @@ time, their median and range, and whether every run returned the first run's hit
 
 Without ``database``, ``claim_id`` and ``repeat`` a response is as it was without them.
 
+Live fact-check (:mod:`wikilense.factcheck`), off unless ``WIKILENSE_FACTCHECK`` is
+``subscription`` or ``api``: ``GET /api/factcheck`` says whether it is on (the page then shows a
+"Fact-check" button under a free-text search, else one line on how to turn it on), and
+``POST /api/factcheck`` takes the ``/api/search`` parameters without ``sentences`` and
+``repeat``, runs the search again and sends the statement with its first passages to the model
+with the LLM experiment's request: one call, timed apart from the search. It needs the header
+``X-WikiLense-Factcheck: 1`` and refuses ``claim_id`` (free text only).
+
 Errors: invalid parameters are 422 (FastAPI validation, an inconsistent filter pair, a filter
 given with strategy ``none``, an argument ``search`` refuses, a database that is not offered, or
 a ``q`` that is not the picked claim's text), 404 (a claim that is not offered on the database)
@@ -75,13 +83,14 @@ from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 import numpy as np
 import pymysql
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
-from wikilense import __version__, db, picker, search
+from wikilense import __version__, db, factcheck, picker, search
 from wikilense.config import Settings, load_settings
 from wikilense.embedding import Embedder
 from wikilense.evaluate import latency_stats, read_ingest_meta
@@ -253,6 +262,18 @@ INDEX_HTML = """<!DOCTYPE html>
            vertical-align: top; }
   footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line);
            font-size: .9rem; color: var(--muted); }
+  #fc-off { margin: .75rem 0 0; }
+  #fc-panel { margin: 1rem 0; padding: .75rem 1rem; background: var(--panel);
+              border: 1px solid var(--line); border-radius: .5rem; }
+  #fc-panel p { margin: .35rem 0; }
+  #fc-panel button { padding: .45rem 1rem; font: inherit; font-weight: 600; color: #fff;
+                     background: var(--accent); border: 0; border-radius: .35rem; cursor: pointer; }
+  #fc-panel button:disabled { opacity: .6; cursor: wait; }
+  #fc-verdict { font-size: 1.1rem; }
+  #fc-caveats { margin: .35rem 0; padding-left: 1.25rem; }
+  #fc-sources { margin-top: .5rem; font-size: .85rem; }
+  #fc-sources ul { margin: .25rem 0; padding-left: 1.25rem; }
+  #hits li.cited { outline: 2px solid var(--accent); outline-offset: .35rem; border-radius: .2rem; }
 </style>
 </head>
 <body>
@@ -326,6 +347,7 @@ __STRATEGY_OPTIONS__
     <input name="repeat" type="checkbox" value="__PAGE_REPEAT__"> <span id="repeat-text">repeat __PAGE_REPEAT__ times</span></label>
   <button type="submit">Search</button>
 </form>
+<p class="note" id="fc-off" hidden></p>
 
 <section id="claim-box" hidden>
   <h2 id="claim-head"></h2>
@@ -335,6 +357,24 @@ __STRATEGY_OPTIONS__
   <p id="summary"></p>
 </section>
 <p id="status"></p>
+<section id="fc-panel" hidden>
+  <p class="note" id="fc-intro"></p>
+  <p class="note" id="fc-hint" hidden></p>
+  <button type="button" id="fc-button">Fact-check</button>
+  <p id="fc-status" role="status"></p>
+  <div id="fc-result" hidden>
+    <p class="meta" id="fc-statement"></p>
+    <p><strong id="fc-verdict"></strong> <span class="meta" id="fc-asof"></span></p>
+    <p><span class="set-head" id="fc-reason-label"></span> <span id="fc-reason"></span></p>
+    <p class="note" id="fc-nocite" hidden></p>
+    <p class="note" id="fc-reason-note"></p>
+    <p class="note" id="fc-passages" hidden></p>
+    <p id="fc-reliability"></p>
+    <ul class="note" id="fc-caveats"></ul>
+    <p class="meta" id="fc-time"></p>
+    <details id="fc-sources"><summary>Where these figures come from</summary><ul id="fc-source-list"></ul></details>
+  </div>
+</section>
 <ol id="hits"></ol>
 <details id="sql-box" hidden>
   <summary>SQL that ran and its EXPLAIN</summary>
@@ -352,7 +392,10 @@ page titles. A picked claim's marks and summary use the evaluation's definitions
 computed after the timed statement. The interactive API
 documentation is left on so the API can be tried from the browser:
 <a href="__DOCS_URL__">__DOCS_URL__</a> (OpenAPI schema at <a href="__OPENAPI_URL__">__OPENAPI_URL__</a>).
-Model load, query embedding and SQL time are reported separately in the status line.</p>
+Model load, query embedding and SQL time are reported separately in the status line. The live
+fact-check, when the server is set up for it, is <code>POST /api/factcheck</code> with the search's
+parameters (<code>GET /api/factcheck</code> says whether it is on); its model call is timed on its own,
+never in the search timing.</p>
 </footer>
 
 <script>
@@ -385,6 +428,13 @@ Model load, query embedding and SQL time are reported separately in the status l
   var examplesBox = document.getElementById('examples');
   var exampleButtons = document.getElementById('example-buttons');
   var noticeEl = document.getElementById('notice');
+  var fcOff = document.getElementById('fc-off');
+  var fcPanel = document.getElementById('fc-panel');
+  var fcIntro = document.getElementById('fc-intro');
+  var fcHint = document.getElementById('fc-hint');
+  var fcButton = document.getElementById('fc-button');
+  var fcStatus = document.getElementById('fc-status');
+  var fcResult = document.getElementById('fc-result');
 
   var databases = [];
   var examples = [];
@@ -394,6 +444,9 @@ Model load, query embedding and SQL time are reported separately in the status l
   var picked = null;
   var lastBody = null;
   var pageTitles = null;
+  var fc = null;          // GET /api/factcheck: whether the live fact-check is on
+  var lastParams = null;  // the parameters of the search whose hits are on screen
+  var fcSeq = 0;          // raised by every reset, so a reply for an older search is dropped
 
   function el(tag, cls, text) {
     var node = document.createElement(tag);
@@ -502,6 +555,7 @@ Model load, query embedding and SQL time are reported separately in the status l
     query.value = c.text;
     showFreeNote();
     renderClaimList();
+    updateFactcheck();
   }
 
   function formParams() {
@@ -536,6 +590,7 @@ Model load, query embedding and SQL time are reported separately in the status l
       renderHits(lastBody);
     }
     updateUrl(formParams());
+    updateFactcheck();
   }
 
   claimSearch.addEventListener('input', renderClaimList);
@@ -546,6 +601,7 @@ Model load, query embedding and SQL time are reported separately in the status l
   // Editing the query text drops the picked claim: its marks belong to its own text only.
   query.addEventListener('input', function () {
     if (picked && query.value !== picked.text) dropClaim();
+    updateFactcheck();
   });
 
   function loadClaims() {
@@ -622,6 +678,7 @@ Model load, query embedding and SQL time are reported separately in the status l
     body.hits.forEach(function (h, i) {
       var mark = body.marks ? body.marks[i] : null;
       var li = el('li');
+      li.id = 'hit-' + (i + 1);
       var head = el('div', 'head');
       head.appendChild(el('span', 'dist', h.distance.toFixed(4)));
       head.appendChild(el('strong', null, h.title));
@@ -710,6 +767,7 @@ Model load, query embedding and SQL time are reported separately in the status l
       (body.database ? ' from ' + body.database : '') +
       '; embedding ' + t.embed.toFixed(1) + ' ms, ' + sql +
       '; mhnsw_ef_search ' + body.ef_search + ' (' + loaded + ')';
+    updateFactcheck();
   }
 
   form.addEventListener('submit', function (ev) {
@@ -720,12 +778,15 @@ Model load, query embedding and SQL time are reported separately in the status l
     list.replaceChildren();
     box.hidden = true;
     claimBox.hidden = true;
+    lastParams = null;
+    resetFactcheck();
     fetch('/api/search?' + params.toString()).then(function (resp) {
       return resp.json().then(function (body) {
         if (!resp.ok) {
           status.textContent = 'Error ' + resp.status + ': ' + describe(body.detail);
           return;
         }
+        lastParams = params;
         render(body);
       });
     }).catch(function (err) {
@@ -743,6 +804,8 @@ Model load, query embedding and SQL time are reported separately in the status l
     noticeEl.hidden = true;
     var shown = lastBody !== null;
     lastBody = null;
+    lastParams = null;
+    resetFactcheck();
     list.replaceChildren();
     box.hidden = true;
     claimBox.hidden = true;
@@ -752,6 +815,153 @@ Model load, query embedding and SQL time are reported separately in the status l
       else updateUrl(formParams());
     }).catch(function (err) { notice(String(err.message || err)); });
   });
+
+  // --- the live fact-check: off unless the server is set up for it ---------------------------
+  // One POST per click, never automatic; free text only (a picked claim's answer key is on the
+  // page); the passages are those of the search on screen, which the server runs again.
+
+  function looksLikeQuestion(text) {
+    var t = text.trim();
+    if (t.slice(-1) === '?') return true;
+    var m = t.toLowerCase().match(/[a-z]+/);
+    return m !== null && fc.question_words.indexOf(m[0]) !== -1;
+  }
+
+  function resetFactcheck() {
+    fcSeq++;
+    fcResult.hidden = true;
+    fcStatus.textContent = '';
+    Array.prototype.forEach.call(list.children, function (li) { li.classList.remove('cited'); });
+    updateFactcheck();
+  }
+
+  function updateFactcheck() {
+    if (!fc) return;
+    if (!fc.enabled) {
+      fcPanel.hidden = true;
+      fcOff.replaceChildren(document.createTextNode(fc.note + ' '));
+      var link = el('a', null, 'How to turn it on');
+      link.href = fc.docs_link;
+      fcOff.appendChild(link);
+      fcOff.hidden = false;
+      return;
+    }
+    fcOff.hidden = true;
+    var shown = picked === null && lastBody !== null && lastParams !== null &&
+      !lastParams.has('claim_id') && lastBody.hits.length > 0 &&
+      query.value.trim() === (lastParams.get('q') || '').trim();
+    fcPanel.hidden = !shown;
+    if (!shown) return;
+    var name = fc.experiment.model_name;
+    fcIntro.textContent = 'Sends this statement and the first ' +
+      Math.min(fc.passages, lastBody.hits.length) + ' passages below to ' + name +
+      ', with the prompt and settings of the project\\'s LLM experiment: one model call per ' +
+      'click, through ' + (fc.mode === 'api' ? 'the Anthropic API' : 'this machine\\'s Claude ' +
+      'login') + '. It labels statements, not questions.';
+    fcHint.textContent = fc.question_hint;
+    fcHint.hidden = !looksLikeQuestion(query.value);
+  }
+
+  function samePassages(passages) {
+    return passages.every(function (p, i) {
+      return lastBody.hits[i] !== undefined && lastBody.hits[i].chunk_id === p.chunk_id;
+    });
+  }
+
+  function highlightHits(numbers) {
+    Array.prototype.forEach.call(list.children, function (li) { li.classList.remove('cited'); });
+    numbers.forEach(function (n) {
+      var li = document.getElementById('hit-' + n);
+      if (li) li.classList.add('cited');
+    });
+    var first = document.getElementById('hit-' + numbers[0]);
+    if (first) first.scrollIntoView({behavior: 'smooth', block: 'center'});
+  }
+
+  function renderVerdict(b) {
+    document.getElementById('fc-statement').textContent = 'Statement checked: "' + b.statement + '"';
+    document.getElementById('fc-verdict').textContent = b.verdict_text;
+    document.getElementById('fc-asof').textContent = '(' + b.judged_as_of + ')';
+    document.getElementById('fc-reason-label').textContent = b.reason_label + ':';
+    var same = samePassages(b.passages);
+    var reasonEl = document.getElementById('fc-reason');
+    reasonEl.replaceChildren();
+    b.reason_parts.forEach(function (p) {
+      if (p.passages && p.passages.length && same) {
+        var a = el('a', 'cite', p.text);
+        a.href = '#hit-' + p.passages[0];
+        a.title = 'Show the cited hit';
+        a.addEventListener('click', function (ev) { ev.preventDefault(); highlightHits(p.passages); });
+        reasonEl.appendChild(a);
+      } else {
+        reasonEl.appendChild(document.createTextNode(p.text));
+      }
+    });
+    var noCite = document.getElementById('fc-nocite');
+    var unknown = b.cited_unknown.length ?
+      'The reason also cites ' + b.cited_unknown.map(function (n) { return '[' + n + ']'; }).join(', ') +
+      ', which names no passage that was sent.' : '';
+    noCite.textContent = [b.no_citation || '', unknown].filter(Boolean).join(' ');
+    noCite.hidden = noCite.textContent === '';
+    document.getElementById('fc-reason-note').textContent = b.reason_note;
+    var passagesEl = document.getElementById('fc-passages');
+    passagesEl.textContent = same ? '' : 'The fact-check searched again and got other passages ' +
+      'than the hits shown; the numbers in the reason refer to: ' + b.passages.map(function (p) {
+        return '[' + p.rank + '] ' + p.title + (p.section_path ? ' > ' + p.section_path : '');
+      }).join('; ') + '.';
+    passagesEl.hidden = same;
+    var lines = b.reliability_lines;
+    document.getElementById('fc-reliability').textContent = lines.verdict + ' ' + lines.overall;
+    var caveats = document.getElementById('fc-caveats');
+    caveats.replaceChildren();
+    [lines.limit + ' ' + lines.lower_end].concat(b.caveats, b.question_hint ? [b.question_hint] : [])
+      .forEach(function (text) { caveats.appendChild(el('li', null, text)); });
+    var t = b.timing_ms;
+    document.getElementById('fc-time').textContent = 'Model call ' +
+      (t.model_call / 1000).toFixed(1) + ' s, timed on its own and not part of the search timing ' +
+      'above (its own search for the passages: embedding ' + t.embed.toFixed(1) + ' ms, SQL ' +
+      t.sql.toFixed(1) + ' ms).';
+    var sources = document.getElementById('fc-source-list');
+    sources.replaceChildren(el('li', null, 'Prompt, model, effort and retrieval settings: ' +
+      b.experiment.source + ' (prompt ' + b.experiment.prompt_id + ', effort ' + b.experiment.effort + ')'));
+    var r = b.reliability;
+    [r.per_verdict[b.verdict], r.overall, r.supported_refuted, r.missed_gold_page].forEach(function (f) {
+      sources.appendChild(el('li', null, f.source + (f.missing ? ' (missing)' : '')));
+    });
+    fcResult.hidden = false;
+  }
+
+  fcButton.addEventListener('click', function () {
+    if (!lastParams) return;
+    var params = new URLSearchParams(lastParams);
+    ['sentences', 'repeat', 'claim_id'].forEach(function (name) { params.delete(name); });
+    var headers = {};
+    headers[fc.header] = fc.header_value;
+    fcButton.disabled = true;
+    resetFactcheck();
+    var seq = fcSeq;
+    fcStatus.textContent = 'Asking ' + fc.experiment.model_name + ' (one model call)...';
+    fetch('/api/factcheck?' + params.toString(), {method: 'POST', headers: headers}).then(function (resp) {
+      return resp.json().then(function (body) {
+        if (seq !== fcSeq || lastBody === null) return;  // another search is on screen now
+        if (!resp.ok) {
+          var t = body.timing_ms && body.timing_ms.model_call !== undefined ?
+            ' (model call ' + (body.timing_ms.model_call / 1000).toFixed(1) + ' s)' : '';
+          fcStatus.textContent = describe(body.detail) + t;
+          return;
+        }
+        fcStatus.textContent = '';
+        renderVerdict(body);
+      });
+    }).catch(function (err) {
+      if (seq === fcSeq) fcStatus.textContent = 'Request failed: ' + err;
+    }).then(function () { fcButton.disabled = false; });
+  });
+
+  getJSON('/api/factcheck').then(function (body) {
+    fc = body;
+    updateFactcheck();
+  }).catch(function () { /* an older server without the fact-check: nothing to show */ });
 
   // --- a link with the form's parameters fills the form and runs the search ----------------
   // (/?q=...&k=3&category=..., /?database=...&claim_id=...&repeat=5), so a search can be
@@ -1522,6 +1732,133 @@ def api_pages(
     return {"database": name, "n_pages": len(titles), "titles": titles}
 
 
+def api_factcheck_status(request: Request) -> dict[str, Any]:
+    """Return whether the live fact-check is on, the note when it is not, and the experiment's
+    settings it uses (never the API key)."""
+    body = request.app.state.fact_checker.status()
+    if body["enabled"] and not _addressed_to_this_machine(request):
+        body.update(enabled=False, note=factcheck.LOOPBACK_NOTE)
+    return body
+
+
+def _addressed_to_this_machine(request: Request) -> bool:
+    """Return True when the request's host, and its Origin when it sends one, name this machine
+    (:data:`factcheck.LOOPBACK_HOSTS`)."""
+    if (request.url.hostname or "") not in factcheck.LOOPBACK_HOSTS:
+        return False
+    origin = request.headers.get("origin")
+    return origin is None or (urlsplit(origin).hostname or "") in factcheck.LOOPBACK_HOSTS
+
+
+def _filter_given(value: Any) -> bool:
+    """Return True when a filter parameter holds a value, as ``api_search`` reads it (an empty
+    string is none, and so is a list of blank titles)."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value != ""      # as api_search: only the empty string is no filter
+    if isinstance(value, list):
+        return any(str(v).strip() for v in value)
+    return True
+
+
+def factcheck_differences(
+    state: Any, params: dict[str, Any], body: dict[str, Any], experiment: factcheck.Experiment
+) -> list[str]:
+    """Return how the reader's search differs from the experiment's retrieval, one phrase each:
+    the database, k, the strategy, any filter, ``mhnsw_ef_search`` and the embedding model."""
+    out = []
+    target = body.get("database") or demo_database(state)
+    if target != experiment.database:
+        out.append(f"database {target} instead of {experiment.database}")
+    if params["k"] != experiment.k:
+        out.append(f"k {params['k']} instead of {experiment.k}")
+    if params["strategy"] != experiment.strategy:
+        out.append(f"strategy {params['strategy']} instead of {experiment.strategy}")
+    given = [name for name, _field in API_FILTER_FIELDS if _filter_given(params.get(name))]
+    if given:
+        out.append("filters " + ", ".join(given) + " (the experiment used none)")
+    if body["ef_search"] != experiment.ef_search:
+        out.append(f"mhnsw_ef_search {body['ef_search']} instead of {experiment.ef_search}")
+    model = state.settings.embedding_model
+    if model != experiment.embedding_model:
+        out.append(f"embedding model {model} instead of {experiment.embedding_model}")
+    return out
+
+
+#: The ``/api/search`` parameters the fact-check does not take: it needs no sentence rows, and it
+#: runs the search once.
+FACTCHECK_DROPPED: tuple[str, ...] = ("sentences", "repeat")
+
+
+def api_factcheck(request: Request, **params: Any) -> Any:
+    """Fact-check the statement ``q`` with the passages of the search it describes: one model call.
+
+    The parameters are those of ``/api/search`` without ``sentences`` and ``repeat`` (the
+    signature is set below from :func:`api_search`'s, so the validation is the same). The search
+    runs again through :func:`api_search` and its first passages go to the model with the
+    experiment's request (:mod:`wikilense.factcheck`). Refused without a call: 403 when the
+    fact-check is off, the request lacks the header :data:`factcheck.HEADER`, or its host or
+    Origin is not this machine (:data:`factcheck.LOOPBACK_HOSTS`), 422 for a
+    ``claim_id`` (free text only), a statement over the length cap or a search without hits, 429
+    while another fact-check runs; the search's own errors are as on ``/api/search``. A call
+    without a verdict answers 502, 503 or 504 with a plain ``detail``. The response holds the
+    verdict, the reason and its cited passage numbers, the reliability figures with their sources,
+    the caveats, and ``timing_ms`` with the search's ``embed`` and ``sql`` apart from the
+    ``model_call``.
+    """
+    state = request.app.state
+    checker: factcheck.FactChecker = state.fact_checker
+    if not checker.enabled:
+        raise HTTPException(status_code=403, detail=checker.off_detail())
+    if params.get("claim_id") is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="the fact-check is for free text only: a picked benchmark claim's answer key "
+            "is already on the page; leave out claim_id",
+        )
+    if request.headers.get(factcheck.HEADER) != factcheck.HEADER_VALUE:
+        raise HTTPException(
+            status_code=403,
+            detail=f"send the header {factcheck.HEADER}: {factcheck.HEADER_VALUE} (it keeps other "
+            "websites open in a browser from making calls on this server)",
+        )
+    if not _addressed_to_this_machine(request):
+        raise HTTPException(status_code=403, detail=factcheck.LOOPBACK_NOTE)
+    statement = str(params["q"]).strip()
+    if len(statement) > factcheck.MAX_STATEMENT_CHARS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"the statement has {len(statement):,} characters; the fact-check takes at "
+            f"most {factcheck.MAX_STATEMENT_CHARS:,}",
+        )
+    body = api_search(request, **params)
+    assert checker.experiment is not None
+    hits = [search.Hit(**hit) for hit in body["hits"]]
+    differences = factcheck_differences(state, params, body, checker.experiment)
+    search_timing = {"embed": body["timing_ms"]["embed"], "sql": body["timing_ms"]["sql"]}
+    target = body.get("database") or demo_database(state)
+    try:
+        result = checker.run(statement, hits, differences)
+    except factcheck.FactCheckRefused as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except factcheck.FactCheckFailed as exc:
+        content = {**exc.body, "database": target,
+                   "timing_ms": {**search_timing, **exc.body["timing_ms"]}}
+        return JSONResponse(status_code=exc.status_code, content=content)
+    result["database"] = target
+    result["timing_ms"] = {**search_timing, **result["timing_ms"]}
+    return result
+
+
+api_factcheck.__signature__ = inspect.signature(api_search).replace(  # type: ignore[attr-defined]
+    parameters=[
+        p for name, p in inspect.signature(api_search).parameters.items()
+        if name not in FACTCHECK_DROPPED
+    ]
+)
+
+
 def _parameter_names(endpoint: Callable[..., Any]) -> tuple[str, ...]:
     """Return an endpoint's query parameter names, in signature order (``request`` excluded)."""
     return tuple(name for name in inspect.signature(endpoint).parameters if name != "request")
@@ -1530,6 +1867,8 @@ def _parameter_names(endpoint: Callable[..., Any]) -> tuple[str, ...]:
 #: The query parameters ``/api/search`` accepts, in signature order (``request`` excluded).
 API_PARAMETER_NAMES: tuple[str, ...] = _parameter_names(api_search)
 API_PARAMETERS = frozenset(API_PARAMETER_NAMES)
+#: The query parameters ``POST /api/factcheck`` accepts.
+FACTCHECK_PARAMETER_NAMES: tuple[str, ...] = _parameter_names(api_factcheck)
 
 
 def rejecting_unknown(names: Sequence[str]) -> Callable[[Request], None]:
@@ -1568,6 +1907,7 @@ def create_app(
     warm_up: bool = True,
     offer_s1: bool = True,
     claim_files: Sequence[Path] = picker.CLAIM_FILES,
+    fact_checker: factcheck.FactChecker | None = None,
 ) -> FastAPI:
     """Return the FastAPI app serving ``GET /`` (the page) and ``GET /api/search`` (JSON).
 
@@ -1581,7 +1921,9 @@ def create_app(
     :data:`SCALED_DATABASE` when it is loaded; ``claim_files`` are the picker's claim files. The
     settings, the embedder, the database name, the S1 probe's finding and the claim catalogs
     (with their databases' ingest stamps) are kept on ``app.state``. The Swagger page (:data:`DOCS_URL`) and the schema
-    (:data:`OPENAPI_URL`) are enabled.
+    (:data:`OPENAPI_URL`) are enabled. ``fact_checker`` defaults to
+    ``factcheck.build_factchecker(settings)``, which is off unless ``settings.factcheck`` says
+    otherwise; tests pass one with a fake backend.
     """
     if settings is None:
         settings = load_settings()
@@ -1608,6 +1950,9 @@ def create_app(
     app.state.s1_probe = _UNPROBED
     app.state.claims = None
     app.state.catalogs = {}
+    app.state.fact_checker = (
+        fact_checker if fact_checker is not None else factcheck.build_factchecker(settings)
+    )
     app.state.model_load_ms = round(warm_up_embedder(embedder), 3) if warm_up else None
     app.add_api_route("/", index, response_class=HTMLResponse, include_in_schema=False)
     app.add_api_route(
@@ -1621,6 +1966,7 @@ def create_app(
         ("/api/databases", api_databases, "List the offered databases and the examples"),
         ("/api/claims", api_claims, "List the claims the picker offers on a database"),
         ("/api/pages", api_pages, "List a database's page titles"),
+        ("/api/factcheck", api_factcheck_status, "Say whether the live fact-check is on"),
     ):
         app.add_api_route(
             path,
@@ -1629,4 +1975,12 @@ def create_app(
             dependencies=[Depends(rejecting_unknown(_parameter_names(endpoint)))],
             summary=summary,
         )
+    app.add_api_route(
+        "/api/factcheck",
+        api_factcheck,
+        methods=["POST"],
+        dependencies=[Depends(rejecting_unknown(FACTCHECK_PARAMETER_NAMES))],
+        summary="Fact-check a typed statement with the passages of its search (one model call)",
+        response_model=None,
+    )
     return app

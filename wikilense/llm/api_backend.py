@@ -469,7 +469,14 @@ class AnthropicApiBackend:
         thinking_display: str = "omitted",
         max_tokens: int | None = None,
         client_factory: Any = None,
+        api_key: str | None = None,
+        rate_limit_attempts: int = RATE_LIMIT_MAX_ATTEMPTS,
     ) -> None:
+        """``api_key`` is used instead of reading ``env_file`` (the web page's fact-check passes
+        the key it resolved; the runner never does). It is kept only on the instance.
+        ``rate_limit_attempts`` is the number of 429 answers after which one call gives up;
+        each earlier one is waited out and the request sent again (the web page's fact-check
+        takes 1: the first 429 ends the call)."""
         if max_usd is None or not max_usd > 0:
             raise ApiBackendError("--max-usd is required for the API backend (a positive US$ cap)")
         if cache_ttl not in ("5m", "1h", "off"):
@@ -487,7 +494,8 @@ class AnthropicApiBackend:
         self.max_tokens = max_tokens
         self.gate = RateGate()
         self._client_factory = client_factory
-        self._key: str | None = None
+        self._key: str | None = api_key
+        self.rate_limit_attempts = int(rate_limit_attempts)
         self._local = threading.local()
         self._active: set[Any] = set()
         self._active_lock = threading.Lock()
@@ -776,7 +784,7 @@ class AnthropicApiBackend:
                     entry["outcome"] = "429"
                     attempt -= 1
                     rate_limited += 1
-                    if rate_limited >= RATE_LIMIT_MAX_ATTEMPTS:
+                    if rate_limited >= self.rate_limit_attempts:
                         last = {"status": "error", "error_kind": "rate_limit",
                                 "error": f"429 {rate_limited} times: per-minute limits"}
                         break
