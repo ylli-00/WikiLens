@@ -161,8 +161,8 @@ RAG, 20 no passages, drawn at random with a fixed seed). In 16 of the 40 gold ca
 doubtful: the text Haiku saw settles the claim the way Haiku said". This is a reviewed sample,
 not a measurement over all claims, and the cases were rated by Claude Opus 5.5 agents, not by a
 person: two rated each case independently, they agreed on the main reason in 94 of 100, and a
-third agent settled the 9 cases where they disagreed. An author checked 10 of the cases, picked
-by a hash rule, without seeing the agents' ratings: [pending owner check].
+third agent settled the 9 cases where they disagreed. No person has checked their ratings, so how
+often a person would agree with them is not known.
 
 ## 5. The supported and refuted claims
 
@@ -301,9 +301,11 @@ pair of runs, the SDs for both claim counts and the accuracy differences between
   that mention FEVEROUS, a host where its data is published, or a label next to the word
   "Verdict"; they are kept in the results.
 - **Today's web against December 2020.** On 255 supported/refuted claims web search gave the
-  opposite label (148 supported claims answered REFUTES, 107 refuted ones SUPPORTS). An author
-  checked 40 of them, picked by a hash rule, against the Wikipedia page versions of December 2020:
-  [pending owner check].
+  opposite label (148 supported claims answered REFUTES, 107 refuted ones SUPPORTS). Some may be
+  facts that changed after 2020, where web search answered for today instead of for December 2020
+  as the prompt asks, some may be wrong FEVEROUS labels, and the rest are the model's own errors.
+  None was checked against the December 2020 page versions, so the size of each group is not
+  known. All 255 count as wrong answers in the results above.
 
 ## 10. Cost and time
 
@@ -361,8 +363,10 @@ pair of runs, the SDs for both claim counts and the accuracy differences between
 - One model, Claude Haiku 5.5, at one effort.
 - One prompt per condition, not tuned.
 - The time gap: the labels describe Wikipedia in December 2020; the prompt asks for that date, but
-  the web shows today's pages (section 9).
-- The NOT ENOUGH INFO label, made without outside knowledge (section 4).
+  the web shows today's pages. How many of web search's 255 opposite answers come from it was not
+  checked (section 9).
+- The NOT ENOUGH INFO label, made without outside knowledge (section 4). The audit of those
+  answers was done by Claude agents only, and no person checked its ratings.
 - Outside knowledge is allowed by design, so no condition tests reading alone.
 - Contamination ([section 11](#11-contamination)).
 - RAG was tested where retrieval is strongest: the embedding model was trained on Wikipedia and
