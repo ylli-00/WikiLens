@@ -169,7 +169,7 @@ personal details; `test_docs.py` checks the README, every link and anchor, and t
 | `Makefile` | `make setup` (a Python check, `.env` with generated passwords, MariaDB, the venv, the ingest; `CPU=1` for the pinned CPU-only set), `test`, `lint`, `eval`, `serve`, `examples`, `experiments`, `fetch-s1` and `load-s1` (the scaled database S1 from its release file), `down`; `make -n <target>` prints the commands. |
 | `docker-compose.yml`, `.env.example` | MariaDB 11.8 as `wikilense-mariadb` on `127.0.0.1:3306`, with a 512 MB HNSW cache and a health check; the template for the ignored `.env`. |
 | `pyproject.toml`, `requirements*` | The package, the `wikilense` command, pytest markers, ruff; version ranges, and exact versions in `requirements.lock` (the GPU build behind `results/`) and `requirements-cpu.lock` (CPU only, per-platform PyTorch lines). |
-| `.github/workflows/ci.yml` | On every push to `main` and every pull request: MariaDB 11.8 as a service, the CPU lock, ruff and the whole suite. |
+| `.github/workflows/ci.yml` | On every push to `main` and every pull request: MariaDB 11.8 as a service, the CPU lock, the Anthropic SDK of `requirements-llm.txt`, ruff and the whole suite. |
 | `analysis/feverous/` | How many FEVEROUS claims need several pages (`feverous_analysis.py`, its outputs, the report `FEVEROUS_ANALYSIS.md`); `scripts/scaled_breakdown.py` reads its `feverous_claims.csv`. |
 | `LICENSE`, `.gitignore` | The MIT licence; what git leaves out (the venv, caches, `.env`, the raw downloads). |
 
@@ -300,7 +300,8 @@ There are 917 tests of three kinds, told apart by pytest markers.
 
 `make test` runs all of them, one session at a time, since two would reset the same
 test database. CI (`.github/workflows/ci.yml`) runs ruff and the suite with MariaDB 11.8 as a
-service and `requirements-cpu.lock`; `WIKILENSE_REQUIRE_DB` and `WIKILENSE_REQUIRE_MODEL` turn a
+service, `requirements-cpu.lock` and `requirements-llm.txt` (the Anthropic SDK, which the
+API-backend and fact-check tests import); `WIKILENSE_REQUIRE_DB` and `WIKILENSE_REQUIRE_MODEL` turn a
 skip into a failure, so a service that did not come up cannot give a green run.
 
 ## 8. How the code covers the four criteria

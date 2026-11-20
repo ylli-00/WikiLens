@@ -1,5 +1,7 @@
 # Lint and run the whole test suite against a real MariaDB 11.8.9 on every push and pull request.
 # Dependencies are installed from requirements-cpu.lock, so the lock file is exercised each run.
+# requirements-llm.txt adds the pinned Anthropic SDK, which the API-backend and fact-check tests
+# import; they use fake keys and a fake API or backend, so no key is needed and no call is made.
 name: CI
 
 on:
@@ -54,10 +56,11 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-bge-small-en-v1.5
 
-      - name: Install the pinned CPU-only dependencies and the package
+      - name: Install the pinned CPU-only dependencies, the Anthropic SDK and the package
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-cpu.lock
+          pip install -r requirements-llm.txt
           pip install -e .
 
       - name: Create the test database
