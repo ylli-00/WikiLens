@@ -109,7 +109,8 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `search.py` | The four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment, `ef_search` set per call and restored. | the database (read only) | `db`, `config` | `search_statement` |
 | `evaluate.py` | Recall and latency: ground truth from `claim_evidence`, pure metric functions, one untimed and `repeats` timed passes per claim and k, the JSON and Markdown writer. | the database → `<out>/<name>.json/.md` | `db`, `search` | `evaluate` |
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`): argument checks, one-line errors, exit codes 0, 1, 2 and 130, the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
-| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings, and with `claim_id`, `database` or `repeat` also the claim's marks and summary, the database that answered and the repeated timings; `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `evaluate`, `embedding`; FastAPI | `api_search` |
+| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings, and with `claim_id`, `database` or `repeat` also the claim's marks and summary, the database that answered and the repeated timings; `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `GET /api/factcheck` says whether the live fact-check is on and `POST /api/factcheck` runs it (the search again, then one model call); `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `factcheck`, `evaluate`, `embedding`; FastAPI | `api_search` |
+| `factcheck.py` | The page's live fact-check, off unless `WIKILENSE_FACTCHECK` is `subscription` or `api`: reads the LLM experiment's RAG run record and prompt set (refused if the hash differs), builds the request with the runner's `Runner.request`, makes one call per click through the CLI or API backend, splits the reason's citations, and reads the reliability figures from `results/llm/llm_results.json`. | `results/llm/runs.json`, `results/llm/llm_results.json`, `wikilense/llm/prompts/fact_check_v1/` | `llm.runner`, `llm.cli_backend`, `llm.api_backend`, `llm.claims`, `llm.retrieval` | `FactChecker.run` |
 | `picker.py` | The page's claim picker: reads both claim files, decides which claims a database offers (gold pages in `page`, gold sentences resolved by `ingest.resolve_element`), builds their ground truth with `evaluate.ground_truth_from_rows`, and computes a search's marks and summary with the evaluation's metric functions; the ready-made examples and the rule that chose them. | `data/corpus/claims.jsonl`, `data/scaled/claims_3000.jsonl`, the database (read only) | `corpus`, `evaluate`, `ingest`, `search` | `build_catalog` |
 
 `wikilense/llm/` is the package of the LLM fact-checker extension, with the `scripts/llm_*.py` scripts and the `tests/test_llm_*.py` tests; it is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
@@ -287,9 +288,9 @@ The reasons for the main choices:
 
 ## 7. Testing and CI
 
-There are 762 tests of three kinds, told apart by pytest markers.
+There are 860 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (645) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (743) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
 - `db` tests (111) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.

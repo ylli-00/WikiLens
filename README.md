@@ -201,8 +201,7 @@ table and the method; the measurements are on S1 unless a line says otherwise.
 
 We looked for the cases where MariaDB is the worse home for the vectors. The first two are measured
 on S1 ([results/scaled/run1/s1/separate_index.md](results/scaled/run1/s1/separate_index.md)); the
-others compare MariaDB's documentation with a dedicated store's. We did not measure a dedicated
-vector store.
+others compare MariaDB's documentation with a dedicated store's. We did not measure a dedicated vector store.
 
 1. **Latency, while the corpus fits in memory.** An exact NumPy scan of the 132,359 vectors held in
    the application takes 10.19 ms, or 11.06 ms once the hit rows are fetched from MariaDB, which is
@@ -244,6 +243,7 @@ On three classes RAG is ahead of web search by 9.6 points (95% interval 8.0 to 1
 On the supported/refuted claims it is ahead of web search by 1.7 points (0.1 to 3.3), a little above two rerun standard deviations (1.3), and level with gold.
 Most of the three-class gap is NOT ENOUGH INFO, a label FEVEROUS's annotators gave from December 2020 Wikipedia without outside
 knowledge: web search gives that answer least often and gets only 20.1% of the NOT ENOUGH INFO claims right. [docs/LLM_EXTENSION.md](docs/LLM_EXTENSION.md) has the rest.
+The web page can run this RAG check live on a typed statement, with the same prompt, when the server is [set up for it](docs/SETUP.md#turn-on-the-live-fact-check).
 
 ## Setup and platforms
 
@@ -259,7 +259,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (762 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (860 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs the 53.5 GB FEVEROUS
@@ -338,7 +338,7 @@ claims, and [results/](results/) every experiment as JSON and Markdown, the scal
 EVALUATION, DESIGN (every decision) and ARCHITECTURE (a beginner's guide to the code).
 [analysis/](analysis/) is the earlier FEVEROUS analysis that chose the benchmark, and
 [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
-762 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
+860 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
 `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team

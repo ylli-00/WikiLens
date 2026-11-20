@@ -474,6 +474,46 @@ evidence ([EXAMPLES.md](EXAMPLES.md) shows it).
   lowest such hash: 58230. `picker.pick_examples` is the rule; applied to the real catalogs it gives
   these ids.
 
+**The live fact-check (`factcheck.py`, `web.py`).** Under a free-text search the page can send
+the statement and its first 5 passages to Haiku ([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)).
+- It is off by default. A call needs a Claude login or an API key, and it sends the reader's text
+  to an outside service. A reader or grader without either must get the page exactly as before,
+  and `make setup` and the tests stay free of model calls. Only `WIKILENSE_FACTCHECK` turns it on.
+  An API key in `.env` does not, because the key may be there for the runner's API route, and
+  calls through it are billed per token.
+- It sends the experiment's prompt with the experiment's settings. The page shows how often each
+  verdict was right in the experiment, and those figures describe one request: `fact_check_v1`,
+  Haiku at effort high, the top 5 passages. A different prompt would get different answers, and
+  the figures would no longer apply. That includes a longer reason, or dropping "as of December
+  2020". So the page reads every part of the request from the experiment's files: the settings
+  from the RAG run's record in `results/llm/runs.json` and the prompt set from its folder. A hash
+  that differs from the recorded one keeps the fact-check off. `Runner.request` builds the
+  request, and the backend's own code parses the answer. The server runs the search again and
+  sends the passages MariaDB returns; the browser sends only the statement and the search
+  settings.
+- It is for free text only. A picked benchmark claim already shows its answer key, so a live
+  verdict would add a model call and no information. The experiment already reports the model
+  against the key on those claims.
+- One click is one call. The backend gets one attempt (the runner allows four) and a 60-second
+  limit. On the API route a rate limit ends the call too, where the runner waits it out. The
+  experiment's slowest call in this condition took 16.5 s. A failure shows a plain message in
+  place of a verdict. The call is timed apart from the search, so the page's search timing never
+  includes it.
+- The runner's stop rules apply. The runner stops a whole run on a sign of paid extra usage, a
+  five-minute cache write, the API spending cap, or a fatal result: a login or key problem, a
+  wrong model served, unexpected tools. On the page, each of these turns the fact-check off until
+  the server restarts. The runner's stop at 80% of a usage window does not apply here: a click is
+  one call by a person, and a spent window answers with a plain message.
+- Two rules keep a website open in the same browser from making calls on this machine's login or
+  key.
+  - `POST /api/factcheck` needs the header `X-WikiLense-Factcheck: 1`. A browser sends a custom
+    header to another site only after a CORS preflight, which this server never answers.
+  - The fact-check answers only requests whose host, and whose Origin when there is one, is
+    127.0.0.1, localhost or ::1. A page that rebinds its own name to 127.0.0.1 is same-origin
+    with the server and could send the header, but it still sends its own name as the host.
+  - A server started with `--host 0.0.0.0` therefore offers the search to the network, but not
+    the model calls.
+
 ## Page metadata and the four filters
 
 The four metadata filters are: only articles in this category, longer than this, edited since that

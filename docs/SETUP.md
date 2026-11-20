@@ -124,6 +124,44 @@ by git), `make serve` starts the web page, `make examples` runs the ten examples
 reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
 deletes the data volume.
 
+## Turn on the live fact-check
+
+The web page can show a "Fact-check" button under a free-text search. It sends the statement and
+its first 5 passages to Claude Haiku with the LLM experiment's prompt, and shows the verdict, the
+model's reason and how often that verdict was right in the experiment
+([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)). The button is off by default.
+
+One setting turns it on: `WIKILENSE_FACTCHECK`, in `.env` or the environment, set to
+`subscription` or `api`. Restart `make serve` after changing it. At start-up the server prints a
+line beginning `fact-check:` that says whether the button is on, or why it cannot run.
+
+- Through a Claude subscription, with `WIKILENSE_FACTCHECK=subscription`:
+  - Needs the Claude Code CLI, logged in to a Claude subscription: run `claude` once and log in.
+  - The server uses `claude` on the PATH; `WIKILENSE_CLAUDE_BIN=/path/to/claude` names another
+    binary.
+  - At start-up the server checks the login with `claude auth status`, which makes no model call.
+    It refuses a CLI logged in with an API key, so this route never bills per token.
+  - Each click counts against the subscription's usage limits.
+- Through the Anthropic API, with `WIKILENSE_FACTCHECK=api`:
+  - Install the SDK by hand with `.venv/bin/pip install -r requirements-llm.txt`; `make setup`
+    does not install it.
+  - Set `ANTHROPIC_API_KEY` in the environment or in `.env`. The environment wins.
+  - Each click is billed per token. The server stops sending after US$1.00 at list price per
+    start.
+  - The key stays on the server. It never reaches the browser, a log line or a response.
+
+A key in `.env` turns nothing on by itself: only `WIKILENSE_FACTCHECK` does.
+
+The server still binds to 127.0.0.1 by default. The fact-check answers only requests addressed to
+127.0.0.1 or localhost, so with `wikilense serve --host 0.0.0.0` the search is open to the network
+but the button is not. `POST /api/factcheck` also needs the header `X-WikiLense-Factcheck: 1`,
+which the page sends. Together, the two rules keep another website open in the same browser from
+making calls.
+
+Each click is one model call with no retry, not even after a rate limit on the API route, and it
+times out after 60 seconds. Some calls turn the button off until the server restarts: one that
+shows a sign of paid extra usage, and one that ends with a login, key or wrong-model error.
+
 ## Get the scaled database (S1)
 
 `wikilense_s1` is the database behind the README's headline results: 7,686 Wikipedia pages (the

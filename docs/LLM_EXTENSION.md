@@ -411,3 +411,46 @@ picked lines of `claims_3000.jsonl`, unchanged, the six groups in alphabetical o
 `.venv/bin/pip install -r requirements-llm.txt` (`make setup` does not), put `ANTHROPIC_API_KEY`
 in `.env`, and add `--backend api --max-usd <limit>` to the commands above; the run stops when its
 list-price spend reaches the limit. The reported runs did not use it.
+
+## 14. On the web page
+
+The web page (`make serve`) can run the RAG fact-check live on a statement the reader types. It is
+off unless the server is set up for it ([SETUP.md](SETUP.md#turn-on-the-live-fact-check)). Until
+then the page has one line saying how to turn it on, and no button.
+
+What it sends is the RAG condition's request, unchanged:
+- the system prompt, the user template and the schema of `fact_check_v1`, with Haiku at effort
+  high;
+- the statement and the first 5 passages of the reader's own search, which the server runs again,
+  rendered by the runner's own code (`Runner.request`).
+
+The server reads these settings from the RAG run's record in `results/llm/runs.json`. If the
+prompt set's hash differs from the recorded one, the fact-check stays off and says why. One click
+is one model call, with no retry and no web search.
+
+What it shows:
+- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy". The prompt
+  asks for that date, so a statement about later events is judged as of 2020.
+- Haiku's reason, in full. Each passage number it cites, such as [2], links to that hit and
+  highlights it. If it cites none, the page says "no passage cited: from the model's own
+  knowledge". The reason is the model's own wording and can be wrong even when the verdict is
+  right.
+- How often that verdict was right in this experiment (RAG, all 3,000 claims): Supported 71.9%,
+  Refuted 67.8%, Not enough info 75.1%. These are the per-label precisions in
+  `results/llm/llm_results.json`. Next to them, the overall accuracy of 70.9% and the 83.6% on the
+  supported and refuted claims (sections 3 and 5). The page reads every figure from that file
+  when the server starts. If the file lacks a figure, the page says so and shows no number.
+
+Where the figures stop applying:
+- They were measured on benchmark claims whose evidence was in the database. A typed statement may
+  have none there, especially on the 100-page demo, so expect lower. As the lower end, the page
+  shows the accuracy on the 57 claims whose five passages held no gold page: 57.9% (33 of 57,
+  interval 45.0 to 69.8; section 8).
+- They were measured with the experiment's retrieval: S1, k 5, strategy `inline`,
+  `mhnsw_ef_search` 100, no filter. When the reader's search differs (the demo database, another
+  k, a filter, another strategy or another `ef_search`), the page says so.
+- They were measured through the Claude Code CLI 2.1.322 on a subscription. With the API route
+  the request is the same, but that route was never measured, and the page says so. With another
+  CLI version the page names both versions.
+- The button is for free text only. It is hidden while a benchmark claim is picked, because that
+  claim's answer key is already on the page.
