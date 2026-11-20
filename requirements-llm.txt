@@ -1,0 +1,3 @@
+# The Anthropic SDK for the LLM fact-checker's optional API backend (scripts/llm_run.py --backend api).
+# Installed by hand: .venv/bin/pip install -r requirements-llm.txt; make setup does not install it.
+anthropic==0.121.0

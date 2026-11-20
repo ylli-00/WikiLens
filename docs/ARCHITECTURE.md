@@ -111,7 +111,7 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`): argument checks, one-line errors, exit codes 0, 1, 2 and 130, the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
 | `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings; `/docs` is the API page. | the database (read only) | `db`, `search`, `embedding`; FastAPI | `api_search` |
 
-`wikilense/llm/` is the package of the LLM fact-checker extension, with the `scripts/llm_*.py` scripts and the `tests/test_llm_*.py` tests; it is documented separately.
+`wikilense/llm/` is the package of the LLM fact-checker extension, with the `scripts/llm_*.py` scripts and the `tests/test_llm_*.py` tests; it is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
 
 ### `sql/`
 
@@ -278,9 +278,9 @@ The reasons for the main choices:
 
 ## 7. Testing and CI
 
-There are 634 tests of three kinds, told apart by pytest markers.
+There are 647 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (550) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (563) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
 - `db` tests (78) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.

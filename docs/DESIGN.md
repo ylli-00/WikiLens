@@ -18,7 +18,7 @@ run, which the README and `docs/EVALUATION.md` quote.
 Every file and what it does is listed in [ARCHITECTURE.md](ARCHITECTURE.md) ("File by file");
 `sql/schema.sql` is the single source of truth for the DDL, and `db.apply_schema()` executes it.
 The scaled run adds `scripts/scaled_*.py` and `results/scaled/`. The LLM fact-checker extension
-is in `wikilense/llm/` and is documented separately.
+is in `wikilense/llm/` and is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
 
 Rules for all code: Python 3.10+, the standard library where it is enough, type hints, docstrings
 that say what a function returns, no SQL built by string formatting (parameters only, and

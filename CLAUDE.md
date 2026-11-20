@@ -90,7 +90,7 @@ queries. The corpus is the 100 pages / 75 claims described below; the decisions 
   - Done on 2026-10-22: `data/corpus/page_meta.jsonl` (`scripts/fetch_page_meta.py`), the `category` and `page_category` tables, `page.revision_id` and `page.last_edited`, the filters `--category`, `--edited-since` and `--edited-before`, the experiment groups `uncommitted` and `planner`, and `scripts/make_charts.py`. docs/DESIGN.md, "Page metadata and the four filters", has the decisions, and docs/VECTOR_INDEX.md and `results/planner_choices.md` the measurements.
 - **Owner's decision (2026-09-22), superseded by the evaluation:** the results and the README were called drafts and the 75 claims a development set, to be replaced in a next phase. Since 27 October the 75-claim set and the settings are fixed; a larger claim set would be a new project phase, not a correction.
 - **Since then:** the scaled run (see "The scaled run" above) picked 3,000 claims and scaled the
-  corpus; the LLM fact-checker extension is in `wikilense/llm/`, documented separately. Not
+  corpus; the LLM fact-checker extension is in `wikilense/llm/`, documented in `docs/LLM_EXTENSION.md`. Not
   measured yet: the share of gold evidence outside the lead section (the shards' `order` field is
   enough, and an annotation-context proxy is in `analysis/feverous/FEVEROUS_ANALYSIS.md` Appendix A.4).
 - **Corpus rule kept from phase 1:** 75 FEVEROUS claims (10 dev, 65 train) whose evidence pages are all
@@ -253,7 +253,11 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - Scaled run scripts (each needs `WIKILENSE_FEVEROUS_DB` or an existing `wikilense_s0`/`wikilense_s1`; `docs/SETUP.md` has the order): `scripts/scaled_build.py` (claims, rule-D distractors, corpus folders), `scaled_check.py` (independent check of the pick), `scaled_stage2.py` (databases, embedding, load), `scaled_stage3.py` (page metadata from the MediaWiki API), `scaled_timing.py` (fast vs slow statements), `scaled_sentence_score.py` (FEVEROUS-style score), `scaled_page_coverage.py`, `scaled_filters.py` (filter values by a stated rule), `scaled_uncommitted.py` (uncommitted-rows recall, scratch table in the test database), `scaled_breakdown.py` (six groups, challenge tags, reweighting to FEVEROUS's mix; no database), `scaled_summary.py` (`results/scaled/SUMMARY.md`; no database)
 - `scripts/measure_index_behaviour.py` and `scripts/compare_separate_index.py` take `--database`, `--k` and `--filters` (a `scaled_filters.py` file) for the scaled databases, plus `--sample`, `--repeats`, `--no-turns`, `--passes`, `--cache-mb`, `--builds`, `--build-m` (measure_index_behaviour); both refuse to write a non-default database's results into `results/`
 - `results/scaled/` - every result file of the scaled run (see above)
-- `wikilense/llm/` and `scripts/llm_*.py` - the LLM fact-checker extension, documented separately
+- `wikilense/llm/` and `scripts/llm_*.py` - the LLM fact-checker extension, documented in `docs/LLM_EXTENSION.md`
+- `scripts/llm_results.py` - the LLM write-up's numbers: `table` turns the run folders (outside the repository) into `results/llm/per_claim.csv`, `retrieval_top5.csv` and `runs.json`; `stats` computes every number from those files into `results/llm/llm_results.json` and `LLM_RESULTS.md` (no database, no LLM call); tests in `tests/test_llm_results.py`
+- `results/llm/` - the LLM results: the per-claim table (claim id, label, kind, condition, run, answer, right; no claim text, no justifications), the run summaries and every computed number
+- `docs/img/llm_accuracy.svg`, `docs/img/llm_f1.svg` - the LLM charts, drawn by `scripts/make_charts.py` from `results/llm/llm_results.json`
+- `requirements-llm.txt` - the Anthropic SDK for the LLM runner's optional API backend; installed by hand, never by `make setup`
 
 ## Environment (set up 2026-09-17; the operating system changed on 2026-10-26)
 
