@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Draw the README charts from the JSON files in results/ as self-contained SVG files.
 
-Four charts, written to docs/img/ (standard library only, no plotting package):
+Five charts, written to docs/img/ (standard library only, no plotting package):
 
-- ``recall_at_k.svg``: article and evidence recall at k of the headline run
+- ``scaled_recall_at_k.svg``: article and evidence recall at k of the scaled run on S0 and S1
+  (``results/scaled/eval/s0_full_run1.json`` and ``s1_full_run1.json``), one line each.
+- ``recall_at_k.svg``: article and evidence recall at k of the headline run of the demo corpus
   (``results/final_ef_100.json``), one line each.
 - ``uncommitted_recall.svg``: overlap with the exact top 10 before and after COMMIT, per
   ``mhnsw_ef_search``, for the chunk embeddings and for random vectors
@@ -316,7 +318,52 @@ def scale_cost(data):
     return svg.render()
 
 
+def scaled_recall_at_k(data):
+    """Line chart: article and evidence recall against k on S0 (dashed) and S1 (solid)."""
+    s0, s1 = data["s0_full_run1"], data["s1_full_run1"]
+    ks = [m["k"] for m in sorted(s1["per_k"], key=lambda m: m["k"])]
+
+    def values(run, key):
+        return [m[key] for m in sorted(run["per_k"], key=lambda m: m["k"])]
+
+    series = [
+        ("line1", "s1", "", "S1 article recall", values(s1, "article_recall")),
+        ("line2", "s2", "", "S1 evidence recall", values(s1, "evidence_recall")),
+        ("line1", "s1", ' stroke-dasharray="6 4"', "S0 article recall", values(s0, "article_recall")),
+        ("line2", "s2", ' stroke-dasharray="6 4"', "S0 evidence recall", values(s0, "evidence_recall")),
+    ]
+    svg = Svg(
+        360,
+        "Recall at k, the scaled run",
+        f"{s1['n_claims']:,} claims; S0 {s0['parameters']['n_chunks']:,} chunks (dashed), "
+        f"S1 {s1['parameters']['n_chunks']:,} chunks (solid) (results/scaled/eval/)",
+        "Article and evidence recall at k = " + ", ".join(map(str, ks)) + ": "
+        + "; ".join(f"{name} " + ", ".join(f"{v:.3f}" for v in vals)
+                    for _, _, _, name, vals in series),
+    )
+    left, right, top, bottom = 64, WIDTH - 40, 104, 360 - 48
+    svg.legend(24, 76, [("s1", "article recall: a gold page in the top-k chunks"),
+                        ("s2", "evidence recall: a complete gold set")])
+    for tick in (0, 0.25, 0.5, 0.75, 1.0):
+        y = bottom - tick * (bottom - top)
+        svg.line(left, y, right, y, "axis" if tick == 0 else "grid")
+        svg.text(left - 8, y, _fmt(tick), "tick", "end", "middle")
+    step = (right - left) / (len(ks) - 1)
+    xs = [left + i * step for i in range(len(ks))]
+    for x, k in zip(xs, ks):
+        svg.text(x, bottom + 18, f"k={k}", "tick", "middle")
+    for line_css, dot_css, dash, _, vals in series:
+        points = [(x, bottom - v * (bottom - top)) for x, v in zip(xs, vals)]
+        svg.add(f'<polyline class="line {line_css}"{dash} points="'
+                + " ".join(f"{x:.1f},{y:.1f}" for x, y in points) + '"/>')
+        for x, y in points:
+            svg.add(f'<circle class="dot {dot_css}" cx="{x:.1f}" cy="{y:.1f}" r="4"/>')
+    return svg.render()
+
+
 CHARTS = (
+    (("scaled/eval/s0_full_run1.json", "scaled/eval/s1_full_run1.json"), "scaled_recall_at_k.svg",
+     scaled_recall_at_k),
     ("final_ef_100.json", "recall_at_k.svg", recall_at_k),
     ("uncommitted_recall.json", "uncommitted_recall.svg", uncommitted_recall),
     ("planner_choices.json", "planner_rows.svg", planner_rows),
@@ -331,11 +378,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
     for source, target, draw in CHARTS:
-        path = args.results / source
-        if not path.is_file():
-            print(f"skipped {target}: {path} not found", file=sys.stderr)
+        paths = [args.results / name for name in (source if isinstance(source, tuple) else (source,))]
+        missing = [path for path in paths if not path.is_file()]
+        if missing:
+            print(f"skipped {target}: {missing[0]} not found", file=sys.stderr)
             continue
-        (args.out / target).write_text(draw(json.loads(path.read_text(encoding="utf-8"))),
+        loaded = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in paths}
+        (args.out / target).write_text(draw(loaded if len(paths) > 1 else loaded[paths[0].stem]),
                                        encoding="utf-8")
         print(f"wrote {args.out / target}", file=sys.stderr)
     return 0

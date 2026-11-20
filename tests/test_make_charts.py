@@ -95,3 +95,26 @@ def test_main_skips_missing_results_and_writes_the_rest(
 
 def test_scale_axis_tops_are_round(charts: Any) -> None:
     assert [charts._nice_max(v) for v in (0.7, 3.0, 9.0, 12.0, 47.0)] == [1.0, 5.0, 10.0, 20.0, 50.0]
+
+
+def _scaled_run(n_chunks: int, shift: float) -> dict[str, Any]:
+    return {"n_claims": 3000, "parameters": {"n_chunks": n_chunks},
+            "per_k": [{"k": k, "article_recall": a - shift, "evidence_recall": e - shift}
+                      for k, a, e in ((1, 0.96, 0.45), (5, 0.98, 0.78), (20, 0.99, 0.89))]}
+
+
+def test_the_scaled_chart_draws_both_corpora_and_reads_two_files(
+    charts: Any, tmp_path: Path
+) -> None:
+    data = {"s0_full_run1": _scaled_run(43134, 0.0), "s1_full_run1": _scaled_run(132359, 0.02)}
+    svg = charts.scaled_recall_at_k(data)
+    document = xml.dom.minidom.parseString(svg)
+    assert "scaled run" in document.getElementsByTagName("title")[0].firstChild.data
+    assert svg.count("<polyline") == 4 and svg.count('stroke-dasharray="6 4"') == 2  # S0 dashed
+    assert "43,134 chunks" in svg and "132,359 chunks" in svg
+    (tmp_path / "scaled" / "eval").mkdir(parents=True)
+    for name, run in data.items():
+        (tmp_path / "scaled" / "eval" / f"{name}.json").write_text(json.dumps(run), encoding="utf-8")
+    out = tmp_path / "img"
+    assert charts.main(["--results", str(tmp_path), "--out", str(out)]) == 0
+    assert (out / "scaled_recall_at_k.svg").read_text(encoding="utf-8") == svg
