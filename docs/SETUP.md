@@ -129,7 +129,8 @@ deletes the data volume.
 `wikilense_s1` is the database behind the README's headline results: 7,686 Wikipedia pages (the
 3,851 gold pages of the 3,000 claims of [EVALUATION.md](EVALUATION.md#the-scaled-run), plus 3,835
 pages they link to), 132,359 chunks with their vectors, and the pages' categories and edit dates.
-A release file on GitHub holds the pages, the claims, the saved vectors and the page metadata. The
+A [release file on GitHub](https://github.com/ylli-00/WikiLens/releases/tag/data-s1-v1) holds the
+pages, the claims, the saved vectors and the page metadata. The
 load reads the saved vectors instead of running the embedding model, so it needs neither the
 FEVEROUS Wikipedia file nor a GPU.
 

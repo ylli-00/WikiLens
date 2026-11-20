@@ -39,7 +39,7 @@ endif
 # The scaled database S1 as a release file: the 7,686 pages, the claims, the saved vectors and the
 # page metadata, so that `make load-s1` needs neither the FEVEROUS file nor a GPU. The size and
 # SHA-256 are those of the published file; `make fetch-s1` refuses any other bytes.
-S1_URL    ?=
+S1_URL    ?= https://github.com/ylli-00/WikiLens/releases/download/data-s1-v1/wikilense_s1_v1.tar.gz
 S1_SHA256 := 86ad18f01ad98bfaf23b800181e9f76dc409bf9b0ce20ef606bcaea0e93e032c
 S1_BYTES  := 300308768
 S1_DIR    ?= data/scaled/wikilense_s1
