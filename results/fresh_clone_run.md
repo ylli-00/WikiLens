@@ -116,7 +116,7 @@ client inside the container and printed 14 result tables. No Python is involved.
 The server answered 5 seconds after `make serve`. `GET /` returned 200 (11,831 bytes),
 `GET /docs` returned 200, and
 `GET /api/search?q=Which+river+rises+and+ends+entirely+within+Switzerland%3F&k=1` returned 200 with
-the same chunk (Aare, chunk 1, distance 0.3091). The brief's four filters through the API
+the same chunk (Aare, chunk 1, distance 0.3091). The four metadata filters through the API
 (`q=independence+from+the+Soviet+Union&k=3&category=Member+states+of+the+United+Nations&min_words=1000&edited_since=2020-12-01&linked_from=Asia`)
 returned Azerbaijan (0.2522), Azerbaijan (0.3012), Kazakhstan (0.3087), and the first `EXPLAIN`
 row was `chunk`, type `index`, key `embedding`. A request with a parameter the API does
