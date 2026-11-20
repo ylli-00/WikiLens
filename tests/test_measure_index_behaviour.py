@@ -6,6 +6,7 @@ import importlib.util
 import sys
 from typing import Any
 
+import pymysql
 import pytest
 
 from wikilense.config import REPO_ROOT
@@ -31,12 +32,20 @@ def test_every_statement_is_a_fixed_literal_with_bound_parameters(mib: Any) -> N
         mib.BUILD_DROP_SQL, mib.BUILD_INSERT_SQL, mib.BUILD_KNN_SQL, mib.CHUNK_PAGE_EXPORT_SQL,
         *mib.BUILD_CREATE_SQL.values(),
         mib.CACHE_GET_SQL, mib.CHUNK_FLUSH_SQL, *(mib.cache_set_sql(size) for size in mib.CACHE_SIZES_MB),
+        mib.HARD_CAP_THRESHOLD_SQL, mib.HARD_CAP_SUBQUERY_SQL, mib.HARD_CAP_SCAN_SQL,
+        mib.HARD_CAP_TIME_GET_SQL, mib.HARD_CAP_TIME_SET_SQL,
     ]
     for statement in statements:
         assert "{" not in statement and "%(" not in statement, statement
     # The word limit, the vector and k are placeholders, never text.
     assert mib.FORM_PREDICATE.count("%s") == 3 and mib.FORM_PREDICATE_JOINED.count("%s") == 3
     assert mib.FORM_BARE.count("%s") == 2 and mib.PROBE_KNN_SQL.count("%s") == 2
+    # hard_cap: vector, vector, threshold, vector, k / vector, vector, inner limit, threshold, k
+    assert mib.HARD_CAP_THRESHOLD_SQL.count("%s") == 5 and mib.HARD_CAP_SUBQUERY_SQL.count("%s") == 5
+    assert mib.HARD_CAP_SCAN_SQL.count("%s") == 3
+    # hard_cap's time limit: the seconds are a parameter, the variable is the session's
+    assert mib.HARD_CAP_TIME_SET_SQL == "SET SESSION max_statement_time = %s"
+    assert mib.HARD_CAP_TIME_GET_SQL == "SELECT @@SESSION.max_statement_time"
     # The probe table is the chunk table's vector column and index, nothing else.
     assert "VECTOR(384) NOT NULL" in mib.PROBE_CREATE_SQL
     assert "VECTOR INDEX (embedding) M=16 DISTANCE=cosine" in mib.PROBE_CREATE_SQL
@@ -225,7 +234,7 @@ def test_the_build_tables_differ_in_m_only_and_copy_the_chunk_index(mib: Any) ->
         assert "VECTOR(384) NOT NULL" in statement
     assert mib.BUILD_CREATE_SQL[16].replace("M=16", "M=6") == mib.BUILD_CREATE_SQL[6]
     assert mib.BUILD_INSERT_SQL.count("%s") == 2 and mib.BUILD_KNN_SQL.count("%s") == 2
-    assert mib.PARTS == ("forms", "join_order", "builds", "cache", "isolation")
+    assert mib.PARTS == ("forms", "join_order", "builds", "cache", "isolation", "hard_cap")
 
 
 def test_the_cache_statements_set_whole_megabytes_from_the_default_down(mib: Any) -> None:
@@ -413,3 +422,452 @@ def test_the_builds_report_of_a_single_build_has_no_agreement_between_builds(mib
     text = mib.builds_markdown(report)
     assert "| 16 | 100 | 74 | 74 | 0.990 to 0.990 | - | 1.5 to 1.5 |" in text
     assert mib.BUILD_CREATE_SQL[16] + ";" in text and mib.BUILD_CREATE_SQL[6] + ";" not in text
+
+
+def test_the_hard_cap_statements_are_the_documented_shapes(mib: Any) -> None:
+    from wikilense import search as searchmod
+
+    # The derived table is the bare index search of wikilense.search, nothing else.
+    inner = mib.HARD_CAP_SUBQUERY_SQL.split("FROM (", 1)[1].split(") AS t ", 1)[0]
+    assert inner == searchmod.KNN_SQL
+    assert mib.HARD_CAP_SUBQUERY_SQL.endswith("WHERE t.distance < %s ORDER BY t.distance LIMIT %s")
+    # The threshold statement is the same search with the threshold in its own WHERE.
+    assert mib.HARD_CAP_THRESHOLD_SQL == searchmod.KNN_SQL.replace(
+        "FROM chunk ", "FROM chunk WHERE VEC_DISTANCE_COSINE(embedding, %s) < %s "
+    )
+    # The check counts the same condition without the index, over every chunk.
+    assert "IGNORE INDEX (embedding)" in mib.HARD_CAP_SCAN_SQL
+    assert "LIMIT" not in mib.HARD_CAP_SCAN_SQL
+    assert mib.HARD_CAP_SCAN_SQL.endswith("WHERE VEC_DISTANCE_COSINE(embedding, %s) < %s")
+    assert mib.HARD_CAP_NS == (3, 10, 30) and mib.HARD_CAP_INNER_LIMITS == (10, 100)
+    assert mib.HARD_CAP_EF == 100 and mib.K == 10
+
+
+def test_the_exact_ranking_and_the_threshold_let_exactly_n_through(mib: Any) -> None:
+    import numpy as np
+
+    separate = mib.separate  # scripts/compare_separate_index.py, as the module imports it
+    rng = np.random.default_rng(3)
+    vectors = separate.unit_rows(rng.normal(size=(200, 8)))
+    ids = np.arange(1000, 1200, dtype=np.int64)
+    query = separate.unit_rows(rng.normal(size=(1, 8)))[0]
+    distances = 1.0 - vectors @ query
+    ranked_ids, ranked = mib.exact_ranking(distances, ids, 31)
+    # The same order as compare_separate_index.top_k, with the distances alongside.
+    assert ranked_ids == separate.top_k(vectors, query, ids, 31)
+    assert ranked == sorted(ranked) and len(ranked) == 31
+    for n in (3, 10, 30):
+        threshold = mib.distance_threshold(ranked, n)
+        assert threshold is not None
+        assert int(np.sum(distances < threshold)) == n
+        assert ranked[n - 1] < threshold < ranked[n]
+    # Fewer rows than asked for: all of them; ties go to the smaller id.
+    tied = np.asarray([0.3, 0.1, 0.1, 0.2])
+    assert mib.exact_ranking(tied, np.asarray([7, 9, 4, 1]), 3) == ([4, 9, 1], [0.1, 0.1, 0.2])
+    assert mib.exact_ranking(tied, np.asarray([7, 9, 4, 1]), 9)[0] == [4, 9, 1, 7]
+    with pytest.raises(ValueError):
+        mib.exact_ranking(tied, np.asarray([7, 9, 4, 1]), 0)
+
+
+def test_a_tie_at_the_nth_distance_gives_no_threshold(mib: Any) -> None:
+    nearest = [0.10, 0.20, 0.20, 0.30]
+    assert mib.distance_threshold(nearest, 1) == pytest.approx(0.15)
+    assert mib.distance_threshold(nearest, 2) is None  # the 2nd and the 3rd are tied
+    assert mib.distance_threshold(nearest, 3) == pytest.approx(0.25)
+    assert mib.distance_threshold(nearest, 4) is None  # no 5th chunk
+    assert mib.distance_threshold(nearest, 0) is None
+    # Closer than the margin counts as a tie; just above it does not.
+    margin = mib.TIE_MARGIN
+    assert mib.distance_threshold([0.1, 0.1 + margin / 2], 1) is None
+    assert mib.distance_threshold([0.1, 0.1 + 3 * margin], 1) == pytest.approx(0.1 + 1.5 * margin)
+
+
+def test_the_word_limits_follow_the_rule_of_scaled_filters(mib: Any) -> None:
+    import numpy as np
+
+    assert set(mib.HARD_CAP_SHARES) <= set(mib.scaled_filters.TARGETS)
+    # 10,000 chunks: 3 with 1 word, 20 with 2, 40 with 3, 100 with 5, the rest with 240.
+    words = np.asarray([1] * 3 + [2] * 20 + [3] * 40 + [5] * 100 + [240] * 9837)
+    assert mib.word_limit_candidates(words) == [(2, 3), (3, 23), (4, 63), (6, 163), (241, 10000)]
+    # Targets 50 and 5 chunks: 63 is nearest 50 on a log scale, 3 is nearest 5 (|log 3/5| is
+    # 0.51, |log 23/5| is 1.53).
+    assert mib.pick_word_limits(words) == [
+        {"target_share": 0.005, "words_below": 4, "passing_chunks": 63, "passing_share": 0.0063},
+        {"target_share": 0.0005, "words_below": 2, "passing_chunks": 3, "passing_share": 0.0003},
+    ]
+    # A limit that both shares pick is kept once, under the first.
+    few = np.asarray([1] * 3 + [240] * 9997)
+    assert [entry["words_below"] for entry in mib.pick_word_limits(few)] == [2]
+    # A log-scale tie goes to the larger count: 25 and 100 are equally far from 50.
+    even = np.asarray([1] * 25 + [2] * 75 + [240] * 9900)
+    assert mib.pick_word_limits(even, shares=(0.005,))[0]["passing_chunks"] == 100
+
+
+def test_the_chunk_access_of_a_plan(mib: Any) -> None:
+    assert mib.chunk_access_of([
+        {"table": "<derived2>", "type": "ALL", "key": None},
+        {"table": "chunk", "type": "index", "key": "embedding"},
+    ]) == "index embedding"
+    assert mib.chunk_access_of([{"table": "chunk", "type": "ALL", "key": None}]) == "ALL no key"
+    assert mib.chunk_access_of([{"table": "page", "type": "ALL", "key": None}]) == "no chunk row"
+
+
+def _hard_cap_report() -> dict[str, Any]:
+    def row(kind: str, label: str, claims: int, expected: int, returned: dict[str, int],
+            complete: int, short: int, equal: int, read: float, read_max: float,
+            **extra: Any) -> dict[str, Any]:
+        base = {"case": label, "kind": kind, "label": label, "n": None, "inner_limit": None,
+                "words_below": None, "joined": False, "passing_chunks": None, "claims": claims,
+                "claims_run": claims, "expected_rows": expected, "executions": 2 * claims,
+                "complete": complete, "short": short, "stopped": 0, "server_lost": 0,
+                "not_run": 0, "answered": sum(returned.values()), "rows_returned": returned,
+                "equal_to_exact": equal, "same_set_as_exact": equal,
+                "analyze": {"complete": claims, "skipped": 0, "stopped": 0, "server lost": 0},
+                "chunk_rows_read_p50": read, "chunk_rows_read_max": read_max,
+                "chunk_access": "index embedding", "chunk_access_count": claims,
+                "plans": {"index embedding": claims}, "timed_executions": claims,
+                "p50_ms": 1.5, "p95_ms": 4.25}
+        return {**base, **extra}
+
+    return {
+        "name": "hard_cap", "created_at": "2026-11-20T00:00:00+00:00", "k": 10, "ef_search": 100,
+        "time_limit_s": 10, "server": {"version": "11.8.9-MariaDB", "port": 3307},
+        "repeats": 1, "n_claims_total": 3000, "sample": 4, "seed": 20261119, "n_queries": 4,
+        "n_chunks": 132359, "index_m": 16, "tie_margin": 1e-06,
+        "finished": True, "stopped_early": None, "cases_total": 4, "cases_done": 4,
+        "server_losses": 0, "reconnects": 0,
+        "versions": {"mariadb": "11.8.9-MariaDB"},
+        "word_limits": [
+            {"target_share": 0.005, "words_below": 9, "passing_chunks": 700, "passing_share": 0.005289},
+            {"target_share": 0.0005, "words_below": 3, "passing_chunks": 70, "passing_share": 0.000529},
+        ],
+        "threshold_check": {
+            "per_n": [{"n": 3, "claims_with_threshold": 4, "left_out_ties": 0, "scan_finished": 4,
+                       "server_count_equal_n": 4, "server_counts_other": []},
+                      {"n": 10, "claims_with_threshold": 3, "left_out_ties": 1, "scan_finished": 3,
+                       "server_count_equal_n": 3, "server_counts_other": []}],
+            "scan": {"complete": 4, "stopped": 0, "server lost": 0, "not run": 0,
+                     "no threshold": 0},
+            "server_numpy_distance_gap_max": 2.5e-08,
+        },
+        "results": [
+            row("threshold", "WHERE distance < threshold, n = 3", 4, 3, {"3": 4}, 8, 0, 4, 10, 10,
+                n=3),
+            row("threshold", "WHERE distance < threshold, n = 10", 3, 10, {"10": 2, "9": 1}, 4, 2,
+                2, 10, 10, n=10),
+            row("subquery", "inner LIMIT 10, n = 3", 4, 3, {"3": 4}, 8, 0, 4, 10, 10, n=3,
+                inner_limit=10),
+            row("predicate", "WHERE chunk.n_words < 3", 4, 10, {"10": 4}, 8, 0, 3, 1800, 4100,
+                words_below=3, passing_chunks=70),
+        ],
+    }
+
+
+def test_the_hard_cap_report_is_written_from_the_numbers(mib: Any) -> None:
+    text = mib.hard_cap_markdown(_hard_cap_report())
+    assert text.startswith("# The LIMIT of an index search")
+    assert ("on MariaDB 11.8.9-MariaDB at port 3307: 132,359 chunks, index M = 16, a random "
+            "sample of 4 of the 3,000 corpus claims as queries (`random.Random(20261119)`), k = "
+            "10, `mhnsw_ef_search` 100, a time limit of 10 s on every statement "
+            "(`max_statement_time`). The cases ran one after the other; for each claim the "
+            "statement ran once untimed and then 1 time timed.") in text
+    assert "count the executions, 2 per claim" in text
+    assert ("| n | Claims | Expected | Complete | Short | Stopped | Server lost | Rows returned "
+            "| Equal to exact | Same set | Rows read (largest) | Chunk access | Timed | p50 ms "
+            "| p95 ms |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n") in text
+    assert ("| 10 | 3 | 10 | 4 | 2 | 0 | 0 | 10 (2), 9 (1) | 2/3 | 2/3 | 10 (10) "
+            "| index embedding | 3 | 1.50 | 4.25 |") in text
+    assert ("| 10 | 3 | 4 | 3 | 8 | 0 | 0 | 0 | 3 (4) | 4/4 | 4/4 | 10 (10) | index embedding "
+            "| 4 |") in text
+    assert ("| WHERE chunk.n_words < 3 | 70 | 4 | 10 | 8 | 0 | 0 | 0 | 10 (4) | 3/4 | 3/4 "
+            "| 1800 (4100) | index embedding | 4 |") in text
+    # The threshold rows never read more than LIMIT rows; the predicate row did.
+    assert "No claim read more than `LIMIT` = 10 chunk rows: the threshold was applied" in text
+    assert "Short answers, of the executions: 0/8 at n = 3, 2/6 at n = 10" in text
+    assert "equal to the exact list, of the claims with rows: 4/4 at n = 3, 2/3 at n = 10." in text
+    assert "`EXPLAIN` gives `chunk` `index embedding` for every claim" in text
+    assert "0 of the 8 executions came back short" in text
+    assert "The server read more than `LIMIT` = 10 chunk rows for WHERE chunk.n_words < 3." in text
+    assert "9 words: 700 chunks (0.53%, aimed at 0.50%)" in text
+    assert ("found exactly n chunks under the threshold for 4 of 4 claims at n = 3, 3 of 3 claims "
+            "at n = 10.") in text
+    assert "at most 1e-06 apart: 0 at n = 3, 1 at n = 10" in text
+    assert "was 2.5e-08." in text
+    # Nothing was stopped or lost: one line each, and no early stop.
+    assert "- No statement reached the time limit of 10 s." in text
+    assert "- The connection to the server was never lost." in text
+    assert "stopped early" not in text and "Executions not run" not in text
+    assert "The scan did not finish" not in text
+    assert "SET SESSION max_statement_time = 10;" in text
+    for statement in (mib.HARD_CAP_THRESHOLD_SQL, mib.HARD_CAP_SUBQUERY_SQL, mib.FORM_PREDICATE,
+                      mib.FORM_PREDICATE_JOINED, mib.HARD_CAP_SCAN_SQL):
+        assert statement + ";" in text
+
+    report = _hard_cap_report()
+    report["results"][1]["chunk_rows_read_max"] = 4100
+    report["results"][1]["chunk_access_count"] = 2
+    text = mib.hard_cap_markdown(report)
+    assert ("The server read more than `LIMIT` = 10 chunk rows from the index at n = 10: it went "
+            "on taking rows") in text
+    assert "| index embedding (2/3) |" in text
+
+
+def test_the_hard_cap_report_counts_the_stopped_and_the_lost_executions(mib: Any) -> None:
+    report = _hard_cap_report()
+    # n = 10: one claim complete twice, one stopped then short, one lost on its first execution
+    report["results"][1].update(
+        complete=2, short=1, stopped=1, server_lost=1, not_run=1, answered=2,
+        rows_returned={"10": 1, "9": 1}, equal_to_exact=1, same_set_as_exact=1,
+        analyze={"complete": 1, "skipped": 2, "stopped": 0, "server lost": 0},
+        chunk_rows_read_p50=10, chunk_rows_read_max=10, timed_executions=2,
+    )
+    report["results"][3]["analyze"] = {"complete": 3, "skipped": 0, "stopped": 1,
+                                       "server lost": 0}
+    report["threshold_check"]["scan"].update(complete=3, stopped=1)
+    report["threshold_check"]["per_n"][0]["scan_finished"] = 3
+    report["threshold_check"]["per_n"][0]["server_count_equal_n"] = 3
+    report.update(server_losses=2, reconnects=2, finished=False, cases_done=4, cases_total=10,
+                  stopped_early="the server was lost 5 times in a row")
+    text = mib.hard_cap_markdown(report)
+    assert ("| 10 | 3 | 10 | 2 | 1 | 1 | 1 | 10 (1), 9 (1) | 1/2 | 1/2 | 10 (10) "
+            "| index embedding | 2 | 1.50 | 4.25 |") in text
+    assert ("The part stopped early: the server was lost 5 times in a row. 4 of the 10 cases "
+            "were reached; the tables hold what was measured until then.") in text
+    # 8 + 5 + 8 + 8 executions ran
+    assert ("- Stopped at the time limit of 10 s: 1 of the 29 executions (1 of 5 for WHERE "
+            "distance < threshold, n = 10), `ANALYZE` for 1 claim and the scan check for "
+            "1 claim.") in text
+    assert ("- Server lost: 1 of the 29 executions (1 of 5 for WHERE distance < threshold, "
+            "n = 10). With `EXPLAIN`, `ANALYZE` and the scan check, the connection was lost "
+            "2 times and the part reconnected 2 times;") in text
+    assert ("- Executions not run: 1, the rest of a claim after a lost server and the claims "
+            "after the part stopped.") in text
+    assert "Short answers, of the executions: 0/8 at n = 3, 1/5 at n = 10" in text
+    assert ("for 3 of 3 claims at n = 3, 3 of 3 claims at n = 10. The scan did not finish for "
+            "1 claim (1 stopped at the time limit, 0 with the server lost, 0 not run); their "
+            "thresholds were used all the same.") in text
+    assert "No statement reached" not in text and "never lost" not in text
+
+
+def test_hard_cap_is_refused_without_the_throwaway_flag(
+    mib: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def no_connection(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("nothing may connect without --throwaway-server")
+
+    monkeypatch.setattr(mib, "load_settings", no_connection)
+    monkeypatch.setattr(mib.db, "connect", no_connection)
+    monkeypatch.setattr(mib, "measure_hard_cap", no_connection)
+    for argv in (["hard_cap"], ["forms", "hard_cap"], ["hard_cap", "--sample", "5"]):
+        with pytest.raises(SystemExit) as raised:
+            mib.main(argv)
+        assert raised.value.code == 2
+        err = capsys.readouterr().err
+        assert "hard_cap runs only with --throwaway-server" in err
+        assert "out of memory" in err and "--memory cap" in err
+        assert "never against the project's database server" in err
+
+
+def test_every_part_but_hard_cap_runs_by_default(mib: Any) -> None:
+    assert mib.selected_parts([], False) == ["forms", "join_order", "builds", "cache", "isolation"]
+    assert mib.selected_parts([], True) == list(mib.PARTS)
+    assert mib.selected_parts(["hard_cap", "forms"], True) == ["hard_cap", "forms"]
+    # A named part is kept as named: main refuses hard_cap without the flag.
+    assert mib.selected_parts(["hard_cap"], False) == ["hard_cap"]
+
+
+def test_an_execution_is_complete_short_stopped_or_lost(mib: Any) -> None:
+    err = pymysql.err
+    stopped = err.OperationalError(1969, "Query execution was interrupted (max_statement_time "
+                                         "exceeded)")
+    assert mib.error_outcome(stopped) == "stopped"
+    assert mib.error_outcome(err.OperationalError(2013, "Lost connection to server")) == (
+        "server lost"
+    )
+    assert mib.error_outcome(err.OperationalError(2006, "Server has gone away")) == "server lost"
+    assert mib.error_outcome(err.OperationalError(2055, "Lost connection")) == "server lost"
+    assert mib.error_outcome(err.InterfaceError(0, "")) == "server lost"  # a closed connection
+    # Anything else is not an outcome: the caller raises it.
+    assert mib.error_outcome(err.ProgrammingError(1064, "syntax")) is None
+    assert mib.error_outcome(err.OperationalError(1045, "Access denied")) is None
+    assert mib.error_outcome(ValueError("no")) is None
+    # A result: the expected number of rows, or fewer.
+    assert mib.rows_outcome(10, 10) == "complete"
+    assert mib.rows_outcome(9, 10) == "short" and mib.rows_outcome(0, 3) == "short"
+    assert mib.OUTCOMES == ("complete", "short", "stopped", "server lost")
+    assert mib.HARD_CAP_STATEMENT_SECONDS == 10 and mib.HARD_CAP_LOST_IN_A_ROW == 5
+    assert mib.HARD_CAP_RECONNECT_SECONDS == 180 and mib.HARD_CAP_RECONNECT_INTERVAL == 2
+
+
+class _FakeCursor:
+    def __init__(self, conn: _FakeConnection) -> None:
+        self.conn = conn
+        self.rows: list[Any] = []
+
+    def __enter__(self) -> Any:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def execute(self, sql: str, params: Any = None) -> None:
+        self.conn.statements.append((sql, params))
+        self.rows = {"SELECT @@SESSION.max_statement_time": [(0.0,)],
+                     "SELECT @@SESSION.mhnsw_ef_search": [(20,)]}.get(sql, [])
+
+    def fetchone(self) -> Any:
+        return self.rows[0]
+
+
+class _FakeConnection:
+    """Answers the session statements of GuardedConnection; nothing else."""
+
+    def __init__(self) -> None:
+        self.open = True
+        self.statements: list[tuple[str, Any]] = []
+
+    def cursor(self, *args: Any) -> _FakeCursor:
+        return _FakeCursor(self)
+
+    def close(self) -> None:
+        self.open = False
+
+
+def _lose(conn: Any) -> None:
+    conn.open = False  # as PyMySQL closes a connection whose server went away
+    raise pymysql.err.OperationalError(2013, "Lost connection to server")
+
+
+def _stop(conn: Any) -> None:
+    raise pymysql.err.OperationalError(1969, "max_statement_time exceeded")
+
+
+def _ok(conn: Any) -> int:
+    return 1
+
+
+def test_the_part_stops_after_five_lost_servers_in_a_row(mib: Any) -> None:
+    connections: list[_FakeConnection] = []
+
+    def connect(settings: Any) -> _FakeConnection:
+        connections.append(_FakeConnection())
+        return connections[-1]
+
+    guard = mib.GuardedConnection(None, connect=connect, sleep=lambda s: None, clock=lambda: 0.0)
+    guard.start()
+    set_up = [("SET SESSION max_statement_time = %s", (10,)),
+              ("SET SESSION mhnsw_ef_search = %s", (100,))]
+    assert connections[0].statements == [("SELECT @@SESSION.max_statement_time", None),
+                                          ("SELECT @@SESSION.mhnsw_ef_search", None), *set_up]
+    for _ in range(4):
+        assert guard.attempt(_lose) == ("server lost", None)
+    # Each lost server: the connection closed, a new one with the same session settings.
+    assert len(connections) == 5 and guard.conn is connections[-1]
+    assert all(conn.statements == set_up for conn in connections[1:])
+    assert not any(conn.open for conn in connections[:-1])
+    assert guard.attempt(_ok) == (None, 1)  # a statement that came back ends the run
+    for _ in range(4):
+        guard.attempt(_lose)
+    assert guard.attempt(_stop) == ("stopped", None)  # stopped: the server is still there
+    for _ in range(4):
+        guard.attempt(_lose)
+    # EXPLAIN does not run the statement: it does not end the run of lost servers.
+    assert guard.attempt(_ok, executes=False) == (None, 1)
+    with pytest.raises(mib.HardCapStop, match="the server was lost 5 times in a row"):
+        guard.attempt(_lose)
+    assert guard.losses == 13 and guard.reconnects == 12
+    guard.close()  # the last connection is closed: nothing to write back
+    assert connections[-1].statements == set_up
+
+
+def test_the_part_stops_when_the_server_does_not_come_back(mib: Any) -> None:
+    now = [0.0]
+    sleeps: list[float] = []
+    tries: list[float] = []
+
+    def connect(settings: Any) -> _FakeConnection:
+        tries.append(now[0])
+        if len(tries) > 1:
+            raise pymysql.err.OperationalError(2003, "Can't connect to server")
+        return _FakeConnection()
+
+    def sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    guard = mib.GuardedConnection(None, connect=connect, sleep=sleep, clock=lambda: now[0])
+    with pytest.raises(mib.HardCapStop, match="did not accept a connection within 180 s"):
+        guard.attempt(_lose)
+    # One try at once, then one every 2 s up to 180 s.
+    assert set(sleeps) == {2.0} and tries[1:] == [2.0 * i for i in range(91)]
+
+
+def test_closing_the_part_writes_the_session_values_back(mib: Any) -> None:
+    conn = _FakeConnection()
+    guard = mib.GuardedConnection(None, connect=lambda settings: conn)
+    guard.start()
+    guard.close()
+    assert conn.statements[-2:] == [("SET SESSION max_statement_time = %s", (0.0,)),
+                                    ("SET SESSION mhnsw_ef_search = %s", (20,))]
+    assert not conn.open
+
+
+class _ScriptedGuard:
+    """Answers run_claims' statements from a script: per claim, one entry per execution, the
+    number of rows, 'stopped', 'server lost' or 'end' (the part stops)."""
+
+    def __init__(self, mib: Any, script: dict[int, list[Any]]) -> None:
+        self.mib = mib
+        self.script = script
+        self.calls: list[tuple[str, int]] = []
+
+    def attempt(self, work: Any, sql: str, params: Any, executes: bool = True) -> Any:
+        claim = params[0]
+        self.calls.append((work.__name__, claim))
+        if work is self.mib.db.explain:
+            return None, [{"table": "chunk", "type": "index", "key": "embedding", "Extra": ""}]
+        if work is not self.mib._fetch:
+            return None, 12.0  # rows read
+        step = self.script[claim].pop(0)
+        if step == "end":
+            raise self.mib.HardCapStop("the server was lost 5 times in a row")
+        if isinstance(step, str):
+            return step, None
+        return None, [(chunk,) for chunk in range(step)]
+
+
+def test_the_claims_of_a_case_record_every_execution(mib: Any) -> None:
+    guard = _ScriptedGuard(mib, {0: [10, 10], 2: ["server lost"], 3: ["stopped", 9]})
+    records: list[dict[str, Any]] = []
+    mib.run_claims(guard, "SQL", [(0,), None, (2,), (3,)], 10, 1, records)
+    assert [record["claim"] for record in records] == [0, 2, 3]  # claim 1 has no threshold
+    first, lost, stopped = records
+    assert first["outcomes"] == ["complete", "complete"] and len(first["ms"]) == 1
+    assert first["rows"] == list(range(10)) and first["analyze"] == "complete"
+    assert first["rows_read"] == 12.0 and first["access"] == "index embedding"
+    # A lost server ends the claim; EXPLAIN still runs, ANALYZE does not.
+    assert lost["outcomes"] == ["server lost"] and lost["ms"] == [] and lost["rows"] is None
+    assert lost["analyze"] == "skipped" and lost["access"] == "index embedding"
+    # Stopped, then short: only the short timed execution has a time.
+    assert stopped["outcomes"] == ["stopped", "short"] and len(stopped["ms"]) == 1
+    assert stopped["rows"] == list(range(9)) and stopped["analyze"] == "skipped"
+    assert ("_rows_read_of", 2) not in guard.calls and ("_rows_read_of", 3) not in guard.calls
+
+    case = {"key": "threshold_10", "kind": "threshold", "label": "n = 10", "n": 10,
+            "inner_limit": None, "words_below": None, "joined": False, "claims": 3,
+            "expected": 10}
+    row = mib.summarise_hard_cap_case(case, records, lambda claim: list(range(10)), 1)
+    assert (row["complete"], row["short"], row["stopped"], row["server_lost"]) == (2, 1, 1, 1)
+    assert row["executions"] == 6 and row["not_run"] == 1 and row["answered"] == 2
+    assert row["rows_returned"] == {"10": 1, "9": 1} and row["equal_to_exact"] == 1
+    assert row["analyze"] == {"complete": 1, "skipped": 2, "stopped": 0, "server lost": 0}
+    assert row["timed_executions"] == 2 and row["chunk_rows_read_max"] == 12.0
+    assert row["chunk_access_count"] == 3
+
+    # A stop of the part keeps the claims run so far.
+    guard = _ScriptedGuard(mib, {0: [10, 10], 1: ["end"]})
+    records = []
+    with pytest.raises(mib.HardCapStop):
+        mib.run_claims(guard, "SQL", [(0,), (1,)], 10, 1, records)
+    assert [record["claim"] for record in records] == [0, 1]
+    assert records[0]["analyze"] == "complete" and records[1]["outcomes"] == []
