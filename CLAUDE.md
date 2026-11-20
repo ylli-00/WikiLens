@@ -31,26 +31,48 @@ Goal: retrieval over Wikipedia inside MariaDB. Chunk articles, embed the chunks,
     (`scripts/measure_index_behaviour.py`; `docs/VECTOR_INDEX.md` has the tables):
     - A predicate on `chunk` itself keeps the HNSW search going until `k` rows pass: not short,
       but approximate. With a join the result was the exact top 10 in every case measured.
-    - `STRAIGHT_JOIN` stays. Left free, the optimizer starts from the filter's table under 8 of
-      12 filters: much faster under a very selective filter, 4 to 5 times slower under one loose
-      filter (`results/join_order.md`).
+    - `STRAIGHT_JOIN` stays. Left free, the optimizer starts from the filter's table under 17 of
+      18 filters on S1: 0.86 to 3.13 ms instead of 129.95 to 1,387.73 ms when 662 or fewer chunks
+      pass, 1,566.76 and 1,689.04 ms instead of about 27 ms when half pass
+      (`results/scaled/run1/s1/join_order.md`, 200 claims; on the demo corpus `results/join_order.md`).
     - A REPEATABLE READ transaction that searches the index before and after another
       connection's commit leaves the index stale for every later reader, at any isolation
       level, until the next committed write or `FLUSH TABLES` (`results/isolation.md`, 10 of 10
-      trials, three runs). Not reported to MariaDB: that is the owner's step.
-    - Twenty builds of the graph at the chosen settings all find 74 of 75 gold pages
-      (`results/build_variance.md`).
+      trials, three runs). It is MariaDB issue MDEV-41321. The rule that holds: no index search
+      in a REPEATABLE READ transaction whose snapshot predates another connection's commit.
+    - Twenty builds of the S1 graph at the chosen settings find a gold page for 2,922 to 2,937 of
+      3,000 claims (exact ranking 2,943), with the server defaults 2,218 to 2,433
+      (`results/scaled/run1/s1/build_variance.md`; on the demo corpus all twenty find 74 of 75,
+      `results/build_variance.md`).
     - The graph must fit in `mhnsw_max_cache_size` (16 MB by default, 512 MB in our compose
-      file): with 8 MB or less for the 13.0 MB graph the lists were exact for only 57 to 67 of 75
-      claims, joined or not, and the search was slower (`results/cache_size.md`).
+      file), with room: on S1 (a 156.0 MB graph file) 192 MB and more gave the counts of 512 MB,
+      while 160 MB already lost exactness and was about 13 times slower joined, and 16 MB found a
+      gold page for 2,658 of 3,000 claims instead of 2,933
+      (`results/scaled/run1/s1/cache_size.md`; on the demo corpus `results/cache_size.md`).
     - Corrected: "a derived table without DISTINCT loses the index" was wrong. The merged plan
       keeps the index; the DISTINCT prevents a chunk coming back once per link row.
     - When a timing is compared, time each statement alone and taking turns: alternating with a
       statement that reads thousands of rows made the other one 0.4 ms slower.
-  - The core idea is fixed (owner's rule): the 75 claims, the 100-page corpus rule, 240-word
-    chunks, overlap 1, bge-small-en-v1.5 with the title prefix, M=16, `mhnsw_ef_search` 100,
-    strategy `inline`. A bug that changes results is fixed and the affected groups rerun; the
-    settings are not re-chosen.
+  - The core idea is fixed: FEVEROUS claims are the queries and their gold evidence is the
+    ground truth; the settings are 240-word chunks, overlap 1, bge-small-en-v1.5 with the title
+    prefix, M=16, `mhnsw_ef_search` 100, strategy `inline`. The 75 claims on the 100-page corpus
+    remain the demo and the `make eval` check (what `make setup` loads and the tests pin); the
+    scaled run below is the reported result. A bug that changes results is fixed and the
+    affected groups rerun; the settings are not re-chosen.
+
+### The scaled run (November 2026): the reported result
+
+- 3,000 FEVEROUS train + dev claims (`data/scaled/claims_3000.jsonl`; per label 700 on one page
+  and 300 needing two or more pages, text-only evidence) on two databases: `wikilense_s0` (the gold
+  pages, 3,851 pages, 43,134 chunks) and `wikilense_s1` (plus one rule-D distractor per gold
+  article, 7,686 pages, 132,359 chunks), both with categories and edit dates. Headline k = 5.
+- Results in `results/scaled/` (`SUMMARY.md` is written by `scripts/scaled_summary.py` from the
+  files there, one column per run); method and tables in `docs/EVALUATION.md`, the data in
+  `docs/DATA.md`, the database measurements in `docs/VECTOR_INDEX.md`, the commands in
+  `docs/SETUP.md`, "Reproduce the scaled run". Timed with the CPU capped at 50% and the GPU at
+  2,100 MHz, so the times are compared only within the scaled run.
+- The building needs the FEVEROUS DB (`WIKILENSE_FEVEROUS_DB`), a GPU and hours; outputs larger
+  than a few MB (corpus folders, vectors, the sentence-score units) stay outside the repository.
 
 ### Earlier: the pipeline works end to end on the 100-page corpus (2026-09-22)
 
@@ -65,13 +87,12 @@ queries. The corpus is the 100 pages / 75 claims described below; the decisions 
 - **Status (2026-10-21):**
   - The brief asks for articles "from dumps.wikimedia.org or the MediaWiki API" and for "a small ground-truth set — questions whose correct source article you already know" (see "The MariaDB brief"). Whether FEVEROUS may serve as the ground truth was an open question to the organizers then; the evaluation of 27 October settled it (see above).
   - Meanwhile "Phase 0" runs on the 100-page corpus: check the vector scores, and add category and edit-date filters from the MediaWiki API (each page's December 2020 revision). Then add a transaction demo, rerun the experiments, and rewrite the README. The organizers give a preliminary grade by running the evaluation prompt.
-  - Done on 2026-10-22: `data/corpus/page_meta.jsonl` (`scripts/fetch_page_meta.py`), the `category` and `page_category` tables, `page.revision_id` and `page.last_edited`, the filters `--category`, `--edited-since` and `--edited-before`, the experiment groups `uncommitted` and `planner`, and `scripts/make_charts.py`. docs/DESIGN.md, "Page metadata and the brief's four filters", has the measured outcomes.
+  - Done on 2026-10-22: `data/corpus/page_meta.jsonl` (`scripts/fetch_page_meta.py`), the `category` and `page_category` tables, `page.revision_id` and `page.last_edited`, the filters `--category`, `--edited-since` and `--edited-before`, the experiment groups `uncommitted` and `planner`, and `scripts/make_charts.py`. docs/DESIGN.md, "Page metadata and the four filters", has the decisions, and docs/VECTOR_INDEX.md and `results/planner_choices.md` the measurements.
 - **Owner's decision (2026-09-22), superseded by the evaluation:** the results and the README were called drafts and the 75 claims a development set, to be replaced in a next phase. Since 27 October the 75-claim set and the settings are fixed; a larger claim set would be a new project phase, not a correction.
-- **Next phase:** deeper analysis of FEVEROUS, pick exactly which claims to run, scale the corpus (the
-  inline filtered statement's cost grows with the table and is the number to watch), then run and
-  document the experiments; the LLM fact-checker extension. This includes measuring the share of gold
-  evidence outside the lead section: the shards' `order` field is enough, and an annotation-context
-  proxy is in `analysis/feverous/FEVEROUS_ANALYSIS.md` Appendix A.4.
+- **Since then:** the scaled run (see "The scaled run" above) picked 3,000 claims and scaled the
+  corpus; the LLM fact-checker extension is in `wikilense/llm/`, documented separately. Not
+  measured yet: the share of gold evidence outside the lead section (the shards' `order` field is
+  enough, and an annotation-context proxy is in `analysis/feverous/FEVEROUS_ANALYSIS.md` Appendix A.4).
 - **Corpus rule kept from phase 1:** 75 FEVEROUS claims (10 dev, 65 train) whose evidence pages are all
   in `wiki_000.jsonl`, their 54 pages plus 46 link-ranked filler pages; `scripts/build_corpus.py`
   rebuilds it byte for byte (`data/corpus/MANIFEST.md`).
@@ -210,7 +231,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - Category and edit-date metadata: the MediaWiki API, each page's December 2020 revision
   (`scripts/fetch_page_meta.py`, committed as `data/corpus/page_meta.jsonl`).
 - FEVEROUS as the ground truth: settled by the evaluation of 27 October 2026.
-- Decided on 2026-11-11 (reasons in docs/DESIGN.md, "Review pass (2026-11-11)"):
+- Decided on 2026-11-11 (reasons in docs/DESIGN.md, "Setup, packaging and the README"):
   `requires-python` stays `>=3.10`; `make setup` keeps installing the version ranges by default
   and the lock files stay opt-in; `make setup` generates the `.env` passwords.
 
@@ -228,6 +249,11 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - `scripts/measure_index_behaviour.py` - five measured behaviours of the vector index: `forms` (`results/statement_forms.md`), `join_order` (`results/join_order.md`), `builds` (`results/build_variance.md`), `cache` (`results/cache_size.md`) and `isolation` (`results/isolation.md`); `builds` and `isolation` use scratch tables in the test database and `cache` changes `mhnsw_max_cache_size` for the whole server while it runs: never run them next to pytest or another measurement
 - `data/corpus/NOTICE.md` - licence and attribution of the committed Wikipedia text and FEVEROUS claims (CC BY-SA 3.0)
 - `data/feverous/` - raw downloads: `feverous_train_challenges.jsonl`, `feverous_dev_challenges.jsonl`, `wiki_pages/wiki_000.jsonl`
+- `data/scaled/claims_3000.jsonl` - the 3,000 claims of the scaled run (licence in `data/scaled/NOTICE.md`)
+- Scaled run scripts (each needs `WIKILENSE_FEVEROUS_DB` or an existing `wikilense_s0`/`wikilense_s1`; `docs/SETUP.md` has the order): `scripts/scaled_build.py` (claims, rule-D distractors, corpus folders), `scaled_check.py` (independent check of the pick), `scaled_stage2.py` (databases, embedding, load), `scaled_stage3.py` (page metadata from the MediaWiki API), `scaled_timing.py` (fast vs slow statements), `scaled_sentence_score.py` (FEVEROUS-style score), `scaled_page_coverage.py`, `scaled_filters.py` (filter values by a stated rule), `scaled_uncommitted.py` (uncommitted-rows recall, scratch table in the test database), `scaled_breakdown.py` (six groups, challenge tags, reweighting to FEVEROUS's mix; no database), `scaled_summary.py` (`results/scaled/SUMMARY.md`; no database)
+- `scripts/measure_index_behaviour.py` and `scripts/compare_separate_index.py` take `--database`, `--k` and `--filters` (a `scaled_filters.py` file) for the scaled databases, plus `--sample`, `--repeats`, `--no-turns`, `--passes`, `--cache-mb`, `--builds`, `--build-m` (measure_index_behaviour); both refuse to write a non-default database's results into `results/`
+- `results/scaled/` - every result file of the scaled run (see above)
+- `wikilense/llm/` and `scripts/llm_*.py` - the LLM fact-checker extension, documented separately
 
 ## Environment (set up 2026-09-17; the operating system changed on 2026-10-26)
 
@@ -240,7 +266,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - `docs/DESIGN.md` is the module contract: layout, data formats, parsing and chunking rules, schema, provisional settings and their reasons. Update it when a decision changes.
 - `docs/ARCHITECTURE.md` (2026-09-23) is the beginner's guide to how the code is built: the pipeline, key ideas, every file, one query end to end, the database, tests, and what is left for the grading. Keep it true when a file or a flow changes.
 - Git: initialised on `main` on 2026-09-17; the commit identity is set in the repository's git config. Remote `origin` is github.com/ylli-00/WikiLens. `docs/DESIGN.md` holds the reasoning behind every decision.
-- The README must stay short (the evaluators' request; `tests/test_docs.py` caps it at 330 lines and checks its first line, its first-screen output, every link and anchor, and the stated number of tests). Put reference material in `docs/`.
+- The README must stay short: `tests/test_docs.py` caps it at 350 lines and checks its first line, its first-screen output, every link and anchor, and the stated number of tests. Put reference material in `docs/`.
 
 ## Working rules
 
