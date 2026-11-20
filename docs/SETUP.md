@@ -1,8 +1,8 @@
 # Setup: what `make setup` does, on which platforms, and what to do when it fails
 
 The [README](../README.md) has the short version: `make setup`, then a query. This page has every
-step, the three sets of packages, what was checked on which platform and how, and the failures we
-know.
+step, the three sets of packages, what was checked on which platform and how, and the known
+failures.
 
 ## What you need
 
@@ -45,12 +45,12 @@ upgrade removed the Python it was made with.
 | `make setup CPU=1` | `requirements-cpu.lock`: every version pinned, PyTorch without CUDA | there is no NVIDIA GPU, or you want a pinned environment; this is what CI installs |
 | `make setup REQS=requirements.lock` | `requirements.lock`: the pinned GPU build | you want the exact environment `results/` was measured in (Linux x86_64 with an NVIDIA GPU) |
 
-The default stays with the ranges on purpose. The lock files cannot be installed on Python 3.10
-or 3.11, on macOS 13 or on an Intel Mac, and the GPU lock file only on Linux; the ranges can adapt.
-The price is that a new release of a dependency can break the default path before we notice. If
+The default uses the ranges because they can adapt: the lock files cannot be installed on Python
+3.10 or 3.11, on macOS 13 or on an Intel Mac, and the GPU lock file installs only on Linux. The
+downside is that a new release of a dependency can break the default path before we notice. If
 that happens, `make setup CPU=1` is the pinned way in.
 
-Without a GPU everything works. Only the embedding is slower: the ingest above, and 18 ms for a
+Everything works without a GPU. Only the embedding is slower: the ingest above, and 18 ms for a
 query instead of 4.6 ms (`results/final_ef_100_rerun_cpu1.md` and `_cpu2.md` against
 `results/final_ef_100.md`). The SQL times do not change.
 
@@ -69,16 +69,15 @@ that platform; nobody ran it there. We have no Mac and no Windows machine.
 | Windows, WSL 2 | a Linux system: as Linux, not run | as Linux, not run |
 | Windows, native | the Makefile needs a POSIX shell; run the four steps above by hand | the lock file resolves; not run |
 
-What stands behind the table, all looked up on 2026-11-11:
+The sources for the table, all looked up on 2026-11-11:
 
 - PyTorch 2.14.0 has wheels for Linux x86_64 and aarch64, for Windows amd64 and for macOS on Apple
   Silicon from macOS 14 (file names on https://pypi.org/project/torch/2.14.0/#files and on
   https://download.pytorch.org/whl/cpu/torch/). There is none for Intel Macs, where the newest
   PyTorch is 2.2.2, and none for macOS 13, where it is 2.11.0.
-- The `+cpu` builds exist for Linux and Windows only. `requirements-cpu.lock` used to pin
-  `torch==2.14.0+cpu` everywhere, so on a Mac pip stopped with "No matching distribution found for
-  torch==2.14.0+cpu". The file now pins `torch==2.14.0` on macOS, where the ordinary wheel is the
-  CPU build, and `torch==2.14.0+cpu` elsewhere.
+- The `+cpu` builds exist for Linux and Windows only, so `requirements-cpu.lock` pins
+  `torch==2.14.0` on macOS, where the ordinary wheel is the CPU build, and `torch==2.14.0+cpu`
+  elsewhere.
 - The lock files need Python 3.12: `numpy==2.5.3` has no release for 3.11 and `networkx==3.6.1`
   none for 3.10. They resolve for 3.12, 3.13 and 3.14.
 - The image `mariadb:11.8.9` is published for linux/amd64 and linux/arm64, so Docker on Apple
@@ -87,9 +86,9 @@ What stands behind the table, all looked up on 2026-11-11:
   release because the measured index behaviour and the plans the tests pin are those of 11.8.9.
 - On a Mac, `python3` may be the 3.9 of the Xcode tools. `make setup` then stops and says so;
   install a newer Python and run, for example, `make setup PYTHON=python3.12`.
-- The Makefile uses `grep -E` with POSIX character classes and plain `sh`, nothing specific to GNU
-  tools, and of `make` itself only `?=`, `:=`, `ifeq`, `ifneq` and `$(filter ...)`. Not run with
-  the `make` that macOS ships.
+- The Makefile uses `grep -E` with POSIX character classes and plain `sh`, and nothing specific to
+  GNU tools. Of `make` itself it uses only `?=`, `:=`, `ifeq`, `ifneq` and `$(filter ...)`. It was
+  not run with the `make` that macOS ships.
 
 The two commands behind "resolves", for one platform (the others change the platform name):
 
@@ -101,11 +100,10 @@ MACOSX_DEPLOYMENT_TARGET=14.0 uv pip compile requirements-cpu.lock --only-binary
     --python-platform aarch64-apple-darwin --python-version 3.12 --index-strategy unsafe-best-match
 ```
 
-Two things to know before repeating them. pip evaluates the `sys_platform` markers of the lock
-file for the machine it runs on, not for `--platform`, so on Linux it would pick the Linux line; we
-ran pip with its marker environment set to the target's. uv evaluates them for the target by
-itself. And pip's dry run still downloads every wheel it resolves, about 200 MB per platform; uv
-reads the metadata only.
+pip evaluates the `sys_platform` markers of the lock file for the machine it runs on, not for
+`--platform`, so on Linux it would pick the Linux line; we ran pip with its marker environment set
+to the target's. uv evaluates them for the target by itself. pip's dry run also downloads every
+wheel it resolves, about 200 MB per platform, while uv reads the metadata only.
 
 ## When it fails
 
@@ -125,3 +123,93 @@ by git), `make serve` starts the web page, `make examples` runs the ten examples
 `sql/examples.sql` through the `mariadb` client inside the container (no Python), `make experiments`
 reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
 deletes the data volume.
+
+## Reproduce the scaled run
+
+The scaled run ([EVALUATION.md](EVALUATION.md#the-scaled-run): 3,000 claims on the databases
+`wikilense_s0` and `wikilense_s1`) cannot be rebuilt from the repository alone. It needs:
+
+- the full FEVEROUS Wikipedia, `feverous_wikiv1.db` (53.5 GB, the one SQLite file inside the
+  10.4 GB `feverous-wiki-pages-db.zip` of https://fever.ai/dataset/feverous.html), with its path in
+  `WIKILENSE_FEVEROUS_DB`, and the FEVEROUS train and dev files in `data/feverous/`
+  ([DATA.md](DATA.md));
+- an NVIDIA GPU for the embedding, the network for the page metadata (the fetch for the 7,686
+  pages of S1 took 294 minutes), and a working folder outside the repository for the corpus
+  folders, the vectors and the large intermediate files;
+- hours of machine time. Run one heavy step at a time: the measurements below are timings, and
+  two steps at once spoil each other's times.
+
+The commands, in order, from the repository root after `make setup` (`OUT` is the working folder):
+
+```
+export WIKILENSE_FEVEROUS_DB=/path/to/feverous_wikiv1.db
+OUT=/path/to/working/folder
+
+# 1. The claims, the distractor pages and the corpus folders S0 and S1 (docs/DATA.md)
+.venv/bin/python scripts/scaled_build.py claims --out-dir $OUT
+for step in distractors corpora report; do
+  .venv/bin/python scripts/scaled_build.py $step --out-dir $OUT --claims $OUT/claims_3000.jsonl.tmp
+done
+.venv/bin/python scripts/scaled_check.py --out-dir $OUT --claims $OUT/claims_3000.jsonl.tmp
+mv $OUT/claims_3000.jsonl.tmp $OUT/claims_3000.jsonl
+sha256sum $OUT/claims_3000.jsonl data/scaled/claims_3000.jsonl     # the two must be equal
+
+# 2. Two databases, the embedding (once, for S1, whose chunks include S0's) and the loads
+.venv/bin/python scripts/scaled_stage2.py create-dbs
+.venv/bin/python scripts/scaled_stage2.py embed --corpus-dir $OUT/S1 --vectors-dir $OUT/vectors \
+    --corpora-json $OUT/corpora.json
+for db in S0 S1; do
+  low=$(echo $db | tr A-Z a-z)
+  WIKILENSE_DB_NAME=wikilense_$low .venv/bin/python scripts/scaled_stage2.py ingest \
+      --corpus-dir $OUT/$db --vectors-dir $OUT/vectors --out $OUT/ingest_$db.json
+  WIKILENSE_DB_NAME=wikilense_$low .venv/bin/python scripts/scaled_stage2.py verify \
+      --corpus-dir $OUT/$db --corpora-json $OUT/corpora.json
+done
+
+# 3. Categories and edit dates of the S1 pages (one file serves both databases)
+.venv/bin/python scripts/scaled_stage3.py fetch --pages $OUT/S1/pages.jsonl --out $OUT/page_meta_S1.jsonl
+for db in wikilense_s0 wikilense_s1; do
+  .venv/bin/python scripts/scaled_stage3.py load --database $db --meta $OUT/page_meta_S1.jsonl
+  .venv/bin/python scripts/scaled_stage3.py verify --database $db --meta $OUT/page_meta_S1.jsonl
+done
+
+# 4. Recall and latency, the evidence scores (run each per database: s0, s1)
+R=results/scaled
+WIKILENSE_DB_NAME=wikilense_s1 .venv/bin/wikilense eval --ef-search 100 --out $R/eval --name s1_full_run1
+.venv/bin/python scripts/scaled_timing.py --database wikilense_s1 --out $R/timing/scale_k5_s1_run1.json
+.venv/bin/python scripts/scaled_sentence_score.py --database wikilense_s1 \
+    --claims data/scaled/claims_3000.jsonl --out-dir $OUT/sentence_score
+.venv/bin/python scripts/scaled_page_coverage.py --database wikilense_s1 --out $R/page_coverage/page_coverage_s1.json
+
+# 5. The measurements of docs/VECTOR_INDEX.md (filters, join order, statement forms, the copy of
+#    the vectors, the index cache, graph builds, uncommitted rows)
+.venv/bin/python scripts/scaled_filters.py --database wikilense_s1 --out $R/filters/filters_s1.json
+.venv/bin/python scripts/measure_index_behaviour.py join_order --database wikilense_s1 --k 5 \
+    --filters $R/filters/filters_s1.json --sample 200 --repeats 1 --no-turns --out $R/run1/s1
+.venv/bin/python scripts/measure_index_behaviour.py forms --database wikilense_s1 --k 5 --repeats 1 --out $R/run1/s1
+.venv/bin/python scripts/compare_separate_index.py --database wikilense_s1 --k 5 --repeats 1 \
+    --filters $R/filters/filters_s1.json --out $R/run1/s1
+.venv/bin/python scripts/measure_index_behaviour.py cache --database wikilense_s1 --k 5 --passes 2 \
+    --cache-mb 256,192,160,128,64,16 --out $R/run1/s1
+.venv/bin/python scripts/measure_index_behaviour.py builds --database wikilense_s1 --k 5 \
+    --builds 1 --build-m 16 --out $R/build_timing/s1
+.venv/bin/python scripts/scaled_uncommitted.py --database wikilense_s0 --out $R/run1/s0
+
+# 6. The tables (no database)
+.venv/bin/python scripts/scaled_breakdown.py --claims data/scaled/claims_3000.jsonl \
+    --eval S0=$R/eval/s0_full_run1.json --eval S1=$R/eval/s1_full_run1.json \
+    --sentences S0=$OUT/sentence_score/wikilense_s0/claims.jsonl \
+    --sentences S1=$OUT/sentence_score/wikilense_s1/claims.jsonl --out $R/breakdown/breakdown.json
+.venv/bin/python scripts/scaled_summary.py
+```
+
+- The `cache` step changes `mhnsw_max_cache_size` for the whole server and puts the configured
+  value back at the end. `builds` and `scaled_uncommitted.py` work on scratch tables in the test
+  database. Run none of them next to the test suite.
+- `compare_separate_index.py` adds rows for hnswlib when it is importable. hnswlib is in no
+  requirements file; to include it, install it into a folder of its own
+  (`pip install --target <folder> hnswlib`) and put that folder on `PYTHONPATH` for this one command.
+- A rerun writes into `run2/` (and so on) instead of `run1/`; `scripts/scaled_summary.py` then
+  shows each run in its own column.
+- The scaled times were measured with the CPU capped at 50% and the GPU at 2,100 MHz. On another
+  machine, or without the caps, the times differ; the recall does not depend on them.
