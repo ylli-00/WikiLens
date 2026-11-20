@@ -258,6 +258,7 @@ Everything this section used to list as open is decided; docs/DESIGN.md has the 
 - `scripts/llm_results.py` - the LLM write-up's numbers: `table` turns the run folders (outside the repository) into `results/llm/per_claim.csv`, `retrieval_top5.csv` and `runs.json`; `stats` computes every number from those files into `results/llm/llm_results.json` and `LLM_RESULTS.md` (no database, no LLM call); tests in `tests/test_llm_results.py`
 - `results/llm/` - the LLM results: the per-claim table (claim id, label, kind, condition, run, answer, right; no claim text, no justifications), the run summaries and every computed number
 - `docs/img/llm_accuracy.svg`, `docs/img/llm_f1.svg` - the LLM charts, drawn by `scripts/make_charts.py` from `results/llm/llm_results.json`
+- `wikilense/picker.py` - the web page's claim picker: which claims of `data/corpus/claims.jsonl` and `data/scaled/claims_3000.jsonl` a database offers, their ground truth through `evaluate.ground_truth_from_rows`, a search's gold marks and summary with the evaluation's functions, and the ready-made examples (`EXAMPLES`, chosen by `pick_examples`); the page offers the demo database and `wikilense_s1` when it is loaded (`web.py`, `GET /api/databases`, `/api/claims`, `/api/pages`); tests in `tests/test_picker.py` and `tests/test_web.py`
 - `requirements-llm.txt` - the Anthropic SDK for the LLM runner's optional API backend; installed by hand, never by `make setup`
 
 ## Environment (set up 2026-09-17; the operating system changed on 2026-10-26)

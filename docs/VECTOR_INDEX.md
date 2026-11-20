@@ -525,7 +525,7 @@ transaction whose snapshot predates another connection's commit. Searching at RE
 in autocommit mode did not cause the state. PyMySQL opens connections with autocommit off, so a
 connection that has run one `SELECT` is in a REPEATABLE READ transaction until it commits, rolls
 back or closes. That is how WikiLense's own connections work. A web request runs one search and
-closes. `wikilense query` runs a `COUNT(*)`, loads the model, runs one search and closes, which is
+closes; with "repeat" it rolls back between the runs, so each search has a transaction of its own. `wikilense query` runs a `COUNT(*)`, loads the model, runs one search and closes, which is
 the shape of the `COUNT(*)` control. That shape stayed correct on this table but not in the
 8-dimensional repro. `wikilense query` stays safe because no other connection commits a write to
 the corpus while it runs. `wikilense eval` and the experiment scripts run many searches in one

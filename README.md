@@ -38,11 +38,11 @@ make setup
 - Put your own question between the quotes. The first number is the cosine distance. `--k 5`
   returns more passages, `--category`, `--min-words`, `--edited-since` and `--linked-from` filter
   them, `--explain` prints the SQL statement and MariaDB's plan, and `make serve` opens the same
-  search as a web page at http://127.0.0.1:8000.
+  search as a web page at http://127.0.0.1:8000, with a claim picker, a database choice and examples.
 - [docs/EXAMPLES.md](docs/EXAMPLES.md) has the filtered queries, the hybrid with full-text search,
   every option, and ten examples for the `mariadb` client that need no Python.
 
-![The web page with the four metadata filters](docs/img/web_page.png)
+![The web page with a benchmark claim picked and its gold evidence marked](docs/img/web_page.png)
 
 ## What we found
 
@@ -259,7 +259,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (675 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (759 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs the 53.5 GB FEVEROUS
@@ -338,7 +338,7 @@ claims, and [results/](results/) every experiment as JSON and Markdown, the scal
 EVALUATION, DESIGN (every decision) and ARCHITECTURE (a beginner's guide to the code).
 [analysis/](analysis/) is the earlier FEVEROUS analysis that chose the benchmark, and
 [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
-675 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
+759 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a
 `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team

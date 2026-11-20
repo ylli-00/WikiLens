@@ -167,11 +167,11 @@ the top 5 for 2,922 to 2,937 of the 3,000 claims ([build_variance.md](../results
 the reported run found 2,933. A test load from the release file found 2,934, and evidence recall@5
 was 2,256 of 3,000 against the reported 2,253 ([the test load](../results/scaled/release_check/README.md)).
 
-To query S1, name it in `WIKILENSE_DB_NAME`; a variable set in the shell takes precedence over
-`.env`:
+The web page needs no setting: once S1 is loaded, `make serve` offers it in the page's database
+selector, next to the demo database. To query S1 from the command line, name it in
+`WIKILENSE_DB_NAME`; a variable set in the shell takes precedence over `.env`:
 
 ```
-WIKILENSE_DB_NAME=wikilense_s1 make serve                       # the web page on S1
 WIKILENSE_DB_NAME=wikilense_s1 .venv/bin/wikilense query "The Eiffel Tower is in Paris."
 WIKILENSE_DB_NAME=wikilense_s1 .venv/bin/wikilense eval --ef-search 100 --out /tmp/s1_eval --name s1
 ```

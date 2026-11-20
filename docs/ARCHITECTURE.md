@@ -109,7 +109,8 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `search.py` | The four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment, `ef_search` set per call and restored. | the database (read only) | `db`, `config` | `search_statement` |
 | `evaluate.py` | Recall and latency: ground truth from `claim_evidence`, pure metric functions, one untimed and `repeats` timed passes per claim and k, the JSON and Markdown writer. | the database → `<out>/<name>.json/.md` | `db`, `search` | `evaluate` |
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`): argument checks, one-line errors, exit codes 0, 1, 2 and 130, the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
-| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings; `/docs` is the API page. | the database (read only) | `db`, `search`, `embedding`; FastAPI | `api_search` |
+| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings, and with `claim_id`, `database` or `repeat` also the claim's marks and summary, the database that answered and the repeated timings; `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `evaluate`, `embedding`; FastAPI | `api_search` |
+| `picker.py` | The page's claim picker: reads both claim files, decides which claims a database offers (gold pages in `page`, gold sentences resolved by `ingest.resolve_element`), builds their ground truth with `evaluate.ground_truth_from_rows`, and computes a search's marks and summary with the evaluation's metric functions; the ready-made examples and the rule that chose them. | `data/corpus/claims.jsonl`, `data/scaled/claims_3000.jsonl`, the database (read only) | `corpus`, `evaluate`, `ingest`, `search` | `build_catalog` |
 
 `wikilense/llm/` is the package of the LLM fact-checker extension, with the `scripts/llm_*.py` scripts and the `tests/test_llm_*.py` tests; it is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
 
@@ -227,6 +228,13 @@ wikilense query "When was Kabul founded?" --heading '%History%' --k 3 --explain
 *20th century*) lack "history". `heading` matches a section's own heading, `path` anything under
 it: `--path 'History%' --title Kabul` returns *Kabul > History > Antiquity* at distance 0.2361.
 
+The web page runs the same `search.search` for the same filters. When a benchmark claim is picked
+(`/api/search?claim_id=...`), the statement is timed alone; afterwards, on the same connection,
+`picker.search_marks` looks up each hit's sentences (`evaluate.chunk_sentence_ids`) and marks the
+hits on a gold page and the chunks holding a gold sentence, and the summary applies
+`evaluate.article_recall_at_k`, `gold_page_rank` and `evidence_recall_at_k` to the hits in search
+order, as `make eval` does for every claim.
+
 ## 6. The database
 
 There are eleven tables, all InnoDB with `utf8mb4` text. The arrows read "one to many".
@@ -279,11 +287,11 @@ The reasons for the main choices:
 
 ## 7. Testing and CI
 
-There are 675 tests of three kinds, told apart by pytest markers.
+There are 759 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (591) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (645) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- `db` tests (78) need MariaDB and use only the test database (`wikilense_test`, reset per test);
+- `db` tests (108) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.
 - `slow` tests (6) load the real embedding model: `.venv/bin/python -m pytest -m slow`.
 

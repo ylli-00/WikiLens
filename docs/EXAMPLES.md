@@ -122,16 +122,58 @@ All options:
   server value).
 - Output: `--json` for scripts.
 
-`wikilense serve` starts a web page with the same query and filters. Searches can be shared as
-links: a link with the form's parameters fills the form and runs the search. The screenshot below is
-`http://127.0.0.1:8000/?q=independence+from+the+Soviet+Union&k=3&category=Member+states+of+the+United+Nations&min_words=1000&edited_since=2020-12-01&linked_from=Asia`.
-The API behind the page, `GET /api/search`, takes the same parameters and returns `hits`, the `sql`
-that ran, its `explain` rows, the effective `ef_search` and `timing_ms`. Swagger is enabled at
-`/docs`, so the API can be tried from the browser. (The Swagger page is FastAPI's default and loads
-its script from a CDN, so it needs a network connection; the search page itself has no external
-assets.)
+`wikilense serve` (or `make serve`) starts a web page with the same query and filters. The links
+below point to your own machine, so they work only once the page is running at
+http://127.0.0.1:8000.
 
-![The web page with the four metadata filters](img/web_page.png)
+- A free-text search is a question typed into the box. A note under the box says what such a search
+  can and cannot tell: there is no answer key, so the page cannot know whether a hit is right, and
+  the hits are the closest passages among this database's pages, not all of Wikipedia. "Which pages
+  does it hold?" lists them.
+- The claim picker next to the query box searches the FEVEROUS claims by text or id. Picking one
+  fills the query with the claim's text, runs the search and shows the claim's label, whether it
+  needs one page or several, and its gold evidence (page title and sentence text, read from the
+  database). Each hit on a gold page is marked "gold page", and each chunk that holds a gold
+  sentence "gold evidence"; with "show the chunk's sentences" on, the gold sentences are
+  highlighted. A summary line gives the claim's result at the chosen k by the evaluation's
+  definitions: whether a gold page is in the hits and the rank of the first, and whether the
+  evidence is fully covered (evidence recall), with the gold units covered out of how many. Evidence
+  in a table is shown as "evidence in a table (not indexed)". Editing the query drops the claim.
+- A claim file belongs to a database when the database's `claim` table holds exactly its claim ids:
+  `data/corpus/claims.jsonl` for the demo, `data/scaled/claims_3000.jsonl` for S1. The picker then
+  offers every claim of either file whose gold pages are all in that database and whose gold
+  sentences all resolve there: 75 on the demo (8 of them are also among the 3,000) and 3,032 on S1
+  (the 3,000 and 32 more demo claims). Without a matching file the picker is hidden.
+  [DESIGN.md](DESIGN.md#cli-and-web-clipy-webpy) has the details.
+- The database selector offers the demo database and, when it is loaded, the scaled database S1
+  (`wikilense_s1`; [SETUP.md](SETUP.md#get-the-scaled-database-s1) has the download). The labels
+  give each one's size, read from the database.
+- "Repeat 5 times" runs the search statement five times on the same connection and shows the median
+  SQL time and the range, because a single timing on a laptop can drift by tens of percent. The
+  query is embedded once.
+- Each example button fills the whole form and runs it. The row has a supported, a refuted and a
+  not-enough-info claim, the supported claim with a filter that hides its gold page, a free-text
+  question, and, on S1 only, a claim whose evidence needs two pages. The first five are the same on
+  both databases, so you can switch and compare.
+
+Every search goes into the address bar, so a link reproduces it. For example
+[`/?database=wikilense&claim_id=36003&sentences=1`](http://127.0.0.1:8000/?database=wikilense&claim_id=36003&sentences=1)
+is the screenshot below (the supported example on the demo), and
+[`/?q=independence+from+the+Soviet+Union&k=3&category=Member+states+of+the+United+Nations&min_words=1000&edited_since=2020-12-01&linked_from=Asia`](http://127.0.0.1:8000/?q=independence+from+the+Soviet+Union&k=3&category=Member+states+of+the+United+Nations&min_words=1000&edited_since=2020-12-01&linked_from=Asia)
+uses the four metadata filters. A link with a claim or a database that the server does not offer
+shows a message and runs nothing.
+
+The API behind the page, `GET /api/search`, takes the same parameters and returns `hits`, the `sql`
+that ran, its `explain` rows, the effective `ef_search` and `timing_ms`. With `claim_id` it also
+returns `claim`, `marks` (one per hit) and `summary`; these are computed after the timed statement,
+so `sql` and `timing_ms.sql` are the search alone. With `repeat` it returns `repeat` (every run's
+time, the median and the range), with `database` the database that answered. `GET /api/databases`,
+`/api/claims` and `/api/pages` list the choices, the claims and the page titles. Swagger is enabled
+at `/docs`, so the API can be tried from the browser. (The Swagger page is FastAPI's default and
+loads its script from a CDN, so it needs a network connection; the search page itself has no
+external assets.)
+
+![The web page with a benchmark claim picked and its gold evidence marked](img/web_page.png)
 
 [sql/examples.sql](../sql/examples.sql) has ten worked examples for the `mariadb` client alone (no
 Python, no model). They include the four-filter statement with its `EXPLAIN`, a page's categories

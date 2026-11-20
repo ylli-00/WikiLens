@@ -429,6 +429,48 @@ to 127.0.0.1 by default and the text is what a reader needs to fix a setup. The 
 its script from a CDN, which docs/EXAMPLES.md states. `make examples` runs `sql/examples.sql`
 through the `mariadb` client in the container, which is the path for a reader without Python.
 
+**The claim picker, the database choice and the examples (`picker.py`, `web.py`).** The page can
+search with a FEVEROUS claim instead of free text and mark the hits against the claim's gold
+evidence ([EXAMPLES.md](EXAMPLES.md) shows it).
+- The marks use the evaluation's own code. The ground truth comes from
+  `evaluate.ground_truth_from_rows`, the function `load_ground_truth` builds it with, over evidence
+  resolved by `ingest.resolve_element`, the rule `claim_evidence` is written with. The summary
+  applies `article_recall_at_k`, `gold_page_rank`, `covered_units`, `evidence_recall_at_k` and
+  `unit_coverage_at_k` to the hits in search order, with each chunk's sentences from
+  `chunk_sentence_ids`. A second definition could disagree with the reported numbers, and a reader
+  comparing the page with `results/` could not tell which one is right. Checked read-only on the
+  real databases: for each database's own claims (75 on the demo, 3,000 on S1) the resolved ground
+  truth equals `load_ground_truth`, and the page's summary at k = 5 equals `evaluate()`'s outcome
+  for the claim (same hits, gold-page rank, evidence recall and unit coverage): 0 differences.
+- The marks stay outside the timed statement. They need one more lookup (`chunk_sentence`). Inside
+  the timing it would add to `timing_ms.sql`, and the SQL box would no longer show the statement the
+  time belongs to. So the search statement is timed alone, as in the evaluation, and the lookup runs
+  after it on the same connection.
+- Which claims are offered: a claim file belongs to a database when the database's `claim` table
+  holds exactly the file's claim ids (the ingest writes that table from the corpus's own claims
+  file; `ingest_meta`'s checksum would not do, because S1 was loaded from a FEVEROUS-format copy of
+  `claims_3000.jsonl`). Without such a file the picker is hidden. A claim of either file is offered
+  when every page its evidence cites is in `page` and every sentence or list item of it resolves to
+  a `sentence` row; one whose pages are there but whose sentence does not resolve is left out and
+  listed by `GET /api/claims`. A claim in both files is shown once, with both. The rule is checked
+  when `wikilense serve` starts.
+- The page offers at most two databases: the demo database and `wikilense_s1`, the latter only when
+  it exists, has the schema and holds chunks. The `database` parameter accepts only these names, so
+  the API never reaches another database, and each request opens its own connection to the chosen
+  one.
+- "Repeat 5 times" runs the statement five times on the same connection after one embedding; the
+  page shows the median and the range, and the hits of the first run.
+- The examples are fixed (`picker.EXAMPLES`), so the same links work on every server, including one
+  without S1. The candidates are the 40 claims offered on both the demo and S1 that have a
+  sentence-only evidence set. For SUPPORTS, REFUTES and NOT ENOUGH INFO, in that order, the example
+  is the candidate of that label with the lowest SHA-256 of `example-2026-11-20:<claim id>`, among
+  those citing no page an earlier example cites: 36003 (Andorra), 22563 (Asteraceae) and 87976
+  (Lincoln, England). The filter example is 36003 with `max_words` 8,375, one word below Andorra's
+  8,376 on both databases. The free-text example asks about the Black Sea, a page of both. The
+  two-page example, S1 only, is the S1 claim whose every evidence set needs two pages with the
+  lowest such hash: 58230. `picker.pick_examples` is the rule; applied to the real catalogs it gives
+  these ids.
+
 ## Page metadata and the four filters
 
 The four metadata filters are: only articles in this category, longer than this, edited since that
