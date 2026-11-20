@@ -55,7 +55,7 @@ import contextlib
 import hashlib
 import logging
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -292,6 +292,27 @@ class _Loader:
                 batch = rows[start : start + self._batch_rows]
                 self.inserted[table] += db.insert_rows(self._conn, table, columns, batch)
             rows.clear()
+
+
+def resolve_element(
+    element_id: str,
+    page_ids: Mapping[str, int],
+    sentence_ids: Mapping[tuple[int, str], int],
+) -> tuple[str, str, str, int | None, int | None]:
+    """Return ``(title, element_type, key, page_id, sentence_id)`` of one gold evidence element.
+
+    ``page_ids`` maps NFC page titles to ``page_id``, ``sentence_ids`` maps ``(page_id,
+    element_key)`` to ``sentence_id``. The page resolves by title; a sentence or list item also
+    resolves to its text unit when that page holds it, a table element only to the page. This is
+    the rule ``claim_evidence`` is written with, and the web page's claim picker resolves claim
+    files with it. Raises ``ValueError`` when ``element_id`` is not a FEVEROUS element id.
+    """
+    title, element_type, key = parse_element_id(element_id)
+    page_id = page_ids.get(title)
+    sentence_id = None
+    if page_id is not None and element_type in _TEXT_UNIT_TYPES:
+        sentence_id = sentence_ids.get((page_id, key))
+    return title, element_type, key, page_id, sentence_id
 
 
 def sha256_of_file(path: str | Path) -> str:
@@ -756,13 +777,11 @@ class _Ingest:
                 for position, element_id in enumerate(evidence_set["content"]):
                     with self.timer.stage("resolve"):
                         try:
-                            title, element_type, key = parse_element_id(element_id)
+                            title, element_type, _key, page_id, sentence_id = resolve_element(
+                                element_id, self.page_ids, self.sentence_ids
+                            )
                         except ValueError as exc:
                             raise IngestError(f"claim {claim_id}: {exc}") from exc
-                        page_id = self.page_ids.get(title)
-                        sentence_id = None
-                        if page_id is not None and element_type in _TEXT_UNIT_TYPES:
-                            sentence_id = self.sentence_ids.get((page_id, key))
                     with self.timer.stage("load"):
                         self.loader.add(
                             "claim_evidence",

@@ -376,6 +376,20 @@ def load_ground_truth(conn: pymysql.Connection) -> list[ClaimTruth]:
         claim_rows = cur.fetchall()
         cur.execute(EVIDENCE_SQL)
         evidence_rows = cur.fetchall()
+    return ground_truth_from_rows(claim_rows, evidence_rows)
+
+
+def ground_truth_from_rows(
+    claim_rows: Sequence[Sequence[Any]], evidence_rows: Sequence[Sequence[Any]]
+) -> list[ClaimTruth]:
+    """Return one :class:`ClaimTruth` per claim row, in the order of ``claim_rows``.
+
+    ``claim_rows`` are ``(claim_id, split, text, label)`` as :data:`CLAIMS_SQL` selects them;
+    ``evidence_rows`` are ``(claim_id, evidence_set, element_type, page_id, page_title,
+    sentence_id)`` as :data:`EVIDENCE_SQL` selects them, ordered by claim, set and position.
+    :func:`load_ground_truth` reads both from the tables; the web page's claim picker
+    (``wikilense.picker``) builds the same rows for a claim file resolved against a database.
+    """
     gold_pages: dict[int, set[int]] = defaultdict(set)
     gold_titles: dict[int, set[str]] = defaultdict(set)
     elements: dict[tuple[int, int], list[tuple[str, int | None]]] = defaultdict(list)
