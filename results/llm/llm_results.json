@@ -3889,5 +3889,5341 @@
     "en.wikisource.org": 5
    }
   }
+ },
+ "multihop": {
+  "scope": "supported and refuted claims of the original run, NOT ENOUGH INFO left out; equal weight = the mean of the supported and the refuted figure",
+  "claims_file": "data/scaled/claims_3000.jsonl",
+  "claims_sha256": "905cf1281d01e310702e820121864ac96ab0c07d5e857c24ad2d1314f532ab8a",
+  "n": 2000,
+  "bootstrap_seed": 20261121,
+  "bootstrap_resamples": 10000,
+  "small_tag_below": 100,
+  "tag_order": [
+   "Other",
+   "Multi-hop Reasoning",
+   "Entity Disambiguation",
+   "Search terms not in claim",
+   "Numerical Reasoning",
+   "Combining Tables and Text"
+  ],
+  "meanings": {
+   "two_or_more_articles": 600,
+   "multi_hop_reasoning_tag": 488,
+   "both": 427,
+   "both_per_label": {
+    "SUPPORTS": 266,
+    "REFUTES": 161
+   }
+  },
+  "repeats_per_kind": {
+   "single": 210,
+   "needs2": 90
+  },
+  "kinds": {
+   "counts": {
+    "single": {
+     "SUPPORTS": 700,
+     "REFUTES": 700
+    },
+    "needs2": {
+     "SUPPORTS": 300,
+     "REFUTES": 300
+    }
+   },
+   "accuracy": {
+    "no_retrieval": {
+     "single": {
+      "SUPPORTS": {
+       "right": 194,
+       "n": 700,
+       "acc": 0.27714285714285714,
+       "wilson": [
+        0.24526971333745548,
+        0.3114487301305067
+       ],
+       "pct": "27.7",
+       "wilson_pct": [
+        "24.5",
+        "31.1"
+       ]
+      },
+      "REFUTES": {
+       "right": 275,
+       "n": 700,
+       "acc": 0.39285714285714285,
+       "wilson": [
+        0.35735596121543745,
+        0.4295279058364675
+       ],
+       "pct": "39.3",
+       "wilson_pct": [
+        "35.7",
+        "43.0"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.335,
+       "point_pct": "33.5",
+       "bootstrap": [
+        0.3107142857142857,
+        0.3592857142857143
+       ],
+       "bootstrap_pct": [
+        "31.1",
+        "35.9"
+       ]
+      }
+     },
+     "needs2": {
+      "SUPPORTS": {
+       "right": 111,
+       "n": 300,
+       "acc": 0.37,
+       "wilson": [
+        0.3173308011545093,
+        0.42595649064490193
+       ],
+       "pct": "37.0",
+       "wilson_pct": [
+        "31.7",
+        "42.6"
+       ]
+      },
+      "REFUTES": {
+       "right": 125,
+       "n": 300,
+       "acc": 0.4166666666666667,
+       "wilson": [
+        0.36227512359534986,
+        0.4731654480709394
+       ],
+       "pct": "41.7",
+       "wilson_pct": [
+        "36.2",
+        "47.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.3933333333333333,
+       "point_pct": "39.3",
+       "bootstrap": [
+        0.355,
+        0.43166666666666664
+       ],
+       "bootstrap_pct": [
+        "35.5",
+        "43.2"
+       ]
+      }
+     }
+    },
+    "web": {
+     "single": {
+      "SUPPORTS": {
+       "right": 562,
+       "n": 700,
+       "acc": 0.8028571428571428,
+       "wilson": [
+        0.771765747569667,
+        0.8306425215636152
+       ],
+       "pct": "80.3",
+       "wilson_pct": [
+        "77.2",
+        "83.1"
+       ]
+      },
+      "REFUTES": {
+       "right": 618,
+       "n": 700,
+       "acc": 0.8828571428571429,
+       "wilson": [
+        0.8569171236670827,
+        0.904617858067444
+       ],
+       "pct": "88.3",
+       "wilson_pct": [
+        "85.7",
+        "90.5"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8428571428571429,
+       "point_pct": "84.3",
+       "bootstrap": [
+        0.8242857142857143,
+        0.8614285714285714
+       ],
+       "bootstrap_pct": [
+        "82.4",
+        "86.1"
+       ]
+      }
+     },
+     "needs2": {
+      "SUPPORTS": {
+       "right": 238,
+       "n": 300,
+       "acc": 0.7933333333333333,
+       "wilson": [
+        0.7439440144288735,
+        0.8353051733057882
+       ],
+       "pct": "79.3",
+       "wilson_pct": [
+        "74.4",
+        "83.5"
+       ]
+      },
+      "REFUTES": {
+       "right": 220,
+       "n": 300,
+       "acc": 0.7333333333333333,
+       "wilson": [
+        0.6805715919237879,
+        0.7801948074106021
+       ],
+       "pct": "73.3",
+       "wilson_pct": [
+        "68.1",
+        "78.0"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7633333333333333,
+       "point_pct": "76.3",
+       "bootstrap": [
+        0.7283333333333333,
+        0.7966666666666666
+       ],
+       "bootstrap_pct": [
+        "72.8",
+        "79.7"
+       ]
+      }
+     }
+    },
+    "retrieved": {
+     "single": {
+      "SUPPORTS": {
+       "right": 593,
+       "n": 700,
+       "acc": 0.8471428571428572,
+       "wilson": [
+        0.8185955106747251,
+        0.8719007600771034
+       ],
+       "pct": "84.7",
+       "wilson_pct": [
+        "81.9",
+        "87.2"
+       ]
+      },
+      "REFUTES": {
+       "right": 603,
+       "n": 700,
+       "acc": 0.8614285714285714,
+       "wilson": [
+        0.8338548002645919,
+        0.8850569548803157
+       ],
+       "pct": "86.1",
+       "wilson_pct": [
+        "83.4",
+        "88.5"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8542857142857143,
+       "point_pct": "85.4",
+       "bootstrap": [
+        0.8357142857142856,
+        0.8721428571428571
+       ],
+       "bootstrap_pct": [
+        "83.6",
+        "87.2"
+       ]
+      }
+     },
+     "needs2": {
+      "SUPPORTS": {
+       "right": 257,
+       "n": 300,
+       "acc": 0.8566666666666667,
+       "wilson": [
+        0.8124985303950185,
+        0.8918158228732633
+       ],
+       "pct": "85.7",
+       "wilson_pct": [
+        "81.2",
+        "89.2"
+       ]
+      },
+      "REFUTES": {
+       "right": 219,
+       "n": 300,
+       "acc": 0.73,
+       "wilson": [
+        0.6770872468075737,
+        0.7770967753934679
+       ],
+       "pct": "73.0",
+       "wilson_pct": [
+        "67.7",
+        "77.7"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7933333333333333,
+       "point_pct": "79.3",
+       "bootstrap": [
+        0.76,
+        0.825
+       ],
+       "bootstrap_pct": [
+        "76.0",
+        "82.5"
+       ]
+      }
+     }
+    },
+    "gold": {
+     "single": {
+      "SUPPORTS": {
+       "right": 596,
+       "n": 700,
+       "acc": 0.8514285714285714,
+       "wilson": [
+        0.8231644740949591,
+        0.875856441974793
+       ],
+       "pct": "85.1",
+       "wilson_pct": [
+        "82.3",
+        "87.6"
+       ]
+      },
+      "REFUTES": {
+       "right": 579,
+       "n": 700,
+       "acc": 0.8271428571428572,
+       "wilson": [
+        0.7973650417900913,
+        0.8533495508114259
+       ],
+       "pct": "82.7",
+       "wilson_pct": [
+        "79.7",
+        "85.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8392857142857143,
+       "point_pct": "83.9",
+       "bootstrap": [
+        0.8192857142857144,
+        0.8578571428571429
+       ],
+       "bootstrap_pct": [
+        "81.9",
+        "85.8"
+       ]
+      }
+     },
+     "needs2": {
+      "SUPPORTS": {
+       "right": 261,
+       "n": 300,
+       "acc": 0.87,
+       "wilson": [
+        0.8272186992368379,
+        0.9034251625648376
+       ],
+       "pct": "87.0",
+       "wilson_pct": [
+        "82.7",
+        "90.3"
+       ]
+      },
+      "REFUTES": {
+       "right": 221,
+       "n": 300,
+       "acc": 0.7366666666666667,
+       "wilson": [
+        0.6840594845533765,
+        0.7832892919143619
+       ],
+       "pct": "73.7",
+       "wilson_pct": [
+        "68.4",
+        "78.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8033333333333333,
+       "point_pct": "80.3",
+       "bootstrap": [
+        0.7716666666666667,
+        0.8333333333333334
+       ],
+       "bootstrap_pct": [
+        "77.2",
+        "83.3"
+       ]
+      }
+     }
+    }
+   },
+   "gap_one_minus_two": {
+    "no_retrieval": {
+     "SUPPORTS": {
+      "first": {
+       "right": 194,
+       "n": 700,
+       "acc": 0.27714285714285714,
+       "wilson": [
+        0.24526971333745548,
+        0.3114487301305067
+       ],
+       "pct": "27.7",
+       "wilson_pct": [
+        "24.5",
+        "31.1"
+       ]
+      },
+      "second": {
+       "right": 111,
+       "n": 300,
+       "acc": 0.37,
+       "wilson": [
+        0.3173308011545093,
+        0.42595649064490193
+       ],
+       "pct": "37.0",
+       "wilson_pct": [
+        "31.7",
+        "42.6"
+       ]
+      },
+      "difference": -0.09285714285714286,
+      "interval": [
+       -0.1572545507345785,
+       -0.03000066006920296
+      ],
+      "difference_pct": "-9.3",
+      "interval_pct": [
+       "-15.7",
+       "-3.0"
+      ],
+      "level": false
+     },
+     "REFUTES": {
+      "first": {
+       "right": 275,
+       "n": 700,
+       "acc": 0.39285714285714285,
+       "wilson": [
+        0.35735596121543745,
+        0.4295279058364675
+       ],
+       "pct": "39.3",
+       "wilson_pct": [
+        "35.7",
+        "43.0"
+       ]
+      },
+      "second": {
+       "right": 125,
+       "n": 300,
+       "acc": 0.4166666666666667,
+       "wilson": [
+        0.36227512359534986,
+        0.4731654480709394
+       ],
+       "pct": "41.7",
+       "wilson_pct": [
+        "36.2",
+        "47.3"
+       ]
+      },
+      "difference": -0.023809523809523836,
+      "interval": [
+       -0.09053617664124584,
+       0.04178914092661787
+      ],
+      "difference_pct": "-2.4",
+      "interval_pct": [
+       "-9.1",
+       "4.2"
+      ],
+      "level": true
+     },
+     "equal_weight": {
+      "point": -0.058333333333333334,
+      "point_pct": "-5.8",
+      "bootstrap": [
+       -0.10452380952380946,
+       -0.012857142857142845
+      ],
+      "bootstrap_pct": [
+       "-10.5",
+       "-1.3"
+      ],
+      "level": false
+     }
+    },
+    "web": {
+     "SUPPORTS": {
+      "first": {
+       "right": 562,
+       "n": 700,
+       "acc": 0.8028571428571428,
+       "wilson": [
+        0.771765747569667,
+        0.8306425215636152
+       ],
+       "pct": "80.3",
+       "wilson_pct": [
+        "77.2",
+        "83.1"
+       ]
+      },
+      "second": {
+       "right": 238,
+       "n": 300,
+       "acc": 0.7933333333333333,
+       "wilson": [
+        0.7439440144288735,
+        0.8353051733057882
+       ],
+       "pct": "79.3",
+       "wilson_pct": [
+        "74.4",
+        "83.5"
+       ]
+      },
+      "difference": 0.00952380952380949,
+      "interval": [
+       -0.042709419474553596,
+       0.06619242598573243
+      ],
+      "difference_pct": "1.0",
+      "interval_pct": [
+       "-4.3",
+       "6.6"
+      ],
+      "level": true
+     },
+     "REFUTES": {
+      "first": {
+       "right": 618,
+       "n": 700,
+       "acc": 0.8828571428571429,
+       "wilson": [
+        0.8569171236670827,
+        0.904617858067444
+       ],
+       "pct": "88.3",
+       "wilson_pct": [
+        "85.7",
+        "90.5"
+       ]
+      },
+      "second": {
+       "right": 220,
+       "n": 300,
+       "acc": 0.7333333333333333,
+       "wilson": [
+        0.6805715919237879,
+        0.7801948074106021
+       ],
+       "pct": "73.3",
+       "wilson_pct": [
+        "68.1",
+        "78.0"
+       ]
+      },
+      "difference": 0.14952380952380961,
+      "interval": [
+       0.09596186082629463,
+       0.20659683365107628
+      ],
+      "difference_pct": "15.0",
+      "interval_pct": [
+       "9.6",
+       "20.7"
+      ],
+      "level": false
+     },
+     "equal_weight": {
+      "point": 0.07952380952380952,
+      "point_pct": "8.0",
+      "bootstrap": [
+       0.04166666666666663,
+       0.11904761904761907
+      ],
+      "bootstrap_pct": [
+       "4.2",
+       "11.9"
+      ],
+      "level": false
+     }
+    },
+    "retrieved": {
+     "SUPPORTS": {
+      "first": {
+       "right": 593,
+       "n": 700,
+       "acc": 0.8471428571428572,
+       "wilson": [
+        0.8185955106747251,
+        0.8719007600771034
+       ],
+       "pct": "84.7",
+       "wilson_pct": [
+        "81.9",
+        "87.2"
+       ]
+      },
+      "second": {
+       "right": 257,
+       "n": 300,
+       "acc": 0.8566666666666667,
+       "wilson": [
+        0.8124985303950185,
+        0.8918158228732633
+       ],
+       "pct": "85.7",
+       "wilson_pct": [
+        "81.2",
+        "89.2"
+       ]
+      },
+      "difference": -0.00952380952380949,
+      "interval": [
+       -0.05480530875260384,
+       0.041109954106918555
+      ],
+      "difference_pct": "-1.0",
+      "interval_pct": [
+       "-5.5",
+       "4.1"
+      ],
+      "level": true
+     },
+     "REFUTES": {
+      "first": {
+       "right": 603,
+       "n": 700,
+       "acc": 0.8614285714285714,
+       "wilson": [
+        0.8338548002645919,
+        0.8850569548803157
+       ],
+       "pct": "86.1",
+       "wilson_pct": [
+        "83.4",
+        "88.5"
+       ]
+      },
+      "second": {
+       "right": 219,
+       "n": 300,
+       "acc": 0.73,
+       "wilson": [
+        0.6770872468075737,
+        0.7770967753934679
+       ],
+       "pct": "73.0",
+       "wilson_pct": [
+        "67.7",
+        "77.7"
+       ]
+      },
+      "difference": 0.13142857142857145,
+      "interval": [
+       0.0768536769379151,
+       0.18937734151858523
+      ],
+      "difference_pct": "13.1",
+      "interval_pct": [
+       "7.7",
+       "18.9"
+      ],
+      "level": false
+     },
+     "equal_weight": {
+      "point": 0.06095238095238095,
+      "point_pct": "6.1",
+      "bootstrap": [
+       0.024285714285714244,
+       0.09857738095238093
+      ],
+      "bootstrap_pct": [
+       "2.4",
+       "9.9"
+      ],
+      "level": false
+     }
+    },
+    "gold": {
+     "SUPPORTS": {
+      "first": {
+       "right": 596,
+       "n": 700,
+       "acc": 0.8514285714285714,
+       "wilson": [
+        0.8231644740949591,
+        0.875856441974793
+       ],
+       "pct": "85.1",
+       "wilson_pct": [
+        "82.3",
+        "87.6"
+       ]
+      },
+      "second": {
+       "right": 261,
+       "n": 300,
+       "acc": 0.87,
+       "wilson": [
+        0.8272186992368379,
+        0.9034251625648376
+       ],
+       "pct": "87.0",
+       "wilson_pct": [
+        "82.7",
+        "90.3"
+       ]
+      },
+      "difference": -0.018571428571428572,
+      "interval": [
+       -0.062344715980186614,
+       0.030692762829741226
+      ],
+      "difference_pct": "-1.9",
+      "interval_pct": [
+       "-6.2",
+       "3.1"
+      ],
+      "level": true
+     },
+     "REFUTES": {
+      "first": {
+       "right": 579,
+       "n": 700,
+       "acc": 0.8271428571428572,
+       "wilson": [
+        0.7973650417900913,
+        0.8533495508114259
+       ],
+       "pct": "82.7",
+       "wilson_pct": [
+        "79.7",
+        "85.3"
+       ]
+      },
+      "second": {
+       "right": 221,
+       "n": 300,
+       "acc": 0.7366666666666667,
+       "wilson": [
+        0.6840594845533765,
+        0.7832892919143619
+       ],
+       "pct": "73.7",
+       "wilson_pct": [
+        "68.4",
+        "78.3"
+       ]
+      },
+      "difference": 0.09047619047619049,
+      "interval": [
+       0.035155421571822845,
+       0.14924953820234166
+      ],
+      "difference_pct": "9.0",
+      "interval_pct": [
+       "3.5",
+       "14.9"
+      ],
+      "level": false
+     },
+     "equal_weight": {
+      "point": 0.03595238095238095,
+      "point_pct": "3.6",
+      "bootstrap": [
+       -0.0004761904761904079,
+       0.0726190476190477
+      ],
+      "bootstrap_pct": [
+       "-0.0",
+       "7.3"
+      ],
+      "level": true
+     }
+    }
+   },
+   "paired": {
+    "single": {
+     "retrieved-no_retrieval": {
+      "SUPPORTS": {
+       "n": 700,
+       "b_only_first_right": 408,
+       "c_only_second_right": 9,
+       "both_right": 185,
+       "both_wrong": 98,
+       "difference": 0.57,
+       "interval": [
+        0.5314483619025079,
+        0.608551638097492
+       ],
+       "difference_pct": "57.0",
+       "interval_pct": [
+        "53.1",
+        "60.9"
+       ],
+       "interval_pct_2dp": [
+        "53.14",
+        "60.86"
+       ],
+       "level": false,
+       "mcnemar_p": 5.819308638238958e-108,
+       "mcnemar_p_text": "5.8e-108"
+      },
+      "REFUTES": {
+       "n": 700,
+       "b_only_first_right": 338,
+       "c_only_second_right": 10,
+       "both_right": 265,
+       "both_wrong": 87,
+       "difference": 0.4685714285714286,
+       "interval": [
+        0.4295409379262932,
+        0.507601919216564
+       ],
+       "difference_pct": "46.9",
+       "interval_pct": [
+        "43.0",
+        "50.8"
+       ],
+       "interval_pct_2dp": [
+        "42.95",
+        "50.76"
+       ],
+       "level": false,
+       "mcnemar_p": 2.264159058625214e-86,
+       "mcnemar_p_text": "2.3e-86"
+      },
+      "equal_weight": {
+       "point": 0.5192857142857142,
+       "point_pct": "51.9",
+       "bootstrap": [
+        0.49214285714285716,
+        0.5457142857142858
+       ],
+       "bootstrap_pct": [
+        "49.2",
+        "54.6"
+       ],
+       "level": false
+      }
+     },
+     "retrieved-gold": {
+      "SUPPORTS": {
+       "n": 700,
+       "b_only_first_right": 29,
+       "c_only_second_right": 32,
+       "both_right": 564,
+       "both_wrong": 75,
+       "difference": -0.004285714285714286,
+       "interval": [
+        -0.026152108592961194,
+        0.017580680021532624
+       ],
+       "difference_pct": "-0.4",
+       "interval_pct": [
+        "-2.6",
+        "1.8"
+       ],
+       "interval_pct_2dp": [
+        "-2.62",
+        "1.76"
+       ],
+       "level": true,
+       "mcnemar_p": 0.798152627305718,
+       "mcnemar_p_text": "0.80"
+      },
+      "REFUTES": {
+       "n": 700,
+       "b_only_first_right": 42,
+       "c_only_second_right": 18,
+       "both_right": 561,
+       "both_wrong": 79,
+       "difference": 0.03428571428571429,
+       "interval": [
+        0.012746243540127246,
+        0.05582518503130133
+       ],
+       "difference_pct": "3.4",
+       "interval_pct": [
+        "1.3",
+        "5.6"
+       ],
+       "interval_pct_2dp": [
+        "1.27",
+        "5.58"
+       ],
+       "level": false,
+       "mcnemar_p": 0.002670436282807066,
+       "mcnemar_p_text": "0.0027"
+      },
+      "equal_weight": {
+       "point": 0.015,
+       "point_pct": "1.5",
+       "bootstrap": [
+        -1.785714285723369e-05,
+        0.030714285714285694
+       ],
+       "bootstrap_pct": [
+        "-0.0",
+        "3.1"
+       ],
+       "level": true
+      }
+     },
+     "retrieved-web": {
+      "SUPPORTS": {
+       "n": 700,
+       "b_only_first_right": 68,
+       "c_only_second_right": 37,
+       "both_right": 525,
+       "both_wrong": 70,
+       "difference": 0.04428571428571428,
+       "interval": [
+        0.015782437281131108,
+        0.07278899129029745
+       ],
+       "difference_pct": "4.4",
+       "interval_pct": [
+        "1.6",
+        "7.3"
+       ],
+       "interval_pct_2dp": [
+        "1.58",
+        "7.28"
+       ],
+       "level": false,
+       "mcnemar_p": 0.003220989868798528,
+       "mcnemar_p_text": "0.0032"
+      },
+      "REFUTES": {
+       "n": 700,
+       "b_only_first_right": 23,
+       "c_only_second_right": 38,
+       "both_right": 580,
+       "both_wrong": 59,
+       "difference": -0.02142857142857143,
+       "interval": [
+        -0.04323957782442579,
+        0.00038243496728293525
+       ],
+       "difference_pct": "-2.1",
+       "interval_pct": [
+        "-4.3",
+        "0.0"
+       ],
+       "interval_pct_2dp": [
+        "-4.32",
+        "0.04"
+       ],
+       "level": true,
+       "mcnemar_p": 0.07217743850092258,
+       "mcnemar_p_text": "0.072"
+      },
+      "equal_weight": {
+       "point": 0.011428571428571429,
+       "point_pct": "1.1",
+       "bootstrap": [
+        -0.0071428571428571175,
+        0.028571428571428692
+       ],
+       "bootstrap_pct": [
+        "-0.7",
+        "2.9"
+       ],
+       "level": true
+      }
+     }
+    },
+    "needs2": {
+     "retrieved-no_retrieval": {
+      "SUPPORTS": {
+       "n": 300,
+       "b_only_first_right": 151,
+       "c_only_second_right": 5,
+       "both_right": 106,
+       "both_wrong": 38,
+       "difference": 0.4866666666666667,
+       "interval": [
+        0.4264512095640749,
+        0.5468821237692585
+       ],
+       "difference_pct": "48.7",
+       "interval_pct": [
+        "42.6",
+        "54.7"
+       ],
+       "interval_pct_2dp": [
+        "42.65",
+        "54.69"
+       ],
+       "level": false,
+       "mcnemar_p": 1.6334509634623737e-38,
+       "mcnemar_p_text": "1.6e-38"
+      },
+      "REFUTES": {
+       "n": 300,
+       "b_only_first_right": 101,
+       "c_only_second_right": 7,
+       "both_right": 118,
+       "both_wrong": 74,
+       "difference": 0.31333333333333335,
+       "interval": [
+        0.2554306492018561,
+        0.3712360174648106
+       ],
+       "difference_pct": "31.3",
+       "interval_pct": [
+        "25.5",
+        "37.1"
+       ],
+       "interval_pct_2dp": [
+        "25.54",
+        "37.12"
+       ],
+       "level": false,
+       "mcnemar_p": 1.8435809190426689e-22,
+       "mcnemar_p_text": "1.8e-22"
+      },
+      "equal_weight": {
+       "point": 0.4,
+       "point_pct": "40.0",
+       "bootstrap": [
+        0.3583333333333333,
+        0.44166666666666665
+       ],
+       "bootstrap_pct": [
+        "35.8",
+        "44.2"
+       ],
+       "level": false
+      }
+     },
+     "retrieved-gold": {
+      "SUPPORTS": {
+       "n": 300,
+       "b_only_first_right": 13,
+       "c_only_second_right": 17,
+       "both_right": 244,
+       "both_wrong": 26,
+       "difference": -0.013333333333333334,
+       "interval": [
+        -0.049086051126944905,
+        0.022419384460278233
+       ],
+       "difference_pct": "-1.3",
+       "interval_pct": [
+        "-4.9",
+        "2.2"
+       ],
+       "interval_pct_2dp": [
+        "-4.91",
+        "2.24"
+       ],
+       "level": true,
+       "mcnemar_p": 0.584664711728692,
+       "mcnemar_p_text": "0.58"
+      },
+      "REFUTES": {
+       "n": 300,
+       "b_only_first_right": 18,
+       "c_only_second_right": 20,
+       "both_right": 201,
+       "both_wrong": 61,
+       "difference": -0.006666666666666667,
+       "interval": [
+        -0.04693377188870818,
+        0.03360043855537485
+       ],
+       "difference_pct": "-0.7",
+       "interval_pct": [
+        "-4.7",
+        "3.4"
+       ],
+       "interval_pct_2dp": [
+        "-4.69",
+        "3.36"
+       ],
+       "level": true,
+       "mcnemar_p": 0.8714146793645341,
+       "mcnemar_p_text": "0.87"
+      },
+      "equal_weight": {
+       "point": -0.01,
+       "point_pct": "-1.0",
+       "bootstrap": [
+        -0.036666666666666736,
+        0.016666666666666607
+       ],
+       "bootstrap_pct": [
+        "-3.7",
+        "1.7"
+       ],
+       "level": true
+      }
+     },
+     "retrieved-web": {
+      "SUPPORTS": {
+       "n": 300,
+       "b_only_first_right": 31,
+       "c_only_second_right": 12,
+       "both_right": 226,
+       "both_wrong": 31,
+       "difference": 0.06333333333333334,
+       "interval": [
+        0.02109511016643987,
+        0.10557155650022682
+       ],
+       "difference_pct": "6.3",
+       "interval_pct": [
+        "2.1",
+        "10.6"
+       ],
+       "interval_pct_2dp": [
+        "2.11",
+        "10.56"
+       ],
+       "level": false,
+       "mcnemar_p": 0.005401572654591291,
+       "mcnemar_p_text": "0.0054"
+      },
+      "REFUTES": {
+       "n": 300,
+       "b_only_first_right": 23,
+       "c_only_second_right": 24,
+       "both_right": 196,
+       "both_wrong": 57,
+       "difference": -0.0033333333333333335,
+       "interval": [
+        -0.04812202172010581,
+        0.04145535505343914
+       ],
+       "difference_pct": "-0.3",
+       "interval_pct": [
+        "-4.8",
+        "4.1"
+       ],
+       "interval_pct_2dp": [
+        "-4.81",
+        "4.15"
+       ],
+       "level": true,
+       "mcnemar_p": 1.0,
+       "mcnemar_p_text": "1.0"
+      },
+      "equal_weight": {
+       "point": 0.03,
+       "point_pct": "3.0",
+       "bootstrap": [
+        0.0,
+        0.06000000000000005
+       ],
+       "bootstrap_pct": [
+        "0.0",
+        "6.0"
+       ],
+       "level": true
+      }
+     }
+    }
+   },
+   "paired_change_two_minus_one": {
+    "retrieved-no_retrieval": {
+     "SUPPORTS": {
+      "point": -0.08333333333333333,
+      "point_pct": "-8.3",
+      "bootstrap": [
+       -0.15714285714285714,
+       -0.010000000000000009
+      ],
+      "bootstrap_pct": [
+       "-15.7",
+       "-1.0"
+      ],
+      "level": false
+     },
+     "REFUTES": {
+      "point": -0.15523809523809523,
+      "point_pct": "-15.5",
+      "bootstrap": [
+       -0.2257142857142857,
+       -0.08571428571428569
+      ],
+      "bootstrap_pct": [
+       "-22.6",
+       "-8.6"
+      ],
+      "level": false
+     },
+     "equal_weight": {
+      "point": -0.11928571428571429,
+      "point_pct": "-11.9",
+      "bootstrap": [
+       -0.16904761904761906,
+       -0.06880952380952388
+      ],
+      "bootstrap_pct": [
+       "-16.9",
+       "-6.9"
+      ],
+      "level": false
+     }
+    },
+    "retrieved-gold": {
+     "SUPPORTS": {
+      "point": -0.009047619047619047,
+      "point_pct": "-0.9",
+      "bootstrap": [
+       -0.0519047619047619,
+       0.03190476190476199
+      ],
+      "bootstrap_pct": [
+       "-5.2",
+       "3.2"
+      ],
+      "level": true
+     },
+     "REFUTES": {
+      "point": -0.040952380952380955,
+      "point_pct": "-4.1",
+      "bootstrap": [
+       -0.08714285714285708,
+       0.004285714285714337
+      ],
+      "bootstrap_pct": [
+       "-8.7",
+       "0.4"
+      ],
+      "level": true
+     },
+     "equal_weight": {
+      "point": -0.025,
+      "point_pct": "-2.5",
+      "bootstrap": [
+       -0.056190476190476124,
+       0.005952380952380931
+      ],
+      "bootstrap_pct": [
+       "-5.6",
+       "0.6"
+      ],
+      "level": true
+     }
+    },
+    "retrieved-web": {
+     "SUPPORTS": {
+      "point": 0.01904761904761905,
+      "point_pct": "1.9",
+      "bootstrap": [
+       -0.030476190476190546,
+       0.07047619047619047
+      ],
+      "bootstrap_pct": [
+       "-3.0",
+       "7.0"
+      ],
+      "level": true
+     },
+     "REFUTES": {
+      "point": 0.018095238095238095,
+      "point_pct": "1.8",
+      "bootstrap": [
+       -0.03190476190476188,
+       0.0685714285714284
+      ],
+      "bootstrap_pct": [
+       "-3.2",
+       "6.9"
+      ],
+      "level": true
+     },
+     "equal_weight": {
+      "point": 0.018571428571428572,
+      "point_pct": "1.9",
+      "bootstrap": [
+       -0.016428571428571462,
+       0.05452380952380953
+      ],
+      "bootstrap_pct": [
+       "-1.6",
+       "5.5"
+      ],
+      "level": true
+     }
+    }
+   }
+  },
+  "coverage": {
+   "single": {
+    "gold_page_in_top5": {
+     "SUPPORTS": {
+      "right": 696,
+      "n": 700,
+      "acc": 0.9942857142857143,
+      "wilson": [
+       0.9854000755767771,
+       0.9977756844237686
+      ],
+      "pct": "99.4",
+      "wilson_pct": [
+       "98.5",
+       "99.8"
+      ]
+     },
+     "REFUTES": {
+      "right": 694,
+      "n": 700,
+      "acc": 0.9914285714285714,
+      "wilson": [
+       0.9814267233134978,
+       0.996065939808432
+      ],
+      "pct": "99.1",
+      "wilson_pct": [
+       "98.1",
+       "99.6"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.9928571428571429,
+      "point_pct": "99.3",
+      "bootstrap": [
+       0.9878571428571429,
+       0.9971428571428571
+      ],
+      "bootstrap_pct": [
+       "98.8",
+       "99.7"
+      ]
+     }
+    },
+    "gold_set_in_top5": {
+     "SUPPORTS": {
+      "right": 696,
+      "n": 700,
+      "acc": 0.9942857142857143,
+      "wilson": [
+       0.9854000755767771,
+       0.9977756844237686
+      ],
+      "pct": "99.4",
+      "wilson_pct": [
+       "98.5",
+       "99.8"
+      ]
+     },
+     "REFUTES": {
+      "right": 694,
+      "n": 700,
+      "acc": 0.9914285714285714,
+      "wilson": [
+       0.9814267233134978,
+       0.996065939808432
+      ],
+      "pct": "99.1",
+      "wilson_pct": [
+       "98.1",
+       "99.6"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.9928571428571429,
+      "point_pct": "99.3",
+      "bootstrap": [
+       0.9878571428571429,
+       0.9971428571428571
+      ],
+      "bootstrap_pct": [
+       "98.8",
+       "99.7"
+      ]
+     }
+    },
+    "rag_when_set_in_top5": {
+     "SUPPORTS": {
+      "right": 593,
+      "n": 696,
+      "acc": 0.8520114942528736,
+      "wilson": [
+       0.8237000452910089,
+       0.8764583905607609
+      ],
+      "pct": "85.2",
+      "wilson_pct": [
+       "82.4",
+       "87.6"
+      ]
+     },
+     "REFUTES": {
+      "right": 601,
+      "n": 694,
+      "acc": 0.8659942363112392,
+      "wilson": [
+       0.838623938716999,
+       0.8893349562528622
+      ],
+      "pct": "86.6",
+      "wilson_pct": [
+       "83.9",
+       "88.9"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.8590028652820564,
+      "point_pct": "85.9",
+      "bootstrap": [
+       0.8403164232005035,
+       0.8770040929643248
+      ],
+      "bootstrap_pct": [
+       "84.0",
+       "87.7"
+      ]
+     }
+    },
+    "rag_when_set_not_in_top5": {
+     "SUPPORTS": {
+      "right": 0,
+      "n": 4,
+      "acc": 0.0,
+      "wilson": [
+       0.0,
+       0.48990002040399916
+      ],
+      "pct": "0.0",
+      "wilson_pct": [
+       "0.0",
+       "49.0"
+      ]
+     },
+     "REFUTES": {
+      "right": 2,
+      "n": 6,
+      "acc": 0.3333333333333333,
+      "wilson": [
+       0.09676933255921683,
+       0.7000116786584712
+      ],
+      "pct": "33.3",
+      "wilson_pct": [
+       "9.7",
+       "70.0"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.16666666666666666,
+      "point_pct": "16.7",
+      "bootstrap": [
+       0.0,
+       0.3333333333333333
+      ],
+      "bootstrap_pct": [
+       "0.0",
+       "33.3"
+      ]
+     }
+    },
+    "rag_set_in_minus_not": {
+     "SUPPORTS": {
+      "first": {
+       "right": 593,
+       "n": 696,
+       "acc": 0.8520114942528736,
+       "wilson": [
+        0.8237000452910089,
+        0.8764583905607609
+       ],
+       "pct": "85.2",
+       "wilson_pct": [
+        "82.4",
+        "87.6"
+       ]
+      },
+      "second": {
+       "right": 0,
+       "n": 4,
+       "acc": 0.0,
+       "wilson": [
+        0.0,
+        0.48990002040399916
+       ],
+       "pct": "0.0",
+       "wilson_pct": [
+        "0.0",
+        "49.0"
+       ]
+      },
+      "difference": 0.8520114942528736,
+      "interval": [
+       0.361294092753641,
+       0.8764583905607609
+      ],
+      "difference_pct": "85.2",
+      "interval_pct": [
+       "36.1",
+       "87.6"
+      ],
+      "level": false
+     },
+     "REFUTES": {
+      "first": {
+       "right": 601,
+       "n": 694,
+       "acc": 0.8659942363112392,
+       "wilson": [
+        0.838623938716999,
+        0.8893349562528622
+       ],
+       "pct": "86.6",
+       "wilson_pct": [
+        "83.9",
+        "88.9"
+       ]
+      },
+      "second": {
+       "right": 2,
+       "n": 6,
+       "acc": 0.3333333333333333,
+       "wilson": [
+        0.09676933255921683,
+        0.7000116786584712
+       ],
+       "pct": "33.3",
+       "wilson_pct": [
+        "9.7",
+        "70.0"
+       ]
+      },
+      "difference": 0.5326609029779059,
+      "interval": [
+       0.16496246387219204,
+       0.7703735775866644
+      ],
+      "difference_pct": "53.3",
+      "interval_pct": [
+       "16.5",
+       "77.0"
+      ],
+      "level": false
+     },
+     "equal_weight": {
+      "point": 0.6923361986153898,
+      "point_pct": "69.2",
+      "bootstrap": [
+       0.5148625637649477,
+       0.8640607402530723
+      ],
+      "bootstrap_pct": [
+       "51.5",
+       "86.4"
+      ],
+      "level": false
+     }
+    }
+   },
+   "needs2": {
+    "gold_page_in_top5": {
+     "SUPPORTS": {
+      "right": 300,
+      "n": 300,
+      "acc": 1.0,
+      "wilson": [
+       0.9873565700022643,
+       0.9999999999999999
+      ],
+      "pct": "100.0",
+      "wilson_pct": [
+       "98.7",
+       "100.0"
+      ]
+     },
+     "REFUTES": {
+      "right": 297,
+      "n": 300,
+      "acc": 0.99,
+      "wilson": [
+       0.9710159953649371,
+       0.9965934432372818
+      ],
+      "pct": "99.0",
+      "wilson_pct": [
+       "97.1",
+       "99.7"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.995,
+      "point_pct": "99.5",
+      "bootstrap": [
+       0.9883333333333333,
+       1.0
+      ],
+      "bootstrap_pct": [
+       "98.8",
+       "100.0"
+      ]
+     }
+    },
+    "gold_set_in_top5": {
+     "SUPPORTS": {
+      "right": 198,
+      "n": 300,
+      "acc": 0.66,
+      "wilson": [
+       0.6046734114246599,
+       0.7112806909760647
+      ],
+      "pct": "66.0",
+      "wilson_pct": [
+       "60.5",
+       "71.1"
+      ]
+     },
+     "REFUTES": {
+      "right": 131,
+      "n": 300,
+      "acc": 0.43666666666666665,
+      "wilson": [
+       0.38169301003457207,
+       0.4932418244318077
+      ],
+      "pct": "43.7",
+      "wilson_pct": [
+       "38.2",
+       "49.3"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.5483333333333333,
+      "point_pct": "54.8",
+      "bootstrap": [
+       0.51,
+       0.5883333333333334
+      ],
+      "bootstrap_pct": [
+       "51.0",
+       "58.8"
+      ]
+     }
+    },
+    "rag_when_set_in_top5": {
+     "SUPPORTS": {
+      "right": 174,
+      "n": 198,
+      "acc": 0.8787878787878788,
+      "wilson": [
+       0.8259787427458695,
+       0.917178267503752
+      ],
+      "pct": "87.9",
+      "wilson_pct": [
+       "82.6",
+       "91.7"
+      ]
+     },
+     "REFUTES": {
+      "right": 90,
+      "n": 131,
+      "acc": 0.6870229007633588,
+      "wilson": [
+       0.6032451962760919,
+       0.7601441435122227
+      ],
+      "pct": "68.7",
+      "wilson_pct": [
+       "60.3",
+       "76.0"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.7829053897756187,
+      "point_pct": "78.3",
+      "bootstrap": [
+       0.7383954044259388,
+       0.8285334258616701
+      ],
+      "bootstrap_pct": [
+       "73.8",
+       "82.9"
+      ]
+     }
+    },
+    "rag_when_set_not_in_top5": {
+     "SUPPORTS": {
+      "right": 83,
+      "n": 102,
+      "acc": 0.8137254901960784,
+      "wilson": [
+       0.7272970187923337,
+       0.8773801591792768
+      ],
+      "pct": "81.4",
+      "wilson_pct": [
+       "72.7",
+       "87.7"
+      ]
+     },
+     "REFUTES": {
+      "right": 129,
+      "n": 169,
+      "acc": 0.7633136094674556,
+      "wilson": [
+       0.6938234738552493,
+       0.8210988596570532
+      ],
+      "pct": "76.3",
+      "wilson_pct": [
+       "69.4",
+       "82.1"
+      ]
+     },
+     "equal_weight": {
+      "point": 0.788519549831767,
+      "point_pct": "78.9",
+      "bootstrap": [
+       0.73746954403063,
+       0.8376261747302471
+      ],
+      "bootstrap_pct": [
+       "73.7",
+       "83.8"
+      ]
+     }
+    },
+    "rag_set_in_minus_not": {
+     "SUPPORTS": {
+      "first": {
+       "right": 174,
+       "n": 198,
+       "acc": 0.8787878787878788,
+       "wilson": [
+        0.8259787427458695,
+        0.917178267503752
+       ],
+       "pct": "87.9",
+       "wilson_pct": [
+        "82.6",
+        "91.7"
+       ]
+      },
+      "second": {
+       "right": 83,
+       "n": 102,
+       "acc": 0.8137254901960784,
+       "wilson": [
+        0.7272970187923337,
+        0.8773801591792768
+       ],
+       "pct": "81.4",
+       "wilson_pct": [
+        "72.7",
+        "87.7"
+       ]
+      },
+      "difference": 0.06506238859180036,
+      "interval": [
+       -0.017646267139410796,
+       0.15963353966306398
+      ],
+      "difference_pct": "6.5",
+      "interval_pct": [
+       "-1.8",
+       "16.0"
+      ],
+      "level": true
+     },
+     "REFUTES": {
+      "first": {
+       "right": 90,
+       "n": 131,
+       "acc": 0.6870229007633588,
+       "wilson": [
+        0.6032451962760919,
+        0.7601441435122227
+       ],
+       "pct": "68.7",
+       "wilson_pct": [
+        "60.3",
+        "76.0"
+       ]
+      },
+      "second": {
+       "right": 129,
+       "n": 169,
+       "acc": 0.7633136094674556,
+       "wilson": [
+        0.6938234738552493,
+        0.8210988596570532
+       ],
+       "pct": "76.3",
+       "wilson_pct": [
+        "69.4",
+        "82.1"
+       ]
+      },
+      "difference": -0.07629070870409682,
+      "interval": [
+       -0.17806417729306756,
+       0.024583446006319967
+      ],
+      "difference_pct": "-7.6",
+      "interval_pct": [
+       "-17.8",
+       "2.5"
+      ],
+      "level": true
+     },
+     "equal_weight": {
+      "point": -0.005614160056148243,
+      "point_pct": "-0.6",
+      "bootstrap": [
+       -0.07325639030200179,
+       0.06180584423693471
+      ],
+      "bootstrap_pct": [
+       "-7.3",
+       "6.2"
+      ],
+      "level": true
+     }
+    }
+   }
+  },
+  "tags": {
+   "Other": {
+    "n": 1311,
+    "small": false,
+    "n_per_label": {
+     "SUPPORTS": 602,
+     "REFUTES": 709
+    },
+    "counts": {
+     "SUPPORTS": {
+      "single": 574,
+      "needs2": 28
+     },
+     "REFUTES": {
+      "single": 614,
+      "needs2": 95
+     }
+    },
+    "accuracy": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "right": 167,
+       "n": 602,
+       "acc": 0.27740863787375414,
+       "wilson": [
+        0.24314022844401462,
+        0.3144999204001717
+       ],
+       "pct": "27.7",
+       "wilson_pct": [
+        "24.3",
+        "31.4"
+       ]
+      },
+      "REFUTES": {
+       "right": 285,
+       "n": 709,
+       "acc": 0.4019746121297602,
+       "wilson": [
+        0.3665059554951089,
+        0.43849981296733775
+       ],
+       "pct": "40.2",
+       "wilson_pct": [
+        "36.7",
+        "43.8"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.3396916250017572,
+       "point_pct": "34.0",
+       "bootstrap": [
+        0.3149937444062809,
+        0.3652985581676499
+       ],
+       "bootstrap_pct": [
+        "31.5",
+        "36.5"
+       ]
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "right": 483,
+       "n": 602,
+       "acc": 0.8023255813953488,
+       "wilson": [
+        0.7686384139904682,
+        0.8321786972808608
+       ],
+       "pct": "80.2",
+       "wilson_pct": [
+        "76.9",
+        "83.2"
+       ]
+      },
+      "REFUTES": {
+       "right": 609,
+       "n": 709,
+       "acc": 0.8589562764456982,
+       "wilson": [
+        0.8313968630153324,
+        0.8826467618236219
+       ],
+       "pct": "85.9",
+       "wilson_pct": [
+        "83.1",
+        "88.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8306409289205235,
+       "point_pct": "83.1",
+       "bootstrap": [
+        0.8098768093191946,
+        0.8508099470968891
+       ],
+       "bootstrap_pct": [
+        "81.0",
+        "85.1"
+       ]
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "right": 521,
+       "n": 602,
+       "acc": 0.8654485049833887,
+       "wilson": [
+        0.8358593544067704,
+        0.8904030877893415
+       ],
+       "pct": "86.5",
+       "wilson_pct": [
+        "83.6",
+        "89.0"
+       ]
+      },
+      "REFUTES": {
+       "right": 597,
+       "n": 709,
+       "acc": 0.842031029619182,
+       "wilson": [
+        0.8133506353794325,
+        0.8670249207048365
+       ],
+       "pct": "84.2",
+       "wilson_pct": [
+        "81.3",
+        "86.7"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8537397673012853,
+       "point_pct": "85.4",
+       "bootstrap": [
+        0.8338999292438464,
+        0.8727174111682263
+       ],
+       "bootstrap_pct": [
+        "83.4",
+        "87.3"
+       ]
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "right": 517,
+       "n": 602,
+       "acc": 0.8588039867109635,
+       "wilson": [
+        0.8287066185463762,
+        0.8843510519734429
+       ],
+       "pct": "85.9",
+       "wilson_pct": [
+        "82.9",
+        "88.4"
+       ]
+      },
+      "REFUTES": {
+       "right": 575,
+       "n": 709,
+       "acc": 0.8110014104372355,
+       "wilson": [
+        0.7805357020960487,
+        0.8381150612712968
+       ],
+       "pct": "81.1",
+       "wilson_pct": [
+        "78.1",
+        "83.8"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8349026985740995,
+       "point_pct": "83.5",
+       "bootstrap": [
+        0.813809398853844,
+        0.8545394934140547
+       ],
+       "bootstrap_pct": [
+        "81.4",
+        "85.5"
+       ]
+      }
+     }
+    }
+   },
+   "Multi-hop Reasoning": {
+    "n": 488,
+    "small": false,
+    "n_per_label": {
+     "SUPPORTS": 319,
+     "REFUTES": 169
+    },
+    "counts": {
+     "SUPPORTS": {
+      "single": 53,
+      "needs2": 266
+     },
+     "REFUTES": {
+      "single": 8,
+      "needs2": 161
+     }
+    },
+    "accuracy": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "right": 113,
+       "n": 319,
+       "acc": 0.3542319749216301,
+       "wilson": [
+        0.3037649723744716,
+        0.40816806227781616
+       ],
+       "pct": "35.4",
+       "wilson_pct": [
+        "30.4",
+        "40.8"
+       ]
+      },
+      "REFUTES": {
+       "right": 71,
+       "n": 169,
+       "acc": 0.42011834319526625,
+       "wilson": [
+        0.34828770137463766,
+        0.49549990531264115
+       ],
+       "pct": "42.0",
+       "wilson_pct": [
+        "34.8",
+        "49.5"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.3871751590584482,
+       "point_pct": "38.7",
+       "bootstrap": [
+        0.3419153790506576,
+        0.4329675298176624
+       ],
+       "bootstrap_pct": [
+        "34.2",
+        "43.3"
+       ]
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "right": 253,
+       "n": 319,
+       "acc": 0.7931034482758621,
+       "wilson": [
+        0.7452904331248391,
+        0.8339409918216363
+       ],
+       "pct": "79.3",
+       "wilson_pct": [
+        "74.5",
+        "83.4"
+       ]
+      },
+      "REFUTES": {
+       "right": 129,
+       "n": 169,
+       "acc": 0.7633136094674556,
+       "wilson": [
+        0.6938234738552493,
+        0.8210988596570532
+       ],
+       "pct": "76.3",
+       "wilson_pct": [
+        "69.4",
+        "82.1"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7782085288716588,
+       "point_pct": "77.8",
+       "bootstrap": [
+        0.7390421249837695,
+        0.8163401253918494
+       ],
+       "bootstrap_pct": [
+        "73.9",
+        "81.6"
+       ]
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "right": 267,
+       "n": 319,
+       "acc": 0.8369905956112853,
+       "wilson": [
+        0.7924887407359789,
+        0.8734725232399152
+       ],
+       "pct": "83.7",
+       "wilson_pct": [
+        "79.2",
+        "87.3"
+       ]
+      },
+      "REFUTES": {
+       "right": 127,
+       "n": 169,
+       "acc": 0.7514792899408284,
+       "wilson": [
+        0.6812203109178723,
+        0.8105594458073604
+       ],
+       "pct": "75.1",
+       "wilson_pct": [
+        "68.1",
+        "81.1"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7942349427760569,
+       "point_pct": "79.4",
+       "bootstrap": [
+        0.7550685388881675,
+        0.8321863812579993
+       ],
+       "bootstrap_pct": [
+        "75.5",
+        "83.2"
+       ]
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "right": 278,
+       "n": 319,
+       "acc": 0.8714733542319749,
+       "wilson": [
+        0.8302787009423024,
+        0.9038274365567064
+       ],
+       "pct": "87.1",
+       "wilson_pct": [
+        "83.0",
+        "90.4"
+       ]
+      },
+      "REFUTES": {
+       "right": 128,
+       "n": 169,
+       "acc": 0.757396449704142,
+       "wilson": [
+        0.6875138879332751,
+        0.8158371571854927
+       ],
+       "pct": "75.7",
+       "wilson_pct": [
+        "68.8",
+        "81.6"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8144349019680585,
+       "point_pct": "81.4",
+       "bootstrap": [
+        0.7766596798427037,
+        0.850470915026618
+       ],
+       "bootstrap_pct": [
+        "77.7",
+        "85.0"
+       ]
+      }
+     }
+    }
+   },
+   "Entity Disambiguation": {
+    "n": 80,
+    "small": true,
+    "n_per_label": {
+     "SUPPORTS": 34,
+     "REFUTES": 46
+    },
+    "counts": {
+     "SUPPORTS": {
+      "single": 31,
+      "needs2": 3
+     },
+     "REFUTES": {
+      "single": 26,
+      "needs2": 20
+     }
+    },
+    "accuracy": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "right": 12,
+       "n": 34,
+       "acc": 0.35294117647058826,
+       "wilson": [
+        0.21487714895296073,
+        0.5208634116998658
+       ],
+       "pct": "35.3",
+       "wilson_pct": [
+        "21.5",
+        "52.1"
+       ]
+      },
+      "REFUTES": {
+       "right": 14,
+       "n": 46,
+       "acc": 0.30434782608695654,
+       "wilson": [
+        0.19079670807448904,
+        0.4480591874023817
+       ],
+       "pct": "30.4",
+       "wilson_pct": [
+        "19.1",
+        "44.8"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.32864450127877237,
+       "point_pct": "32.9",
+       "bootstrap": [
+        0.22634271099744246,
+        0.43478260869565216
+       ],
+       "bootstrap_pct": [
+        "22.6",
+        "43.5"
+       ]
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "right": 28,
+       "n": 34,
+       "acc": 0.8235294117647058,
+       "wilson": [
+        0.6648593225994784,
+        0.9165114439643031
+       ],
+       "pct": "82.4",
+       "wilson_pct": [
+        "66.5",
+        "91.7"
+       ]
+      },
+      "REFUTES": {
+       "right": 33,
+       "n": 46,
+       "acc": 0.717391304347826,
+       "wilson": [
+        0.5745116426970621,
+        0.8267595845508592
+       ],
+       "pct": "71.7",
+       "wilson_pct": [
+        "57.5",
+        "82.7"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.770460358056266,
+       "point_pct": "77.0",
+       "bootstrap": [
+        0.6758312020460358,
+        0.8580562659846547
+       ],
+       "bootstrap_pct": [
+        "67.6",
+        "85.8"
+       ]
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "right": 27,
+       "n": 34,
+       "acc": 0.7941176470588235,
+       "wilson": [
+        0.6320128389178601,
+        0.8965060397764868
+       ],
+       "pct": "79.4",
+       "wilson_pct": [
+        "63.2",
+        "89.7"
+       ]
+      },
+      "REFUTES": {
+       "right": 35,
+       "n": 46,
+       "acc": 0.7608695652173914,
+       "wilson": [
+        0.6206458383088198,
+        0.860879634388686
+       ],
+       "pct": "76.1",
+       "wilson_pct": [
+        "62.1",
+        "86.1"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7774936061381074,
+       "point_pct": "77.7",
+       "bootstrap": [
+        0.6860613810741688,
+        0.8650895140664961
+       ],
+       "bootstrap_pct": [
+        "68.6",
+        "86.5"
+       ]
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "right": 28,
+       "n": 34,
+       "acc": 0.8235294117647058,
+       "wilson": [
+        0.6648593225994784,
+        0.9165114439643031
+       ],
+       "pct": "82.4",
+       "wilson_pct": [
+        "66.5",
+        "91.7"
+       ]
+      },
+      "REFUTES": {
+       "right": 33,
+       "n": 46,
+       "acc": 0.717391304347826,
+       "wilson": [
+        0.5745116426970621,
+        0.8267595845508592
+       ],
+       "pct": "71.7",
+       "wilson_pct": [
+        "57.5",
+        "82.7"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.770460358056266,
+       "point_pct": "77.0",
+       "bootstrap": [
+        0.6751918158567776,
+        0.8580562659846547
+       ],
+       "bootstrap_pct": [
+        "67.5",
+        "85.8"
+       ]
+      }
+     }
+    }
+   },
+   "Search terms not in claim": {
+    "n": 33,
+    "small": true,
+    "n_per_label": {
+     "SUPPORTS": 18,
+     "REFUTES": 15
+    },
+    "counts": {
+     "SUPPORTS": {
+      "single": 16,
+      "needs2": 2
+     },
+     "REFUTES": {
+      "single": 9,
+      "needs2": 6
+     }
+    },
+    "accuracy": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "right": 4,
+       "n": 18,
+       "acc": 0.2222222222222222,
+       "wilson": [
+        0.09000781913382,
+        0.4521502645230549
+       ],
+       "pct": "22.2",
+       "wilson_pct": [
+        "9.0",
+        "45.2"
+       ]
+      },
+      "REFUTES": {
+       "right": 5,
+       "n": 15,
+       "acc": 0.3333333333333333,
+       "wilson": [
+        0.15176100694691233,
+        0.5828687484878702
+       ],
+       "pct": "33.3",
+       "wilson_pct": [
+        "15.2",
+        "58.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.2777777777777778,
+       "point_pct": "27.8",
+       "bootstrap": [
+        0.12777777777777777,
+        0.43333333333333335
+       ],
+       "bootstrap_pct": [
+        "12.8",
+        "43.3"
+       ]
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "right": 16,
+       "n": 18,
+       "acc": 0.8888888888888888,
+       "wilson": [
+        0.6719975513339578,
+        0.9689811315464172
+       ],
+       "pct": "88.9",
+       "wilson_pct": [
+        "67.2",
+        "96.9"
+       ]
+      },
+      "REFUTES": {
+       "right": 11,
+       "n": 15,
+       "acc": 0.7333333333333333,
+       "wilson": [
+        0.4804911034231324,
+        0.8910272389681718
+       ],
+       "pct": "73.3",
+       "wilson_pct": [
+        "48.0",
+        "89.1"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8111111111111111,
+       "point_pct": "81.1",
+       "bootstrap": [
+        0.6722222222222223,
+        0.9388888888888889
+       ],
+       "bootstrap_pct": [
+        "67.2",
+        "93.9"
+       ]
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "right": 16,
+       "n": 18,
+       "acc": 0.8888888888888888,
+       "wilson": [
+        0.6719975513339578,
+        0.9689811315464172
+       ],
+       "pct": "88.9",
+       "wilson_pct": [
+        "67.2",
+        "96.9"
+       ]
+      },
+      "REFUTES": {
+       "right": 13,
+       "n": 15,
+       "acc": 0.8666666666666667,
+       "wilson": [
+        0.6211750079348376,
+        0.9626395301086407
+       ],
+       "pct": "86.7",
+       "wilson_pct": [
+        "62.1",
+        "96.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8777777777777778,
+       "point_pct": "87.8",
+       "bootstrap": [
+        0.7555555555555555,
+        0.9722222222222222
+       ],
+       "bootstrap_pct": [
+        "75.6",
+        "97.2"
+       ]
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "right": 14,
+       "n": 18,
+       "acc": 0.7777777777777778,
+       "wilson": [
+        0.5478497354769452,
+        0.90999218086618
+       ],
+       "pct": "77.8",
+       "wilson_pct": [
+        "54.8",
+        "91.0"
+       ]
+      },
+      "REFUTES": {
+       "right": 11,
+       "n": 15,
+       "acc": 0.7333333333333333,
+       "wilson": [
+        0.4804911034231324,
+        0.8910272389681718
+       ],
+       "pct": "73.3",
+       "wilson_pct": [
+        "48.0",
+        "89.1"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7555555555555555,
+       "point_pct": "75.6",
+       "bootstrap": [
+        0.6,
+        0.9
+       ],
+       "bootstrap_pct": [
+        "60.0",
+        "90.0"
+       ]
+      }
+     }
+    }
+   },
+   "Numerical Reasoning": {
+    "n": 57,
+    "small": true,
+    "n_per_label": {
+     "SUPPORTS": 6,
+     "REFUTES": 51
+    },
+    "counts": {
+     "SUPPORTS": {
+      "single": 6,
+      "needs2": 0
+     },
+     "REFUTES": {
+      "single": 34,
+      "needs2": 17
+     }
+    },
+    "accuracy": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "right": 1,
+       "n": 6,
+       "acc": 0.16666666666666666,
+       "wilson": [
+        0.03005258587173032,
+        0.563509436563646
+       ],
+       "pct": "16.7",
+       "wilson_pct": [
+        "3.0",
+        "56.4"
+       ]
+      },
+      "REFUTES": {
+       "right": 19,
+       "n": 51,
+       "acc": 0.37254901960784315,
+       "wilson": [
+        0.2532032972099011,
+        0.5097503729966575
+       ],
+       "pct": "37.3",
+       "wilson_pct": [
+        "25.3",
+        "51.0"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.2696078431372549,
+       "point_pct": "27.0",
+       "bootstrap": [
+        0.13725490196078433,
+        0.4509803921568627
+       ],
+       "bootstrap_pct": [
+        "13.7",
+        "45.1"
+       ]
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "right": 3,
+       "n": 6,
+       "acc": 0.5,
+       "wilson": [
+        0.18761280689940874,
+        0.8123871931005913
+       ],
+       "pct": "50.0",
+       "wilson_pct": [
+        "18.8",
+        "81.2"
+       ]
+      },
+      "REFUTES": {
+       "right": 48,
+       "n": 51,
+       "acc": 0.9411764705882353,
+       "wilson": [
+        0.8407512606105803,
+        0.9797937271359478
+       ],
+       "pct": "94.1",
+       "wilson_pct": [
+        "84.1",
+        "98.0"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7205882352941176,
+       "point_pct": "72.1",
+       "bootstrap": [
+        0.5343137254901961,
+        0.9068627450980392
+       ],
+       "bootstrap_pct": [
+        "53.4",
+        "90.7"
+       ]
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "right": 5,
+       "n": 6,
+       "acc": 0.8333333333333334,
+       "wilson": [
+        0.43649056343635395,
+        0.9699474141282697
+       ],
+       "pct": "83.3",
+       "wilson_pct": [
+        "43.6",
+        "97.0"
+       ]
+      },
+      "REFUTES": {
+       "right": 43,
+       "n": 51,
+       "acc": 0.8431372549019608,
+       "wilson": [
+        0.7198929160164018,
+        0.9183087411197868
+       ],
+       "pct": "84.3",
+       "wilson_pct": [
+        "72.0",
+        "91.8"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8382352941176471,
+       "point_pct": "83.8",
+       "bootstrap": [
+        0.6617647058823529,
+        0.9607843137254901
+       ],
+       "bootstrap_pct": [
+        "66.2",
+        "96.1"
+       ]
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "right": 5,
+       "n": 6,
+       "acc": 0.8333333333333334,
+       "wilson": [
+        0.43649056343635395,
+        0.9699474141282697
+       ],
+       "pct": "83.3",
+       "wilson_pct": [
+        "43.6",
+        "97.0"
+       ]
+      },
+      "REFUTES": {
+       "right": 46,
+       "n": 51,
+       "acc": 0.9019607843137255,
+       "wilson": [
+        0.7902151004554693,
+        0.957392555046923
+       ],
+       "pct": "90.2",
+       "wilson_pct": [
+        "79.0",
+        "95.7"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8676470588235294,
+       "point_pct": "86.8",
+       "bootstrap": [
+        0.6911764705882353,
+        0.9803921568627452
+       ],
+       "bootstrap_pct": [
+        "69.1",
+        "98.0"
+       ]
+      }
+     }
+    }
+   },
+   "Combining Tables and Text": {
+    "n": 31,
+    "small": true,
+    "n_per_label": {
+     "SUPPORTS": 21,
+     "REFUTES": 10
+    },
+    "counts": {
+     "SUPPORTS": {
+      "single": 20,
+      "needs2": 1
+     },
+     "REFUTES": {
+      "single": 9,
+      "needs2": 1
+     }
+    },
+    "accuracy": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "right": 8,
+       "n": 21,
+       "acc": 0.38095238095238093,
+       "wilson": [
+        0.20750767797982506,
+        0.5912170418449848
+       ],
+       "pct": "38.1",
+       "wilson_pct": [
+        "20.8",
+        "59.1"
+       ]
+      },
+      "REFUTES": {
+       "right": 6,
+       "n": 10,
+       "acc": 0.6,
+       "wilson": [
+        0.3126695474501863,
+        0.8318224187964902
+       ],
+       "pct": "60.0",
+       "wilson_pct": [
+        "31.3",
+        "83.2"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.49047619047619045,
+       "point_pct": "49.0",
+       "bootstrap": [
+        0.2976190476190476,
+        0.6642857142857143
+       ],
+       "bootstrap_pct": [
+        "29.8",
+        "66.4"
+       ]
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "right": 17,
+       "n": 21,
+       "acc": 0.8095238095238095,
+       "wilson": [
+        0.599990134607267,
+        0.9233255938482269
+       ],
+       "pct": "81.0",
+       "wilson_pct": [
+        "60.0",
+        "92.3"
+       ]
+      },
+      "REFUTES": {
+       "right": 8,
+       "n": 10,
+       "acc": 0.8,
+       "wilson": [
+        0.49015684672072335,
+        0.9433190520193067
+       ],
+       "pct": "80.0",
+       "wilson_pct": [
+        "49.0",
+        "94.3"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.8047619047619048,
+       "point_pct": "80.5",
+       "bootstrap": [
+        0.6547619047619048,
+        0.95
+       ],
+       "bootstrap_pct": [
+        "65.5",
+        "95.0"
+       ]
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "right": 14,
+       "n": 21,
+       "acc": 0.6666666666666666,
+       "wilson": [
+        0.45373075657210293,
+        0.8280546356731631
+       ],
+       "pct": "66.7",
+       "wilson_pct": [
+        "45.4",
+        "82.8"
+       ]
+      },
+      "REFUTES": {
+       "right": 7,
+       "n": 10,
+       "acc": 0.7,
+       "wilson": [
+        0.39677321997956516,
+        0.892210712513788
+       ],
+       "pct": "70.0",
+       "wilson_pct": [
+        "39.7",
+        "89.2"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.6833333333333333,
+       "point_pct": "68.3",
+       "bootstrap": [
+        0.5095238095238095,
+        0.8547619047619048
+       ],
+       "bootstrap_pct": [
+        "51.0",
+        "85.5"
+       ]
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "right": 15,
+       "n": 21,
+       "acc": 0.7142857142857143,
+       "wilson": [
+        0.500432261771624,
+        0.8618632425437179
+       ],
+       "pct": "71.4",
+       "wilson_pct": [
+        "50.0",
+        "86.2"
+       ]
+      },
+      "REFUTES": {
+       "right": 7,
+       "n": 10,
+       "acc": 0.7,
+       "wilson": [
+        0.39677321997956516,
+        0.892210712513788
+       ],
+       "pct": "70.0",
+       "wilson_pct": [
+        "39.7",
+        "89.2"
+       ]
+      },
+      "equal_weight": {
+       "point": 0.7071428571428572,
+       "point_pct": "70.7",
+       "bootstrap": [
+        0.5333333333333333,
+        0.8785714285714286
+       ],
+       "bootstrap_pct": [
+        "53.3",
+        "87.9"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "multihop_vs_other": {
+   "accuracy": {
+    "all": {
+     "no_retrieval": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 113,
+        "n": 319,
+        "acc": 0.3542319749216301,
+        "wilson": [
+         0.3037649723744716,
+         0.40816806227781616
+        ],
+        "pct": "35.4",
+        "wilson_pct": [
+         "30.4",
+         "40.8"
+        ]
+       },
+       "REFUTES": {
+        "right": 71,
+        "n": 169,
+        "acc": 0.42011834319526625,
+        "wilson": [
+         0.34828770137463766,
+         0.49549990531264115
+        ],
+        "pct": "42.0",
+        "wilson_pct": [
+         "34.8",
+         "49.5"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.3871751590584482,
+        "point_pct": "38.7",
+        "bootstrap": [
+         0.3419153790506576,
+         0.4329675298176624
+        ],
+        "bootstrap_pct": [
+         "34.2",
+         "43.3"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 167,
+        "n": 602,
+        "acc": 0.27740863787375414,
+        "wilson": [
+         0.24314022844401462,
+         0.3144999204001717
+        ],
+        "pct": "27.7",
+        "wilson_pct": [
+         "24.3",
+         "31.4"
+        ]
+       },
+       "REFUTES": {
+        "right": 285,
+        "n": 709,
+        "acc": 0.4019746121297602,
+        "wilson": [
+         0.3665059554951089,
+         0.43849981296733775
+        ],
+        "pct": "40.2",
+        "wilson_pct": [
+         "36.7",
+         "43.8"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.3396916250017572,
+        "point_pct": "34.0",
+        "bootstrap": [
+         0.3149937444062809,
+         0.3652985581676499
+        ],
+        "bootstrap_pct": [
+         "31.5",
+         "36.5"
+        ]
+       }
+      }
+     },
+     "web": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 253,
+        "n": 319,
+        "acc": 0.7931034482758621,
+        "wilson": [
+         0.7452904331248391,
+         0.8339409918216363
+        ],
+        "pct": "79.3",
+        "wilson_pct": [
+         "74.5",
+         "83.4"
+        ]
+       },
+       "REFUTES": {
+        "right": 129,
+        "n": 169,
+        "acc": 0.7633136094674556,
+        "wilson": [
+         0.6938234738552493,
+         0.8210988596570532
+        ],
+        "pct": "76.3",
+        "wilson_pct": [
+         "69.4",
+         "82.1"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7782085288716588,
+        "point_pct": "77.8",
+        "bootstrap": [
+         0.7390421249837695,
+         0.8163401253918494
+        ],
+        "bootstrap_pct": [
+         "73.9",
+         "81.6"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 483,
+        "n": 602,
+        "acc": 0.8023255813953488,
+        "wilson": [
+         0.7686384139904682,
+         0.8321786972808608
+        ],
+        "pct": "80.2",
+        "wilson_pct": [
+         "76.9",
+         "83.2"
+        ]
+       },
+       "REFUTES": {
+        "right": 609,
+        "n": 709,
+        "acc": 0.8589562764456982,
+        "wilson": [
+         0.8313968630153324,
+         0.8826467618236219
+        ],
+        "pct": "85.9",
+        "wilson_pct": [
+         "83.1",
+         "88.3"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8306409289205235,
+        "point_pct": "83.1",
+        "bootstrap": [
+         0.8098768093191946,
+         0.8508099470968891
+        ],
+        "bootstrap_pct": [
+         "81.0",
+         "85.1"
+        ]
+       }
+      }
+     },
+     "retrieved": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 267,
+        "n": 319,
+        "acc": 0.8369905956112853,
+        "wilson": [
+         0.7924887407359789,
+         0.8734725232399152
+        ],
+        "pct": "83.7",
+        "wilson_pct": [
+         "79.2",
+         "87.3"
+        ]
+       },
+       "REFUTES": {
+        "right": 127,
+        "n": 169,
+        "acc": 0.7514792899408284,
+        "wilson": [
+         0.6812203109178723,
+         0.8105594458073604
+        ],
+        "pct": "75.1",
+        "wilson_pct": [
+         "68.1",
+         "81.1"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7942349427760569,
+        "point_pct": "79.4",
+        "bootstrap": [
+         0.7550685388881675,
+         0.8321863812579993
+        ],
+        "bootstrap_pct": [
+         "75.5",
+         "83.2"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 521,
+        "n": 602,
+        "acc": 0.8654485049833887,
+        "wilson": [
+         0.8358593544067704,
+         0.8904030877893415
+        ],
+        "pct": "86.5",
+        "wilson_pct": [
+         "83.6",
+         "89.0"
+        ]
+       },
+       "REFUTES": {
+        "right": 597,
+        "n": 709,
+        "acc": 0.842031029619182,
+        "wilson": [
+         0.8133506353794325,
+         0.8670249207048365
+        ],
+        "pct": "84.2",
+        "wilson_pct": [
+         "81.3",
+         "86.7"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8537397673012853,
+        "point_pct": "85.4",
+        "bootstrap": [
+         0.8338999292438464,
+         0.8727174111682263
+        ],
+        "bootstrap_pct": [
+         "83.4",
+         "87.3"
+        ]
+       }
+      }
+     },
+     "gold": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 278,
+        "n": 319,
+        "acc": 0.8714733542319749,
+        "wilson": [
+         0.8302787009423024,
+         0.9038274365567064
+        ],
+        "pct": "87.1",
+        "wilson_pct": [
+         "83.0",
+         "90.4"
+        ]
+       },
+       "REFUTES": {
+        "right": 128,
+        "n": 169,
+        "acc": 0.757396449704142,
+        "wilson": [
+         0.6875138879332751,
+         0.8158371571854927
+        ],
+        "pct": "75.7",
+        "wilson_pct": [
+         "68.8",
+         "81.6"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8144349019680585,
+        "point_pct": "81.4",
+        "bootstrap": [
+         0.7766596798427037,
+         0.850470915026618
+        ],
+        "bootstrap_pct": [
+         "77.7",
+         "85.0"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 517,
+        "n": 602,
+        "acc": 0.8588039867109635,
+        "wilson": [
+         0.8287066185463762,
+         0.8843510519734429
+        ],
+        "pct": "85.9",
+        "wilson_pct": [
+         "82.9",
+         "88.4"
+        ]
+       },
+       "REFUTES": {
+        "right": 575,
+        "n": 709,
+        "acc": 0.8110014104372355,
+        "wilson": [
+         0.7805357020960487,
+         0.8381150612712968
+        ],
+        "pct": "81.1",
+        "wilson_pct": [
+         "78.1",
+         "83.8"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8349026985740995,
+        "point_pct": "83.5",
+        "bootstrap": [
+         0.813809398853844,
+         0.8545394934140547
+        ],
+        "bootstrap_pct": [
+         "81.4",
+         "85.5"
+        ]
+       }
+      }
+     }
+    },
+    "single": {
+     "no_retrieval": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 15,
+        "n": 53,
+        "acc": 0.2830188679245283,
+        "wilson": [
+         0.17966135362950317,
+         0.41570542000107713
+        ],
+        "pct": "28.3",
+        "wilson_pct": [
+         "18.0",
+         "41.6"
+        ]
+       },
+       "REFUTES": {
+        "right": 1,
+        "n": 8,
+        "acc": 0.125,
+        "wilson": [
+         0.022416908863296142,
+         0.47089480576986154
+        ],
+        "pct": "12.5",
+        "wilson_pct": [
+         "2.2",
+         "47.1"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.20400943396226415,
+        "point_pct": "20.4",
+        "bootstrap": [
+         0.09433962264150944,
+         0.347877358490566
+        ],
+        "bootstrap_pct": [
+         "9.4",
+         "34.8"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 158,
+        "n": 574,
+        "acc": 0.27526132404181186,
+        "wilson": [
+         0.24030688572903589,
+         0.31320397260999683
+        ],
+        "pct": "27.5",
+        "wilson_pct": [
+         "24.0",
+         "31.3"
+        ]
+       },
+       "REFUTES": {
+        "right": 249,
+        "n": 614,
+        "acc": 0.40553745928338764,
+        "wilson": [
+         0.3674039275999242,
+         0.4448456845984127
+        ],
+        "pct": "40.6",
+        "wilson_pct": [
+         "36.7",
+         "44.5"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.34039939166259975,
+        "point_pct": "34.0",
+        "bootstrap": [
+         0.31309180957677424,
+         0.3667426851967449
+        ],
+        "bootstrap_pct": [
+         "31.3",
+         "36.7"
+        ]
+       }
+      }
+     },
+     "web": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 41,
+        "n": 53,
+        "acc": 0.7735849056603774,
+        "wilson": [
+         0.6447347199775757,
+         0.8654550002273447
+        ],
+        "pct": "77.4",
+        "wilson_pct": [
+         "64.5",
+         "86.5"
+        ]
+       },
+       "REFUTES": {
+        "right": 8,
+        "n": 8,
+        "acc": 1.0,
+        "wilson": [
+         0.6755843804891231,
+         1.0
+        ],
+        "pct": "100.0",
+        "wilson_pct": [
+         "67.6",
+         "100.0"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8867924528301887,
+        "point_pct": "88.7",
+        "bootstrap": [
+         0.8301886792452831,
+         0.9433962264150944
+        ],
+        "bootstrap_pct": [
+         "83.0",
+         "94.3"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 463,
+        "n": 574,
+        "acc": 0.8066202090592335,
+        "wilson": [
+         0.7723146246142089,
+         0.8368488554813746
+        ],
+        "pct": "80.7",
+        "wilson_pct": [
+         "77.2",
+         "83.7"
+        ]
+       },
+       "REFUTES": {
+        "right": 540,
+        "n": 614,
+        "acc": 0.8794788273615635,
+        "wilson": [
+         0.8513389826754457,
+         0.9028996441829594
+        ],
+        "pct": "87.9",
+        "wilson_pct": [
+         "85.1",
+         "90.3"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8430495182103985,
+        "point_pct": "84.3",
+        "bootstrap": [
+         0.8220102373196836,
+         0.8631416058518426
+        ],
+        "bootstrap_pct": [
+         "82.2",
+         "86.3"
+        ]
+       }
+      }
+     },
+     "retrieved": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 39,
+        "n": 53,
+        "acc": 0.7358490566037735,
+        "wilson": [
+         0.6041907894277545,
+         0.8356279348868316
+        ],
+        "pct": "73.6",
+        "wilson_pct": [
+         "60.4",
+         "83.6"
+        ]
+       },
+       "REFUTES": {
+        "right": 8,
+        "n": 8,
+        "acc": 1.0,
+        "wilson": [
+         0.6755843804891231,
+         1.0
+        ],
+        "pct": "100.0",
+        "wilson_pct": [
+         "67.6",
+         "100.0"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8679245283018868,
+        "point_pct": "86.8",
+        "bootstrap": [
+         0.8018867924528301,
+         0.9245283018867925
+        ],
+        "bootstrap_pct": [
+         "80.2",
+         "92.5"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 498,
+        "n": 574,
+        "acc": 0.867595818815331,
+        "wilson": [
+         0.8374090120036233,
+         0.8928949328836953
+        ],
+        "pct": "86.8",
+        "wilson_pct": [
+         "83.7",
+         "89.3"
+        ]
+       },
+       "REFUTES": {
+        "right": 527,
+        "n": 614,
+        "acc": 0.8583061889250815,
+        "wilson": [
+         0.8284894017619779,
+         0.8836672416236409
+        ],
+        "pct": "85.8",
+        "wilson_pct": [
+         "82.8",
+         "88.4"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8629510038702062,
+        "point_pct": "86.3",
+        "bootstrap": [
+         0.8426693073352325,
+         0.8823616202658071
+        ],
+        "bootstrap_pct": [
+         "84.3",
+         "88.2"
+        ]
+       }
+      }
+     },
+     "gold": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 47,
+        "n": 53,
+        "acc": 0.8867924528301887,
+        "wilson": [
+         0.7742322969866086,
+         0.9470704108893132
+        ],
+        "pct": "88.7",
+        "wilson_pct": [
+         "77.4",
+         "94.7"
+        ]
+       },
+       "REFUTES": {
+        "right": 8,
+        "n": 8,
+        "acc": 1.0,
+        "wilson": [
+         0.6755843804891231,
+         1.0
+        ],
+        "pct": "100.0",
+        "wilson_pct": [
+         "67.6",
+         "100.0"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.9433962264150944,
+        "point_pct": "94.3",
+        "bootstrap": [
+         0.8962264150943396,
+         0.9811320754716981
+        ],
+        "bootstrap_pct": [
+         "89.6",
+         "98.1"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 492,
+        "n": 574,
+        "acc": 0.8571428571428571,
+        "wilson": [
+         0.8261380748344266,
+         0.8833989332314517
+        ],
+        "pct": "85.7",
+        "wilson_pct": [
+         "82.6",
+         "88.3"
+        ]
+       },
+       "REFUTES": {
+        "right": 508,
+        "n": 614,
+        "acc": 0.8273615635179153,
+        "wilson": [
+         0.7954554603860048,
+         0.8551967456163104
+        ],
+        "pct": "82.7",
+        "wilson_pct": [
+         "79.5",
+         "85.5"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8422522103303862,
+        "point_pct": "84.2",
+        "bootstrap": [
+         0.8210426857642239,
+         0.8621939160585185
+        ],
+        "bootstrap_pct": [
+         "82.1",
+         "86.2"
+        ]
+       }
+      }
+     }
+    },
+    "needs2": {
+     "no_retrieval": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 98,
+        "n": 266,
+        "acc": 0.3684210526315789,
+        "wilson": [
+         0.3127081910504372,
+         0.42788036164121607
+        ],
+        "pct": "36.8",
+        "wilson_pct": [
+         "31.3",
+         "42.8"
+        ]
+       },
+       "REFUTES": {
+        "right": 70,
+        "n": 161,
+        "acc": 0.43478260869565216,
+        "wilson": [
+         0.36060977402844174,
+         0.5119951994733927
+        ],
+        "pct": "43.5",
+        "wilson_pct": [
+         "36.1",
+         "51.2"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.40160183066361554,
+        "point_pct": "40.2",
+        "bootstrap": [
+         0.35420071918927754,
+         0.4507212324288983
+        ],
+        "bootstrap_pct": [
+         "35.4",
+         "45.1"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 9,
+        "n": 28,
+        "acc": 0.32142857142857145,
+        "wilson": [
+         0.1793304754342074,
+         0.5066149544436882
+        ],
+        "pct": "32.1",
+        "wilson_pct": [
+         "17.9",
+         "50.7"
+        ]
+       },
+       "REFUTES": {
+        "right": 36,
+        "n": 95,
+        "acc": 0.37894736842105264,
+        "wilson": [
+         0.28789651358466833,
+         0.4794079412197865
+        ],
+        "pct": "37.9",
+        "wilson_pct": [
+         "28.8",
+         "47.9"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.35018796992481205,
+        "point_pct": "35.0",
+        "bootstrap": [
+         0.2524436090225564,
+         0.45207236842105253
+        ],
+        "bootstrap_pct": [
+         "25.2",
+         "45.2"
+        ]
+       }
+      }
+     },
+     "web": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 212,
+        "n": 266,
+        "acc": 0.7969924812030075,
+        "wilson": [
+         0.7445847015247744,
+         0.8409439938283512
+        ],
+        "pct": "79.7",
+        "wilson_pct": [
+         "74.5",
+         "84.1"
+        ]
+       },
+       "REFUTES": {
+        "right": 121,
+        "n": 161,
+        "acc": 0.7515527950310559,
+        "wilson": [
+         0.6794645295475432,
+         0.8119162869453809
+        ],
+        "pct": "75.2",
+        "wilson_pct": [
+         "67.9",
+         "81.2"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7742726381170317,
+        "point_pct": "77.4",
+        "bootstrap": [
+         0.7324268551814318,
+         0.8147270349787512
+        ],
+        "bootstrap_pct": [
+         "73.2",
+         "81.5"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 20,
+        "n": 28,
+        "acc": 0.7142857142857143,
+        "wilson": [
+         0.529403642629825,
+         0.8474618415167003
+        ],
+        "pct": "71.4",
+        "wilson_pct": [
+         "52.9",
+         "84.7"
+        ]
+       },
+       "REFUTES": {
+        "right": 69,
+        "n": 95,
+        "acc": 0.7263157894736842,
+        "wilson": [
+         0.629183776326649,
+         0.8058557212128485
+        ],
+        "pct": "72.6",
+        "wilson_pct": [
+         "62.9",
+         "80.6"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7203007518796992,
+        "point_pct": "72.0",
+        "bootstrap": [
+         0.6225563909774436,
+         0.8107142857142857
+        ],
+        "bootstrap_pct": [
+         "62.3",
+         "81.1"
+        ]
+       }
+      }
+     },
+     "retrieved": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 228,
+        "n": 266,
+        "acc": 0.8571428571428571,
+        "wilson": [
+         0.8099977614939285,
+         0.8941190240572986
+        ],
+        "pct": "85.7",
+        "wilson_pct": [
+         "81.0",
+         "89.4"
+        ]
+       },
+       "REFUTES": {
+        "right": 119,
+        "n": 161,
+        "acc": 0.7391304347826086,
+        "wilson": [
+         0.6662923304368165,
+         0.8008227667231236
+        ],
+        "pct": "73.9",
+        "wilson_pct": [
+         "66.6",
+         "80.1"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7981366459627329,
+        "point_pct": "79.8",
+        "bootstrap": [
+         0.7582543314808761,
+         0.8368747956848643
+        ],
+        "bootstrap_pct": [
+         "75.8",
+         "83.7"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 23,
+        "n": 28,
+        "acc": 0.8214285714285714,
+        "wilson": [
+         0.644082084514089,
+         0.9212161417056989
+        ],
+        "pct": "82.1",
+        "wilson_pct": [
+         "64.4",
+         "92.1"
+        ]
+       },
+       "REFUTES": {
+        "right": 70,
+        "n": 95,
+        "acc": 0.7368421052631579,
+        "wilson": [
+         0.6403379066787737,
+         0.814935986095119
+        ],
+        "pct": "73.7",
+        "wilson_pct": [
+         "64.0",
+         "81.5"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7791353383458647,
+        "point_pct": "77.9",
+        "bootstrap": [
+         0.6887218045112782,
+         0.8569548872180451
+        ],
+        "bootstrap_pct": [
+         "68.9",
+         "85.7"
+        ]
+       }
+      }
+     },
+     "gold": {
+      "Multi-hop Reasoning": {
+       "SUPPORTS": {
+        "right": 231,
+        "n": 266,
+        "acc": 0.868421052631579,
+        "wilson": [
+         0.822503465313089,
+         0.9038485871502823
+        ],
+        "pct": "86.8",
+        "wilson_pct": [
+         "82.3",
+         "90.4"
+        ]
+       },
+       "REFUTES": {
+        "right": 120,
+        "n": 161,
+        "acc": 0.7453416149068323,
+        "wilson": [
+         0.6728698294176029,
+         0.8063781274088292
+        ],
+        "pct": "74.5",
+        "wilson_pct": [
+         "67.3",
+         "80.6"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.8068813337692057,
+        "point_pct": "80.7",
+        "bootstrap": [
+         0.7669990192873488,
+         0.8454560313828048
+        ],
+        "bootstrap_pct": [
+         "76.7",
+         "84.5"
+        ]
+       }
+      },
+      "Other": {
+       "SUPPORTS": {
+        "right": 25,
+        "n": 28,
+        "acc": 0.8928571428571429,
+        "wilson": [
+         0.7280377463234293,
+         0.9628823079452005
+        ],
+        "pct": "89.3",
+        "wilson_pct": [
+         "72.8",
+         "96.3"
+        ]
+       },
+       "REFUTES": {
+        "right": 67,
+        "n": 95,
+        "acc": 0.7052631578947368,
+        "wilson": [
+         0.6070487055586042,
+         0.7875220015121027
+        ],
+        "pct": "70.5",
+        "wilson_pct": [
+         "60.7",
+         "78.8"
+        ]
+       },
+       "equal_weight": {
+        "point": 0.7990601503759398,
+        "point_pct": "79.9",
+        "bootstrap": [
+         0.7223684210526315,
+         0.8674812030075187
+        ],
+        "bootstrap_pct": [
+         "72.2",
+         "86.7"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "gap": {
+    "all": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "first": {
+        "right": 113,
+        "n": 319,
+        "acc": 0.3542319749216301,
+        "wilson": [
+         0.3037649723744716,
+         0.40816806227781616
+        ],
+        "pct": "35.4",
+        "wilson_pct": [
+         "30.4",
+         "40.8"
+        ]
+       },
+       "second": {
+        "right": 167,
+        "n": 602,
+        "acc": 0.27740863787375414,
+        "wilson": [
+         0.24314022844401462,
+         0.3144999204001717
+        ],
+        "pct": "27.7",
+        "wilson_pct": [
+         "24.3",
+         "31.4"
+        ]
+       },
+       "difference": 0.07682333704787597,
+       "interval": [
+        0.014192022311959443,
+        0.14072502250403895
+       ],
+       "difference_pct": "7.7",
+       "interval_pct": [
+        "1.4",
+        "14.1"
+       ],
+       "level": false
+      },
+      "REFUTES": {
+       "first": {
+        "right": 71,
+        "n": 169,
+        "acc": 0.42011834319526625,
+        "wilson": [
+         0.34828770137463766,
+         0.49549990531264115
+        ],
+        "pct": "42.0",
+        "wilson_pct": [
+         "34.8",
+         "49.5"
+        ]
+       },
+       "second": {
+        "right": 285,
+        "n": 709,
+        "acc": 0.4019746121297602,
+        "wilson": [
+         0.3665059554951089,
+         0.43849981296733775
+        ],
+        "pct": "40.2",
+        "wilson_pct": [
+         "36.7",
+         "43.8"
+        ]
+       },
+       "difference": 0.01814373106550604,
+       "interval": [
+        -0.0624399608366947,
+        0.10145282727187745
+       ],
+       "difference_pct": "1.8",
+       "interval_pct": [
+        "-6.2",
+        "10.1"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.04748353405669099,
+       "point_pct": "4.7",
+       "bootstrap": [
+        -0.004992369173651223,
+        0.09874101089633922
+       ],
+       "bootstrap_pct": [
+        "-0.5",
+        "9.9"
+       ],
+       "level": true
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "first": {
+        "right": 253,
+        "n": 319,
+        "acc": 0.7931034482758621,
+        "wilson": [
+         0.7452904331248391,
+         0.8339409918216363
+        ],
+        "pct": "79.3",
+        "wilson_pct": [
+         "74.5",
+         "83.4"
+        ]
+       },
+       "second": {
+        "right": 483,
+        "n": 602,
+        "acc": 0.8023255813953488,
+        "wilson": [
+         0.7686384139904682,
+         0.8321786972808608
+        ],
+        "pct": "80.2",
+        "wilson_pct": [
+         "76.9",
+         "83.2"
+        ]
+       },
+       "difference": -0.00922213311948672,
+       "interval": [
+        -0.06558961439997114,
+        0.04371679594615887
+       ],
+       "difference_pct": "-0.9",
+       "interval_pct": [
+        "-6.6",
+        "4.4"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 129,
+        "n": 169,
+        "acc": 0.7633136094674556,
+        "wilson": [
+         0.6938234738552493,
+         0.8210988596570532
+        ],
+        "pct": "76.3",
+        "wilson_pct": [
+         "69.4",
+         "82.1"
+        ]
+       },
+       "second": {
+        "right": 609,
+        "n": 709,
+        "acc": 0.8589562764456982,
+        "wilson": [
+         0.8313968630153324,
+         0.8826467618236219
+        ],
+        "pct": "85.9",
+        "wilson_pct": [
+         "83.1",
+         "88.3"
+        ]
+       },
+       "difference": -0.09564266697824253,
+       "interval": [
+        -0.16906009028391594,
+        -0.03162191715367231
+       ],
+       "difference_pct": "-9.6",
+       "interval_pct": [
+        "-16.9",
+        "-3.2"
+       ],
+       "level": false
+      },
+      "equal_weight": {
+       "point": -0.05243240004886466,
+       "point_pct": "-5.2",
+       "bootstrap": [
+        -0.09708302440973687,
+        -0.008598737808820351
+       ],
+       "bootstrap_pct": [
+        "-9.7",
+        "-0.9"
+       ],
+       "level": false
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "first": {
+        "right": 267,
+        "n": 319,
+        "acc": 0.8369905956112853,
+        "wilson": [
+         0.7924887407359789,
+         0.8734725232399152
+        ],
+        "pct": "83.7",
+        "wilson_pct": [
+         "79.2",
+         "87.3"
+        ]
+       },
+       "second": {
+        "right": 521,
+        "n": 602,
+        "acc": 0.8654485049833887,
+        "wilson": [
+         0.8358593544067704,
+         0.8904030877893415
+        ],
+        "pct": "86.5",
+        "wilson_pct": [
+         "83.6",
+         "89.0"
+        ]
+       },
+       "difference": -0.02845790937210335,
+       "interval": [
+        -0.07947894709539936,
+        0.01851494316365796
+       ],
+       "difference_pct": "-2.8",
+       "interval_pct": [
+        "-7.9",
+        "1.9"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 127,
+        "n": 169,
+        "acc": 0.7514792899408284,
+        "wilson": [
+         0.6812203109178723,
+         0.8105594458073604
+        ],
+        "pct": "75.1",
+        "wilson_pct": [
+         "68.1",
+         "81.1"
+        ]
+       },
+       "second": {
+        "right": 597,
+        "n": 709,
+        "acc": 0.842031029619182,
+        "wilson": [
+         0.8133506353794325,
+         0.8670249207048365
+        ],
+        "pct": "84.2",
+        "wilson_pct": [
+         "81.3",
+         "86.7"
+        ]
+       },
+       "difference": -0.09055173967835362,
+       "interval": [
+        -0.16512397797753398,
+        -0.02487807805543836
+       ],
+       "difference_pct": "-9.1",
+       "interval_pct": [
+        "-16.5",
+        "-2.5"
+       ],
+       "level": false
+      },
+      "equal_weight": {
+       "point": -0.05950482452522849,
+       "point_pct": "-6.0",
+       "bootstrap": [
+        -0.10241766883703037,
+        -0.016366493761759703
+       ],
+       "bootstrap_pct": [
+        "-10.2",
+        "-1.6"
+       ],
+       "level": false
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "first": {
+        "right": 278,
+        "n": 319,
+        "acc": 0.8714733542319749,
+        "wilson": [
+         0.8302787009423024,
+         0.9038274365567064
+        ],
+        "pct": "87.1",
+        "wilson_pct": [
+         "83.0",
+         "90.4"
+        ]
+       },
+       "second": {
+        "right": 517,
+        "n": 602,
+        "acc": 0.8588039867109635,
+        "wilson": [
+         0.8287066185463762,
+         0.8843510519734429
+        ],
+        "pct": "85.9",
+        "wilson_pct": [
+         "82.9",
+         "88.4"
+        ]
+       },
+       "difference": 0.012669367521011443,
+       "interval": [
+        -0.03580384160714212,
+        0.056858033641524905
+       ],
+       "difference_pct": "1.3",
+       "interval_pct": [
+        "-3.6",
+        "5.7"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 128,
+        "n": 169,
+        "acc": 0.757396449704142,
+        "wilson": [
+         0.6875138879332751,
+         0.8158371571854927
+        ],
+        "pct": "75.7",
+        "wilson_pct": [
+         "68.8",
+         "81.6"
+        ]
+       },
+       "second": {
+        "right": 575,
+        "n": 709,
+        "acc": 0.8110014104372355,
+        "wilson": [
+         0.7805357020960487,
+         0.8381150612712968
+        ],
+        "pct": "81.1",
+        "wilson_pct": [
+         "78.1",
+         "83.8"
+        ]
+       },
+       "difference": -0.05360496073309351,
+       "interval": [
+        -0.12856309905849767,
+        0.012300089723233834
+       ],
+       "difference_pct": "-5.4",
+       "interval_pct": [
+        "-12.9",
+        "1.2"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": -0.020467796606041033,
+       "point_pct": "-2.0",
+       "bootstrap": [
+        -0.06235928799530988,
+        0.020747905508665558
+       ],
+       "bootstrap_pct": [
+        "-6.2",
+        "2.1"
+       ],
+       "level": true
+      }
+     }
+    },
+    "single": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "first": {
+        "right": 15,
+        "n": 53,
+        "acc": 0.2830188679245283,
+        "wilson": [
+         0.17966135362950317,
+         0.41570542000107713
+        ],
+        "pct": "28.3",
+        "wilson_pct": [
+         "18.0",
+         "41.6"
+        ]
+       },
+       "second": {
+        "right": 158,
+        "n": 574,
+        "acc": 0.27526132404181186,
+        "wilson": [
+         0.24030688572903589,
+         0.31320397260999683
+        ],
+        "pct": "27.5",
+        "wilson_pct": [
+         "24.0",
+         "31.3"
+        ]
+       },
+       "difference": 0.007757543882716433,
+       "interval": [
+        -0.10234431959658673,
+        0.14497100481029587
+       ],
+       "difference_pct": "0.8",
+       "interval_pct": [
+        "-10.2",
+        "14.5"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 1,
+        "n": 8,
+        "acc": 0.125,
+        "wilson": [
+         0.022416908863296142,
+         0.47089480576986154
+        ],
+        "pct": "12.5",
+        "wilson_pct": [
+         "2.2",
+         "47.1"
+        ]
+       },
+       "second": {
+        "right": 249,
+        "n": 614,
+        "acc": 0.40553745928338764,
+        "wilson": [
+         0.3674039275999242,
+         0.4448456845984127
+        ],
+        "pct": "40.6",
+        "wilson_pct": [
+         "36.7",
+         "44.5"
+        ]
+       },
+       "difference": -0.28053745928338764,
+       "interval": [
+        -0.3903938526548163,
+        0.06745303325516427
+       ],
+       "difference_pct": "-28.1",
+       "interval_pct": [
+        "-39.0",
+        "6.7"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": -0.13638995770033557,
+       "point_pct": "-13.6",
+       "bootstrap": [
+        -0.24912459149548252,
+        0.011493197373236409
+       ],
+       "bootstrap_pct": [
+        "-24.9",
+        "1.1"
+       ],
+       "level": true
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "first": {
+        "right": 41,
+        "n": 53,
+        "acc": 0.7735849056603774,
+        "wilson": [
+         0.6447347199775757,
+         0.8654550002273447
+        ],
+        "pct": "77.4",
+        "wilson_pct": [
+         "64.5",
+         "86.5"
+        ]
+       },
+       "second": {
+        "right": 463,
+        "n": 574,
+        "acc": 0.8066202090592335,
+        "wilson": [
+         0.7723146246142089,
+         0.8368488554813746
+        ],
+        "pct": "80.7",
+        "wilson_pct": [
+         "77.2",
+         "83.7"
+        ]
+       },
+       "difference": -0.033035303398856075,
+       "interval": [
+        -0.16538386370461575,
+        0.06503093645899828
+       ],
+       "difference_pct": "-3.3",
+       "interval_pct": [
+        "-16.5",
+        "6.5"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 8,
+        "n": 8,
+        "acc": 1.0,
+        "wilson": [
+         0.6755843804891231,
+         1.0
+        ],
+        "pct": "100.0",
+        "wilson_pct": [
+         "67.6",
+         "100.0"
+        ]
+       },
+       "second": {
+        "right": 540,
+        "n": 614,
+        "acc": 0.8794788273615635,
+        "wilson": [
+         0.8513389826754457,
+         0.9028996441829594
+        ],
+        "pct": "87.9",
+        "wilson_pct": [
+         "85.1",
+         "90.3"
+        ]
+       },
+       "difference": 0.12052117263843654,
+       "interval": [
+        -0.20473876778338584,
+        0.14866101732455428
+       ],
+       "difference_pct": "12.1",
+       "interval_pct": [
+        "-20.5",
+        "14.9"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.043742934619790196,
+       "point_pct": "4.4",
+       "bootstrap": [
+        -0.018255658942600516,
+        0.10119632452470423
+       ],
+       "bootstrap_pct": [
+        "-1.8",
+        "10.1"
+       ],
+       "level": true
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "first": {
+        "right": 39,
+        "n": 53,
+        "acc": 0.7358490566037735,
+        "wilson": [
+         0.6041907894277545,
+         0.8356279348868316
+        ],
+        "pct": "73.6",
+        "wilson_pct": [
+         "60.4",
+         "83.6"
+        ]
+       },
+       "second": {
+        "right": 498,
+        "n": 574,
+        "acc": 0.867595818815331,
+        "wilson": [
+         0.8374090120036233,
+         0.8928949328836953
+        ],
+        "pct": "86.8",
+        "wilson_pct": [
+         "83.7",
+         "89.3"
+        ]
+       },
+       "difference": -0.13174676221155746,
+       "interval": [
+        -0.26581370253778447,
+        -0.027501532791153346
+       ],
+       "difference_pct": "-13.2",
+       "interval_pct": [
+        "-26.6",
+        "-2.8"
+       ],
+       "level": false
+      },
+      "REFUTES": {
+       "first": {
+        "right": 8,
+        "n": 8,
+        "acc": 1.0,
+        "wilson": [
+         0.6755843804891231,
+         1.0
+        ],
+        "pct": "100.0",
+        "wilson_pct": [
+         "67.6",
+         "100.0"
+        ]
+       },
+       "second": {
+        "right": 527,
+        "n": 614,
+        "acc": 0.8583061889250815,
+        "wilson": [
+         0.8284894017619779,
+         0.8836672416236409
+        ],
+        "pct": "85.8",
+        "wilson_pct": [
+         "82.8",
+         "88.4"
+        ]
+       },
+       "difference": 0.14169381107491852,
+       "interval": [
+        -0.18371159326957787,
+        0.17151059823802206
+       ],
+       "difference_pct": "14.2",
+       "interval_pct": [
+        "-18.4",
+        "17.2"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.004973524431680571,
+       "point_pct": "0.5",
+       "bootstrap": [
+        -0.06118054459559858,
+        0.06529936279612493
+       ],
+       "bootstrap_pct": [
+        "-6.1",
+        "6.5"
+       ],
+       "level": true
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "first": {
+        "right": 47,
+        "n": 53,
+        "acc": 0.8867924528301887,
+        "wilson": [
+         0.7742322969866086,
+         0.9470704108893132
+        ],
+        "pct": "88.7",
+        "wilson_pct": [
+         "77.4",
+         "94.7"
+        ]
+       },
+       "second": {
+        "right": 492,
+        "n": 574,
+        "acc": 0.8571428571428571,
+        "wilson": [
+         0.8261380748344266,
+         0.8833989332314517
+        ],
+        "pct": "85.7",
+        "wilson_pct": [
+         "82.6",
+         "88.3"
+        ]
+       },
+       "difference": 0.02964959568733161,
+       "interval": [
+        -0.08593228098501317,
+        0.09743402423674653
+       ],
+       "difference_pct": "3.0",
+       "interval_pct": [
+        "-8.6",
+        "9.7"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 8,
+        "n": 8,
+        "acc": 1.0,
+        "wilson": [
+         0.6755843804891231,
+         1.0
+        ],
+        "pct": "100.0",
+        "wilson_pct": [
+         "67.6",
+         "100.0"
+        ]
+       },
+       "second": {
+        "right": 508,
+        "n": 614,
+        "acc": 0.8273615635179153,
+        "wilson": [
+         0.7954554603860048,
+         0.8551967456163104
+        ],
+        "pct": "82.7",
+        "wilson_pct": [
+         "79.5",
+         "85.5"
+        ]
+       },
+       "difference": 0.17263843648208466,
+       "interval": [
+        -0.15296913644133014,
+        0.2045445396139952
+       ],
+       "difference_pct": "17.3",
+       "interval_pct": [
+        "-15.3",
+        "20.5"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.10114401608470812,
+       "point_pct": "10.1",
+       "bootstrap": [
+        0.05135818851735318,
+        0.14512590349603416
+       ],
+       "bootstrap_pct": [
+        "5.1",
+        "14.5"
+       ],
+       "level": false
+      }
+     }
+    },
+    "needs2": {
+     "no_retrieval": {
+      "SUPPORTS": {
+       "first": {
+        "right": 98,
+        "n": 266,
+        "acc": 0.3684210526315789,
+        "wilson": [
+         0.3127081910504372,
+         0.42788036164121607
+        ],
+        "pct": "36.8",
+        "wilson_pct": [
+         "31.3",
+         "42.8"
+        ]
+       },
+       "second": {
+        "right": 9,
+        "n": 28,
+        "acc": 0.32142857142857145,
+        "wilson": [
+         0.1793304754342074,
+         0.5066149544436882
+        ],
+        "pct": "32.1",
+        "wilson_pct": [
+         "17.9",
+         "50.7"
+        ]
+       },
+       "difference": 0.046992481203007475,
+       "interval": [
+        -0.14639293551650884,
+        0.20102909475032946
+       ],
+       "difference_pct": "4.7",
+       "interval_pct": [
+        "-14.6",
+        "20.1"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 70,
+        "n": 161,
+        "acc": 0.43478260869565216,
+        "wilson": [
+         0.36060977402844174,
+         0.5119951994733927
+        ],
+        "pct": "43.5",
+        "wilson_pct": [
+         "36.1",
+         "51.2"
+        ]
+       },
+       "second": {
+        "right": 36,
+        "n": 95,
+        "acc": 0.37894736842105264,
+        "wilson": [
+         0.28789651358466833,
+         0.4794079412197865
+        ],
+        "pct": "37.9",
+        "wilson_pct": [
+         "28.8",
+         "47.9"
+        ]
+       },
+       "difference": 0.05583524027459952,
+       "interval": [
+        -0.06904044226455236,
+        0.1752171582565416
+       ],
+       "difference_pct": "5.6",
+       "interval_pct": [
+        "-6.9",
+        "17.5"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.05141386073880353,
+       "point_pct": "5.1",
+       "bootstrap": [
+        -0.06135501797973193,
+        0.16027357796665576
+       ],
+       "bootstrap_pct": [
+        "-6.1",
+        "16.0"
+       ],
+       "level": true
+      }
+     },
+     "web": {
+      "SUPPORTS": {
+       "first": {
+        "right": 212,
+        "n": 266,
+        "acc": 0.7969924812030075,
+        "wilson": [
+         0.7445847015247744,
+         0.8409439938283512
+        ],
+        "pct": "79.7",
+        "wilson_pct": [
+         "74.5",
+         "84.1"
+        ]
+       },
+       "second": {
+        "right": 20,
+        "n": 28,
+        "acc": 0.7142857142857143,
+        "wilson": [
+         0.529403642629825,
+         0.8474618415167003
+        ],
+        "pct": "71.4",
+        "wilson_pct": [
+         "52.9",
+         "84.7"
+        ]
+       },
+       "difference": 0.08270676691729317,
+       "interval": [
+        -0.06041016511748043,
+        0.27274127926131225
+       ],
+       "difference_pct": "8.3",
+       "interval_pct": [
+        "-6.0",
+        "27.3"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 121,
+        "n": 161,
+        "acc": 0.7515527950310559,
+        "wilson": [
+         0.6794645295475432,
+         0.8119162869453809
+        ],
+        "pct": "75.2",
+        "wilson_pct": [
+         "67.9",
+         "81.2"
+        ]
+       },
+       "second": {
+        "right": 69,
+        "n": 95,
+        "acc": 0.7263157894736842,
+        "wilson": [
+         0.629183776326649,
+         0.8058557212128485
+        ],
+        "pct": "72.6",
+        "wilson_pct": [
+         "62.9",
+         "80.6"
+        ]
+       },
+       "difference": 0.025237005557371628,
+       "interval": [
+        -0.08210971661658355,
+        0.13959774678479897
+       ],
+       "difference_pct": "2.5",
+       "interval_pct": [
+        "-8.2",
+        "14.0"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.05397188623733246,
+       "point_pct": "5.4",
+       "bootstrap": [
+        -0.046126389342922534,
+        0.15951372997711663
+       ],
+       "bootstrap_pct": [
+        "-4.6",
+        "16.0"
+       ],
+       "level": true
+      }
+     },
+     "retrieved": {
+      "SUPPORTS": {
+       "first": {
+        "right": 228,
+        "n": 266,
+        "acc": 0.8571428571428571,
+        "wilson": [
+         0.8099977614939285,
+         0.8941190240572986
+        ],
+        "pct": "85.7",
+        "wilson_pct": [
+         "81.0",
+         "89.4"
+        ]
+       },
+       "second": {
+        "right": 23,
+        "n": 28,
+        "acc": 0.8214285714285714,
+        "wilson": [
+         0.644082084514089,
+         0.9212161417056989
+        ],
+        "pct": "82.1",
+        "wilson_pct": [
+         "64.4",
+         "92.1"
+        ]
+       },
+       "difference": 0.0357142857142857,
+       "interval": [
+        -0.07464974477372828,
+        0.21687447267762847
+       ],
+       "difference_pct": "3.6",
+       "interval_pct": [
+        "-7.5",
+        "21.7"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 119,
+        "n": 161,
+        "acc": 0.7391304347826086,
+        "wilson": [
+         0.6662923304368165,
+         0.8008227667231236
+        ],
+        "pct": "73.9",
+        "wilson_pct": [
+         "66.6",
+         "80.1"
+        ]
+       },
+       "second": {
+        "right": 70,
+        "n": 95,
+        "acc": 0.7368421052631579,
+        "wilson": [
+         0.6403379066787737,
+         0.814935986095119
+        ],
+        "pct": "73.7",
+        "wilson_pct": [
+         "64.0",
+         "81.5"
+        ]
+       },
+       "difference": 0.0022883295194507935,
+       "interval": [
+        -0.10450138753273104,
+        0.11682655093340912
+       ],
+       "difference_pct": "0.2",
+       "interval_pct": [
+        "-10.5",
+        "11.7"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.019001307616868256,
+       "point_pct": "1.9",
+       "bootstrap": [
+        -0.07002308761033013,
+        0.11637054593004245
+       ],
+       "bootstrap_pct": [
+        "-7.0",
+        "11.6"
+       ],
+       "level": true
+      }
+     },
+     "gold": {
+      "SUPPORTS": {
+       "first": {
+        "right": 231,
+        "n": 266,
+        "acc": 0.868421052631579,
+        "wilson": [
+         0.822503465313089,
+         0.9038485871502823
+        ],
+        "pct": "86.8",
+        "wilson_pct": [
+         "82.3",
+         "90.4"
+        ]
+       },
+       "second": {
+        "right": 25,
+        "n": 28,
+        "acc": 0.8928571428571429,
+        "wilson": [
+         0.7280377463234293,
+         0.9628823079452005
+        ],
+        "pct": "89.3",
+        "wilson_pct": [
+         "72.8",
+         "96.3"
+        ]
+       },
+       "difference": -0.024436090225563922,
+       "interval": [
+        -0.10817346880144761,
+        0.14414784636333955
+       ],
+       "difference_pct": "-2.4",
+       "interval_pct": [
+        "-10.8",
+        "14.4"
+       ],
+       "level": true
+      },
+      "REFUTES": {
+       "first": {
+        "right": 120,
+        "n": 161,
+        "acc": 0.7453416149068323,
+        "wilson": [
+         0.6728698294176029,
+         0.8063781274088292
+        ],
+        "pct": "74.5",
+        "wilson_pct": [
+         "67.3",
+         "80.6"
+        ]
+       },
+       "second": {
+        "right": 67,
+        "n": 95,
+        "acc": 0.7052631578947368,
+        "wilson": [
+         0.6070487055586042,
+         0.7875220015121027
+        ],
+        "pct": "70.5",
+        "wilson_pct": [
+         "60.7",
+         "78.8"
+        ]
+       },
+       "difference": 0.04007845701209545,
+       "interval": [
+        -0.06955127000235597,
+        0.15571380846697228
+       ],
+       "difference_pct": "4.0",
+       "interval_pct": [
+        "-7.0",
+        "15.6"
+       ],
+       "level": true
+      },
+      "equal_weight": {
+       "point": 0.007821183393265773,
+       "point_pct": "0.8",
+       "bootstrap": [
+        -0.07250204315135673,
+        0.09158303367113427
+       ],
+       "bootstrap_pct": [
+        "-7.3",
+        "9.2"
+       ],
+       "level": true
+      }
+     }
+    }
+   },
+   "rag_minus_gold": {
+    "Multi-hop Reasoning": {
+     "SUPPORTS": {
+      "n": 319,
+      "b_only_first_right": 11,
+      "c_only_second_right": 22,
+      "both_right": 256,
+      "both_wrong": 30,
+      "difference": -0.034482758620689655,
+      "interval": [
+       -0.06957506864957205,
+       0.0006095514081927364
+      ],
+      "difference_pct": "-3.4",
+      "interval_pct": [
+       "-7.0",
+       "0.1"
+      ],
+      "interval_pct_2dp": [
+       "-6.96",
+       "0.06"
+      ],
+      "level": true,
+      "mcnemar_p": 0.08014331245794892,
+      "mcnemar_p_text": "0.080"
+     },
+     "REFUTES": {
+      "n": 169,
+      "b_only_first_right": 11,
+      "c_only_second_right": 12,
+      "both_right": 116,
+      "both_wrong": 30,
+      "difference": -0.005917159763313609,
+      "interval": [
+       -0.06153029923713619,
+       0.049695979710508965
+      ],
+      "difference_pct": "-0.6",
+      "interval_pct": [
+       "-6.2",
+       "5.0"
+      ],
+      "interval_pct_2dp": [
+       "-6.15",
+       "4.97"
+      ],
+      "level": true,
+      "mcnemar_p": 1.0,
+      "mcnemar_p_text": "1.0"
+     },
+     "equal_weight": {
+      "point": -0.020199959192001633,
+      "point_pct": "-2.0",
+      "bootstrap": [
+       -0.05292055424681408,
+       0.012348824915137854
+      ],
+      "bootstrap_pct": [
+       "-5.3",
+       "1.2"
+      ],
+      "level": true
+     }
+    },
+    "Other": {
+     "SUPPORTS": {
+      "n": 602,
+      "b_only_first_right": 25,
+      "c_only_second_right": 21,
+      "both_right": 496,
+      "both_wrong": 60,
+      "difference": 0.006644518272425249,
+      "interval": [
+       -0.015431106085409629,
+       0.028720142630260126
+      ],
+      "difference_pct": "0.7",
+      "interval_pct": [
+       "-1.5",
+       "2.9"
+      ],
+      "interval_pct_2dp": [
+       "-1.54",
+       "2.87"
+      ],
+      "level": true,
+      "mcnemar_p": 0.6587380770236564,
+      "mcnemar_p_text": "0.66"
+     },
+     "REFUTES": {
+      "n": 709,
+      "b_only_first_right": 41,
+      "c_only_second_right": 19,
+      "both_right": 556,
+      "both_wrong": 93,
+      "difference": 0.031029619181946404,
+      "interval": [
+       0.009738391676494353,
+       0.052320846687398455
+      ],
+      "difference_pct": "3.1",
+      "interval_pct": [
+       "1.0",
+       "5.2"
+      ],
+      "interval_pct_2dp": [
+       "0.97",
+       "5.23"
+      ],
+      "level": false,
+      "mcnemar_p": 0.0062176026593266705,
+      "mcnemar_p_text": "0.0062"
+     },
+     "equal_weight": {
+      "point": 0.018837068727185827,
+      "point_pct": "1.9",
+      "bootstrap": [
+       0.0033538885426576126,
+       0.034241761125350934
+      ],
+      "bootstrap_pct": [
+       "0.3",
+       "3.4"
+      ],
+      "level": false
+     }
+    }
+   },
+   "rag_minus_gold_difference": {
+    "SUPPORTS": {
+     "point": -0.041127276893114906,
+     "point_pct": "-4.1",
+     "bootstrap": [
+      -0.08244670325664713,
+      -0.00018746289796811588
+     ],
+     "bootstrap_pct": [
+      "-8.2",
+      "-0.0"
+     ],
+     "level": false
+    },
+    "REFUTES": {
+     "point": -0.036946778945260016,
+     "point_pct": "-3.7",
+     "bootstrap": [
+      -0.09556755493611313,
+      0.022815908730523016
+     ],
+     "bootstrap_pct": [
+      "-9.6",
+      "2.3"
+     ],
+     "level": true
+    },
+    "equal_weight": {
+     "point": -0.03903702791918746,
+     "point_pct": "-3.9",
+     "bootstrap": [
+      -0.07464860219157625,
+      -0.00238371535976453
+     ],
+     "bootstrap_pct": [
+      "-7.5",
+      "-0.2"
+     ],
+     "level": false
+    }
+   }
+  }
  }
 }

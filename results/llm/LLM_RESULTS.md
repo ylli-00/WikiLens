@@ -257,3 +257,129 @@ Two rerun SDs of a difference for each paired comparison between conditions: the
 | 2,000 S/R | web vs no passages | 46.7 | no | 1.5 | no passages original-r1 | no |
 
 User texts of the repeats against the original rows: r1/no_retrieval 0 of 450 differ; r1/gold 0 of 450 differ; r1/retrieved 0 of 450 differ; r1/web 0 of 450 differ; r2/no_retrieval 0 of 450 differ; r2/gold 0 of 450 differ; r2/retrieved 0 of 450 differ; r2/web 0 of 450 differ.
+
+## 6. Multi-hop claims: supported and refuted claims, equal weight
+
+The 2,000 supported and refuted claims of the original run; NOT ENOUGH INFO claims are left out of this section. A group's equal-weight figure is the mean of its supported and its refuted figure, half each, so that a group's label mix does not move it. The two kinds hold 700 + 700 and 300 + 300 claims, so for them the equal-weight figure is the plain one. Intervals are 95%: Wilson for one label's accuracy; Newcombe's, from the two Wilson intervals, for a gap between two sets of claims of one label; the paired formula with McNemar's exact p for a gap between two conditions on the same claims of one label; a paired bootstrap (10,000 resamples, seed 20261121, the claims resampled within each label and group) for every equal-weight figure, gap and change of a gap. Gaps are in percentage points. Tags with fewer than 100 supported/refuted claims get their numbers but no conclusions. The challenge tags come from `data/scaled/claims_3000.jsonl` (SHA-256 checked).
+
+Two meanings of "multi-hop": **two or more articles** (`kind` `needs2`: every evidence set spans two or more pages), 600 claims; the **Multi-hop Reasoning** challenge tag (the verifying annotator's view of the main difficulty; the pick did not balance on it), 488 claims. 427 claims are both (266 supported, 161 refuted).
+
+The repeat runs of section 5 hold 210 of these supported/refuted claims on one article and 90 on two or more, so this section uses the original run only, and its subgroup gaps have no rerun SD of their own.
+
+### One article against two or more
+
+| condition | claims | SUPPORTS | REFUTES | equal weight |
+|---|---|---|---|---|
+| no passages | one article (700 + 700) | 27.7% (24.5–31.1) | 39.3% (35.7–43.0) | 33.5% (31.1–35.9) |
+| no passages | two or more (300 + 300) | 37.0% (31.7–42.6) | 41.7% (36.2–47.3) | 39.3% (35.5–43.2) |
+| web | one article (700 + 700) | 80.3% (77.2–83.1) | 88.3% (85.7–90.5) | 84.3% (82.4–86.1) |
+| web | two or more (300 + 300) | 79.3% (74.4–83.5) | 73.3% (68.1–78.0) | 76.3% (72.8–79.7) |
+| RAG | one article (700 + 700) | 84.7% (81.9–87.2) | 86.1% (83.4–88.5) | 85.4% (83.6–87.2) |
+| RAG | two or more (300 + 300) | 85.7% (81.2–89.2) | 73.0% (67.7–77.7) | 79.3% (76.0–82.5) |
+| gold | one article (700 + 700) | 85.1% (82.3–87.6) | 82.7% (79.7–85.3) | 83.9% (81.9–85.8) |
+| gold | two or more (300 + 300) | 87.0% (82.7–90.3) | 73.7% (68.4–78.3) | 80.3% (77.2–83.3) |
+
+Gap, one article minus two or more:
+
+| condition | SUPPORTS (Newcombe) | REFUTES (Newcombe) | equal weight (bootstrap) |
+|---|---|---|---|
+| no passages | -9.3 (-15.7 to -3.0) | -2.4 (-9.1 to 4.2) | -5.8 (-10.5 to -1.3) |
+| web | 1.0 (-4.3 to 6.6) | 15.0 (9.6 to 20.7) | 8.0 (4.2 to 11.9) |
+| RAG | -1.0 (-5.5 to 4.1) | 13.1 (7.7 to 18.9) | 6.1 (2.4 to 9.9) |
+| gold | -1.9 (-6.2 to 3.1) | 9.0 (3.5 to 14.9) | 3.6 (-0.0 to 7.3) |
+
+Paired gaps within each kind (RAG minus the other condition, on the same claims):
+
+| pair | claims | SUPPORTS (paired formula, McNemar p) | REFUTES (paired formula, McNemar p) | equal weight (bootstrap) |
+|---|---|---|---|---|
+| RAG − no passages | one article | 57.0 (53.1 to 60.9), p 5.8e-108 | 46.9 (43.0 to 50.8), p 2.3e-86 | 51.9 (49.2 to 54.6) |
+| RAG − no passages | two or more | 48.7 (42.6 to 54.7), p 1.6e-38 | 31.3 (25.5 to 37.1), p 1.8e-22 | 40.0 (35.8 to 44.2) |
+| RAG − gold | one article | -0.4 (-2.6 to 1.8), p 0.80 | 3.4 (1.3 to 5.6), p 0.0027 | 1.5 (-0.0 to 3.1) |
+| RAG − gold | two or more | -1.3 (-4.9 to 2.2), p 0.58 | -0.7 (-4.7 to 3.4), p 0.87 | -1.0 (-3.7 to 1.7) |
+| RAG − web | one article | 4.4 (1.6 to 7.3), p 0.0032 | -2.1 (-4.3 to 0.0), p 0.072 | 1.1 (-0.7 to 2.9) |
+| RAG − web | two or more | 6.3 (2.1 to 10.6), p 0.0054 | -0.3 (-4.8 to 4.1), p 1.0 | 3.0 (0.0 to 6.0) |
+
+Change of each paired gap from one article to two or more (the gap on two or more minus the gap on one article; bootstrap):
+
+| pair | SUPPORTS | REFUTES | equal weight |
+|---|---|---|---|
+| RAG − no passages | -8.3 (-15.7 to -1.0) | -15.5 (-22.6 to -8.6) | -11.9 (-16.9 to -6.9) |
+| RAG − gold | -0.9 (-5.2 to 3.2) | -4.1 (-8.7 to 0.4) | -2.5 (-5.6 to 0.6) |
+| RAG − web | 1.9 (-3.0 to 7.0) | 1.8 (-3.2 to 6.9) | 1.9 (-1.6 to 5.5) |
+
+### What the five RAG passages covered, by kind
+
+Pages, not sentences: a claim counts for "the whole gold set" when every page of the evidence set shown in the gold condition is among the pages of the five passages. Whether the passages held the gold sentences themselves was not measured.
+
+| claims | measure | SUPPORTS | REFUTES | equal weight |
+|---|---|---|---|---|
+| one article | a gold page in the top 5 (share of claims) | 696 / 700 = 99.4% (98.5–99.8) | 694 / 700 = 99.1% (98.1–99.6) | 99.3% (98.8–99.7) |
+| one article | the whole gold set in the top 5 (share of claims) | 696 / 700 = 99.4% (98.5–99.8) | 694 / 700 = 99.1% (98.1–99.6) | 99.3% (98.8–99.7) |
+| one article | RAG accuracy when the whole gold set is in the top 5 | 593 / 696 = 85.2% (82.4–87.6) | 601 / 694 = 86.6% (83.9–88.9) | 85.9% (84.0–87.7) |
+| one article | RAG accuracy when it is not | 0 / 4 = 0.0% (0.0–49.0) | 2 / 6 = 33.3% (9.7–70.0) | 16.7% (0.0–33.3) |
+| one article | RAG accuracy, gold set in minus not in (points; Newcombe, bootstrap) | 85.2 (36.1 to 87.6) | 53.3 (16.5 to 77.0) | 69.2 (51.5 to 86.4) |
+| two or more | a gold page in the top 5 (share of claims) | 300 / 300 = 100.0% (98.7–100.0) | 297 / 300 = 99.0% (97.1–99.7) | 99.5% (98.8–100.0) |
+| two or more | the whole gold set in the top 5 (share of claims) | 198 / 300 = 66.0% (60.5–71.1) | 131 / 300 = 43.7% (38.2–49.3) | 54.8% (51.0–58.8) |
+| two or more | RAG accuracy when the whole gold set is in the top 5 | 174 / 198 = 87.9% (82.6–91.7) | 90 / 131 = 68.7% (60.3–76.0) | 78.3% (73.8–82.9) |
+| two or more | RAG accuracy when it is not | 83 / 102 = 81.4% (72.7–87.7) | 129 / 169 = 76.3% (69.4–82.1) | 78.9% (73.7–83.8) |
+| two or more | RAG accuracy, gold set in minus not in (points; Newcombe, bootstrap) | 6.5 (-1.8 to 16.0) | -7.6 (-17.8 to 2.5) | -0.6 (-7.3 to 6.2) |
+
+### The challenge tags
+
+| tag | claims (S + R) | SUPPORTS: one article / two or more | REFUTES: one article / two or more | |
+|---|---|---|---|---|
+| Other | 1,311 (602 + 709) | 574 / 28 | 614 / 95 |  |
+| Multi-hop Reasoning | 488 (319 + 169) | 53 / 266 | 8 / 161 |  |
+| Entity Disambiguation | 80 (34 + 46) | 31 / 3 | 26 / 20 | fewer than 100: numbers only |
+| Search terms not in claim | 33 (18 + 15) | 16 / 2 | 9 / 6 | fewer than 100: numbers only |
+| Numerical Reasoning | 57 (6 + 51) | 6 / 0 | 34 / 17 | fewer than 100: numbers only |
+| Combining Tables and Text | 31 (21 + 10) | 20 / 1 | 9 / 1 | fewer than 100: numbers only |
+
+Equal-weight accuracy per tag (bootstrap interval):
+
+| tag | no passages | web | RAG | gold |
+|---|---|---|---|---|
+| Other | 34.0% (31.5–36.5) | 83.1% (81.0–85.1) | 85.4% (83.4–87.3) | 83.5% (81.4–85.5) |
+| Multi-hop Reasoning | 38.7% (34.2–43.3) | 77.8% (73.9–81.6) | 79.4% (75.5–83.2) | 81.4% (77.7–85.0) |
+| Entity Disambiguation | 32.9% (22.6–43.5) | 77.0% (67.6–85.8) | 77.7% (68.6–86.5) | 77.0% (67.5–85.8) |
+| Search terms not in claim | 27.8% (12.8–43.3) | 81.1% (67.2–93.9) | 87.8% (75.6–97.2) | 75.6% (60.0–90.0) |
+| Numerical Reasoning | 27.0% (13.7–45.1) | 72.1% (53.4–90.7) | 83.8% (66.2–96.1) | 86.8% (69.1–98.0) |
+| Combining Tables and Text | 49.0% (29.8–66.4) | 80.5% (65.5–95.0) | 68.3% (51.0–85.5) | 70.7% (53.3–87.9) |
+
+Accuracy per tag and label, SUPPORTS / REFUTES (Wilson intervals in the JSON):
+
+| tag | no passages | web | RAG | gold |
+|---|---|---|---|---|
+| Other | 27.7 / 40.2 | 80.2 / 85.9 | 86.5 / 84.2 | 85.9 / 81.1 |
+| Multi-hop Reasoning | 35.4 / 42.0 | 79.3 / 76.3 | 83.7 / 75.1 | 87.1 / 75.7 |
+| Entity Disambiguation | 35.3 / 30.4 | 82.4 / 71.7 | 79.4 / 76.1 | 82.4 / 71.7 |
+| Search terms not in claim | 22.2 / 33.3 | 88.9 / 73.3 | 88.9 / 86.7 | 77.8 / 73.3 |
+| Numerical Reasoning | 16.7 / 37.3 | 50.0 / 94.1 | 83.3 / 84.3 | 83.3 / 90.2 |
+| Combining Tables and Text | 38.1 / 60.0 | 81.0 / 80.0 | 66.7 / 70.0 | 71.4 / 70.0 |
+
+### Multi-hop Reasoning against Other
+
+Per condition: SUPPORTS / REFUTES accuracy and the equal-weight accuracy of each tag, overall and within each kind, and the gap Multi-hop Reasoning minus Other.
+
+| claims (Multi-hop Reasoning S + R; Other S + R) | condition | Multi-hop Reasoning | Other | gap SUPPORTS / REFUTES (Newcombe) | gap, equal weight (bootstrap) |
+|---|---|---|---|---|---|
+| all (319 + 169; 602 + 709) | no passages | 35.4 / 42.0; 38.7% (34.2–43.3) | 27.7 / 40.2; 34.0% (31.5–36.5) | 7.7 (1.4 to 14.1) / 1.8 (-6.2 to 10.1) | 4.7 (-0.5 to 9.9) |
+| all (319 + 169; 602 + 709) | web | 79.3 / 76.3; 77.8% (73.9–81.6) | 80.2 / 85.9; 83.1% (81.0–85.1) | -0.9 (-6.6 to 4.4) / -9.6 (-16.9 to -3.2) | -5.2 (-9.7 to -0.9) |
+| all (319 + 169; 602 + 709) | RAG | 83.7 / 75.1; 79.4% (75.5–83.2) | 86.5 / 84.2; 85.4% (83.4–87.3) | -2.8 (-7.9 to 1.9) / -9.1 (-16.5 to -2.5) | -6.0 (-10.2 to -1.6) |
+| all (319 + 169; 602 + 709) | gold | 87.1 / 75.7; 81.4% (77.7–85.0) | 85.9 / 81.1; 83.5% (81.4–85.5) | 1.3 (-3.6 to 5.7) / -5.4 (-12.9 to 1.2) | -2.0 (-6.2 to 2.1) |
+| one article (53 + 8; 574 + 614) | no passages | 28.3 / 12.5; 20.4% (9.4–34.8) | 27.5 / 40.6; 34.0% (31.3–36.7) | 0.8 (-10.2 to 14.5) / -28.1 (-39.0 to 6.7) | -13.6 (-24.9 to 1.1) |
+| one article (53 + 8; 574 + 614) | web | 77.4 / 100.0; 88.7% (83.0–94.3) | 80.7 / 87.9; 84.3% (82.2–86.3) | -3.3 (-16.5 to 6.5) / 12.1 (-20.5 to 14.9) | 4.4 (-1.8 to 10.1) |
+| one article (53 + 8; 574 + 614) | RAG | 73.6 / 100.0; 86.8% (80.2–92.5) | 86.8 / 85.8; 86.3% (84.3–88.2) | -13.2 (-26.6 to -2.8) / 14.2 (-18.4 to 17.2) | 0.5 (-6.1 to 6.5) |
+| one article (53 + 8; 574 + 614) | gold | 88.7 / 100.0; 94.3% (89.6–98.1) | 85.7 / 82.7; 84.2% (82.1–86.2) | 3.0 (-8.6 to 9.7) / 17.3 (-15.3 to 20.5) | 10.1 (5.1 to 14.5) |
+| two or more (266 + 161; 28 + 95) | no passages | 36.8 / 43.5; 40.2% (35.4–45.1) | 32.1 / 37.9; 35.0% (25.2–45.2) | 4.7 (-14.6 to 20.1) / 5.6 (-6.9 to 17.5) | 5.1 (-6.1 to 16.0) |
+| two or more (266 + 161; 28 + 95) | web | 79.7 / 75.2; 77.4% (73.2–81.5) | 71.4 / 72.6; 72.0% (62.3–81.1) | 8.3 (-6.0 to 27.3) / 2.5 (-8.2 to 14.0) | 5.4 (-4.6 to 16.0) |
+| two or more (266 + 161; 28 + 95) | RAG | 85.7 / 73.9; 79.8% (75.8–83.7) | 82.1 / 73.7; 77.9% (68.9–85.7) | 3.6 (-7.5 to 21.7) / 0.2 (-10.5 to 11.7) | 1.9 (-7.0 to 11.6) |
+| two or more (266 + 161; 28 + 95) | gold | 86.8 / 74.5; 80.7% (76.7–84.5) | 89.3 / 70.5; 79.9% (72.2–86.7) | -2.4 (-10.8 to 14.4) / 4.0 (-7.0 to 15.6) | 0.8 (-7.3 to 9.2) |
+
+RAG minus gold within each tag, on the same claims, and the difference between the two tags' gaps (Multi-hop Reasoning minus Other; bootstrap):
+
+| tag | SUPPORTS (paired formula, McNemar p) | REFUTES (paired formula, McNemar p) | equal weight (bootstrap) |
+|---|---|---|---|
+| Multi-hop Reasoning | -3.4 (-7.0 to 0.1), p 0.080 | -0.6 (-6.2 to 5.0), p 1.0 | -2.0 (-5.3 to 1.2) |
+| Other | 0.7 (-1.5 to 2.9), p 0.66 | 3.1 (1.0 to 5.2), p 0.0062 | 1.9 (0.3 to 3.4) |
+| difference, Multi-hop Reasoning − Other | -4.1 (-8.2 to -0.0) | -3.7 (-9.6 to 2.3) | -3.9 (-7.5 to -0.2) |
