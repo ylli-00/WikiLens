@@ -589,6 +589,16 @@ before the category box and the "last edited" footer.
   default would make the setup fail on Python 3.10 and 3.11, on macOS 13, and (for the GPU lock)
   everywhere but Linux. The cost is that a new release of a dependency can break the default path;
   `make setup CPU=1` is the pinned way in, and CI installs it on every push.
+- **On Linux the ranges take PyTorch's CPU build; `make setup GPU=1` takes PyPI's CUDA build.** The
+  demo needs no GPU (a query's embedding takes 18 ms on the CPU, 4.6 ms on the GPU), and the
+  environment is 1.5 GB with the CPU build against 5.8 GB with the GPU build. The Makefile adds
+  `--extra-index-url https://download.pytorch.org/whl/cpu` when `uname -s` is `Linux`, and pip
+  takes `+cpu`, which sorts above PyPI's build of the same release. macOS wheels have no CUDA and
+  native Windows does not run the Makefile, so neither gets the index; nor do the lock files, since
+  `==2.14.0` in `requirements.lock` would also match `2.14.0+cpu`. The cost is that pip would take
+  the CUDA build without a message if the CPU index lacked a wheel that PyPI has; on 2026-11-21 it
+  had one for every Python from 3.10 to 3.14 on Linux x86_64 and aarch64 (`docs/SETUP.md`,
+  "Platforms").
 - **`requires-python` is `>=3.10`.** The package's own code needs nothing newer, and the ranges
   resolve for Python 3.10 to 3.14 on Linux, Windows and macOS 14. Narrowing it to the lock files'
   3.12 (numpy 2.5.3) would refuse setups that work, and `make setup` reports that a lock file

@@ -30,9 +30,9 @@ make setup
 ```
 
 - That is the whole path. `make setup` needs Docker, Python 3.10 or newer and `make`. It starts
-  MariaDB 11.8 in a container, builds a virtual environment and loads the 100 Wikipedia pages
-  committed here ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited.
-- The output is from a fresh clone with `make setup CPU=1` (no GPU packages), which took 4 minutes
+  MariaDB 11.8 in a container, builds a virtual environment with PyTorch's CPU build (`GPU=1` for
+  CUDA) and loads the 100 Wikipedia pages committed here ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited.
+- The output is from a fresh clone with `make setup CPU=1` (the pinned versions), which took 4 minutes
   45 seconds ([the record](results/fresh_clone_run.md); [setup and platforms](#setup-and-platforms), also for a Mac).
 - Put your own question between the quotes. The first number is the cosine distance. `--k 5`
   returns more passages, `--category`, `--min-words`, `--edited-since` and `--linked-from` filter
@@ -272,7 +272,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (921 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (926 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs the 53.5 GB FEVEROUS
@@ -281,10 +281,10 @@ Wikipedia, a GPU and hours ([its commands](docs/SETUP.md#reproduce-the-scaled-ru
 
 **Without a GPU** everything works; only the embedding is slower. The ingest took 230.0 s on this
 laptop's CPU against 21 s on its GPU, and a query embedding takes 18 ms against 4.6 ms. The SQL times
-do not change. `make setup CPU=1` installs pinned CPU-only packages (1.4 GB instead of 5.8 GB; Python 3.12 or newer).
+do not change. So `make setup` installs PyTorch's CPU build (1.5 GB against 5.8 GB for the GPU build); `CPU=1` pins CPU-only versions (1.4 GB; Python 3.12 or newer).
 
-**Platforms.** On Linux x86_64 both were run: `make setup` on the author's laptop and `make setup CPU=1`
-from a fresh clone, and CI installs the same lock file on every push. On macOS 14 or newer with Apple
+**Platforms.** On Linux x86_64 all three were run: the default's install and the tests, `GPU=1` on the author's laptop,
+`CPU=1` from a fresh clone; CI installs that lock file on every push. On macOS 14 or newer with Apple
 Silicon both resolve: pip's and uv's resolvers find every package for that platform, but it was not run
 there, because we have no Mac and no Windows machine. [The platform table](docs/SETUP.md#platforms) has
 macOS 13, Intel Macs and Windows, and the commands behind each cell.
@@ -339,7 +339,7 @@ To learn the feature, five files are enough: [sql/schema.sql](sql/schema.sql) (t
 claims, [results/](results/) every experiment as JSON and Markdown, and [docs/](docs/) the reference pages
 ([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [analysis/](analysis/) is the earlier FEVEROUS analysis
 that chose the benchmark. [tests/](tests/) holds
-921 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
+926 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 
