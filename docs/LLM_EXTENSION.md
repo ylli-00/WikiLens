@@ -197,7 +197,8 @@ the six comparisons):
 ![Accuracy of the four conditions on three classes and on the supported/refuted claims](img/llm_accuracy.svg)
 
 **How the comparisons are worded.** Two conditions are "level" only where the 95% interval of
-their paired difference includes zero; otherwise one is "ahead by X points", with the interval.
+their paired difference includes zero; otherwise one is "ahead by X points", with the interval in
+the text or, where the text leaves it out, in [LLM_RESULTS.md](../results/llm/LLM_RESULTS.md).
 The text also says when a gap is smaller than about two rerun standard deviations, the spread
 between reruns of the same claims (section 7).
 
@@ -205,16 +206,34 @@ between reruns of the same claims (section 7).
 
 ![F1 of the supported and refuted labels for the four conditions](img/llm_f1.svg)
 
-On the 2,000 claims a NOT ENOUGH INFO answer lowers recall and counts toward neither label's
-precision. On refuted claims web search, RAG and gold are level (F1 84.4, 85.6 and 85.1; every
-paired difference includes zero). On supported claims the order is gold, RAG, web search: RAG is
-ahead of web search by 4.3 F1 points (2.8 to 5.9) and gold ahead of RAG by 2.3 (1.0 to 3.6).
-RAG's edge over web search there comes from recall (85.0 against 80.0) and from precision (91.6
-against 88.2), because web search called more refuted claims supported: 107 of the 1,000, against
-78 for RAG and 37 for gold. Gold's edge over RAG is precision (95.9 against 91.6), with nearly
-the same recall. RAG's 1.7-point lead over web search in accuracy comes from the supported claims:
-it gets 850 of them right and web search 800, while on the refuted claims web search is ahead,
-838 against 822. Intervals are by paired bootstrap (10,000 resamples, seed 20261121).
+Only the 2,000 supported and refuted claims count here. For each label, recall is the share of its
+1,000 claims that got that label as the answer, and precision the share of the answers with that
+label that were right; F1 combines the two. A "not enough information" answer lowers recall and
+counts toward neither label's precision.
+
+| condition | supported: precision / recall / F1 | refuted: precision / recall / F1 |
+|---|---|---|
+| web search | 88.2 / 80.0 / 83.9 | 85.0 / 83.8 / 84.4 |
+| RAG | 91.6 / 85.0 / 88.2 | 89.3 / 82.2 / 85.6 |
+| gold | 95.9 / 85.7 / 90.5 | 90.9 / 80.0 / 85.1 |
+
+What it means:
+
+- **On refuted claims web search, RAG and gold are level.** No paired difference in F1 is larger
+  than chance.
+- **On supported claims gold is best, then RAG, then web search.** RAG is ahead of web search by
+  4.3 F1 points (2.8 to 5.9) and gold ahead of RAG by 2.3 (1.0 to 3.6).
+- **Web search's weakness is calling refuted claims "supported".** It did that for 107 of the
+  1,000 refuted claims, against 78 for RAG and 37 for gold, and each such answer lowers its
+  precision on supported claims. RAG also finds more of the supported claims (recall 85.0 against
+  80.0), so it is ahead on both counts. Gold's edge over RAG is precision alone: its recall is
+  nearly the same.
+- **RAG's small lead in accuracy (1.7 points) comes from the supported claims.** RAG gets 850 of
+  them right against web search's 800; on the refuted claims web search is ahead, 838 against 822.
+
+Intervals are by paired bootstrap (10,000 resamples, seed 20261121);
+[LLM_RESULTS.md, section 2](../results/llm/LLM_RESULTS.md#precision-recall-and-f1-per-label) has
+every one, and the no-passages row.
 
 ## 7. Run-to-run variance
 
@@ -244,49 +263,64 @@ in the original run and wrong in r1, or the other way round; between r1 and r2 i
 | gold | 450 | 72.0 / 72.4 / 72.9% | 8.4 / 5.8 / 7.1% |
 | gold | 300 supported/refuted | 83.3 / 80.0 / 82.0% | 6.7 / 3.3 / 5.3% |
 
-A switch always changes the label, but a label can also change from one wrong answer to another
-(a supported claim answered refuted in one run and not enough information in the other). That
-leaves accuracy unchanged and is not a switch. Counting every change, the label stayed the same
-between two runs on 86.2% to 95.3% of the 450 claims. RAG's answers changed least (93.3% to 95.3%
-identical), those without passages most (86.2% to 88.4% identical: 11.6% to 13.8% changed,
-against 8.4% to 10.9% switches). Accuracy moves less than the switches because they go both ways:
-without passages 10.9% of the claims switched between the original and r1, yet accuracy fell by
-only 3.3 points. The third pair, r1 vs r2, compares the two repeats with each other: if something
-had changed between the original runs and the repeats, the first two pairs would show more
-switches than this one ("The original runs against the repeats" below).
+What the table shows:
 
-**The rerun standard deviation.** If a share f of the claims switches between right and wrong from
-one run to the next, an accuracy over n claims varies between runs by about √(f / 2n), and a
-difference between two conditions by √2 times that. With the switch rates above, one condition's
-accuracy varies by 0.2 to 0.4 points over the 3,000 claims and by 0.2 to 0.5 over the 2,000
-supported/refuted ones; a difference between two conditions by 0.3 to 0.6 and 0.3 to 0.7 points.
+- **RAG's answers are the most stable, those without passages the least.** Between two runs RAG
+  changed its answer on 4.7% to 6.7% of the 450 claims, the model without passages on 11.6% to
+  13.8%.
+- **A changed answer is not always a switch.** An answer can change from one wrong label to
+  another, for example a supported claim answered refuted in one run and not enough information in
+  the next. Accuracy stays the same, so the table does not count it.
+- **Accuracy moves much less than the switches,** because claims switch in both directions and
+  most of it cancels out. Without passages 10.9% of the claims switched between the original and
+  r1, yet accuracy fell by only 3.3 points.
+- **r1 vs r2 shows how much two runs made the same way differ.** The original is compared against
+  that below.
 
-**The original runs against the repeats.** If something had changed between the original runs and
-the repeats, the original would differ from both repeats more than they differ from each other.
+**Run-to-run chance is small: well under a point.** One rerun standard deviation is:
 
-- For web search, RAG and gold it does not. The original switches against a repeat about as often
-  as the repeats do against each other, and of the 18 accuracy differences between two runs of
-  these conditions one has an interval that excludes zero: gold on the 300 supported/refuted
-  claims, original against r1, 3.3 points (0.4 to 6.2, p 0.041). There r1 is the low run, and the
-  original is level with r2 (1.3, −0.7 to 3.4).
-- No passages is the exception. Its original run scored highest on the sample (also on the
-  supported/refuted claims), it switched against the repeats more often than they did against
-  each other, and it is ahead of r1 by 3.3 points (0.3 to 6.4, p 0.044), though level with r2
-  (2.0, −0.9 to 4.9). The repeats ran the same CLI binary, so the CLI version does not explain
-  it. Nor can the runs tell a change between the runs from chance: 3 of the 16 differences
-  between the original and a repeat exclude zero, against none of the 8 between the repeats,
-  with no correction for the 24 comparisons.
-- Either way, no comparison in this document changes: no passages trails every other condition by
-  16.1 points or more on three classes and by 46.7 or more on the supported/refuted claims.
+| what moves | 3,000 claims | 2,000 supported/refuted |
+|---|---|---|
+| one condition's accuracy | 0.2 to 0.4 points | 0.2 to 0.5 points |
+| a difference between two conditions | 0.3 to 0.6 points | 0.3 to 0.7 points |
 
-**The wording rule.** Its last part (section 5) takes two rerun standard deviations of a
-difference, from the larger of the two conditions' SDs over the three pairs of runs: 1.1 to 1.2
-points for the comparisons on 3,000 claims and 1.2 to 1.5 for those on 2,000. Every paired
-three-class gap in section 3 is larger; the reweighted figures there have no rerun SD of their
-own. On the supported/refuted claims, RAG's 1.7-point lead over web search is above two rerun SDs
-(1.3) but not by much, and RAG against gold (0.8) and gold against web search (1.0), level
-already, are below them (1.2 and 1.3). [LLM_RESULTS.md](../results/llm/LLM_RESULTS.md) has every
-pair of runs, the SDs for both claim counts and the accuracy differences between runs.
+If a share f of the claims switches between right and wrong from one run to the next, an accuracy
+over n claims varies between runs by about √(f / 2n), and a difference between two conditions by
+√2 times that, with f from the table above.
+
+**Nothing clearly changed between the original runs and the repeats.** If something had, the
+original would differ from both repeats more than they differ from each other.
+
+- **Web search, RAG and gold: no sign of a change.** The original disagrees with a repeat about as
+  often as the two repeats disagree with each other. Of their 18 accuracy differences between two
+  runs, only one is larger than chance (its 95% interval excludes zero): gold on the 300
+  supported/refuted claims, original vs r1, 3.3 points. There r1 is the low run; the original is
+  level with r2.
+- **No passages: maybe, but the runs cannot tell.** Its original run scored highest, disagrees
+  with the repeats more than they do with each other, and is ahead of r1 by more than chance,
+  though level with r2. The repeats used the same CLI binary, so the CLI version is not the cause.
+  Over all four conditions, 3 of the 16 differences between the original and a repeat are larger
+  than chance and none of the 8 between the repeats are, but with 24 comparisons and no correction
+  for that, chance cannot be ruled out.
+- **Either way, no conclusion in this document changes.** No passages trails every other condition
+  by 16.1 points or more on three classes and by 46.7 or more on the supported/refuted claims.
+
+**Every gap between two conditions is larger than this noise, except two that are level anyway.**
+Section 5 flags a gap smaller than two rerun standard deviations of a difference (the larger of
+the two conditions' SDs over the three pairs of runs): 1.1 to 1.2 points on the 3,000 claims, 1.2
+to 1.5 on the 2,000 supported/refuted ones. Every paired gap on three classes in section 3 is
+above that; the reweighted figures there have no rerun SD of their own. The closest cases are on
+the supported/refuted claims:
+
+| comparison | gap, points | two rerun SDs | result |
+|---|---|---|---|
+| RAG against web search | 1.7 | 1.3 | above, but not by much |
+| RAG against gold | 0.8 | 1.2 | below (the two are level anyway) |
+| gold against web search | 1.0 | 1.3 | below (the two are level anyway) |
+
+[LLM_RESULTS.md, section 5](../results/llm/LLM_RESULTS.md#5-run-to-run-variance-450-repeated-claims)
+has every pair of runs, the SDs for both claim counts and every difference between runs with its
+interval.
 
 ## 8. Where it fails
 
@@ -296,34 +330,65 @@ pair of runs, the SDs for both claim counts and the accuracy differences between
   so the second article is hard for the model as well as for retrieval
   ([Multi-hop claims and RAG](#multi-hop-claims-and-rag) below). On refuted claims that need two
   or more articles all three of web search, RAG and gold reach only 73.0% to 73.7%.
-- **Claims where retrieval missed.** For 2,943 of the 3,000 claims (98.1%) a gold page is among the
-  five passages; RAG is right on 71.2% of those and on 57.9% of the other 57. On the
-  supported/refuted claims the split is sharper: 83.9% against 30.8% (4 of 13). When every page of
-  the shown gold set is among the passages (2,534 claims, 84.5%), RAG is right on 71.7%, against
-  66.3% when it is not.
+
+**When the search misses the right article.** This is rare: 57 of the 3,000 claims got no passage
+from an article that holds their evidence. How often RAG is right with and without such a passage:
+
+| claims | the right article is among the passages | it is not |
+|---|---|---|
+| supported or refuted | 83.9% of 1,987 | 30.8% of 13 |
+| all three labels | 71.2% of 2,943 | 57.9% of 57 |
+
+What it means:
+
+- **On supported and refuted claims a miss is costly.** Without the right article RAG mostly
+  answers "not enough information", which is wrong for these claims.
+- **The overall accuracy hides this.** Most misses (44 of 57) are NOT ENOUGH INFO claims, where
+  "not enough information" is the right answer, so over all claims the drop looks small.
+- **For claims that need several articles, finding one of them is as good as finding all.** RAG
+  is right about as often either way (65.6% with every article among the passages, 67.6% without;
+  from `per_claim.csv` and `retrieval_top5.csv` in `results/llm/`). The limit on these claims is
+  the model combining the articles, not the search: given the gold evidence it drops on them too
+  (above).
 
 ### Multi-hop claims and RAG
 
-Here only the supported and refuted claims count, as in section 5, each label weighted one half so
-that a group's label mix cannot make it look easier or harder; for the one-article and
-two-or-more groups (700 + 700 and 300 + 300 claims) that changes nothing. Equal-weight figures and
-gaps get paired bootstrap intervals, with the claims resampled within each label and group, and a
-gap within one label Newcombe's interval
-([LLM_RESULTS.md, section 6](../results/llm/LLM_RESULTS.md#6-multi-hop-claims-supported-and-refuted-claims-equal-weight) has every number).
+Only the supported and refuted claims count here, as in section 5, and each label weighs one half,
+so that a group with more refuted claims does not look harder for that reason alone (the
+one-article and two-or-more groups are balanced already; the tags are not).
+[LLM_RESULTS.md, section 6](../results/llm/LLM_RESULTS.md#6-multi-hop-claims-supported-and-refuted-claims-equal-weight)
+has every number with its 95% interval.
 
-- **Two meanings.** In 600 claims every evidence set spans two or more articles; 488 carry the
-  Multi-hop Reasoning tag, the main difficulty named by the annotator who verified them; 427 are both.
-- **Does RAG do worse on them?** Yes, by 6.1 points (79.3% against 85.4%, 2.4 to 9.9), all on the
-  refuted claims (13.1, 7.7 to 18.9; on supported ones −1.0, −5.5 to 4.1).
-- **Retrieval or the model?** Gold drops 3.6 points (−0.0 to 7.3, so only just level; refuted 9.0,
-  3.5 to 14.9), and RAG's gap to gold does not clearly change (−2.5, −5.6 to 0.6). The passages
-  held every page of the gold set for 99.3% of the one-article claims and 54.8% of the others, and
-  on those others RAG is level with and without the whole set (−0.6, −7.3 to 6.2). Whether
-  they held the gold sentences was not measured. [EVALUATION.md](EVALUATION.md#feverouss-challenge-tags)
-  has the search on its own per tag, from the bare index query.
-- **Does RAG still help?** Over no passages, by 51.9 points (49.2 to 54.6) on one article and 40.0
-  (35.8 to 44.2) on two or more, a smaller lead (−11.9, −16.9 to −6.9). Against web search it is
-  level in both groups (1.1, −0.7 to 2.9; 3.0, 0.0 to 6.0), with no clear change (1.9, −1.6 to 5.5).
+"Multi-hop" means two overlapping things: 600 of these claims need two or more articles (every
+evidence set spans two or more), and 488 carry the Multi-hop Reasoning tag, which the annotator who
+verified the claim chose as its main difficulty; 427 are both. Accuracy by the number of articles a
+claim needs (drops in points; "level" where the 95% interval includes zero):
+
+| condition | one article | two or more | drop | drop, supported claims | drop, refuted claims |
+|---|---|---|---|---|---|
+| web search | 84.3% | 76.3% | 8.0 | 1.0 (level) | 15.0 |
+| RAG | 85.4% | 79.3% | 6.1 | −1.0 (level) | 13.1 |
+| gold | 83.9% | 80.3% | 3.6 (only just level) | −1.9 (level) | 9.0 |
+
+What it means:
+
+- **A second article makes refuted claims harder, not supported ones.** RAG drops 6.1 points, all
+  of it on the refuted claims; on supported claims it does as well as with one article. Web search
+  and gold show the same pattern.
+- **The model struggles with the second article too, so better search alone would not fix it.**
+  Gold, which is handed the evidence, drops on the refuted claims as well, and RAG stays as close
+  to gold on two-article claims as on one-article ones (level in both). Having every article among
+  the passages did not help RAG either: on the two-article claims it is right on 78.3% when the
+  passages hold them all and on 78.9% when they do not. Whether the passages held the evidence
+  sentences was not measured; [EVALUATION.md](EVALUATION.md#feverouss-challenge-tags) has the
+  search on its own per tag.
+- **RAG still helps a lot.** Its lead over no passages shrinks from 51.9 points on one article to
+  40.0 on two or more, but stays very large. Against web search it is level in both groups.
+
+**The Multi-hop Reasoning tag adds nothing beyond the number of articles.** RAG is 6.0 points less
+accurate on it than on Other, but within each group (one article, two or more) the two tags are
+level. The overall gap comes from the mix: 427 of the tag's 488 claims need two or more articles,
+against 123 of Other's 1,311.
 
 | tag (supported + refuted claims), equal weight | no passages | web search | RAG | gold |
 |---|---|---|---|---|
@@ -334,13 +399,10 @@ gap within one label Newcombe's interval
 | Numerical Reasoning (6 + 51) | 27.0% | 72.1% | 83.8% | 86.8% |
 | Combining Tables and Text (21 + 10) | 49.0% | 80.5% | 68.3% | 70.7% |
 
-RAG is 6.0 points (1.6 to 10.2) less accurate on Multi-hop Reasoning than on Other, but the two tags
-are level within each group (one article 0.5, −6.1 to 6.5; two or more 1.9, −7.0 to 11.6), and 427
-of the tag's 488 claims need two or more articles.
-
-**Limits.** One run (the repeats hold only 90 supported/refuted claims on two or more articles), so
-these gaps have no rerun SD of their own. NOT ENOUGH INFO is left out by choice, the tags were not
-balanced, and the last four tags have fewer than 100 claims here, too few for conclusions.
+**Limits.** These numbers come from one run: the repeats hold only 90 supported/refuted claims on
+two or more articles, too few for a rerun SD of their own. NOT ENOUGH INFO is left out by choice,
+the tags were not balanced when the claims were picked, and the last four tags have fewer than 100
+claims here, too few for conclusions.
 
 ## 9. The web condition
 
