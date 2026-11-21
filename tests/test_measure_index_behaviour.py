@@ -9,7 +9,7 @@ from typing import Any
 import pymysql
 import pytest
 
-from wikilense.config import REPO_ROOT
+from wikilense.config import REPO_ROOT, Settings
 
 SCRIPT = REPO_ROOT / "scripts" / "measure_index_behaviour.py"
 
@@ -672,11 +672,57 @@ def test_hard_cap_is_refused_without_the_throwaway_flag(
 
 
 def test_every_part_but_hard_cap_runs_by_default(mib: Any) -> None:
-    assert mib.selected_parts([], False) == ["forms", "join_order", "builds", "cache", "isolation"]
-    assert mib.selected_parts([], True) == list(mib.PARTS)
-    assert mib.selected_parts(["hard_cap", "forms"], True) == ["hard_cap", "forms"]
+    assert mib.selected_parts([]) == ["forms", "join_order", "builds", "cache", "isolation"]
+    assert mib.selected_parts(["hard_cap", "forms"]) == ["hard_cap", "forms"]
     # A named part is kept as named: main refuses hard_cap without the flag.
-    assert mib.selected_parts(["hard_cap"], False) == ["hard_cap"]
+    assert mib.selected_parts(["hard_cap"]) == ["hard_cap"]
+
+
+def test_the_throwaway_flag_goes_with_the_named_part_only(
+    mib: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def no_connection(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("nothing may run: the flag is given without the part")
+
+    monkeypatch.setattr(mib, "load_settings", no_connection)
+    monkeypatch.setattr(mib.db, "connect", no_connection)
+    for argv in (["--throwaway-server"], ["forms", "--throwaway-server"]):
+        with pytest.raises(SystemExit) as raised:
+            mib.main(argv)
+        assert raised.value.code == 2
+        assert "--throwaway-server goes with the part hard_cap" in capsys.readouterr().err
+
+
+def test_hard_cap_is_refused_at_the_address_of_the_projects_own_server(
+    mib: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Any,
+) -> None:
+    # The project's address is what the .env file gives, the defaults where it names none.
+    env_file = tmp_path / ".env"
+    env_file.write_text("WIKILENSE_DB_PORT=3307\nWIKILENSE_DB_PASSWORD=secret\n")
+    assert mib.project_server_address(env_file) == ("127.0.0.1", 3307)
+    assert mib.project_server_address(tmp_path / "missing") == ("127.0.0.1", 3306)
+
+    monkeypatch.setattr(mib, "project_server_address", lambda: ("127.0.0.1", 3306))
+    assert mib.is_project_server(Settings(db_password="x"))
+    assert mib.is_project_server(Settings(db_password="x", db_host="localhost"))
+    assert not mib.is_project_server(Settings(db_password="x", db_port=3308))
+    assert not mib.is_project_server(Settings(db_password="x", db_host="db.example"))
+
+    def no_connection(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("nothing may connect to the project's own server")
+
+    monkeypatch.setattr(mib, "load_settings", lambda: Settings(db_password="x"))
+    monkeypatch.setattr(mib.db, "connect", no_connection)
+    monkeypatch.setattr(mib, "measure_hard_cap", no_connection)
+    with pytest.raises(SystemExit) as raised:
+        mib.main(["hard_cap", "--throwaway-server", "--sample", "5"])
+    assert raised.value.code == 2
+    err = capsys.readouterr().err
+    assert "hard_cap would connect to 127.0.0.1:3306, the project's own database server" in err
+    assert "export WIKILENSE_DB_PORT" in err
 
 
 def test_an_execution_is_complete_short_stopped_or_lost(mib: Any) -> None:
@@ -873,4 +919,5 @@ def test_the_claims_of_a_case_record_every_execution(mib: Any) -> None:
     with pytest.raises(mib.HardCapStop):
         mib.run_claims(guard, "SQL", [(0,), (1,)], 10, 1, records)
     assert [record["claim"] for record in records] == [0, 1]
-    assert records[0]["analyze"] == "complete" and records[1]["outcomes"] == []
+    # The execution that ended the part is a lost server, not one that never ran.
+    assert records[0]["analyze"] == "complete" and records[1]["outcomes"] == ["server lost"]

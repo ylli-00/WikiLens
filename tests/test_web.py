@@ -370,6 +370,28 @@ def test_a_search_stopped_at_the_time_limit_is_504_with_a_plain_message(
     assert "max_statement_time" in responses["504"]["description"]
 
 
+@pytest.mark.parametrize(
+    ("errno", "text"),
+    [(2013, "Lost connection to MySQL server during query"), (2006, "MySQL server has gone away")],
+)
+def test_a_search_during_which_the_server_closes_the_connection_is_503(
+    monkeypatch: pytest.MonkeyPatch, errno: int, text: str
+) -> None:
+    conn = ClosingConnection()
+    monkeypatch.setattr(webmod.db, "connect", lambda settings=None, database=None: conn)
+
+    def lost_search(*args: Any, **kwargs: Any) -> list[Hit]:
+        raise pymysql.err.OperationalError(errno, text)
+
+    monkeypatch.setattr(webmod.search, "search", lost_search)
+    client = TestClient(webmod.create_app(OFFLINE_SETTINGS, embedder=FakeEmbedder()))
+    resp = client.get("/api/search", params={"q": "x"})
+    assert resp.status_code == 503, resp.text
+    assert resp.json() == {"detail": searchmod.connection_lost_message()}
+    assert "closed the connection during the search" in resp.json()["detail"]
+    assert conn.closed
+
+
 def test_api_search_passes_the_statement_time_limit_of_the_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -380,7 +402,7 @@ def test_api_search_passes_the_statement_time_limit_of_the_settings(
 
     def recording(*args: Any, **kwargs: Any) -> list[Hit]:
         seen.append(kwargs["statement_seconds"])
-        raise pymysql.err.OperationalError(2013, "Lost connection to MySQL server")
+        raise pymysql.err.OperationalError(1205, "Lock wait timeout exceeded")
 
     monkeypatch.setattr(webmod.search, "search", recording)
     for seconds in (OFFLINE_SETTINGS.statement_seconds, 0):

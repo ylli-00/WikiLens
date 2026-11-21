@@ -239,11 +239,14 @@ The API (`Hit`, `Filters`, `search()`, `explain_search()`, `hit_sentences()`) is
   README can quote it.
 - **A time limit on WikiLense's own searches.** On 11.8.9 a vector search that fewer rows pass
   than its `LIMIT` can keep searching and grow `mariadbd` until it runs out of memory
-  (`docs/VECTOR_INDEX.md`). MariaDB's `max_statement_time` stops such a statement with error 1969
+  (`docs/VECTOR_INDEX.md`). A short `max_statement_time` stops such a statement with error 1969
   and the server keeps running. So `search(..., statement_seconds=N)` sets it for the session
   around the search and restores the previous value, the same way as `ef_search`, and the web page
   and `wikilense query` pass `WIKILENSE_STATEMENT_SECONDS` (see "Database"). A stopped
-  search is a plain message: 504 on the API, exit code 1 on the command line. Why 5 s: every
+  search is a plain message: 504 on the API, exit code 1 on the command line. A search during
+  which the server closes the connection is a 503 with a plain message. The limit bounds one
+  search, not several running at once: the page does not queue or refuse parallel requests.
+  Why 5 s: every
   median we measured for the statement `wikilense query` runs is far below it. The slowest is
   1,387.73 ms, on S1 when 66 chunks pass a category filter (`results/scaled/run1/s1/join_order.md`).
   The evaluation, the LLM retrieval and the

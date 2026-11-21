@@ -195,9 +195,9 @@ table and the method; the measurements are on S1 unless a line says otherwise.
   ([the run](results/scaled/run1/s0/uncommitted_recall.md)). The second is the stale index above:
   with a `DELETE` in that sequence the index returned no row at all, until the next committed write
   or `FLUSH TABLES`. So no index search should run in a REPEATABLE READ transaction whose snapshot predates another connection's commit.
-- **No hard cap, and a search that runs away** ([30 claims](results/scaled/run1/s1/hard_cap.md), [three versions](results/scaled/version_probe/version_probe.md)). A `WHERE` inside
+- **No hard cap, and a search that runs away** ([30 claims](results/scaled/run1/s1/hard_cap.md), [three versions](results/scaled/version_probe/version_probe.md), [in SQL only](results/scaled/runaway_repro/runaway_repro.md)). A `WHERE` inside
   the statement is not capped at `LIMIT`, as the documentation says it is. When fewer rows pass, 11.8.9 keeps searching: a threshold only 3 chunks meet ran to a 10 s `max_statement_time`
-  in 57 of 60 executions, and without a limit `mariadbd` grew until it was killed. 12.3.3 and 13.0.2 kept memory flat, and joined filters never ran away. The page and `wikilense query` stop a search after 5 s ([setting](docs/SETUP.md#afterwards)).
+  in 57 of 60 executions, and under a 60 s limit `mariadbd` outgrew a 2 GB container and was killed. 12.3.3 and 13.0.2 took 42 to 150 MB for such a statement and were not killed, and joined filters never ran away. The page and `wikilense query` stop a search after 5 s ([setting](docs/SETUP.md#afterwards)).
 - **Results are reproducible up to the graph build.** At the chosen settings twenty S1 builds found 2,922 to 2,937 gold pages; two builds agree on 2,838 to 2,907 of 3,000 hit lists ([builds](results/scaled/run1/s1/build_variance.md)).
 
 ## What the database-native approach gave
@@ -256,7 +256,7 @@ On the supported/refuted claims it is ahead of web search by 1.7 points (0.1 to 
 Most of the three-class gap is NOT ENOUGH INFO, a label FEVEROUS's annotators gave from December 2020 Wikipedia without outside
 knowledge: web search gives that answer least often and gets only 20.1% of the NOT ENOUGH INFO claims right. [docs/LLM_EXTENSION.md](docs/LLM_EXTENSION.md) has the rest.
 The web page can run this RAG check live on a typed statement when the server is [set up for it](docs/SETUP.md#turn-on-the-live-fact-check);
-without that, its "Copy the prompt" box gives the same prompt and passages to paste into any chatbot ([details](docs/LLM_EXTENSION.md#14-on-the-web-page)).
+without that, its "Copy the prompt" box gives that prompt, with one sentence changed, and the passages to paste into any chatbot ([details](docs/LLM_EXTENSION.md#14-on-the-web-page)).
 
 ## Setup and platforms
 
@@ -272,7 +272,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (917 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (921 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), up to the HNSW build. The scaled run needs the 53.5 GB FEVEROUS
@@ -339,7 +339,7 @@ To learn the feature, five files are enough: [sql/schema.sql](sql/schema.sql) (t
 claims, [results/](results/) every experiment as JSON and Markdown, and [docs/](docs/) the reference pages
 ([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [analysis/](analysis/) is the earlier FEVEROUS analysis
 that chose the benchmark, and [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
-917 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
+921 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 

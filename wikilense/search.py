@@ -73,6 +73,8 @@ STATEMENT_TIME_GET_SQL = "SELECT @@SESSION.max_statement_time"
 STATEMENT_TIME_SET_SQL = "SET SESSION max_statement_time = %s"
 #: MariaDB's error for a statement stopped at ``max_statement_time`` (ER_STATEMENT_TIMEOUT).
 ER_STATEMENT_TIMEOUT = 1969
+#: The client's errors for a connection the server closed (CR_SERVER_GONE_ERROR, CR_SERVER_LOST).
+CONNECTION_LOST_ERRORS = (2006, 2013)
 
 #: The strategies whose statement uses the ``overfetch`` factor (inner LIMIT ``k * overfetch``).
 OVERFETCH_STRATEGIES: frozenset[str] = frozenset({"overfetch", "rrf"})
@@ -685,6 +687,23 @@ def statement_stopped_message(seconds: float) -> str:
         f"The search was stopped after {seconds:g} s by MariaDB's max_statement_time, a guard "
         "against a vector search that keeps searching when few rows pass its filters (see "
         "docs/VECTOR_INDEX.md)."
+    )
+
+
+def is_connection_lost(exc: BaseException) -> bool:
+    """Return True when ``exc`` says the server closed the connection during a statement."""
+    return (
+        isinstance(exc, pymysql.err.OperationalError)
+        and bool(exc.args)
+        and exc.args[0] in CONNECTION_LOST_ERRORS
+    )
+
+
+def connection_lost_message() -> str:
+    """Return the plain message for a search during which the server closed the connection."""
+    return (
+        "MariaDB closed the connection during the search: the server was stopped or ran out of "
+        "memory. Try again in a moment."
     )
 
 

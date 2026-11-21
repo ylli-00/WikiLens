@@ -79,9 +79,9 @@ Usage (from the project root, with the database up and the corpus ingested):
     python scripts/measure_index_behaviour.py builds
     python scripts/measure_index_behaviour.py cache
     python scripts/measure_index_behaviour.py isolation
-    # a throwaway server only (see hard_cap):
-    python scripts/measure_index_behaviour.py hard_cap --throwaway-server --database wikilense_s1 \
-        --sample 200 --out results/scaled/run1/s1
+    # a throwaway server only (see hard_cap), at another address than the project's server:
+    WIKILENSE_DB_PORT=3308 python scripts/measure_index_behaviour.py hard_cap \
+        --throwaway-server --database wikilense_s1 --sample 200 --out results/scaled/run1/s1
 
 Do not run it while the test suite or another measurement runs: ``builds`` and ``isolation``
 use the test database, and ``cache`` changes a server-wide setting for its duration.
@@ -106,6 +106,7 @@ from typing import Any
 
 import numpy as np
 import pymysql
+from dotenv import dotenv_values
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 for entry in (str(REPO_ROOT), str(REPO_ROOT / "scripts")):
@@ -304,6 +305,13 @@ HARD_CAP_REFUSAL = (
     "a throwaway MariaDB container started with a --memory cap, never against the project's "
     "database server."
 )
+HARD_CAP_SAME_SERVER = (
+    "hard_cap would connect to {host}:{port}, the project's own database server (the address "
+    "that .env gives). Start a throwaway MariaDB container with a --memory cap on another port "
+    "and export WIKILENSE_DB_PORT, with its user and passwords, for this run."
+)
+#: Host names that all mean this machine.
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 def utc_now() -> str:
@@ -2029,7 +2037,11 @@ def run_claims(
         records.append(record)
         for pass_index in range(-1, repeats):  # -1 is the untimed execution
             start = time.perf_counter()
-            outcome, found = guard.attempt(_fetch, sql, claim_params)
+            try:
+                outcome, found = guard.attempt(_fetch, sql, claim_params)
+            except HardCapStop:
+                record["outcomes"].append(SERVER_LOST)  # the execution that ended the part
+                raise
             elapsed = (time.perf_counter() - start) * 1000.0
             if outcome is None:
                 got = [int(row[0]) for row in found]
@@ -2049,7 +2061,11 @@ def run_claims(
         if STOPPED in record["outcomes"] or SERVER_LOST in record["outcomes"]:
             record["analyze"] = "skipped"
             continue
-        outcome, read = guard.attempt(_rows_read_of, sql, claim_params)
+        try:
+            outcome, read = guard.attempt(_rows_read_of, sql, claim_params)
+        except HardCapStop:
+            record["analyze"] = SERVER_LOST
+            raise
         record["analyze"] = outcome or COMPLETE
         record["rows_read"] = read
 
@@ -2245,9 +2261,14 @@ def measure_hard_cap(
                     if widest is None:
                         scans[i] = NO_THRESHOLD
                         continue
-                    outcome, found = guard.attempt(
-                        _fetch, HARD_CAP_SCAN_SQL, (vector_params[i], vector_params[i], widest)
-                    )
+                    try:
+                        outcome, found = guard.attempt(
+                            _fetch, HARD_CAP_SCAN_SQL,
+                            (vector_params[i], vector_params[i], widest),
+                        )
+                    except HardCapStop:
+                        scans[i] = SERVER_LOST
+                        raise
                     scans[i] = outcome or COMPLETE
                     if outcome is not None:
                         continue
@@ -2614,12 +2635,36 @@ def _positive_ints(text: str) -> tuple[int, ...]:
     return values
 
 
-def selected_parts(named: Sequence[str], throwaway_server: bool) -> list[str]:
-    """The parts to run: those ``named``, or every part in :data:`PARTS` order when none is
-    named, hard_cap only with ``throwaway_server``."""
+def selected_parts(named: Sequence[str]) -> list[str]:
+    """The parts to run: those ``named``, or every part in :data:`PARTS` order but hard_cap
+    when none is named. hard_cap runs only when it is named."""
     if named:
         return list(named)
-    return [part for part in PARTS if part != "hard_cap" or throwaway_server]
+    return [part for part in PARTS if part != "hard_cap"]
+
+
+def project_server_address(env_file: Path | None = None) -> tuple[str, int]:
+    """Host and port of the project's own database server: ``WIKILENSE_DB_HOST`` and
+    ``WIKILENSE_DB_PORT`` of the repository's ``.env`` file, the defaults where it names none.
+
+    Exported variables are not looked at, so a run that exports another port differs from it.
+    """
+    fields = Settings.__dataclass_fields__
+    host, port = fields["db_host"].default, fields["db_port"].default
+    path = REPO_ROOT / ".env" if env_file is None else env_file
+    if path.is_file():
+        values = dotenv_values(path)
+        host = values.get("WIKILENSE_DB_HOST") or host
+        with suppress(ValueError):
+            port = int(values.get("WIKILENSE_DB_PORT") or port)
+    return host, port
+
+
+def is_project_server(settings: Settings) -> bool:
+    """True when ``settings`` connect to the address of :func:`project_server_address`."""
+    host, port = project_server_address()
+    same_host = settings.db_host == host or {settings.db_host, host} <= LOOPBACK_HOSTS
+    return same_host and settings.db_port == port
 
 
 def _write_json(path: Path, report: dict[str, Any]) -> None:
@@ -2668,20 +2713,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                              + ",".join(str(m) for m in BUILD_CREATE_SQL) + ")")
     parser.add_argument("--throwaway-server", action="store_true",
                         help="hard_cap: the server is a throwaway MariaDB container with a "
-                             "--memory cap; hard_cap runs only with this flag")
+                             "--memory cap; hard_cap runs only with this flag, when it is "
+                             "named, and at another address than the one .env gives")
     args = parser.parse_args(argv)
-    parts = selected_parts(args.parts, args.throwaway_server)
+    parts = selected_parts(args.parts)
     unknown = [part for part in parts if part not in PARTS]
     if unknown:
         parser.error(f"unknown part(s) {unknown}; choose from {', '.join(PARTS)}")
     if "hard_cap" in parts and not args.throwaway_server:
         parser.error(HARD_CAP_REFUSAL)
+    if args.throwaway_server and "hard_cap" not in parts:
+        parser.error("--throwaway-server goes with the part hard_cap; name it")
     optional = [value for value in (args.repeats, args.sample) if value is not None]
     if min(args.k, args.builds, args.passes, *optional) < 1:
         parser.error("--k, --builds, --passes, --repeats and --sample must be at least 1")
     if args.passes < 2 and "cache" in (args.parts or PARTS):
         parser.error("--passes must be at least 2: the cache part compares two passes")
     settings = load_settings()
+    if "hard_cap" in parts and is_project_server(settings):
+        parser.error(HARD_CAP_SAME_SERVER.format(host=settings.db_host, port=settings.db_port))
     if args.database:
         if args.database == settings.test_db_name:
             parser.error("--database names the test database; measure a corpus database")

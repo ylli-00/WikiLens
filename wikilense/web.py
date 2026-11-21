@@ -76,7 +76,8 @@ search MariaDB stops at that limit (error 1969) is a 504 with a one-sentence ``d
 Errors: invalid parameters are 422 (FastAPI validation, an inconsistent filter pair, a filter
 given with strategy ``none``, an argument ``search`` refuses, a database that is not offered, or
 a ``q`` that is not the picked claim's text), 404 (a claim that is not offered on the database)
-or 400 (a blank query, an unknown parameter); a server that cannot be reached, a database without schema, without
+or 400 (a blank query, an unknown parameter); a server that cannot be reached or that closes the
+connection during the search, a database without schema, without
 chunks or without the FULLTEXT index that ``rrf`` needs, a model that cannot be loaded, or one
 whose vectors do not have the ``chunk.embedding`` dimension are 503 with a one-sentence
 ``detail``.
@@ -1763,6 +1764,11 @@ def api_search(
                     status_code=503,
                     detail="the database was ingested with an older schema: re-run "
                     "'wikilense ingest'",
+                ) from exc
+            # the server closed the connection: it was stopped, or ran out of memory mid-search
+            if search.is_connection_lost(exc):
+                raise HTTPException(
+                    status_code=503, detail=search.connection_lost_message()
                 ) from exc
             raise
     finally:

@@ -40,7 +40,7 @@ DEFAULT_FACTCHECK = "off"
 #: Seconds a search of the web page or of `wikilense query` may run before MariaDB stops it
 #: (``max_statement_time``, error 1969); 0 sets no limit. On 11.8.9 a vector search that fewer
 #: rows pass than its LIMIT can keep searching until the server runs out of memory
-#: (docs/VECTOR_INDEX.md). The evaluation and the measurement scripts set no limit.
+#: (docs/VECTOR_INDEX.md). The evaluation and the measurement scripts do not use it.
 DEFAULT_STATEMENT_SECONDS = 5
 
 
@@ -142,7 +142,7 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
     statement_seconds = _get_int(env, "WIKILENSE_STATEMENT_SECONDS", DEFAULT_STATEMENT_SECONDS)
     if statement_seconds < 0:
         raise SettingsError(
-            "WIKILENSE_STATEMENT_SECONDS must be 0 (no limit) or a positive number of seconds, "
+            "WIKILENSE_STATEMENT_SECONDS must be 0 (no limit) or a positive whole number of seconds, "
             f"got {statement_seconds}"
         )
     return Settings(

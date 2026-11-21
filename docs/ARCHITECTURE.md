@@ -130,7 +130,7 @@ median time, *p95* the slow tail. The demo corpus's numbers are in
 | `run_experiments.py` | The protocol behind `results/` (its groups are in [DESIGN.md](DESIGN.md); `summary` rebuilds `results/SUMMARY.md`). Root SQL goes through `docker exec`, the password in the environment only. | the main database, docker → `results/` |
 | `make_charts.py` | The README charts as SVG, with a dark variant. | `results/` → `docs/img/` |
 | `compare_separate_index.py` | Where the database-native search loses: MariaDB's statements against an exact NumPy scan of a copy of the vectors and, when installed, hnswlib (in no requirements file). | the database (read only) → `results/separate_index.*` |
-| `measure_index_behaviour.py` | Six measured behaviours of the index, five that its documentation does not describe: `forms`, `join_order`, `builds`, `cache`, `isolation` ([VECTOR_INDEX.md](VECTOR_INDEX.md)), and `hard_cap`, the documentation's "hard cap" on a distance threshold (only with `--throwaway-server`, never against the project's server). | the corpus database, scratch tables in the test database; `cache` sets a server variable and restores it → `results/` |
+| `measure_index_behaviour.py` | Six measured behaviours of the index, five that its documentation does not describe: `forms`, `join_order`, `builds`, `cache`, `isolation` ([VECTOR_INDEX.md](VECTOR_INDEX.md)), and `hard_cap`, the documentation's "hard cap" on a distance threshold (only with `--throwaway-server`, and only at another address than the project's server). | the corpus database, scratch tables in the test database; `cache` sets a server variable and restores it → `results/` |
 | `make_env.py` | Writes `.env` from `.env.example` with two random passwords, once; never prints them or touches an existing file. | `.env.example` → `.env` |
 | `scaled_build.py` | The scaled run's data: picks the 3,000 claims and the distractor pages ([DATA.md](DATA.md) has the rules), and writes the S0 and S1 corpus folders. | the FEVEROUS database (read only) |
 | `scaled_check.py` | Re-derives every rule of the build with separate code and compares the results. | writes only `SELFCHECK.md` |
@@ -281,9 +281,9 @@ rules. Three points a beginner may miss:
 
 ## 7. Testing and CI
 
-There are 917 tests of three kinds, told apart by pytest markers.
+There are 921 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (799) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (803) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
 - `db` tests (112) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.
