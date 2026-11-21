@@ -46,16 +46,14 @@ without the 10 GB archive; `data/feverous/` is not committed (two files are over
 limit). `scripts/build_corpus.py` picks the 75 claims whose evidence lies entirely in that shard,
 their 54 evidence pages and 46 "filler" pages they link to (realistic distractors), and
 `scripts/fetch_page_meta.py` adds each page's December 2020 revision, edit date and categories.
-`wikilense ingest` parses, chunks, embeds and fills eleven tables in about 21 s on the RTX 4060,
-17 s of it embedding (`results/SUMMARY.md` section 8). `search.search()` ranks chunks by cosine
-distance with any filters in the same statement; `evaluate.evaluate()` checks every claim's hits
-against its gold evidence in `claim_evidence`.
+`wikilense ingest` parses, chunks, embeds and fills eleven tables. `search.search()` ranks chunks
+by cosine distance with any filters in the same statement; `evaluate.evaluate()` checks every
+claim's hits against its gold evidence in `claim_evidence`.
 
-The scaled run is the reported result: the same code on 3,000 FEVEROUS claims (per label, 700
-on one page and 300 on two or more) in two databases. `wikilense_s0` (S0) holds their gold pages,
-43,134 chunks; `wikilense_s1` (S1) adds one distractor per gold page (the page it links to most
-among those not yet in the corpus), 132,359 chunks. The `scripts/scaled_*.py` scripts build, load
-and measure it; [DATA.md](DATA.md) and [EVALUATION.md](EVALUATION.md) describe data and results.
+The scaled run is the reported result: the same code on 3,000 FEVEROUS claims in two databases,
+`wikilense_s0` (S0, their gold pages) and `wikilense_s1` (S1, one distractor page per gold page
+added). The `scripts/scaled_*.py` scripts build, load and measure it; [DATA.md](DATA.md) and
+[EVALUATION.md](EVALUATION.md) describe data and results.
 
 ## 3. Key ideas for a beginner
 
@@ -88,9 +86,8 @@ and the full-text ranking and sorts the sums, so a good keyword match can still 
 pages of the top-k chunks; *evidence recall* when every gold sentence of one evidence set is inside
 them (through `chunk_sentence`), over the 66 claims whose evidence is sentences and list items (the
 other 9 need table cells, which are not indexed). Each claim is searched 5 times; *p50* is the
-median time, *p95* the slow tail. Demo defaults at k=10: article recall 74 of 75, evidence recall
-60 of 66, SQL p50 0.51 ms and p95 0.94 ms, query embedding p50 4.58 ms on the GPU and about 18 ms
-on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
+median time, *p95* the slow tail. The demo corpus's numbers are in
+[EVALUATION.md](EVALUATION.md#the-demo-corpus-100-pages-75-claims).
 
 ## 4. File by file
 
@@ -105,13 +102,13 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `chunking.py` | Groups a page's units into chunks (at most `max_words`, never across a section, one unit of overlap); `embedding_text` adds the `title > section path:` prefix. | - | `config`, `wikitext` | `chunk_units` |
 | `embedding.py` | `Embedder`: loads the model lazily (on the GPU when there is one) at its pinned revision; `embed_queries` prepends the BGE query instruction, `embed_passages` does not. | the Hugging Face model cache | `config`; sentence-transformers, torch | `Embedder.embed_queries` |
 | `db.py` | The MariaDB layer: `connect`, `apply_schema`, `insert_rows` with an allowlist of tables and columns (`SCHEMA_COLUMNS`), `vec_param` (the bytes of a `VECTOR`), the one allowed session variable, `EXPLAIN`. | the database; `sql/schema.sql` | `config`; PyMySQL | `insert_sql` |
-| `ingest.py` | `wikilense ingest`: checks settings and model, then seven steps (schema, pages, chunks with embeddings, links, `ANALYZE TABLE`, claims and evidence, `ingest_meta`), each committed when done. | `data/corpus/` → all eleven tables | `db`, `corpus`, `wikitext`, `chunking`, `embedding` | `_Ingest.run` |
-| `search.py` | The four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment, `ef_search` set per call and restored, and so is `max_statement_time` when the caller passes a time limit (the web page and `wikilense query` do). | the database (read only) | `db`, `config` | `search_statement` |
+| `ingest.py` | `wikilense ingest`: checks settings and model, then seven steps, each committed when done ([DESIGN.md](DESIGN.md) lists them). | `data/corpus/` → all eleven tables | `db`, `corpus`, `wikitext`, `chunking`, `embedding` | `_Ingest.run` |
+| `search.py` | The four strategies (`inline`, `overfetch`, `none`, `rrf`), the `Filters` (words, heading, path, links, titles, category, edit date), every SQL statement as a named constant or fragment; `ef_search`, and `max_statement_time` when the caller passes a time limit, set per call and restored. | the database (read only) | `db`, `config` | `search_statement` |
 | `evaluate.py` | Recall and latency: ground truth from `claim_evidence`, pure metric functions, one untimed and `repeats` timed passes per claim and k, the JSON and Markdown writer. | the database → `<out>/<name>.json/.md` | `db`, `search` | `evaluate` |
 | `cli.py` | The `wikilense` command (`init-db`, `ingest`, `query`, `eval`, `serve`): argument checks, one-line errors, exit codes 0, 1, 2 and 130, the text output of `query`. | stdout / stderr | `db`, `ingest`, `search`, `evaluate`, `embedding`, `web` | `cmd_query` |
-| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings, and with `claim_id`, `database` or `repeat` also the claim's marks and summary, the database that answered and the repeated timings; `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `GET /api/factcheck` says whether the live fact-check is on and `POST /api/factcheck` runs it (the search again, then one model call); `GET /api/prompt` returns the copy box's text (the search again, no model call); a search MariaDB stops at the time limit is a 504; `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `factcheck`, `evaluate`, `embedding`; FastAPI | `api_search` |
-| `factcheck.py` | The page's live fact-check, off unless `WIKILENSE_FACTCHECK` is `subscription` or `api`: reads the LLM experiment's RAG run record and prompt set (refused if the hash differs), builds the request with the runner's `Runner.request`, makes one call per click through the CLI or API backend, splits the reason's citations, and reads the reliability figures from `results/llm/llm_results.json`. Also the copyable prompt, loaded whatever the setting: the same request as one text to paste into a chatbot, with its one changed sentence (a plain answer instead of the tool call). | `results/llm/runs.json`, `results/llm/llm_results.json`, `wikilense/llm/prompts/fact_check_v1/` | `llm.runner`, `llm.cli_backend`, `llm.api_backend`, `llm.claims`, `llm.retrieval` | `FactChecker.run` |
-| `picker.py` | The page's claim picker: reads both claim files, decides which claims a database offers (gold pages in `page`, gold sentences resolved by `ingest.resolve_element`), builds their ground truth with `evaluate.ground_truth_from_rows`, and computes a search's marks and summary with the evaluation's metric functions; the ready-made examples and the rule that chose them. | `data/corpus/claims.jsonl`, `data/scaled/claims_3000.jsonl`, the database (read only) | `corpus`, `evaluate`, `ingest`, `search` | `build_catalog` |
+| `web.py` | FastAPI: `GET /` is one self-contained page (its script writes with `textContent` only), `GET /api/search` returns hits, SQL, `EXPLAIN` and timings (with `claim_id` also the claim's marks and summary); `/api/databases`, `/api/claims` and `/api/pages` feed the database selector, the claim picker and the page list; `GET` and `POST /api/factcheck` are the live fact-check and `GET /api/prompt` returns the copy box's text; a search MariaDB stops at the time limit is a 504; `/docs` is the API page. | the demo database and `wikilense_s1` when loaded (read only) | `db`, `search`, `picker`, `factcheck`, `evaluate`, `embedding`; FastAPI | `api_search` |
+| `factcheck.py` | The page's live fact-check, off unless `WIKILENSE_FACTCHECK` is `subscription` or `api`: the LLM experiment's RAG request (refused if the prompt set's hash differs), built with `Runner.request`, one call per click through the CLI or API backend, and the reliability figures from `results/llm/llm_results.json`. Also the copyable prompt, whatever the setting ([DESIGN.md](DESIGN.md) has the rules of both). | `results/llm/runs.json`, `results/llm/llm_results.json`, `wikilense/llm/prompts/fact_check_v1/` | `llm.runner`, `llm.cli_backend`, `llm.api_backend`, `llm.claims`, `llm.retrieval` | `FactChecker.run` |
+| `picker.py` | The page's claim picker: reads both claim files, decides which claims a database offers, builds their ground truth with `evaluate.ground_truth_from_rows`, and computes a search's marks and summary with the evaluation's metric functions; the ready-made examples and the rule that chose them. | `data/corpus/claims.jsonl`, `data/scaled/claims_3000.jsonl`, the database (read only) | `corpus`, `evaluate`, `ingest`, `search` | `build_catalog` |
 
 `wikilense/llm/` is the package of the LLM fact-checker extension, with the `scripts/llm_*.py` scripts and the `tests/test_llm_*.py` tests; it is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
 
@@ -129,13 +126,13 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 |---|---|---|
 | `fetch_wiki_shard.py` | Downloads one FEVEROUS Wikipedia shard with HTTP range requests (only that member of the zip) and checks its CRC. | → `data/feverous/wiki_pages/` |
 | `build_corpus.py` | Applies `corpus.select_corpus`; writes the corpus with a manifest of counts and SHA-256 digests, the same bytes on every run. | `data/feverous/` → `data/corpus/` |
-| `fetch_page_meta.py` | Each corpus page's revision live at the end of December 2020 (by sentence matching for pages edited that month, moved pages through the move log): id, timestamp, categories. One polite request at a time. | → `page_meta.jsonl`, `PAGE_META.md` |
-| `run_experiments.py` | The protocol behind `results/`: groups `stability`, `ef_search`, `index_m`, `chunk_size`, `prefix`, `filters`, `final`, `restore`, `uncommitted`, `planner`, `scale` and `summary` (rebuilds `results/SUMMARY.md`). Root SQL goes through `docker exec`, the password in the environment only. | the main database, docker → `results/` |
+| `fetch_page_meta.py` | Each corpus page's December 2020 revision ([DATA.md](DATA.md) has the rule): id, timestamp, categories. One polite request at a time. | → `page_meta.jsonl`, `PAGE_META.md` |
+| `run_experiments.py` | The protocol behind `results/` (its groups are in [DESIGN.md](DESIGN.md); `summary` rebuilds `results/SUMMARY.md`). Root SQL goes through `docker exec`, the password in the environment only. | the main database, docker → `results/` |
 | `make_charts.py` | The README charts as SVG, with a dark variant. | `results/` → `docs/img/` |
-| `compare_separate_index.py` | Where the database-native search loses: MariaDB's statements against an exact NumPy scan of a copy of the vectors and, when installed, hnswlib (in no requirements file). Takes `--database`, `--k` and `--filters` (the `four_filters` case of a `scaled_filters.py` file), and more (`--help`). | the database (read only) → `results/separate_index.*` |
-| `measure_index_behaviour.py` | Six measured behaviours of the index, five that its documentation does not describe: `forms`, `join_order`, `builds`, `cache`, `isolation` ([VECTOR_INDEX.md](VECTOR_INDEX.md)), and `hard_cap`, the documentation's "hard cap" on a distance threshold (only with `--throwaway-server`, never against the project's server). Takes `--database`, `--k` and `--filters` (a `scaled_filters.py` file, for `join_order`), and more (`--help`). | the corpus database, scratch tables in the test database; `cache` sets a server variable and restores it → `results/` |
+| `compare_separate_index.py` | Where the database-native search loses: MariaDB's statements against an exact NumPy scan of a copy of the vectors and, when installed, hnswlib (in no requirements file). | the database (read only) → `results/separate_index.*` |
+| `measure_index_behaviour.py` | Six measured behaviours of the index, five that its documentation does not describe: `forms`, `join_order`, `builds`, `cache`, `isolation` ([VECTOR_INDEX.md](VECTOR_INDEX.md)), and `hard_cap`, the documentation's "hard cap" on a distance threshold (only with `--throwaway-server`, never against the project's server). | the corpus database, scratch tables in the test database; `cache` sets a server variable and restores it → `results/` |
 | `make_env.py` | Writes `.env` from `.env.example` with two random passwords, once; never prints them or touches an existing file. | `.env.example` → `.env` |
-| `scaled_build.py` | The scaled run's data: picks the 3,000 claims (seeded, only claims whose evidence lands in a chunk) and the distractor pages, and writes the S0 and S1 corpus folders. | the FEVEROUS database (read only) |
+| `scaled_build.py` | The scaled run's data: picks the 3,000 claims and the distractor pages ([DATA.md](DATA.md) has the rules), and writes the S0 and S1 corpus folders. | the FEVEROUS database (read only) |
 | `scaled_check.py` | Re-derives every rule of the build with separate code and compares the results. | writes only `SELFCHECK.md` |
 | `scaled_stage2.py` | Creates `wikilense_s0` and `wikilense_s1`, embeds every chunk text in saved parts, ingests each folder and checks the counts. | refuses any other database (`wikilense_s1_check`, a scratch copy for testing a load, only with `--allow-check-database`) |
 | `scaled_stage3.py` | Each page's December 2020 revision, edit date and categories (resumable, with `fetch_page_meta.py`'s client), loaded so the four metadata filters work at scale. | MediaWiki API → a scaled database |
@@ -145,7 +142,7 @@ on the CPU (`results/final_ef_100.md`, `results/final_ef_100_rerun_cpu1.md`).
 | `scaled_uncommitted.py` | The `uncommitted` group with a scaled database's vectors. | a scratch table in the test database |
 | `scaled_sentence_score.py` | The FEVEROUS-style evidence score: of the units in the top 10 chunks, the 5 sentences and 25 list items closest to the claim, and whether a whole gold set is among them. | a scaled database |
 | `scaled_page_coverage.py` | Page coverage as FEVEROUS reports it: the share of a claim's gold pages among the first 1, 2, 3, 5 and 10 distinct pages of its top 50 chunks. | a scaled database |
-| `scaled_breakdown.py` | Recall split by label, page count and challenge tag, and reweighted to FEVEROUS's mix of those groups; a label check per metric, and equal label weights per tag where recall differs by label. | result files, no database |
+| `scaled_breakdown.py` | Recall split by label, page count and challenge tag, and reweighted to FEVEROUS's mix of those groups. | result files, no database |
 | `scaled_summary.py` | Every table of the scaled run in one file, one column per run. | `results/scaled/` → `results/scaled/SUMMARY.md` |
 
 ### `tests/`
@@ -164,9 +161,9 @@ personal details; `test_docs.py` checks the README, every link and anchor, and t
 | `data/corpus/` | The committed demo corpus (pages, claims, page metadata, manifests) and `NOTICE.md`: the CC BY-SA 3.0 licence of its Wikipedia text and claims, which the code's MIT licence does not cover. `data/feverous/` holds the raw downloads, not committed. |
 | `data/scaled/` | `claims_3000.jsonl`, the scaled run's claims with their evidence sets, gold pages and gold evidence text, and `NOTICE.md`, its licence. `make fetch-s1` unpacks S1's release file into `wikilense_s1/` here, which git ignores. |
 | `results/`, `results/scaled/` | The result files (JSON and Markdown) of the demo corpus and of the scaled run, each folder with its `SUMMARY.md`. |
-| `README.md` | One question and its answer on the first screen, then a sketch of how it works, the findings, the data model, how MariaDB uses the index, what the approach gave and where it loses, setup, the method. |
+| `README.md` | One question and its answer on the first screen, then the findings, the data model, how MariaDB uses the index, where the approach loses, setup and the method. |
 | `CLAUDE.md` | The project's rules for Claude Code sessions: the task, the benchmark facts, the environment, the rules for comments. |
-| `Makefile` | `make setup` (a Python check, `.env` with generated passwords, MariaDB, the venv, the ingest; `CPU=1` for the pinned CPU-only set), `test`, `lint`, `eval`, `serve`, `examples`, `experiments`, `fetch-s1` and `load-s1` (the scaled database S1 from its release file), `down`; `make -n <target>` prints the commands. |
+| `Makefile` | `make setup` ([SETUP.md](SETUP.md) has its steps; `CPU=1` for the pinned CPU-only set), `test`, `lint`, `eval`, `serve`, `examples`, `experiments`, `fetch-s1` and `load-s1` (the scaled database S1 from its release file), `down`; `make -n <target>` prints the commands. |
 | `docker-compose.yml`, `.env.example` | MariaDB 11.8 as `wikilense-mariadb` on `127.0.0.1:3306`, with a 512 MB HNSW cache and a health check; the template for the ignored `.env`. |
 | `pyproject.toml`, `requirements*` | The package, the `wikilense` command, pytest markers, ruff; version ranges, and exact versions in `requirements.lock` (the GPU build behind `results/`) and `requirements-cpu.lock` (CPU only, per-platform PyTorch lines). |
 | `.github/workflows/ci.yml` | On every push to `main` and every pull request: MariaDB 11.8 as a service, the CPU lock, the Anthropic SDK of `requirements-llm.txt`, ruff and the whole suite. |
@@ -233,10 +230,8 @@ it: `--path 'History%' --title Kabul` returns *Kabul > History > Antiquity* at d
 
 The web page runs the same `search.search` for the same filters. When a benchmark claim is picked
 (`/api/search?claim_id=...`), the statement is timed alone; afterwards, on the same connection,
-`picker.search_marks` looks up each hit's sentences (`evaluate.chunk_sentence_ids`) and marks the
-hits on a gold page and the chunks holding a gold sentence, and the summary applies
-`evaluate.article_recall_at_k`, `gold_page_rank` and `evidence_recall_at_k` to the hits in search
-order, as `make eval` does for every claim.
+`picker.search_marks` marks the hits against the claim's gold evidence with the evaluation's own
+functions, as `make eval` does for every claim ([DESIGN.md](DESIGN.md) has the rules).
 
 ## 6. The database
 
@@ -274,17 +269,13 @@ erDiagram
 | `claim_evidence` | 114 | element id of a claim's gold evidence set (87 resolve to a sentence, 27 are table cells) |
 | `ingest_meta` | 19 | setting of the ingest (model and revision, chunk settings, index M, corpus digests, time); linked to no other table |
 
-The reasons for the main choices:
+The [README](../README.md) gives the reason for each table's shape, and [DESIGN.md](DESIGN.md) the
+rules. Three points a beginner may miss:
 
-- **The vector next to the metadata.** `chunk.embedding` sits in the row that holds `page_id` and
-  `section_id`, so "nearest chunks under a *History* heading of pages longer than 1,000 words" is
-  one statement with joins, and one transaction covers vectors and metadata.
 - **`chunk_sentence`.** Chunks overlap by one sentence, so chunks and sentences are many-to-many.
   This table joins a hit to the gold sentences for evidence recall and lists its sentences.
 - **`link`.** Every link keeps its target title (`to_title`): 40,169 of the 40,542 targets are
-  outside the corpus. The search joins a `SELECT DISTINCT to_page_id` derived table, because the
-  plainer `IN (subquery)` made MariaDB start from `link` and lose the vector index (measured;
-  [VECTOR_INDEX.md](VECTOR_INDEX.md)).
+  outside the corpus.
 - **Collations.** Titles compare exactly (`utf8mb4_bin`; Wikipedia titles are case-sensitive),
   headings and paths case- and accent-insensitively, on purpose.
 
@@ -319,10 +310,7 @@ The project area's four criteria are documentation, MariaDB depth, execution and
 | An ingest that runs from the README and a query interface (usability) | the README's first screen (`make setup`, one query, its output), `wikilense query`, the web page and `/docs` (`wikilense serve`), `sql/examples.sql`, `docs/EXAMPLES.md` |
 | What the database-native approach gave (documentation) | the README's sections on what it gave and where it loses (`results/separate_index.md`) |
 
-Three features help a reader try it quickly or judge its limits. The README's first screen is one
-question (`make setup`, one query, its real output), and `tests/test_docs.py` caps the README's
-length. The README section "Where this approach loses" measures MariaDB against an in-process copy
-of the vectors (`scripts/compare_separate_index.py`); no dedicated vector store was measured.
 `make setup CPU=1` resolves on macOS through per-platform PyTorch lines in `requirements-cpu.lock`
-(checked by resolution, not run on a Mac). Still open: the setup run on a Mac and on Windows, a
-dedicated vector store measured, a second embedding model, tables and captions as chunks.
+(checked by resolution, not run on a Mac). No dedicated vector store was measured. Still open: the
+setup run on a Mac and on Windows, a dedicated vector store measured, a second embedding model,
+tables and captions as chunks.
