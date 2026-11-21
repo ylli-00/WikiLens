@@ -54,10 +54,11 @@ flowchart LR
   where your own knowledge falls short; a claim may need several facts checked." and ends the
   justification rule with "the sources used, such as a page title"; its user turn is the claim
   alone.
-- **Two facts about the prompt.** It lets the model add its own knowledge where the passages
-  fall short, because real retrieval will not always find the answer. And it is the same for gold:
-  "gold" means the annotators' evidence plus the model's own knowledge, so it is a reference
-  point, not a ceiling.
+- **Three facts about the prompt.** It lets the model add its own knowledge where the passages
+  fall short, because real retrieval will not always find the answer. It asks for the state as of
+  December 2020, the date of FEVEROUS's Wikipedia, so later events do not count. And it is the same
+  for gold: "gold" means the annotators' evidence plus the model's own knowledge, so it is a
+  reference point, not a ceiling.
 - **The passages** of RAG come from the `inline` statement (the joined statement that
   `wikilense query` runs) on S1, 132,359 chunks, with k = 5 and `mhnsw_ef_search` 100, each chunk
   headed by its page title and section path. Retrieval was cached once per claim, so every run
@@ -154,8 +155,8 @@ correct verdict, when it finds the answer outside Wikipedia or finds what the an
 those answers count as wrong. Claude Opus 5.5 agents reviewed 100 of them (40 gold, 40 RAG, 20 no
 passages, drawn at random with a fixed seed) and named the main reason for each. In 16 of the 40
 gold cases and 16 of the 40 RAG cases, that reason was a doubtful label: the text Haiku saw does
-settle the claim, the way Haiku answered. (For the no-passage cases the agents judged from the
-annotators' evidence: 4 of 20.) Two agents rated each case without seeing each other's ratings
+settle the claim, the way Haiku answered. In those cases Haiku may have been right and the label
+wrong. (For the no-passage cases the agents judged from the annotators' evidence: 4 of 20.) Two agents rated each case without seeing each other's ratings
 and agreed on the main reason in 94 of 100. A third agent settled those 6 cases and 3 more where
 they disagreed on another rating. This is a sample, not a count over all claims, and no person
 has checked the ratings.
@@ -463,7 +464,8 @@ prompt set's hash differs from the recorded one, the fact-check stays off and sa
 is one model call, with no retry and no web search.
 
 What it shows:
-- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy".
+- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy". The prompt
+  asks for that date, so a statement about later events is judged as of 2020.
 - Haiku's reason, in full. Each passage number it cites, such as [2], links to that hit and
   highlights it. If it cites none, the page says "no passage cited: from the model's own
   knowledge". The reason is the model's own wording and can be wrong even when the verdict is
