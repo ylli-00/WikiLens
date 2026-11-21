@@ -9,16 +9,15 @@ for recall.
 This file is the contract between modules and the record of each design decision, with its reason
 and its evidence. The settings were chosen on the 75-claim development set and the 100-page corpus
 ("Chosen defaults and their evidence"), and the scaled run keeps them fixed. The numbers are
-those of the current result files: `results/SUMMARY.md` (rebuilt from the JSON files by
-`scripts/run_experiments.py summary`) for the demo corpus and `results/scaled/` for the scaled
-run, which the README and `docs/EVALUATION.md` quote.
+those of the current result files: `results/SUMMARY.md` for the demo corpus and
+`results/scaled/` for the scaled run.
 
 ## Repository layout
 
 Every file and what it does is listed in [ARCHITECTURE.md](ARCHITECTURE.md) ("File by file");
 `sql/schema.sql` is the single source of truth for the DDL, and `db.apply_schema()` executes it.
-The scaled run adds `scripts/scaled_*.py` and `results/scaled/`. The LLM fact-checker extension
-is in `wikilense/llm/` and is documented in [LLM_EXTENSION.md](LLM_EXTENSION.md).
+The LLM fact-checker extension is in `wikilense/llm/` and is documented in
+[LLM_EXTENSION.md](LLM_EXTENSION.md).
 
 Rules for all code: Python 3.10+, the standard library where it is enough, type hints, docstrings
 that say what a function returns, no SQL built by string formatting (parameters only, and
@@ -74,9 +73,8 @@ documented limitation: 27 of the 114 evidence ids of the 75 development claims a
 ## Chunking rules (`chunking.py`)
 
 - `chunk_units(units, max_words, overlap_units=1)` is a pure function over one page's text
-  units. Ingest passes `Settings.chunk_max_words` (240: at equal retrieved text the 60-, 120- and
-  240-word chunkings are close, and 240 needs about half the vectors; `results/SUMMARY.md` section 4) and
-  `Settings.chunk_overlap_units` (1, kept without a sweep). A chunk never crosses a section
+  units. Ingest passes `Settings.chunk_max_words` (240, see "Chosen defaults and their evidence")
+  and `Settings.chunk_overlap_units` (1, kept without a sweep). A chunk never crosses a section
   boundary.
 - Only *chunkable* units take part (`TextUnit.chunkable`). A unit that is empty after cleaning, or
   a hatnote (`wikitext.HATNOTE_RE`: "Main article: X", "See also: Y", "For other uses, see Z",
@@ -105,9 +103,8 @@ documented limitation: 27 of the 114 evidence ids of the 75 development claims a
   (5c38ec7c405e..., the snapshot every result was measured with), so a later update of the model
   repository cannot change the vectors. `embed_queries` prepends the model's query instruction
   (`"Represent this sentence for searching relevant passages: "` for bge); passages are embedded
-  without it. The `Embedder` API and the text helpers for `VEC_FromText` / `VEC_ToText` are in
-  `wikilense/embedding.py`. The bytes bound for a `VECTOR` parameter (float32 little-endian, the
-  MariaDB storage format) come from `db.vec_param(v)`.
+  without it. The bytes bound for a `VECTOR` parameter (float32 little-endian, the MariaDB storage
+  format) come from `db.vec_param(v)`.
 
 ## Database (`sql/schema.sql`, `db.py`, `config.py`)
 
@@ -136,13 +133,13 @@ references cascade, and every FK column has an explicit index. `claim.split`, `c
 with `LIKE` is deliberately case- and accent-insensitive.
 
 Settings come from `WIKILENSE_*` variables (the full list is in `.env.example` and
-`wikilense/config.py`). The ones that carry a decision are `WIKILENSE_CHUNK_MAX_WORDS` (240; see
-`results/SUMMARY.md` section 4), `WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_EF_SEARCH` (100,
+`wikilense/config.py`). The ones that carry a decision are `WIKILENSE_CHUNK_MAX_WORDS` (240),
+`WIKILENSE_CHUNK_OVERLAP_UNITS` (1), `WIKILENSE_EF_SEARCH` (100,
 passed as `mhnsw_ef_search` per query, 1 to 10000; 0 keeps the server's session value, default 20;
 anything else is a `SettingsError`), `WIKILENSE_STATEMENT_SECONDS` (5, the time limit of the web
 page's and `wikilense query`'s searches; 0 for none; see "Search"), and `WIKILENSE_TEST_DB_NAME`
 (the test suite resets that database, so `tests/conftest.py` refuses a name that equals the main
-database or does not end in `_test`). The index `M` (16; see `results/SUMMARY.md` section 3) is written literally in
+database or does not end in `_test`). The index `M` (16) is written literally in
 `sql/schema.sql` (`db.VECTOR_INDEX_M`). It is not a setting, and `ingest_meta` records the `M` of
 the index that is in place.
 
@@ -169,8 +166,9 @@ corpora").
 Inputs: one or more shards, and the train and dev claim files. Rule:
 
 1. A claim is *in-shard* when every page cited in every `content` id of every evidence set is a
-   shard title (NFC). On `wiki_000.jsonl` there are 75 such claims (65 train, 10 dev; 7 SUPPORTS,
-   58 REFUTES, 10 NEI), all citing a single page; 66 have an evidence set made only of text units.
+   shard title (NFC). On `wiki_000.jsonl` there are 75 such claims, all citing a single page; 66
+   have an evidence set made only of text units
+   ([DATA.md](DATA.md#the-demo-corpus-100-pages-and-75-claims) has the counts).
 2. The evidence pages are the union of those pages: 54.
 3. Filler pages: link targets of the evidence pages that are shard titles and not evidence pages,
    ranked by the number of distinct evidence pages linking to them (descending), then title
@@ -244,7 +242,7 @@ The API (`Hit`, `Filters`, `search()`, `explain_search()`, `hit_sentences()`) is
   (`docs/VECTOR_INDEX.md`). MariaDB's `max_statement_time` stops such a statement with error 1969
   and the server keeps running. So `search(..., statement_seconds=N)` sets it for the session
   around the search and restores the previous value, the same way as `ef_search`, and the web page
-  and `wikilense query` pass `WIKILENSE_STATEMENT_SECONDS` (default 5, 0 for none). A stopped
+  and `wikilense query` pass `WIKILENSE_STATEMENT_SECONDS` (see "Database"). A stopped
   search is a plain message: 504 on the API, exit code 1 on the command line. Why 5 s: every
   median we measured for the statement `wikilense query` runs is far below it. The slowest is
   1,387.73 ms, on S1 when 66 chunks pass a category filter (`results/scaled/run1/s1/join_order.md`).
@@ -277,27 +275,19 @@ This is the main finding of the project. `docs/VECTOR_INDEX.md` has the statemen
 table.
 
 - **The bare statement is the HNSW search.** `ORDER BY VEC_DISTANCE_COSINE(...) LIMIT k`
-  (strategies `none` and `overfetch`) reads exactly `LIMIT` rows: SQL p50 0.40 ms at k=1 on the
-  120-word demo ingest at ef_search 20 (`results/ef_20.md`), 1.11 ms (S0) and 1.43 ms (S1) at k=5
-  and ef_search 100 (`results/scaled/eval/`). `mhnsw_ef_search` sets its accuracy: at ef 20 that
-  M=6 graph found 61/66/67/68/68 of 75 gold pages at k=1/3/5/10/20 against 66/72/74/74/74 for the
-  exact ranking of the same vectors (`results/inline_ef_20.md`), so the gap comes from HNSW and
-  not from the embedding.
+  (strategies `none` and `overfetch`) reads exactly `LIMIT` rows: SQL p50 1.11 ms (S0) and 1.43 ms
+  (S1) at k=5 and ef_search 100 (`results/scaled/eval/`). `mhnsw_ef_search` sets its accuracy.
 - **A join makes the ranking exact, while the graph fits in `mhnsw_max_cache_size`.** With another
   table in the statement (strategy `inline`), `EXPLAIN` still reports `type index, key embedding`,
   but the server ranks exactly over the index, at a cost that grows with the table: 2.24 ms on the
   4,598 chunks of the demo corpus (`results/final_inline.md`), 15.74 ms on S0 and 25.81 ms on S1
-  (`results/scaled/timing/`). The walk then continues until `k` rows have passed the joins and
-  predicates (`ANALYZE` reports `r_rows` = `k` for `chunk` unfiltered, tests/test_search.py). The
-  joined hit list equals NumPy's exact ranking, in order, for 75 of 75 claims on the demo corpus
-  (`results/separate_index.md`) and for 3,000 of 3,000 on S0 and S1 (`results/scaled/run1/`).
-  Under a filter it is close but not always exact. On the demo corpus the statement returned the
-  scan's chunks with two near-equal neighbours swapped in 2 of 75 lists under the four filters
-  (`results/join_order.md`), so `search()` sorts the rows it gets by the reported distance and the
-  chunk id. On S1, after that sort, the list is the exact one for 2,996 of 3,000 claims under the
-  History heading and 2,962 under the four filters (`results/scaled/run1/s1/separate_index.md`).
-  With a cache that does not hold the graph the lists are no longer exact (2,725 to 2,734 of 3,000
-  on S1 at 160 MB, `results/scaled/run1/s1/cache_size.md`).
+  (`results/scaled/timing/`). The joined hit list equals NumPy's exact ranking, in order, for 75 of
+  75 claims on the demo corpus (`results/separate_index.md`) and for 3,000 of 3,000 on S0 and S1
+  (`results/scaled/run1/`). Under a filter it is close but not always exact. On the demo corpus the
+  statement returned the scan's chunks with two near-equal neighbours swapped in 2 of 75 lists
+  under the four filters (`results/join_order.md`), so `search()` sorts the rows it gets by the
+  reported distance and the chunk id. The lists under a filter on S1 are in
+  [VECTOR_INDEX.md](VECTOR_INDEX.md#the-joined-statement-against-a-brute-force-ranking-and-a-copy-of-the-vectors).
 
 `scripts/measure_index_behaviour.py` has five parts:
 
@@ -306,51 +296,43 @@ table.
   75 claims when 304 chunks pass, against 75 of 75 with a join. So copying a filter column onto
   the vector table without an index of its own would not give an exact filtered search.
 - **`join_order` (`results/scaled/run1/s{0,1}/join_order.md`)** measures the decision under
-  "Search", on a fixed sample of 200 claims, because a 20-claim pilot took 2,426 s and all 3,000
-  would take about 100 hours (`results/scaled/pilot/`). Each form is timed alone, because on the
-  demo corpus taking turns with a form that reads thousands of rows slowed the other one (2.11
-  against 2.61 ms, `results/join_order.md`).
+  "Search", on a fixed sample of 200 claims ("The scaled run: 3,000 claims on two larger
+  corpora"). Each form is timed alone, because on the demo corpus taking turns with a form that
+  reads thousands of rows slowed the other one (2.11 against 2.61 ms, `results/join_order.md`).
 - **`isolation` (`results/isolation.md`).** A REPEATABLE READ transaction searches, another
   connection commits, and the first transaction searches again in its old snapshot and ends.
   After that, index searches from new connections at any isolation level missed the committed
-  rows in 10 of 10 trials, until the next committed write or `FLUSH TABLES` (three runs; the five
-  controls were clean). The stale index is MariaDB issue
-  [MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321). It was measured on one patch release
-  in one container, and `results/isolation.md` has the statements to repeat it. WikiLense's
-  connections keep autocommit off and REPEATABLE READ: `wikilense
-  eval` runs many searches in one transaction, but only an ingest commits writes to the corpus,
-  nothing in WikiLense searches while an ingest runs, and no measured number depends on it. An
-  application that writes while it searches must not search the index inside a REPEATABLE READ
-  transaction whose snapshot predates another connection's commit.
+  rows in 10 of 10 trials, until the next committed write or `FLUSH TABLES`
+  ([VECTOR_INDEX.md](VECTOR_INDEX.md#isolation-levels-and-a-reader-that-leaves-the-index-stale)).
+  The stale index is MariaDB issue [MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321). It
+  was measured on one patch release in one container. WikiLense's connections keep autocommit off
+  and REPEATABLE READ: `wikilense eval` runs many searches in one transaction, but only an ingest
+  commits writes to the corpus, nothing in WikiLense searches while an ingest runs, and no
+  measured number depends on it. An application that writes while it searches must not search the
+  index inside a REPEATABLE READ transaction whose snapshot predates another connection's commit.
 - **`builds` (`results/scaled/run1/s1/build_variance.md`).** On S1, twenty fresh builds at `M=16`
-  and `ef_search` 100 found a gold page for 2,922 to 2,937 of 3,000 claims (the exact ranking
-  2,943, the graph in the database 2,933), and twenty builds with the server defaults found 2,218 to
-  2,433. Which build a reader gets moves the headline recall inside the first range, and far more
-  at the defaults. On the demo corpus all twenty builds at `M=16` found 74 of 75, the exact
-  ranking's number (`results/build_variance.md`).
+  and `ef_search` 100 found a gold page for 2,922 to 2,937 of 3,000 claims, and twenty builds with
+  the server defaults found 2,218 to 2,433
+  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-same-vectors-built-several-times)). Which build a reader
+  gets moves the headline recall inside the first range, and far more at the defaults.
 - **`cache` (`results/scaled/run1/s1/cache_size.md`).** On S1, whose graph file is 156.0 MB, every
   count at 192 and 256 MB equals the one at 512 MB. At 160 MB, just above the file, the joined
-  statement is exact for 2,725 to 2,734 of 3,000 claims and takes 351.45 ms instead of 27.53; at
-  the 16 MB default the bare search finds a gold page for 2,658 claims instead of 2,933. On the
-  demo corpus, 8 MB or less for its 13.0 MB graph left 57 to 67 of 75 lists exact
-  (`results/cache_size.md`). The 16 MB default holds neither scaled graph (56.0 and 156.0 MB),
-  which is why `docker-compose.yml` sets 512 MB, more than three times S1's graph.
+  statement is exact for 2,725 to 2,734 of 3,000 claims and takes 351.45 ms instead of 27.53
+  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-index-cache-below-and-above-the-graph)). The 16 MB default
+  holds neither scaled graph (56.0 and 156.0 MB), which is why `docker-compose.yml` sets 512 MB,
+  more than three times S1's graph.
 
-`tests/test_search.py` pins five of the eight rows of the table "Checked against the
-documentation" in `docs/VECTOR_INDEX.md`. The experiment protocol measures the following:
+The experiment protocol measures the following:
 
 - **Uncommitted rows** (`results/uncommitted_recall.md`). A table searched inside the transaction
   that filled it finds fewer true neighbours than after COMMIT (overlap with the exact top 10:
-  0.973 before, 1.000 after, at ef 100). The cause is not known. Each state gets an untimed
-  warm-up pass; without it, the first runs showed a threefold gap, which was a cold-cache effect.
-  The practical rule is to write and search in separate transactions, or to commit before
-  searching, as `tests/test_db.py` does.
+  0.973 before, 1.000 after, at ef 100). The cause is not known. The practical rule is to write
+  and search in separate transactions, or to commit before searching, as `tests/test_db.py` does.
 - **Scale with random distractor pages** (`results/scale.md`). From 4,598 to 89,650 chunks the
   exact joined statement grows 7.6 times (2.52 to 19.17 ms p50) and the bare HNSW search 1.5
   times (0.83 to 1.23 ms). Article recall@10 is 74 / 74 / 71 of 75 at the three sizes.
-- **Vector arithmetic.** `VEC_DISTANCE_COSINE` equals NumPy's `1 - cos` within 1e-5 on 300 random
-  vectors; `tests/test_db.py` requires a mean HNSW overlap of at least 95% with the exact top 10,
-  because every graph build is another approximation.
+- **Vector arithmetic** and the tests' bound on the HNSW overlap are in
+  [VECTOR_INDEX.md](VECTOR_INDEX.md#what-we-measured).
 
 ## Evaluation (`evaluate.py`)
 
@@ -397,17 +379,15 @@ chosen on the 100-page development set and kept for the scaled run. The sweeps a
 
 - **Index `M` = 16.** On the same vectors at ef_search 20, article recall@10 is 67, 74 and 73 of 75
   for M 6, 16 and 32, and evidence recall@20 54, 64 and 62 of 66, against 74 and 63 for the exact
-  ranking. At ef_search 100 the M=16 graph returns the exact hit list for 69 of 75 claims (M=32:
-  73). The build takes 2.9 s (M=6 1.1 s, M=32 9.1 s) and the graph is 17 MB. Section 3,
-  `results/index_m_rebuild.md`.
+  ranking. Section 3, `results/index_m_rebuild.md`.
 - **`mhnsw_ef_search` = 100 as the application default** (the server default of 20 is left as it
   is). On the final ingest the hit lists equal the exact ranking for 74 of 75 claims, against 65
   at 20, for 0.51 ms instead of 0.45 ms at k=10. Section 7, `results/final_ef_100.md`,
   `results/final_ef_20.md`.
 - **`chunk_max_words` = 240, overlap 1.** At equal retrieved text (chunk size x k) the 60-, 120-
   and 240-word chunkings are close: article recall 74, 74 and 74 of 75 and evidence recall 54, 57
-  and 55 of 66 at 1,200 words (60, 63 and 60 at 2,400). The 240-word chunks store 4,598 vectors
-  instead of 8,658 or 19,065 and a 13 MB graph instead of 17 or 29. Section 4,
+  and 55 of 66 at 1,200 words. The 240-word chunks store 4,598 vectors instead of 8,658 or 19,065.
+  Section 4,
   `results/chunk60_ef_100.md`, `results/chunk120_ef_100.md`, `results/chunk240_ef_100.md`.
 - **Embedding prefix kept** (`"title > section path: "`). The exact ranking, which does not depend
   on a graph, decides it: the prefix raises evidence recall@20 from 61 to 63 of 66 and leaves
@@ -417,17 +397,14 @@ chosen on the 100-page development set and kept for the scaled run. The sweeps a
   fills `k`; overfetch filters after the index search and comes back short under a selective
   filter. Under `heading LIKE '%History%'` on the demo corpus (117 of 4,598 chunks pass) inline
   takes 3.07 ms at k=10 and is never short, overfetch 10 takes 0.78 ms and is short for 69 of 75
-  claims (section 6, `results/strategy_*.md`). On the 3,000 claims at k=5 the same filter gives
-  16.49 ms (S0) and 26.59 ms (S1) for inline, and 1.63 and 1.87 ms for overfetch 10, which is
-  short for 2,472 and 2,425 of them (`results/scaled/timing/`).
-- **Final configuration** (section 7: 4,598 chunks, 1,316 hatnote units excluded): article
-  recall@1/5/10/20 63/74/74/74 of 75, evidence recall@1/5/10/20 39/55/60/65 of 66; SQL p50/p95 at
-  k=10 0.51/0.94 ms, query embedding 4.58 ms; hit lists identical to the exact ranking for 74/75.
+  claims (section 6, `results/strategy_*.md`). The same comparison on the 3,000 claims is in
+  [EVALUATION.md](EVALUATION.md#fast-and-slow-statements).
+- **Final configuration** (section 7): the headline table is in
+  [EVALUATION.md](EVALUATION.md#the-demo-corpus-100-pages-75-claims).
 - **Reproducibility.** Every graph build is another approximation (on S1, see `builds` above), and
   within one server process the results are deterministic, except right after the table is
-  reopened (on S1, 10 of 3,000 bare hit lists changed between two passes,
-  `results/scaled/run1/s1/cache_size.md`). A container restart changed 1 of 75 hit lists on the M=6 index
-  and none on M=16 at ef_search 100, without changing recall (`results/stability_comparison.md`,
+  reopened (`results/scaled/run1/s1/cache_size.md`). A container restart changed 1 of 75 hit lists
+  on the M=6 index and none on M=16 at ef_search 100, without changing recall (`results/stability_comparison.md`,
   `results/final_restart_comparison.md`). Running `wikilense eval` after `wikilense ingest` with
   the defaults checks the counts.
 
@@ -457,10 +434,10 @@ evidence ([EXAMPLES.md](EXAMPLES.md) shows it).
   real databases: for each database's own claims (75 on the demo, 3,000 on S1) the resolved ground
   truth equals `load_ground_truth`, and the page's summary at k = 5 equals `evaluate()`'s outcome
   for the claim (same hits, gold-page rank, evidence recall and unit coverage): 0 differences.
-- The marks stay outside the timed statement. They need one more lookup (`chunk_sentence`). Inside
-  the timing it would add to `timing_ms.sql`, and the SQL box would no longer show the statement the
-  time belongs to. So the search statement is timed alone, as in the evaluation, and the lookup runs
-  after it on the same connection.
+- The marks stay outside the timed statement. Their lookup (`chunk_sentence`) would add to
+  `timing_ms.sql`, and the SQL box would no longer show the statement the time belongs to. So the
+  search statement is timed alone, as in the evaluation, and the lookup runs after it on the same
+  connection.
 - Which claims are offered: a claim file belongs to a database when the database's `claim` table
   holds exactly the file's claim ids (the ingest writes that table from the corpus's own claims
   file; `ingest_meta`'s checksum would not do, because S1 was loaded from a FEVEROUS-format copy of
@@ -492,15 +469,15 @@ evidence ([EXAMPLES.md](EXAMPLES.md) shows it).
 **The live fact-check (`factcheck.py`, `web.py`).** Under a free-text search the page can send
 the statement and its first 5 passages to Haiku ([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)).
 - It is off by default. A call needs a Claude login or an API key, and it sends the reader's text
-  to an outside service. A reader or grader without either must get the page exactly as before,
+  to an outside service. A reader without either must get the page exactly as before,
   and `make setup` and the tests stay free of model calls. Only `WIKILENSE_FACTCHECK` turns it on.
   An API key in `.env` does not, because the key may be there for the runner's API route, and
   calls through it are billed per token.
 - It sends the experiment's prompt with the experiment's settings. The page shows how often each
   verdict was right in the experiment, and those figures describe one request: `fact_check_v1`,
   Haiku at effort high, the top 5 passages. A different prompt would get different answers, and
-  the figures would no longer apply. That includes a longer reason, or dropping "as of December
-  2020". So the page reads every part of the request from the experiment's files: the settings
+  the figures would no longer apply. So the page reads every part of the request from the
+  experiment's files: the settings
   from the RAG run's record in `results/llm/runs.json` and the prompt set from its folder. A hash
   that differs from the recorded one keeps the fact-check off. `Runner.request` builds the
   request, and the backend's own code parses the answer. The server runs the search again and
@@ -587,15 +564,13 @@ before the category box and the "last edited" footer.
   every Markdown file and the number of tests the README and ARCHITECTURE.md state.
 - **The README has a section "Where this approach loses"**, so the case for searching inside the
   database is weighed against its cost. `scripts/compare_separate_index.py` runs MariaDB against a
-  copy of the chunk vectors in the application's memory (an exact NumPy scan on one thread,
-  pre-filtered, followed by the `SELECT` of the hit rows): under the History filter and the four
+  copy of the chunk vectors in the application's memory: under the History filter and the four
   metadata filters MariaDB's joined form costs 3.20 / 3.56 and 3.46 / 3.45 ms in two runs and the
   copy 0.78 / 1.04 and 0.71 / 0.73 ms, with equally complete results (`results/separate_index.md`,
   `results/separate_index_repeat.md`). No dedicated vector store was measured.
 - **`make setup` generates the `.env` passwords** with `scripts/make_env.py`, which writes two
   random 128-bit hex strings with mode 0600, never prints them and never touches an existing
-  file. The setup is one command, which is what the README's first screen shows. When a new
-  `.env` meets a data volume created with other passwords, the run ends with one line that names
+  file. The setup is one command. When a new `.env` meets a data volume created with other passwords, the run ends with one line that names
   the cause and both ways out (`cli.ACCESS_DENIED_HINT`). `make setup` stops with one line when
   the Python is too old for what it installs, and rebuilds a venv whose interpreter no longer
   runs.
@@ -629,18 +604,16 @@ pages were picked, [docs/EVALUATION.md](EVALUATION.md) has every table, and
 - **Claims.** The run uses 3,000 FEVEROUS train+dev claims, 1,000 per label. Per label, 700 have
   every evidence set on one page and 300 have every set spanning two or more pages.
   - Only claims with a text-only evidence set (sentences and list items) are used, because tables
-    are not indexed. Of the FEVEROUS train+dev claims, 56% (43,957 of 79,181) have no text-only
-    evidence set.
+    are not indexed.
   - Only claims that can be found are used: every element of a text-only set must be inside a
     chunk. Hatnotes are kept out of chunks by design, so 112 claims were left out before sampling.
   - The claims are sampled with `random.Random(20261111)`. The challenge tags are recorded, not
     balanced on.
   - The label mix is not FEVEROUS's (there 3.5% of claims are NOT ENOUGH INFO), so results are
     reported per group and also reweighted to FEVEROUS's mix (in docs/EVALUATION.md).
-- **Corpora: two sizes.** S0 is the gold pages only (3,851 pages, 43,134 chunks). S1 is S0 plus
-  one distractor page per gold article, picked by "rule D": each gold article's most-linked page
-  (its "favourite link"). S1 has 7,686 pages and 132,359 chunks. Random pages were not used
-  because they barely distract (see docs/DATA.md).
+- **Corpora: two sizes.** S0 is the gold pages only. S1 is S0 plus one distractor page per gold
+  article, picked by "rule D": each gold article's most-linked page (its "favourite link"). Random
+  pages were not used because they barely distract (see docs/DATA.md).
 - **Settings not re-chosen.** 240-word chunks, overlap 1, bge-small-en-v1.5 with the title prefix,
   M=16, `mhnsw_ef_search` 100 and strategy `inline` were chosen on the 75-claim development set
   (the 100-page corpus) and stay fixed for the scaled run.
