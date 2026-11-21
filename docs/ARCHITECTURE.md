@@ -280,11 +280,11 @@ rules. Three points a beginner may miss:
 
 ## 7. Testing and CI
 
-There are 926 tests of three kinds, told apart by pytest markers.
+There are 933 tests of three kinds, told apart by pytest markers.
 
-- Pure tests (808) need no server and no model and run in seconds, even without `.env`:
+- Pure tests (814) need no server and no model and run in seconds, even without `.env`:
   `.venv/bin/python -m pytest -m "not db and not slow"`.
-- `db` tests (112) need MariaDB and use only the test database (`wikilense_test`, reset per test);
+- `db` tests (113) need MariaDB and use only the test database (`wikilense_test`, reset per test);
   without a server they are skipped with the reason: `.venv/bin/python -m pytest -m db`.
 - `slow` tests (6) load the real embedding model: `.venv/bin/python -m pytest -m slow`.
 
