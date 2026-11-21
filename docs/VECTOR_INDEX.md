@@ -128,7 +128,7 @@ wrong-dimension vector.
   | `overfetch 10` | 2,472 | 1.63 ms | 2,425 | 1.87 ms |
   | `inline` | 0 | 16.49 ms | 0 | 26.59 ms |
 
-- A search that fewer rows pass than `LIMIT` is not capped on 11.8.9, and it can run away. The
+- A search whose `WHERE` few rows pass is not capped at `LIMIT` on 11.8.9, and it can run away. The
   `hard_cap` part of `scripts/measure_index_behaviour.py` ran 30 claims at k = 10 in a throwaway copy
   of S1, with a 2 GB memory cap and a 10 s `max_statement_time`
   ([results/scaled/run1/s1/hard_cap.md](../results/scaled/run1/s1/hard_cap.md)).
@@ -143,11 +143,11 @@ wrong-dimension vector.
     - No answer that came back was short.
   - **The documentation's subquery form.** It read exactly its inner `LIMIT` rows, in about 1 ms,
     and came back short in 0 to 6 of 60 executions, where the index missed a qualifying chunk.
-  - **Without a time limit**, such a statement grew `mariadbd` until it ran out of memory: to the
-    2 GB cap in about 20 s in a throwaway container, and to 7.2 GB on the development machine's
-    server, where the kernel's OOM killer stopped it.
-  - **The guard.** `max_statement_time` stops the search ("A search that runs away" below). The
-    web page and `wikilense query` set it to 5 s; their filters are joins.
+  - **Under a 60 s time limit**, such a statement grew `mariadbd` until it ran out of memory: to
+    the 2 GB cap in 20 to 22 s in a throwaway container. Earlier the kernel's OOM killer had
+    stopped the development machine's server at 7.2 GiB; which statement ran then was not logged.
+  - **The guard.** A short `max_statement_time` stops the search ("A search that runs away"
+    below). The web page and `wikilense query` set it to 5 s; their filters are joins.
 - The optimizer chooses per filter whether to keep the index, from its estimate of how many rows
   pass; "The join order we fix" below has the plans under 18 filter levels.
 - Join order matters:
@@ -587,15 +587,15 @@ with its script and logs):
 - `LIMIT` 10.
 
 **On 11.8.9.**
-- **The first run after a server start was fast.** A distance threshold that 3 rows meet returned
-  them in 1.51 and 1.71 s.
-- **The next run was killed.** It grew `mariadbd` to the 2 GB cap in 20 to 22 s, and the kernel
-  killed the server. The logs record this for that threshold, on the same connection and on a
-  fresh one, and once for `WHERE w < x` with 6 rows passing.
-- **With random vectors** the same statements took up to 16.55 s and 1,311 MiB, came back short,
-  and gave the memory back.
+- **As the first search after a server start it was fast.** A distance threshold that 3 rows
+  meet returned them in 1.51 and 1.71 s; after four other searches it took 10.25 s and 842 MiB.
+- **The next run was killed.** Under a 60 s `max_statement_time` it grew `mariadbd` to the 2 GB
+  cap in 20 to 22 s, and the kernel killed the server. The logs record this for that threshold,
+  on the same connection and on a fresh one, and once for `WHERE w < x` with 6 rows passing.
+- **With random vectors** five such statements took 3.29 to 16.55 s (the longest with 30 rows
+  under the threshold) and up to 1,311 MiB; four came back short, and the memory was given back.
 - **With `max_statement_time` = 10** the threshold statement was stopped at 10.0 s (error 1969),
-  at 1.3 and 1.5 GB, and the server stayed up.
+  at 1.3 and 1.5 GiB, and the server stayed up.
 
 **On 12.3.3 and 13.0.2.**
 - Nothing ran away: memory peaked at 552 MiB or less.
@@ -604,14 +604,30 @@ with its script and logs):
 - `WHERE w < x` returned 0 or 1 of the 6 rows that pass. That is the short answer the
   documentation describes.
 
-**Status.** We found no MariaDB ticket for this; we searched JIRA on 2026-11-20. Its nearest
+**In SQL only, a day later.** The same statements on vectors generated in SQL and on the first
+80,000 S1 vectors, with the connection's own memory read from `Max_memory_used`
+([results/scaled/runaway_repro/runaway_repro.md](../results/scaled/runaway_repro/runaway_repro.md)):
+- **The memory is the statement's.** On 11.8.9 the threshold statement took 709 MB on 80,000
+  generated vectors and 984 MB on 80,000 S1 vectors, where a plain search took 0.13 MB. It was
+  given back when the statement ended.
+- **No data file is needed for a kill.** On 160,000 generated vectors the second execution got
+  `mariadbd` killed at the 2 GB cap in 2 of 2 runs, as on the 132,359 S1 vectors.
+- **12.3.3 and 13.0.2 are not flat.** They took 42 to 150 MB for these statements; nothing was
+  killed.
+- **Short answers on every version.** Of 5 passing rows 11.8.9 returned 0 to 3, 12.3.3 0 to 2
+  and 13.0.2 none.
+
+**Status.** We found no MariaDB ticket for this; we searched JIRA on 2026-11-20. A Percona-Lab
+benchmark met the same symptom on 11.8.8
+([pull request](https://github.com/Percona-Lab/vector-bench/pull/14)). 11.8.10 and 12.3.4 were
+released on 2026-11-16 and are not tested here. Its nearest
 relatives are [MDEV-40916](https://jira.mariadb.org/browse/MDEV-40916) (in review for 13.2: the
 search allocates memory for every neighbour it rejects),
 [MDEV-33412](https://jira.mariadb.org/browse/MDEV-33412) and
 [MDEV-35032](https://jira.mariadb.org/browse/MDEV-35032).
 
 **What to do on 11.8.9.**
-- Give vector searches a `max_statement_time`.
+- Give vector searches a short `max_statement_time`: 10 s was enough here, 60 s was not.
 - Size the server's memory with room.
 - Filter through a join: in our measurements the join stopped none of 120 executions, where the
   predicate on the indexed table itself stopped 36.
@@ -656,7 +672,7 @@ and each statement tried on the 11.8.9 container:
 | `M` from 3 to 200, default 6; `mhnsw_ef_search` from 1 to 10000, default 20; `mhnsw_max_cache_size` default 16 MB | the same values in `information_schema.SYSTEM_VARIABLES` (a test reads them) |
 | `INFORMATION_SCHEMA.VECTOR_INDEXES` exists from MariaDB 13.1 | the table does not exist in 11.8.9, which is why the graph size was read from the tablespace file |
 | "Concurrent reads/writes and all transaction isolation levels are supported" | we measured two things it does not mention: the lower recall over a transaction's own uncommitted rows, and the index left stale by a REPEATABLE READ reader ("Isolation levels" above) |
-| "The `LIMIT` is a hard cap on how many rows the index returns *before* the threshold is applied", and "(Adding the `WHERE` directly to an `ORDER BY ... LIMIT` query also uses the index, but with the same hard cap.)" (read on 2026-11-20) | holds for the subquery form, which reads exactly its inner `LIMIT` rows. Not on 11.8.9 for a `WHERE` inside the statement: the search goes on until `LIMIT` rows pass, and when fewer qualify it runs until it is stopped or out of memory ("A search that runs away" above). On 12.3.3 and 13.0.2 a very selective filter comes back short instead |
+| "The `LIMIT` is a hard cap on how many rows the index returns *before* the threshold is applied", and "(Adding the `WHERE` directly to an `ORDER BY ... LIMIT` query also uses the index, but with the same hard cap.)" (read on 2026-11-20) | holds for the subquery form, which reads exactly its inner `LIMIT` rows. Not on 11.8.9 for a `WHERE` inside the statement: the search goes on past `LIMIT`, and when fewer rows qualify it can run until it is stopped or the server is out of memory ("A search that runs away" above); other runs ended by themselves, some with a short answer. On 12.3.3 and 13.0.2 nothing was killed, and a very selective filter came back short |
 
 Not in the reference, and measured here: the second `ORDER BY` key and the `IN (subquery)` that
 lose the index; the exact ranking of the joined statement without a filter, and its nearly exact
@@ -666,7 +682,7 @@ filter's own table over the vector index when the join order is left free; the h
 change with the graph build (and how much, over twenty builds per `M` on S1) and, for `M=6`,
 across a restart; the loss of
 exactness and of repeatability when the graph does not fit in `mhnsw_max_cache_size`; the stale
-index after a REPEATABLE READ reader; a search that fewer rows pass than `LIMIT`, which runs away on
+index after a REPEATABLE READ reader; a search that fewer rows pass than `LIMIT`, which can run away on
 11.8.9.
 
 We searched MariaDB's JIRA for these on 2026-11-20. The stale index is

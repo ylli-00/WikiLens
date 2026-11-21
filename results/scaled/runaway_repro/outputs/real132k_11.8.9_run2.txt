@@ -1,0 +1,13 @@
+   0.00 s                <- SET @q = (SELECT v FROM qv)
+   0.00 s                <- SET SESSION mhnsw_ef_search = 100
+   0.00 s                <- SET SESSION max_statement_time = 60
+   0.04 s  [94500, 94501, 24135, 99577, 105913, 110262, 26062, 58618, 91777, 24148]  <- SELECT id FROM t ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  133696        <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   0.22 s                <- SELECT (MIN(d) + MAX(d)) / 2 INTO @t3 FROM (SELECT VEC_DISTANCE_COSINE(v, @q) AS d FROM t IGNORE INDEX (v) ORD
+   0.21 s  [94500, 94501, 24135]  <- SELECT id FROM t IGNORE INDEX (v) WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q) L
+   0.00 s  2265000       <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+  10.33 s  [94500, 94501, 24135]  <- SELECT id FROM t WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  361398544     <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+  24.66 s  ERROR 2013 Lost connection to MySQL server during query  <- SELECT id FROM t WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q
+[real132k_11.8.9] run 2: 35.699 s, container peak 2039 MiB, state exited oom=true
+Nov 21 08:06:39 (host) kernel: Memory cgroup out of memory: Killed process 150979 (mariadbd) total-vm:8593961176kB, anon-rss:2091384kB, file-rs

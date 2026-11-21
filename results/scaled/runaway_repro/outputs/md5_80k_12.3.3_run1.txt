@@ -1,0 +1,19 @@
+   0.00 s                <- SET @q = (SELECT v FROM qv)
+   0.00 s                <- SET SESSION mhnsw_ef_search = 100
+   0.00 s                <- SET SESSION max_statement_time = 60
+   0.24 s  [57663, 56047, 27293, 13376, 40343, 77448, 27568, 21669, 57648, 8098]  <- SELECT id FROM t ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  167488        <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   0.12 s                <- SELECT (MIN(d) + MAX(d)) / 2 INTO @t3 FROM (SELECT VEC_DISTANCE_COSINE(v, @q) AS d FROM t IGNORE INDEX (v) ORD
+   0.34 s  [7429, 11055, 77089]  <- SELECT id FROM t IGNORE INDEX (v) WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q) L
+   0.00 s  2266064       <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   5.00 s  []            <- SELECT id FROM t WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  132812352     <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   1.47 s  []            <- SELECT id FROM t WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  132812352     <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   1.33 s  []            <- SELECT id FROM t WHERE VEC_DISTANCE_COSINE(v, @q) < @t3 ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  132812352     <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   0.46 s  [70716, 53037, 35358, 17679, 80000]  <- SELECT id FROM t IGNORE INDEX (v) WHERE w < 5 ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   1.33 s  []            <- SELECT id FROM t WHERE w < 5 ORDER BY VEC_DISTANCE_COSINE(v, @q) LIMIT 10
+   0.00 s  132812352     <- SHOW SESSION STATUS LIKE 'Max_memory_used'
+   0.00 s  101952        <- SHOW SESSION STATUS LIKE 'Memory_used'
+[md5_80k_12.3.3] run 1: 10.399 s, container peak 418 MiB, state running oom=false

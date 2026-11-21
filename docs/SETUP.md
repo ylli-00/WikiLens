@@ -126,7 +126,7 @@ deletes the data volume.
 `wikilense query` and the web page stop a search after 5 s (`WIKILENSE_STATEMENT_SECONDS` in `.env`,
 0 for no limit) through MariaDB's `max_statement_time`, a guard against a vector search that keeps
 searching when few rows pass its filters ([VECTOR_INDEX.md](VECTOR_INDEX.md)); `wikilense eval`
-and the measurement scripts set no limit.
+and the measurement scripts do not use it.
 
 ## Turn on the live fact-check
 
