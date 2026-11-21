@@ -1,9 +1,9 @@
 # The data: the demo corpus, the 3,000 claims and the scaled corpora S0 and S1
 
 There are two data sets, both from FEVEROUS and its December 2020 Wikipedia. The demo corpus in
-`data/corpus/` (100 pages, 75 claims) is what `make setup` loads and what the README's first
-screen and `make eval` use. The scaled run uses 3,000 FEVEROUS claims on two larger corpora, S0
-and S1; its results are in [EVALUATION.md](EVALUATION.md).
+`data/corpus/` (100 pages, 75 claims) is what `make setup` loads and `make eval` uses. The scaled
+run uses 3,000 FEVEROUS claims on two larger corpora, S0 and S1; its results are in
+[EVALUATION.md](EVALUATION.md).
 
 ## The demo corpus: 100 pages and 75 claims
 
@@ -32,7 +32,7 @@ occur in the chosen revisions (`probes_matched` per page): 1,005 categories, 1,1
 pairs, edit dates from 2019-12-23 to 2020-12-31
 ([data/corpus/PAGE_META.md](../data/corpus/PAGE_META.md)). The script follows the Wikimedia Robot
 Policy: one request at a time, at most four per second, a User-Agent with this repository's URL,
-`maxlag` and `Retry-After`. The 100 pages took 309 requests.
+`maxlag` and `Retry-After`.
 
 **To rebuild the demo corpus** (about 5 s, byte-identical):
 1. Download the shard with `python3 scripts/fetch_wiki_shard.py wiki_000.jsonl`. It is 44 MB,
@@ -75,11 +75,11 @@ All 112 left-out claims fail for the same reason, a hatnote: the note at the top
 section, such as "This article is about the clothing brand." or "Main article: …". WikiLense keeps
 hatnotes out of the chunks on purpose, so a set that cites one can never be fully retrieved.
 
-The pick has 2,578 train and 422 dev claims. Challenge tags: Other 1,906, Multi-hop Reasoning 709,
-Entity Disambiguation 151, Search terms not in claim 131, Numerical Reasoning 71, Combining Tables
-and Text 32. The mix differs from FEVEROUS's: a third of the claims are NOT ENOUGH INFO, against
-3.5% in FEVEROUS train and dev (45,743 SUPPORTS, 30,696 REFUTES, 2,742 NOT ENOUGH INFO), and 30% of
-the REFUTES claims need two articles, against 4.9% there. Results are therefore given per group.
+The pick has 2,578 train and 422 dev claims (the challenge tags are counted in
+[EVALUATION.md](EVALUATION.md#feverouss-challenge-tags)). The mix differs from FEVEROUS's: a third
+of the claims are NOT ENOUGH INFO, against 3.5% in FEVEROUS train and dev (45,743 SUPPORTS, 30,696
+REFUTES, 2,742 NOT ENOUGH INFO), and 30% of the REFUTES claims need two articles, against 4.9%
+there. Results are therefore given per group.
 The gold pages are every page cited by any evidence set of the claims, table sets included:
 3,851, none missing from the FEVEROUS database, with a median of 5 chunks each.
 
@@ -124,17 +124,13 @@ Why D:
   2.8 times (evidence) as many claims as RD, and 1.3 to 1.4 times as many as hub text of the same
   size (AD).
 - **D distracts most per added chunk**: 9.3 evidence and 8.0 page-set claims lost per 10,000
-  chunks (rough, as the corpora differ in size). It has about the hubs' total effect (−67 against
-  −74 claims for evidence, −58 against −62 for page sets) with 58% of their chunks, and a smaller
-  corpus is faster.
+  chunks (rough, as the corpora differ in size). It has about the hubs' total effect with 58% of
+  their chunks, and a smaller corpus is faster.
 - **D's pages are on topic**: of the distractor chunks in a claim's top 10, 39% come from a page
   the claim's own gold article links to, against 26% for A, 29% for B and about 1% for random pages.
 
-Random pages barely distract (row C), so none were added. A bigger corpus would add more linked
-pages (each article's second favourite); none is built. Article recall hardly moves (99% at
-k = 10 whatever is added). One seed ran per rule. The test's D stopped at 3,000 pages, so some
-gold articles had no distractor of their own; on the 3,000 claims every gold article with a usable
-link gets one (below).
+Random pages barely distract (row C), so none were added. Article recall hardly moves (99% at
+k = 10 whatever is added). One seed ran per rule.
 
 On the 3,000 claims, all 3,851 gold articles were walked and 3,835 pages taken. 16 gold articles
 have no usable link: each of their links was a gold page, taken or missing. Skips: gold page 551,
@@ -170,9 +166,9 @@ counts equal the build's. Both graphs stay below `mhnsw_max_cache_size` (512 MB)
 `scripts/scaled_stage3.py` uses the revision rule and the API client of `fetch_page_meta.py`, with
 the same request rules, including a 5 s pause after any request over 1 s. S1's pages were fetched
 once and the file is loaded into both databases, since S0's pages are a subset: 7,686 of 7,686
-pages, 0 errors, 20,795 requests in 294 minutes; a stopped fetch resumes. 2,921 pages had
-no edit in December 2020 and take the revision live at its end; 4,620 were edited then and take the
-revision that matches their FEVEROUS sentences best. 145 pages have no revision id and no edit date
+pages, 0 errors, 20,795 requests in 294 minutes. 2,921 pages had no edit in December 2020 and
+take the revision live at its end; 4,620 were edited then and take the revision that matches their
+FEVEROUS sentences best. 145 pages have no revision id and no edit date
 (112 whose revision holds none of their sentences, 33 with no revision at the end of 2020); they
 are stored as NULL, so an edit-date filter leaves them out. 285 pages now have another title on
 Wikipedia and are followed through the move log. For 181 pages the chosen revision holds fewer than
@@ -183,15 +179,13 @@ half of the sentence probes (counted, not looked into).
 | `wikilense_s1` | 7,686 | 7,541 | 7,433 | 40,695 | 58,569 |
 | `wikilense_s0` | 3,851 | 3,770 | 3,685 | 21,934 | 27,926 |
 
-The most common category is "Living people" (910 S1 pages). With this metadata, all four filters
-(category, length, edited since, linked from) work on S0 and S1 as on the demo corpus.
+With this metadata, all four filters (category, length, edited since, linked from) work on S0 and
+S1 as on the demo corpus.
 
 ### Rebuilding the scaled data
 
-This needs the FEVEROUS train and dev files in `data/feverous/`, the FEVEROUS Wikipedia database
-(the 53.5 GB SQLite file `feverous_wikiv1.db`, read-only, its path in `WIKILENSE_FEVEROUS_DB`), a
-GPU for the embedding, and hours, most of them for the metadata fetch. In order (the full commands
-are in [SETUP.md](SETUP.md), "Reproduce the scaled run"):
+What this needs, and the full commands, are in [SETUP.md](SETUP.md), "Reproduce the scaled run".
+In order:
 
 1. `scripts/scaled_build.py` with `claims` (the pick, as `claims_3000.jsonl.tmp`), `distractors`
    (rule D), `corpora` (the S0 and S1 folders) and `report` (the selection and distractor reports).
