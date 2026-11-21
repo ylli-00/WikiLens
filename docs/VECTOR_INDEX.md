@@ -516,7 +516,7 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
 - **On this table it took an index search before B's commit and another after it, in one
   REPEATABLE READ transaction; in an 8-dimensional repro one search after the commit was enough,
   so the safe rule is the broader one below.** No control that lacked one of the two searches went
-  stale (the one 4 is the approximate search missing a row), including the two whose step 1 is
+  stale (a control's 4 of 5 is the approximate search missing a row), including the two whose step 1 is
   `COUNT(*)` or the scan. A plain-SQL repro, where A's first statement is not a search and A
   searches the index once, after B's commit:
 
@@ -617,7 +617,7 @@ with its script and logs). A reproduction in SQL only, on vectors generated in S
 80,000 S1 vectors, read the statement's own memory from `Max_memory_used`, in millions of bytes
 ([results/scaled/runaway_repro/runaway_repro.md](../results/scaled/runaway_repro/runaway_repro.md)):
 
-| Version | The container | The statement's own memory | Threshold that 3 rows meet | Of the 5 rows that pass `w < 5`, returned |
+| Version | The container | The statement's own memory, millions of bytes | Threshold that 3 rows meet | Of the 5 rows that pass `w < 5`, returned |
 |---|---|---|---|---|
 | 11.8.9 | killed at the cap after 20 to 22 s, under a 60 s `max_statement_time` | 709 on 80,000 generated, 984 on 80,000 S1 vectors | 1.51 and 1.71 s as the first search after a start, then killed | 0 to 3 |
 | 12.3.3 | at most 552 MiB | 58 to 150 | 6.85 s on the first run, then 0.81 to 1.69 s | 0 to 2 |
