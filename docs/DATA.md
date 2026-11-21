@@ -194,7 +194,7 @@ counts equal the build's. Both graphs stay below `mhnsw_max_cache_size` (512 MB)
 With this metadata, all four filters (category, length, edited since, linked from) work on S0 and
 S1 as on the demo corpus. `scripts/scaled_stage3.py` applies `fetch_page_meta.py`'s revision rule,
 API client and request rules. It fetched S1's 7,686 pages once, with no errors, in 20,795 requests
-over 294 minutes, and the file is loaded into both databases.
+over 294 minutes, and the file is loaded into both databases, since S0's pages are a subset.
 
 | Database | Pages | With revision and edit date | With a category | Categories | Page-category rows |
 |---|---|---|---|---|---|
