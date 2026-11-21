@@ -1,9 +1,6 @@
 # The LLM fact-checker extension
 
-The database part of WikiLense measures retrieval: does the vector search find the gold evidence
-of a FEVEROUS claim? This extension asks the next question: does a language model judge the
-claim better once it reads what the search found? Every number below comes from
-[results/llm/](../results/llm/), written by `scripts/llm_results.py`
+Every number below comes from [results/llm/](../results/llm/), written by `scripts/llm_results.py`
 ([LLM_RESULTS.md](../results/llm/LLM_RESULTS.md) has every table, `llm_results.json` every value).
 
 ## 1. The question
@@ -57,11 +54,10 @@ flowchart LR
   where your own knowledge falls short; a claim may need several facts checked." and ends the
   justification rule with "the sources used, such as a page title"; its user turn is the claim
   alone.
-- **Three facts about the prompt.** It lets the model add its own knowledge where the passages
-  fall short, because real retrieval will not always find the answer. It asks for the state as of
-  December 2020, the date of FEVEROUS's Wikipedia, so later events do not count. And it is the same
-  for gold: "gold" means the annotators' evidence plus the model's own knowledge, so it is a
-  reference point, not a ceiling.
+- **Two facts about the prompt.** It lets the model add its own knowledge where the passages
+  fall short, because real retrieval will not always find the answer. And it is the same for gold:
+  "gold" means the annotators' evidence plus the model's own knowledge, so it is a reference
+  point, not a ceiling.
 - **The passages** of RAG come from the `inline` statement (the joined statement that
   `wikilense query` runs) on S1, 132,359 chunks, with k = 5 and `mhnsw_ef_search` 100, each chunk
   headed by its page title and section path. Retrieval was cached once per claim, so every run
@@ -72,9 +68,9 @@ flowchart LR
   github.com and its content hosts, huggingface.co and hf.co, kaggle.com and paperswithcode.com,
   with their subdomains. FEVEROUS's claims and labels are published there, and reading the answer
   key would not be fact-checking.
-- **What is tested** is open-world fact-checking: the truth is not limited to Wikipedia, and the
-  model may use what it knows. Fact-checking only against your own data, where the verdict must
-  come from the passages alone, is further work.
+- **What is tested** is open-world fact-checking: the truth is not limited to Wikipedia.
+  Fact-checking only against your own data, where the verdict must come from the passages alone,
+  is further work.
 
 ## 3. Three-class results
 
@@ -130,11 +126,10 @@ are level (0.6, −0.7 to 2.0).
 **NOT ENOUGH INFO answers.** This is an interpretation; the cause was not tested. Without passages
 Haiku answers NOT ENOUGH INFO most often (1,765 times), and those answers are right 36.9% of the
 time, close to the 33.3% that chance gives on this balanced set. That fits a model that is unsure
-and hedges, and it makes NOT ENOUGH INFO the label it recalls best there (65.1%). With web search
-it gives this answer least often (308 times) and picks a side on 79.9% of the NOT ENOUGH INFO
-claims. In every condition except no passages, NOT ENOUGH INFO is the label with the lowest
-recall: 20.1% with web search, 45.5% with RAG and 52.9% with gold. Even with the gold evidence,
-Haiku picks a side on 47.1% of the NOT ENOUGH INFO claims.
+and hedges, and it makes NOT ENOUGH INFO the label it recalls best there. With web search it gives
+this answer least often and picks a side on 79.9% of the NOT ENOUGH INFO claims. In every
+condition except no passages, NOT ENOUGH INFO is the label with the lowest recall. Even with the
+gold evidence, Haiku picks a side on 47.1% of the NOT ENOUGH INFO claims.
 
 ## 4. Why NOT ENOUGH INFO is a weak label here
 
@@ -159,12 +154,11 @@ correct verdict, when it finds the answer outside Wikipedia or finds what the an
 those answers count as wrong. Claude Opus 5.5 agents reviewed 100 of them (40 gold, 40 RAG, 20 no
 passages, drawn at random with a fixed seed) and named the main reason for each. In 16 of the 40
 gold cases and 16 of the 40 RAG cases, that reason was a doubtful label: the text Haiku saw does
-settle the claim, the way Haiku answered. In those cases Haiku may have been right and the label
-wrong. (For the no-passage cases the agents judged from the annotators' evidence: 4 of 20.) Two
-agents rated each case without seeing each other's ratings and agreed on the main reason in 94 of
-100. A third agent settled those 6 cases and 3 more where they disagreed on another rating. This
-is a sample, not a count over all claims, and no person has checked the ratings, so how often a
-person would agree with them is not known.
+settle the claim, the way Haiku answered. (For the no-passage cases the agents judged from the
+annotators' evidence: 4 of 20.) Two agents rated each case without seeing each other's ratings
+and agreed on the main reason in 94 of 100. A third agent settled those 6 cases and 3 more where
+they disagreed on another rating. This is a sample, not a count over all claims, and no person
+has checked the ratings.
 
 ## 5. The supported and refuted claims
 
@@ -204,9 +198,7 @@ the six comparisons):
 **How the comparisons are worded.** Two conditions are "level" only where the 95% interval of
 their paired difference includes zero; otherwise one is "ahead by X points", with the interval.
 The text also says when a gap is smaller than about two rerun standard deviations, the spread
-between reruns of the same claims (section 7). For the three close pairs above that is 1.2 to 1.3
-points: RAG's lead over web search (1.7) is above it but not by much, and RAG against gold and
-gold against web search are below it as well as level.
+between reruns of the same claims (section 7).
 
 ## 6. F1 per label
 
@@ -229,9 +221,9 @@ The same model can give a different answer to the same prompt from one run to th
 measure how much, every condition ran twice more (r1 and r2) on 450 of the claims: 150 per label,
 105 of each on one article and 45 needing two or more, the first claims of each of the six groups
 when ordered by the SHA-256 of `repeat450-2026-11-19:<claim id>`. The repeats used the settings,
-prompts and CLI binary (2.1.322) of the original runs; a newer CLI was installed by then and
-not used. RAG read the same cached passages, and all 3,600 user turns of the repeats are byte
-for byte those of the original runs (compared by `user_text_sha256`).
+prompts and CLI binary (2.1.322) of the original runs. RAG read the same cached passages, and all
+3,600 user turns of the repeats are byte for byte those of the original runs (compared by
+`user_text_sha256`).
 
 | condition | claims | accuracy: original / r1 / r2 | switched between right and wrong: original–r1 / original–r2 / r1–r2 |
 |---|---|---|---|
@@ -259,16 +251,15 @@ the repeats, the original would differ from both repeats more than they differ f
 - For web search, RAG and gold it does not. The original switches against a repeat about as often
   as the repeats do against each other, and of the 18 accuracy differences between two runs of
   these conditions one has an interval that excludes zero: gold on the 300 supported/refuted
-  claims, original against r1, 3.3 points (0.4 to 6.2, p 0.041). There r1 is the low run (80.0%
-  against 83.3% and 82.0%), and the original is level with r2 (1.3, −0.7 to 3.4).
-- No passages is the exception. Its original run scored highest on the sample (48.0% against
-  44.7% and 46.0%, and 37.0% against 32.7% and 34.3% on the supported/refuted claims), it switched
-  against the repeats more often than they did against each other (10.9% and 10.0% against 8.4%),
-  and it is ahead of r1 by 3.3 points (0.3 to 6.4, p 0.044), though level with r2 (2.0, −0.9 to
-  4.9). The repeats ran the same CLI binary, so the CLI version does not explain it. Nor can the
-  runs tell a change between the runs from chance: 3 of the 16 differences between the original
-  and a repeat exclude zero, against none of the 8 between the repeats, with no correction for the
-  24 comparisons.
+  claims, original against r1, 3.3 points (0.4 to 6.2, p 0.041). There r1 is the low run, and the
+  original is level with r2 (1.3, −0.7 to 3.4).
+- No passages is the exception. Its original run scored highest on the sample (also on the
+  supported/refuted claims), it switched against the repeats more often than they did against
+  each other, and it is ahead of r1 by 3.3 points (0.3 to 6.4, p 0.044), though level with r2
+  (2.0, −0.9 to 4.9). The repeats ran the same CLI binary, so the CLI version does not explain
+  it. Nor can the runs tell a change between the runs from chance: 3 of the 16 differences
+  between the original and a repeat exclude zero, against none of the 8 between the repeats,
+  with no correction for the 24 comparisons.
 - Either way, no comparison in this document changes: no passages trails every other condition by
   16.1 points or more on three classes and by 46.7 or more on the supported/refuted claims.
 
@@ -284,12 +275,11 @@ pair of runs, the SDs for both claim counts and the accuracy differences between
 ## 8. Where it fails
 
 - **Multi-hop claims (two or more articles).** RAG is right on 72.8% of the one-article claims and
-  66.6% of the others (85.4% against 79.3% on the supported/refuted ones, 6.1 points apart, 95%
-  interval 2.4 to 9.9). Gold drops too (74.4% against 69.3%), clearly so on the refuted claims,
-  and RAG stays level with gold in both groups, so the second article is hard for the model as
-  well as for retrieval ([Multi-hop claims and RAG](#multi-hop-claims-and-rag) below). On refuted
-  claims that need two or more articles all three of web search, RAG and gold reach only 73.0% to
-  73.7%.
+  66.6% of the others (85.4% against 79.3% on the supported/refuted ones). Gold drops too (74.4%
+  against 69.3%), clearly so on the refuted claims, and RAG stays level with gold in both groups,
+  so the second article is hard for the model as well as for retrieval
+  ([Multi-hop claims and RAG](#multi-hop-claims-and-rag) below). On refuted claims that need two
+  or more articles all three of web search, RAG and gold reach only 73.0% to 73.7%.
 - **Claims where retrieval missed.** For 2,943 of the 3,000 claims (98.1%) a gold page is among the
   five passages; RAG is right on 71.2% of those and on 57.9% of the other 57. On the
   supported/refuted claims the split is sharper: 83.9% against 30.8% (4 of 13). When every page of
@@ -370,8 +360,7 @@ balanced, and the last four tags have fewer than 100 claims here, too few for co
   | gold | 2.6 | 1.1 | 276 | 5,532,364 |
 
   With the passages Haiku decides with less thinking (227 thinking tokens at the median against
-  636 without), and web search reads far more prompt tokens than RAG (165.6 against 9.8
-  million) and takes 7.8 times as long.
+  636 without).
 - **The usage window.** By the subscription's own readings, the no-passage and gold run (6,000
   calls) used 0.11 of a five-hour window, RAG 0.05 and web search 0.60, spread over three
   windows. The readings cover the whole account.
@@ -474,8 +463,7 @@ prompt set's hash differs from the recorded one, the fact-check stays off and sa
 is one model call, with no retry and no web search.
 
 What it shows:
-- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy". The prompt
-  asks for that date, so a statement about later events is judged as of 2020.
+- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy".
 - Haiku's reason, in full. Each passage number it cites, such as [2], links to that hit and
   highlights it. If it cites none, the page says "no passage cited: from the model's own
   knowledge". The reason is the model's own wording and can be wrong even when the verdict is
@@ -510,9 +498,8 @@ Three ways to run the fact-check on what the page retrieved:
    into a chatbot. It needs no key and makes no call. `GET /api/prompt` returns the same text.
 
 The copied text is the request above with one change. A chat window has no system field, so the
-system prompt comes first, then a blank line, then the user turn exactly as the runner renders it
-(`EVIDENCE:` with the passages, then `CLAIM:`). The system prompt's last sentence asks for a tool
-call that a chat window does not have:
+system prompt comes first, then a blank line, then the user turn exactly as the runner renders it.
+The system prompt's last sentence asks for a tool call that a chat window does not have:
 
 > Answer with one StructuredOutput call: "result" holds "label" (exactly one of the three) and "justification" (one sentence, at most 30 words: the deciding fact and the passages or sources used, such as [2]). No other text.
 
