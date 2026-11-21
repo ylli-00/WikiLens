@@ -6,11 +6,10 @@ the SQL statements WikiLense runs, and what we measured about how the server exe
 The measurements are on the two databases of the 3,000-claim run
 ([EVALUATION.md](EVALUATION.md#the-scaled-run)): **S1**, 7,686 pages and 132,359 chunks with a
 156.0 MB graph, and **S0**, 3,851 pages and 43,134 chunks with a 56.0 MB graph, at k = 5. (MB are
-of 1,048,576 bytes here, as MariaDB's documentation writes `mhnsw_max_cache_size`.) The
-behaviour around transactions was measured on scratch tables in the test database. The files are
+of 1,048,576 bytes here, as MariaDB's documentation writes `mhnsw_max_cache_size`.) The files are
 in [results/scaled/](../results/scaled/), and [SUMMARY.md](../results/scaled/SUMMARY.md) has every
 table with every run. The earlier measurements on the 100-page demo corpus (4,598 chunks, 75
-claims) are in [results/](../results/); this page names them where it uses them.
+claims) are in [results/](../results/).
 
 **How these were measured.** One measurement at a time, with the laptop's CPU capped at 50% and the
 GPU at 2,100 MHz, so compare times only within this page. Each claim gives one timed run per
@@ -25,8 +24,7 @@ a rerun goes into `results/scaled/run2/`, and `scripts/scaled_summary.py` adds i
 ## The statements
 
 Every statement is a named constant in [wikilense/search.py](../wikilense/search.py), assembled from
-fixed fragments. Values are always bound as parameters, and a vector parameter is bound as the
-raw float32 bytes (`db.vec_param`), sent as a `_binary X'...'` literal.
+fixed fragments. Values are always bound as parameters.
 
 The bare index query is the HNSW search proper. Strategies `none` and `overfetch` run it as a
 derived table joined back to `page` and `section` for the hit metadata (`none` is `overfetch` with
@@ -95,7 +93,6 @@ ORDER BY fused.score DESC, chunk.chunk_id LIMIT ?
 The join back to the evidence is `chunk_sentence JOIN sentence` for the hit chunks, ordered by
 page position (`--sentences`).
 
-
 ## What we measured
 
 Everything here was measured with `EXPLAIN`, `ANALYZE` and the harness.
@@ -112,8 +109,7 @@ wrong-dimension vector.
 - The arithmetic is right: on 300 random, unnormalised vectors, `VEC_DISTANCE_COSINE` equals
   NumPy's `1 - cos` for every row, within 1e-5, and a scan that ignores the index
   (`IGNORE INDEX (embedding)`) returns NumPy's exact top 10 in order. The test requires the HNSW
-  index to find at least 95% of them on average, because every graph build is a different
-  approximation.
+  index to find at least 95% of them on average.
 - Query cost falls into two regimes:
   - The bare query (`none`, `overfetch`) is the HNSW search: 1.11 ms at the median on S0 and
     1.43 ms on S1 in the main harness (`results/scaled/eval/`). It reads exactly `LIMIT` rows,
@@ -150,9 +146,8 @@ wrong-dimension vector.
   - **Without a time limit**, such a statement grew `mariadbd` until it ran out of memory: to the
     2 GB cap in about 20 s in a throwaway container, and to 7.2 GB on the development machine's
     server, where the kernel's OOM killer stopped it.
-  - **Other versions and the guard.** 12.3.3 and 13.0.2 kept their memory flat on the same data.
-    `max_statement_time` stops the search ("A search that runs away" below). The web page and
-    `wikilense query` set it to 5 s; their filters are joins.
+  - **The guard.** `max_statement_time` stops the search ("A search that runs away" below). The
+    web page and `wikilense query` set it to 5 s; their filters are joins.
 - The optimizer chooses per filter whether to keep the index, from its estimate of how many rows
   pass; "The join order we fix" below has the plans under 18 filter levels.
 - Join order matters:
@@ -160,10 +155,8 @@ wrong-dimension vector.
     insert and lost the vector index. The statements use `STRAIGHT_JOIN` with `chunk` first, and
     the ingest runs `ANALYZE TABLE`.
   - An `IN (subquery)` filter becomes a semi-join and loses the index too (a test pins this).
-  - The same filter as a joined derived table keeps the index (a test pins that plan). The
-    derived tables are `SELECT DISTINCT`: without it MariaDB merges them into the join, which
-    still walks the vector index but returns a chunk once per matching link row (on S1 in up to
-    147 of 200 lists, "The join order we fix" below).
+  - The same filter as a joined derived table keeps the index (a test pins that plan). Why the
+    derived tables are `SELECT DISTINCT` is under "The join order we fix" below.
 - Rows a transaction has not committed are found less well. `scripts/scaled_uncommitted.py` fills
   a scratch table in the test database with S0's 43,134 chunk vectors inside one transaction, with
   the chunk table's vector column and index, and searches it with the 3,000 claims before and after
@@ -175,19 +168,16 @@ wrong-dimension vector.
   the statement is also faster (0.32 against 0.83 ms p50 at 100). We did not look into how the
   server searches rows that are not committed. On 1,000 random vectors the overlap is 0.611 to
   0.655 before and 0.802 to 0.997 after. On the 100-page corpus it was 0.972 to 0.973 before and
-  0.990 to 1.000 after (k = 10, `results/uncommitted_recall.md`). The 43,134 inserts took 21.9 to
-  22.2 s, committed or not, and `ROLLBACK` leaves no row behind. Write and search in separate
+  0.990 to 1.000 after (k = 10, `results/uncommitted_recall.md`). Write and search in separate
   transactions, or commit first.
 - `mhnsw_ef_search` is a session variable, set per query and restored after. Values outside its
-  range are clamped with a warning, not an error. `mhnsw_max_cache_size` is global, and its 16 MB
-  default is below the size of both graphs (56.0 MB on S0, 156.0 MB on S1), so the Docker
-  configuration starts the server with 512 MB. The graph lives in a hidden InnoDB table
+  range are clamped with a warning, not an error. The graph lives in a hidden InnoDB table
   (`chunk#i#NN`), not in `SHOW TABLE STATUS`'s `Index_length`.
-- Raw float32 bytes bind as a `_binary` literal, both in `INSERT` and inside
+- Raw float32 bytes (`db.vec_param`) bind as a `_binary` literal, both in `INSERT` and inside
   `VEC_DISTANCE_COSINE`. PyMySQL 1.2.3 and later send `_binary X'<hex>'` by themselves. Versions
   1.2.0 to 1.2.2 do so only on a connection opened with `binary_prefix=True`, which `db.connect`
-  sets for every version. `VEC_FromText(?)` with a JSON list and `UNHEX(?)` work everywhere. A
-  query vector of the wrong dimension returns `NULL` distances, silently. MariaDB knows this:
+  sets for every version. A query vector of the wrong dimension returns `NULL` distances,
+  silently. MariaDB knows this:
   [MDEV-35192](https://jira.mariadb.org/browse/MDEV-35192) was closed as documented.
 - A chunk inserted inside a transaction is visible to the index in the same connection, and gone
   after `ROLLBACK`. Another connection sees it only after `COMMIT`. `UPDATE` of an embedding
@@ -198,9 +188,8 @@ wrong-dimension vector.
   (example 8) shows it from the `mariadb` client.
 - Every build of the HNSW graph is a different approximation; "The same vectors, built several
   times" measures the spread. Within one server process the results are deterministic while the
-  graph fits in the index cache, except just after the table is reopened (10 of 3,000 bare hit
-  lists on S1 changed between the first two passes, "The index cache below and above the graph").
-  A container restart (`docker restart`) changed 1 of 75 hit lists
+  graph fits in the index cache, except just after the table is reopened ("The index cache below
+  and above the graph"). A container restart (`docker restart`) changed 1 of 75 hit lists
   on an `M=6` index of the demo corpus and none on `M=16` at `ef_search=100`, without changing
   recall.
 
@@ -318,20 +307,16 @@ On S0 ([results/scaled/run1/s0/join_order.md](../results/scaled/run1/s0/join_ord
 | four filters | 824 | vector index | 446 | 21.45 | 199 / 198 | derived table first | 824 | 3.94 |
 
 - **As written**, the server walks the vector index under 15 of the 18 filters on S1 (14 of 17 on
-  S0), and reads more `chunk` rows the fewer pass. On S1: 5 without a filter, 13 and 17 at the 50%
-  length and date levels, 121 to 202 at the 5% levels and the loosest category and link levels,
-  1,888 to 6,148 at 0.5%, and 19,656 under both 0.05% levels that keep the index (we did not look
-  into why the two medians are equal). The time follows: about 27 ms at the 50% length and date
-  levels, 34 to 40 ms at 5%, 130 to 323 ms at 0.5%, and 1,386 to 1,388 ms when 66 chunks pass
-  through the category or the link filter. Under the three most selective length and date filters
-  the plan reads all 132,359 chunks and sorts them instead (`chunk` has type `ALL`), in 335 to
-  360 ms. No list came back short, in either form, on either database.
+  S0), and reads more `chunk` rows the fewer pass, up to 19,656 on S1 under both 0.05% levels that
+  keep the index (we did not look into why the two medians are equal). The time follows, up to
+  1,386 to 1,388 ms when 66 chunks pass through the category or the link filter. Under the three
+  most selective length and date filters the plan reads all 132,359 chunks and sorts them instead
+  (`chunk` has type `ALL`), in 335 to 360 ms. No list came back short, in either form, on either
+  database.
 - **Free**, the optimizer starts from another table under 17 of the 18 filters (16 of 17 on S0):
   `page`, or the derived table of the link or category filter. It reads `chunk` by
   `uq_chunk_page_ordinal`, exactly the chunks that pass, sorts them, and the vector index is not in
-  the plan. Its cost follows the number that pass: 0.86 to 1.06 ms for 66 to 139 chunks, 2.82 to
-  3.13 ms for 626 to 662, 12.69 ms for 3,107, 25.84 to 36.12 ms for 6,599 to 9,267, and 1,566.76
-  and 1,689.04 ms for the 66,171 and 66,208 of the 50% length and date levels.
+  the plan. Its cost follows the number that pass.
 - **Each order is slow where the other is fast.** When 662 or fewer chunks pass, the free plan
   takes 0.86 to 3.13 ms and the fixed order 129.95 to 1,387.73 ms. When half the chunks pass, the
   free plan takes 1,566.76 and 1,689.04 ms and the fixed order 26.40 and 26.68 ms. Between them, at
@@ -340,9 +325,9 @@ On S0 ([results/scaled/run1/s0/join_order.md](../results/scaled/run1/s0/join_ord
   12.69 against 54.47 ms. On S0 the pattern is the same at a smaller scale: 0.72 to 1.51 ms free
   against 24.97 to 307.35 ms as written when 256 or fewer pass, and 91.69 and 98.72 ms free against
   16.33 and 16.50 ms when half pass.
-- **The fixed order is not always exact under a filter.** Free, every list equals the scan's. As
-  written, it holds the scan's chunks for 175 to 200 of 200 claims on S1, fewest under the
-  0.5% category filter (175, and 169 in the scan's order), and for 192 to 200 on S0. Under the four
+- **The fixed order is not always exact under a filter.** As written, it holds the scan's chunks
+  for 175 to 200 of 200 claims on S1, fewest under the 0.5% category filter (175, and 169 in the
+  scan's order), and for 192 to 200 on S0. Under the four
   filters on all 3,000 claims it is the exact top 5 for 2,962 ("The joined statement against a
   brute-force ranking" below). We did not look into which rows the walk misses.
 - **Order.** As written, some lists hold the scan's chunks in another order (at most 6 of 200
@@ -379,14 +364,10 @@ The `builds` part of `scripts/measure_index_behaviour.py` copies S1's 132,359 ch
 scratch table that has the chunk table's vector column and index. It does this in `chunk_id`
 order, in one transaction, twenty times for `M=16` and twenty times for the server default `M=6`.
 Every build is then searched with the 3,000 claims (the bare statement, k = 5)
-([results/scaled/run1/s1/build_variance.md](../results/scaled/run1/s1/build_variance.md)). One
-build was timed alone first
-([results/scaled/build_timing/s1/build_variance.md](../results/scaled/build_timing/s1/build_variance.md)).
-The build took 85.6 s of a 717 s job. Most of the job was the fixed cost of exporting the vectors,
-embedding the claims and ranking them exactly, so forty builds fit in one run, and the count is
-twenty per `M`, as on the demo corpus. Each cell is the smallest to the largest value over the
-twenty builds of that `M` (for "two builds agree", over the 190 pairs of builds). The build time
-covers creating the table, the inserts and the commit:
+([results/scaled/run1/s1/build_variance.md](../results/scaled/run1/s1/build_variance.md)).
+Each cell is the smallest to the largest value over the twenty builds of that `M` (for "two
+builds agree", over the 190 pairs of builds). The build time covers creating the table, the
+inserts and the commit:
 
 | M | ef_search | Article recall@5, of 3,000 | Top-5 list equal to exact, of 3,000 | Two builds agree, of 3,000 | Build, s |
 |---|---|---|---|---|---|
@@ -403,12 +384,10 @@ NumPy's exact ranking of the same vectors finds a gold page for 2,943 claims.
   claims, and two builds gave the same list for 2,838 to 2,907. The graph in the database is one
   more build: its bare search finds a gold page for 2,933
   ([results/scaled/eval/s1_full_run1.md](../results/scaled/eval/s1_full_run1.md)), inside that
-  range, and the single timed build gave 2,928 and 2,869. On the demo corpus all twenty builds
-  found 74 of 75 gold pages, the exact ranking's number (`results/build_variance.md`,
-  `results/build_variance_run1.md`).
-- **At `ef_search` 20 the same graphs differ more**: 2,628 to 2,743 lists equal to the exact ones,
-  2,838 to 2,887 gold pages, and two builds agree on 2,608 to 2,752 lists. The larger `ef_search`
-  also makes a result repeatable across builds.
+  range. On the demo corpus all twenty builds found 74 of 75 gold pages, the exact ranking's
+  number (`results/build_variance.md`, `results/build_variance_run1.md`).
+- **At `ef_search` 20 the same graphs differ more** (the table's second row). The larger
+  `ef_search` also makes a result repeatable across builds.
 - **With the server defaults (`M=6`, `ef_search` 20) the build decides hundreds of claims**: 2,218
   to 2,433 gold pages, 1,553 to 1,794 lists equal to the exact ones, and two builds agree on 1,404
   to 1,676 of 3,000 lists. At `ef_search` 100, `M=6` still finds fewer gold pages (2,709 to 2,786)
@@ -416,8 +395,8 @@ NumPy's exact ranking of the same vectors finds a gold page for 2,943 claims.
 - **A build takes 86.5 to 102.3 s at `M=16` and 24.5 to 29.4 s at `M=6`**, for 132,359 inserts
   into an empty table, against 1.4 to 2.3 s and 0.4 to 0.6 s for the 4,598 vectors of the demo
   corpus (the same two files).
-- The scratch table is filled in one transaction, in `chunk_id` order. We did not test whether
-  the way a table is filled (batch size, commits between batches) changes the graph's quality.
+- We did not test whether the way a table is filled (batch size, commits between batches)
+  changes the graph's quality.
 
 ## The index cache below and above the graph
 
@@ -430,8 +409,7 @@ with NumPy's exact top 5
 ([results/scaled/run1/s1/cache_size.md](../results/scaled/run1/s1/cache_size.md)). The order was:
 512 MB on the running server, 16 MB right after `SET GLOBAL` without reopening the table, then 256
 down to 16 MB, each after `FLUSH TABLES chunk`, and 512 MB again at the end. The setting is global,
-so nothing else ran on the server meanwhile, and it was 512 MB again afterwards. The times are of
-the whole `search()` call.
+so nothing else ran on the server meanwhile. The times are of the whole `search()` call.
 
 | Cache | Bare: equal to exact, two passes | Bare: gold page found | Bare p50 ms | Joined: equal to exact, two passes | Joined: gold page found | Joined p50 ms |
 |---|---|---|---|---|---|---|
@@ -445,8 +423,7 @@ the whole `search()` call.
 | 16 MB, table not reopened | 2,151, 2,162 | 2,657 to 2,658 | 17.71 | 2,314, 2,311 | 2,691 to 2,694 | 22.00 |
 | 512 MB, at the end | 2,902, 2,911 | 2,931 to 2,933 | 2.14 | 3,000, 3,000 | 2,943 | 27.31 |
 
-All 3,000 claims got 5 rows at every size; the size changed which rows. The exact ranking finds a
-gold page for 2,943 claims.
+All 3,000 claims got 5 rows at every size; the size changed which rows.
 
 - **The cache has to be larger than the graph's file, by a margin.** At 192 MB and more, every
   count equals the one at 512 MB. At 160 MB, 2.6% above the 156.0 MB file, the joined statement is
@@ -520,9 +497,8 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
 
 - **What it takes.** In every trial that went stale, a REPEATABLE READ transaction had searched
   the index before B's commit and again after it. None of the controls that lacked one of the two
-  went stale (A at READ COMMITTED, in autocommit mode, without the second search, or with a
-  `COUNT(*)` or a scan as its first statement). That holds for this table only. In a plain-SQL repro
-  with 8-dimensional vectors on 11.8.9 and 13.0.2, a transaction whose first statement was
+  went stale. That holds for this table only. In a plain-SQL repro with 8-dimensional vectors on
+  11.8.9 and 13.0.2, a transaction whose first statement was
   `COUNT(*)`, a scan or `START TRANSACTION WITH CONSISTENT SNAPSHOT`, and that searched the index
   once after B's commit, left it stale in 3 of 3 trials. A 384-dimensional rerun of that repro
   stayed correct for `COUNT(*)` and the scan (0 of 5 stale) but went stale in 2 of 5 trials for
@@ -543,7 +519,6 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
   10. Of 20 other queries none came back empty, but the shortest answer had 5 rows. A committed
   insert (3 of 3 tables) or `FLUSH TABLES` (once) brought the 10 rows back, and the control
   without A's second search returned 10 rows in 5 of 5.
-
 
 What to do when other connections write to the table: no index search in a REPEATABLE READ
 transaction whose snapshot predates another connection's commit. Searching at READ COMMITTED or
@@ -566,11 +541,10 @@ only, on this one table.
 
 ## The joined statement against a brute-force ranking, and a copy of the vectors
 
-"The server ranks exactly" above rests on the hit lists of the joined statement not changing with
-`mhnsw_ef_search`. [scripts/compare_separate_index.py](../scripts/compare_separate_index.py) checks
-it directly: it reads all vectors out of MariaDB, ranks them for every claim with NumPy in float64,
-and compares that list with the statement's. The same copy, held in the application's memory, is
-the simplest separate index there is, so the script also times it. On S1
+[scripts/compare_separate_index.py](../scripts/compare_separate_index.py) checks "the server ranks
+exactly" above: it reads all vectors out of MariaDB, ranks them for every claim with NumPy in
+float64, and compares that list with the statement's. The same copy, held in the application's
+memory, is the simplest separate index there is, so the script also times it. On S1
 ([results/scaled/run1/s1/separate_index.md](../results/scaled/run1/s1/separate_index.md); 3,000
 claims, k = 5, the methods taking turns query by query, one timed pass):
 
@@ -585,14 +559,12 @@ claims, k = 5, the methods taking turns query by query, one timed pass):
 
 - **The joined statement is the exact ranking without a filter**: the same 5 chunks in the same
   order as NumPy for 3,000 of 3,000 claims, on S1 as on S0
-  ([results/scaled/run1/s0/separate_index.md](../results/scaled/run1/s0/separate_index.md)). The
-  statement forms above give the same (3,000 of 3,000 joined to `page`).
-- **Under a filter it is nearly exact.** These are the lists of `search()`, which sorts the rows it
-  gets by the reported distance and the chunk id. They equal the exact ranking of the chunks that
-  pass for 2,996 of 3,000 claims under the History heading and for 2,962 under the four metadata
-  filters, where the mean overlap with the exact top 5 is 0.998. On S0 they are 2,998 and 2,993
-  (1,588 and 824 chunks pass). On the demo corpus they were exact for 75 of 75 claims under both
-  (`results/separate_index.md`). We did not look into the 38 lists.
+  ([results/scaled/run1/s0/separate_index.md](../results/scaled/run1/s0/separate_index.md)).
+- **Under a filter it is nearly exact.** These are the lists of `search()`. They equal the exact
+  ranking of the chunks that pass for 2,996 of 3,000 claims under the History heading and for
+  2,962 under the four metadata filters, where the mean overlap with the exact top 5 is 0.998. On
+  S0 they are 2,998 and 2,993 (1,588 and 824 chunks pass). On the demo corpus they were exact for
+  75 of 75 claims under both (`results/separate_index.md`). We did not look into the 38 lists.
 - **The copy.** 132,359 vectors are 203,303,424 bytes of float32; reading them out of MariaDB with
   the columns the filters need took 2.42 s, and the client process grew by 701,804,544 bytes. The
   hnswlib graph is 222,955,496 bytes saved and took 5.87 s to build on all cores. A copy is stale
@@ -708,8 +680,3 @@ We found no ticket for these three:
 
 [MDEV-36869](https://jira.mariadb.org/browse/MDEV-36869), closed as not a bug, says the graph's cache cannot reproduce InnoDB's
 transactional semantics exactly.
-
-Two facts about the index come from its author's description, not from our measurements
-([MariaDB Vector: How it works, part II](https://mariadb.org/mariadb-vector-how-it-works-part-ii/)
-and [part III](https://mariadb.org/mariadb-vector-how-it-works-part-iii/)): the graph stores each
-vector as 16-bit integers with a scale factor, and `ef_construction` is fixed at 10.
