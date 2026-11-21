@@ -186,17 +186,14 @@ http://127.0.0.1:8000.
   definitions: whether a gold page is in the hits and the rank of the first, and whether the
   evidence is fully covered (evidence recall), with the gold units covered out of how many. Evidence
   in a table is shown as "evidence in a table (not indexed)". Editing the query drops the claim.
-- A claim file belongs to a database when the database's `claim` table holds exactly its claim ids:
-  `data/corpus/claims.jsonl` for the demo, `data/scaled/claims_3000.jsonl` for S1. The picker then
-  offers every claim of either file whose gold pages are all in that database and whose gold
-  sentences all resolve there: 75 on the demo (8 of them are also among the 3,000) and 3,032 on S1
-  (the 3,000 and 32 more demo claims). Without a matching file the picker is hidden.
-  [DESIGN.md](DESIGN.md#cli-and-web-clipy-webpy) has the details.
+- The picker offers the claims of `data/corpus/claims.jsonl` and `data/scaled/claims_3000.jsonl`
+  whose gold pages and sentences are all in the database: 75 on the demo (8 of them are also among
+  the 3,000) and 3,032 on S1 (the 3,000 and 32 more demo claims).
+  [DESIGN.md](DESIGN.md#cli-and-web-clipy-webpy) has the rule.
 - The database selector offers the demo database and, when it is loaded, the scaled database S1
   (`wikilense_s1`; [SETUP.md](SETUP.md#get-the-scaled-database-s1) has the download). The labels
   give each one's size, read from the database. A database loaded or ingested again while the page
-  is running, such as S1 after `make load-s1` in another terminal, shows up at the next reload,
-  without restarting `make serve`.
+  is running shows up at the next reload, without restarting `make serve`.
 - "Repeat 5 times" runs the search statement five times on the same connection and shows the median
   SQL time and the range, because a single timing on a laptop can drift by tens of percent. The
   query is embedded once.
