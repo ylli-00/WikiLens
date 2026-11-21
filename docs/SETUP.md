@@ -102,8 +102,7 @@ MACOSX_DEPLOYMENT_TARGET=14.0 uv pip compile requirements-cpu.lock --only-binary
 
 pip evaluates the `sys_platform` markers of the lock file for the machine it runs on, not for
 `--platform`, so on Linux it would pick the Linux line; we ran pip with its marker environment set
-to the target's. uv evaluates them for the target by itself. pip's dry run also downloads every
-wheel it resolves, about 200 MB per platform, while uv reads the metadata only.
+to the target's. uv evaluates them for the target by itself.
 
 ## When it fails
 
@@ -135,8 +134,7 @@ The web page can show a "Fact-check" button under a free-text search. It sends t
 its first 5 passages to Claude Haiku with the LLM experiment's prompt, and shows the verdict, the
 model's reason and how often that verdict was right in the experiment
 ([LLM_EXTENSION.md](LLM_EXTENSION.md#14-on-the-web-page)). The button is off by default. The
-"Copy the prompt" box under every search needs none of this: it shows the same prompt with the
-passages, to paste into a chatbot, and makes no call.
+"Copy the prompt" box under every search needs none of this and makes no call.
 
 One setting turns it on: `WIKILENSE_FACTCHECK`, in `.env` or the environment, set to
 `subscription` or `api`. Restart `make serve` after changing it. At start-up the server prints a
@@ -171,13 +169,12 @@ shows a sign of paid extra usage, and one that ends with a login, key or wrong-m
 
 ## Get the scaled database (S1)
 
-`wikilense_s1` is the database behind the README's headline results: 7,686 Wikipedia pages (the
-3,851 gold pages of the 3,000 claims of [EVALUATION.md](EVALUATION.md#the-scaled-run), plus 3,835
-pages they link to), 132,359 chunks with their vectors, and the pages' categories and edit dates.
-A [release file on GitHub](https://github.com/ylli-00/WikiLens/releases/tag/data-s1-v1) holds the
-pages, the claims, the saved vectors and the page metadata. The
-load reads the saved vectors instead of running the embedding model, so it needs neither the
-FEVEROUS Wikipedia file nor a GPU.
+`wikilense_s1` is the database behind the README's headline results ([DATA.md](DATA.md) describes
+it): 7,686 Wikipedia pages, 132,359 chunks with their vectors, and the pages' categories and edit
+dates. A [release file on GitHub](https://github.com/ylli-00/WikiLens/releases/tag/data-s1-v1)
+holds the pages, the claims, the saved vectors and the page metadata. The load reads the saved
+vectors instead of running the embedding model, so it needs neither the FEVEROUS Wikipedia file nor
+a GPU.
 
 | | |
 |---|---|
@@ -213,7 +210,7 @@ the reported run found 2,933. A test load from the release file found 2,934, and
 was 2,256 of 3,000 against the reported 2,253 ([the test load](../results/scaled/release_check/README.md)).
 
 The web page needs no setting: once S1 is loaded, `make serve` offers it in the page's database
-selector, next to the demo database (a page already running shows it at the next reload). To query S1 from the command line, name it in
+selector, next to the demo database. To query S1 from the command line, name it in
 `WIKILENSE_DB_NAME`; a variable set in the shell takes precedence over `.env`:
 
 ```
