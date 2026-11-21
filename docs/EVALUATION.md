@@ -258,8 +258,8 @@ text units. Latency: 5 timed passes per claim (375 samples per `k`). Machine: i9
 ![Article and evidence recall at k](img/recall_at_k.svg)
 
 **The headline run again, and without the GPU.** The same evaluation ran four more times on the
-default ingest, twice with the GPU hidden (`CUDA_VISIBLE_DEVICES="" wikilense eval --name ...`) to
-embed the query on the CPU, and once in a fresh clone whose chunks were embedded on the CPU too.
+default ingest, two of them with the GPU hidden (`CUDA_VISIBLE_DEVICES="" wikilense eval --name ...`)
+to embed the query on the CPU. The last row is a fresh clone whose chunks were embedded on the CPU.
 
 | run | query embedded on | SQL p50 / p95 at k=10 | query embedding p50 / p95 |
 |---|---|---|---|

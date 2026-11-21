@@ -134,8 +134,8 @@ wrong-dimension vector.
   | `overfetch 10` | 2,472 | 1.63 ms | 2,425 | 1.87 ms |
   | `inline` | 0 | 16.49 ms | 0 | 26.59 ms |
 
-- **On 11.8.9 a search whose `WHERE` fewer rows pass than its `LIMIT` does not stop at `LIMIT`, and
-  it can run away.** The `hard_cap` part of `scripts/measure_index_behaviour.py` ran 30 claims, twice
+- **On 11.8.9 a search whose `WHERE` few rows pass does not stop at `LIMIT`, and it can run
+  away.** The `hard_cap` part of `scripts/measure_index_behaviour.py` ran 30 claims, twice
   each, at k = 10 in a throwaway copy of S1, with a 2 GiB memory cap and a 10 s
   `max_statement_time` ([results/scaled/run1/s1/hard_cap.md](../results/scaled/run1/s1/hard_cap.md)).
   Executions, of 60 per row:
