@@ -233,3 +233,5 @@ Python, no model). They include the four-filter statement with its `EXPLAIN`, a 
 and edit date, and a transaction that shows the vector index following `ROLLBACK`. A test runs every
 statement of the file against the schema. `make examples` runs the file through the `mariadb`
 client inside the container and prints each result as a table; it leaves the database as it was.
+It runs after either path: the ingest of `make setup`, or `make load-demo`, which loads the database
+from a dump without Python ([SETUP.md](SETUP.md#the-sql-examples-without-python)).

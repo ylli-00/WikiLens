@@ -39,7 +39,7 @@ make setup
   them, `--explain` prints the SQL statement and MariaDB's plan, and `make serve` opens the same
   search as a web page at http://127.0.0.1:8000, with a claim picker, a database choice and examples.
 - [docs/EXAMPLES.md](docs/EXAMPLES.md) has the filtered queries, the hybrid with full-text search, every
-  option, a question that only a filter answers, and ten examples for the `mariadb` client that need no Python.
+  option, a question that only a filter answers, and ten examples for the `mariadb` client that need no Python, also [without `make setup`](docs/SETUP.md#the-sql-examples-without-python).
 
 ![The web page with a benchmark claim picked and its gold evidence marked](docs/img/web_page.png)
 

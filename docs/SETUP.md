@@ -142,6 +142,33 @@ deletes the data volume.
 searching when few rows pass its filters ([VECTOR_INDEX.md](VECTOR_INDEX.md)); `wikilense eval`
 and the measurement scripts do not use it.
 
+## The SQL examples without Python
+
+`data/corpus/wikilense_demo.sql.gz` (12,590,416 bytes) is the demo database as the ingest leaves
+it, written by `mariadb-dump`. Loaded in place of the ingest, it lets `make examples` run with
+Docker and `make` alone, with no virtual environment and no model. A question of your own still
+needs `make setup`, because the model has to embed it.
+
+```
+python3 scripts/make_env.py   # or copy .env.example to .env and set the two passwords
+docker compose up -d --wait
+make load-demo
+make examples
+```
+
+- `scripts/make_env.py` writes `.env` as in step 1 above and uses only Python's standard library.
+- `make load-demo` runs the container's own `gzip` and `mariadb` client as the application user.
+  It checks the file with `gzip -t` and stops when the database already holds tables, since the
+  dump drops and re-creates all eleven (`REPLACE=1` replaces them). Then it loads the dump and prints
+  the counts of pages, chunks and claims to compare with the ingest's report. It took 4.71 s on this
+  laptop. `make load-demo DEMO_CHECK=1` loads into the scratch database `wikilense_demo_check` instead.
+- The tables and vectors come back byte for byte. The load builds the HNSW graph anew, as every
+  ingest does, so index searches can return slightly different rows
+  ([build_variance.md](../results/build_variance.md)).
+- `make demo-dump` writes the file again from an ingested database; the same database gives the same
+  bytes. `tests/test_demo_dump.py` pins the file's SHA-256 and checks that its ingest record names
+  the committed corpus files and the default settings.
+
 ## Turn on the live fact-check
 
 The web page can show a "Fact-check" button under a free-text search. It sends the statement and

@@ -612,6 +612,14 @@ before the category box and the "last edited" footer.
   them, and a reader should get the server the numbers describe. The cost is that security fixes
   arrive only when the pin is moved, and moving it means rerunning the tests and
   `scripts/measure_index_behaviour.py`.
+- **The demo database is also committed as a dump**, `data/corpus/wikilense_demo.sql.gz`, so that
+  `make load-demo` and `make examples` run the SQL examples with Docker and `make` alone, without
+  the Python environment and the ingest. A typed question still takes `make setup`, since the model
+  has to embed it. A dump and a restore give back every table and vector byte for byte; only the
+  HNSW graph is built anew, as by every ingest. The file is gzip, the only compressor in the
+  `mariadb:11.8.9` image, so the load runs inside the container; xz would make it 9.2 MB instead of
+  12.6 MB but would need xz on the reader's machine. The cost is the largest file in the repository,
+  written again only when the ingest changes.
 - `make eval`'s `results/baseline.*` is ignored by git; `data/corpus/NOTICE.md` states the licence
   and attribution of the committed Wikipedia text and FEVEROUS claims.
 
