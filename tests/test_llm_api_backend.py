@@ -10,9 +10,6 @@ from pathlib import Path
 
 import pytest
 
-anthropic = pytest.importorskip("anthropic")
-pytest.importorskip("httpx")
-
 from wikilense.llm import api_backend as ab
 from wikilense.llm.api_backend import AnthropicApiBackend, ApiBackendError
 from wikilense.llm.backend import CallRequest
@@ -31,13 +28,25 @@ from wikilense.llm.runner import (
     request_parity,
     run_with_lock,
 )
-from wikilense.llm.testing.fake_api import SONNET_COST, FakeAPI, client_factory
 from wikilense.llm.testing.fixtures import (
     FakeRetriever,
     copy_prompt,
     make_fake_binary,
     write_claims,
 )
+
+try:
+    import anthropic
+    import httpx  # noqa: F401  (the fake API's transport)
+
+    from wikilense.llm.testing.fake_api import SONNET_COST, FakeAPI, client_factory
+except ImportError:
+    anthropic = None
+
+# Skipped test by test rather than as a module, so the suite collects the same tests with or
+# without the optional SDK (requirements-llm.txt) and the stated number of tests stays true.
+pytestmark = pytest.mark.skipif(anthropic is None,
+                                reason="the optional anthropic package is not installed")
 
 PROMPT = load_prompt_set("generic_probe_v0")
 KEY = "sk-ant-test-0123456789abcdefSECRETVALUE"

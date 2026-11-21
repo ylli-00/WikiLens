@@ -22,6 +22,7 @@ reached: ``db.connect``, ``db.get_session_var`` and the search functions are stu
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import json
 import logging
 import os
@@ -54,6 +55,10 @@ from wikilense.llm import api_backend, claims, cli_backend, retrieval
 from wikilense.llm import prompts as prompts_module
 from wikilense.llm.backend import CallRequest, CallResult
 from wikilense.search import Hit
+
+#: The API mode builds its backend with the optional anthropic package (requirements-llm.txt).
+needs_anthropic = pytest.mark.skipif(importlib.util.find_spec("anthropic") is None,
+                                     reason="the optional anthropic package is not installed")
 
 FAKE_KEY = "sk-ant-test-NOT-A-REAL-KEY-1234567890"
 OTHER_FAKE_KEY = "sk-ant-test-NOT-A-REAL-KEY-from-the-environment"
@@ -430,6 +435,7 @@ def test_an_api_key_alone_turns_nothing_on(
     assert post(client, q=STATEMENT).status_code == 403
 
 
+@needs_anthropic
 def test_the_api_mode_reads_the_key_from_the_environment_first_then_from_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1107,6 +1113,7 @@ def test_one_click_is_one_model_call(
 # ---------------------------------------------------------------------------------------------
 
 
+@needs_anthropic
 def test_the_api_key_never_leaves_the_backend(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1541,6 +1548,7 @@ def test_the_first_call_checks_the_login_when_the_server_did_not(
     assert bad.requests == [] and not checker.enabled
 
 
+@needs_anthropic
 def test_the_api_route_makes_one_try_also_on_a_rate_limit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
