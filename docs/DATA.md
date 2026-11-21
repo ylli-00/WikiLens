@@ -29,8 +29,9 @@ today's page. Its timestamp is the "last edited" date of our text, and its `[[Ca
 are the categories. For the 93 pages edited during December 2020, the revision whose wikitext
 contains the most of the page's FEVEROUS sentences is chosen; on a tie, the later one. Three renamed
 pages are followed through the move log. The metadata matches the text: all 100 pages were found,
-and 94.5% of the sentence probes occur in the chosen revisions. They have 1,005 categories in
-1,123 page-category pairs, and edit dates from 2019-12-23 to 2020-12-31
+and 94.5% of the sentence probes (each sentence's first six words) occur in the chosen revisions.
+They have 1,005 categories in 1,123 page-category pairs, and edit dates from 2019-12-23 to
+2020-12-31
 ([data/corpus/PAGE_META.md](../data/corpus/PAGE_META.md)). The script follows the Wikimedia Robot
 Policy: one request at a time, at most four per second, a 5 s pause after any request over 1 s, a
 User-Agent with this repository's URL, `maxlag` and `Retry-After`.

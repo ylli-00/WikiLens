@@ -335,7 +335,7 @@ scaled run; they were not re-measured at scale. The filter strategy has a scaled
 | 120 words | 8,658 | 17 MB | 74 | 57 | 63 |
 | **240 words** | **4,598** | **13 MB** | 74 | 55 | 60 |
 
-**Index `M`** (section 3: the same vectors, the index rebuilt for each `M`):
+**Index `M`** (section 3: the same 120-word chunks, the index rebuilt for each `M`):
 
 | M | article recall@10 of 75, `ef_search` 20 | evidence recall@20 of 66, `ef_search` 20 | hit lists equal to exact of 75, `ef_search` 100 | build |
 |---|---|---|---|---|
