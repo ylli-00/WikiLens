@@ -226,7 +226,14 @@ prompts and CLI binary (2.1.322) of the original runs. RAG read the same cached 
 3,600 user turns of the repeats are byte for byte those of the original runs (compared by
 `user_text_sha256`).
 
-| condition | claims | accuracy: original / r1 / r2 | switched between right and wrong: original–r1 / original–r2 / r1–r2 |
+**How to read the table.** On these claims each condition has three runs: the original and the
+repeats r1 and r2. The accuracy column gives each run's accuracy. The last column compares the
+runs two at a time and gives the share of claims that one run of the pair got right and the other
+got wrong, in either direction. Without passages, for example, 10.9% of the 450 claims were right
+in the original run and wrong in r1, or the other way round; between r1 and r2 it was 8.4%. The
+"300 supported/refuted" rows count only the sample's supported and refuted claims.
+
+| condition | claims | accuracy: original / r1 / r2 | switched between right and wrong: original vs r1 / original vs r2 / r1 vs r2 |
 |---|---|---|---|
 | no passages | 450 | 48.0 / 44.7 / 46.0% | 10.9 / 10.0 / 8.4% |
 | no passages | 300 supported/refuted | 37.0 / 32.7 / 34.3% | 11.0 / 10.7 / 6.3% |
@@ -237,8 +244,16 @@ prompts and CLI binary (2.1.322) of the original runs. RAG read the same cached 
 | gold | 450 | 72.0 / 72.4 / 72.9% | 8.4 / 5.8 / 7.1% |
 | gold | 300 supported/refuted | 83.3 / 80.0 / 82.0% | 6.7 / 3.3 / 5.3% |
 
-Between two runs the label stayed the same on 86.2% to 95.3% of the 450 claims. RAG's answers
-changed least (93.3% to 95.3% identical), those without passages most (86.2% to 88.4%).
+A switch always changes the label, but a label can also change from one wrong answer to another
+(a supported claim answered refuted in one run and not enough information in the other). That
+leaves accuracy unchanged and is not a switch. Counting every change, the label stayed the same
+between two runs on 86.2% to 95.3% of the 450 claims. RAG's answers changed least (93.3% to 95.3%
+identical), those without passages most (86.2% to 88.4% identical: 11.6% to 13.8% changed,
+against 8.4% to 10.9% switches). Accuracy moves less than the switches because they go both ways:
+without passages 10.9% of the claims switched between the original and r1, yet accuracy fell by
+only 3.3 points. The third pair, r1 vs r2, compares the two repeats with each other: if something
+had changed between the original runs and the repeats, the first two pairs would show more
+switches than this one ("The original runs against the repeats" below).
 
 **The rerun standard deviation.** If a share f of the claims switches between right and wrong from
 one run to the next, an accuracy over n claims varies between runs by about √(f / 2n), and a
