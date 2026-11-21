@@ -55,9 +55,14 @@ FEVEROUS claim -> the same statement -> its hits against the claim's gold eviden
 The page text is the December 2020 copy of Wikipedia that the FEVEROUS benchmark ships. We used it instead of a dump or the
 API because the benchmark's gold evidence points at that copy's sentences. Categories are the explicit `[[Category:...]]`
 links of each page's December 2020 revision, fetched from the MediaWiki API, and edit dates are that revision's timestamp
-([docs/DATA.md](docs/DATA.md)). The **index search** (strategy `none`) is the bare statement: it walks the index's HNSW graph
-and is approximate. The **joined statement** (strategy `inline`) adds the joins and any filters, and without a filter its
-ranking is exact. **Over-fetch** (strategy `overfetch`) filters after the index search.
+([docs/DATA.md](docs/DATA.md)).
+
+Words used below:
+
+- **Gold evidence**: the sentences FEVEROUS's annotators marked for a claim. A **gold page** is a page they are on.
+- **S0** and **S1**: the two test corpora, the gold pages alone and with distractor pages added (the box below).
+- **Index search** (strategy `none`): the bare statement. It walks the index's HNSW graph and is approximate.
+- **Joined statement** (strategy `inline`): the same statement with joins and any filters. Without a filter its ranking is exact.
 
 ## What we found
 
@@ -103,10 +108,9 @@ statement that `wikilense query` above runs, which is exact and slower:
   ([the six groups and the weights](docs/EVALUATION.md#the-six-claim-groups)).
 - **The four metadata predicates run inside the vector search, in one statement:** "only articles
   in this category, longer than this, edited since that date, linked from that other article".
-  Without a filter the joined statement returns NumPy's exact top 5, in order, for 3,000 of 3,000
-  claims on S0 and S1. Under the four filters (3,107 of S1's 132,359 chunks pass) it returns 5 rows
-  for every claim, the exact ones for 2,962, in 58.69 ms; filtering after the index search comes
-  back short for 2,801 ([the run](results/scaled/run1/s1/separate_index.md)).
+  Without a filter the joined statement returns the exact top 5 for every claim. Under the four
+  filters it returns 5 rows for every claim, the exact ones for 2,962 of 3,000; filtering after the
+  index search comes back short for 2,801 ([the run](results/scaled/run1/s1/separate_index.md)).
 - **One sequence leaves the index stale for everyone.** After a REPEATABLE READ reader searched
   before and after another connection's commit, index searches at any isolation level missed the
   committed rows, in 10 of 10 trials on a scratch table, until the next write
@@ -176,14 +180,13 @@ table and the method; the measurements are on S1 unless a line says otherwise.
 - **Three regimes of one statement** ([results](results/scaled/run1/s1/statement_forms.md)). The
   bare query is the HNSW search (2.16 ms at `ef_search` 100). A predicate on `chunk` itself keeps
   that search going until `k` rows pass: never short, but approximate (2,514 of 3,000 exact when
-  12,341 chunks pass) and slow (33.30 ms, p95 248.78 ms). With a join, `EXPLAIN` still says
-  `key: embedding`, but the result is exact for 2,984 to 3,000, at about 27 ms at `ef_search` 20 or 100.
+  12,341 chunks pass) and slow (33.30 ms). With a join, `EXPLAIN` still says `key: embedding`, but
+  the result is exact for 2,984 to 3,000, at about 27 ms at `ef_search` 20 or 100.
 - **The join order is fixed, and a very selective filter pays for it** ([200 claims](results/scaled/run1/s1/join_order.md)).
   The statement starts from `chunk` (`STRAIGHT_JOIN`). Under 15 of 18 filters the server then walks
-  the vector index and reads more rows the fewer chunks pass, up to 19,656 when 66 pass (1,386 to
-  1,388 ms). Under the 3 most selective length and date filters it scans all 132,359 chunks (335 to
-  360 ms). Left free, the optimizer sorts only the passing chunks, exact for 200 of 200 claims: 0.86
-  to 3.13 ms when 662 or fewer pass, but 1,567 and 1,689 ms when half pass, against 26 to 27 ms as written.
+  the vector index and reads more rows the fewer chunks pass: 1,386 to 1,388 ms when 66 pass. Left
+  free, the optimizer sorts only the passing chunks: 0.86 to 3.13 ms when 662 or fewer pass, but
+  1,567 and 1,689 ms when half pass, against 26 to 27 ms as written.
 - **Vectors are rows.** An inserted chunk is searchable in the same transaction and gone after
   `ROLLBACK`; another connection sees it after `COMMIT`; deleting a page cascades to its vectors. A
   search sees what its isolation level allows, through the index as by a scan, with two caveats. A
@@ -219,7 +222,7 @@ others compare MariaDB's documentation with a dedicated store's. We did not meas
    slower than MariaDB's index search (2.87 ms in the same run). An in-memory HNSW graph (hnswlib,
    `M=16`) answers in 0.36 ms, with 0.961 of the exact top 5 against MariaDB's 0.993.
 2. **Filtered queries that must be complete.** Under the four filters (3,107 chunks pass) MariaDB's joined
-   statement takes 58.69 ms (p95 189.01 ms); filtering the copy first and fetching the rows takes 2.44 ms and
+   statement takes 58.69 ms; filtering the copy first and fetching the rows takes 2.44 ms and
    is exact. The copy costs 203,303,424 bytes of vectors (the process grew by 701,804,544 bytes) and an export
    of four relational tables; it is stale after the next write and outside every transaction.
 3. **No filter-aware index.** A filtered search here walks the whole index exactly, filters after
@@ -331,14 +334,11 @@ The settings were chosen on the 75-claim development set over the 100-page corpu
 To learn the feature, five files are enough: [sql/schema.sql](sql/schema.sql) (the tables), [sql/examples.sql](sql/examples.sql)
 (ten statements to run), [wikilense/search.py](wikilense/search.py) (every search statement as a named constant),
 [docs/EXAMPLES.md](docs/EXAMPLES.md) and [docs/VECTOR_INDEX.md](docs/VECTOR_INDEX.md). The rest builds, measures and tests it.
-[wikilense/](wikilense/) is the package (its `llm/` folder and `factcheck.py` are the LLM extension), and
-[scripts/](scripts/) builds the corpora, fetches the page metadata and runs the experiments.
-[data/corpus/](data/corpus/) is the committed demo corpus, [data/scaled/](data/scaled/) the 3,000
-claims, and [results/](results/) every experiment as JSON and Markdown, the scaled run in
-[results/scaled/](results/scaled/). [docs/](docs/) also has SETUP, DATA, EVALUATION, DESIGN (every
-decision) and ARCHITECTURE (a beginner's guide to the code).
-[analysis/](analysis/) is the earlier FEVEROUS analysis that chose the benchmark, and
-[CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
+[wikilense/](wikilense/) is the package (its `llm/` folder and `factcheck.py` are the LLM extension),
+[scripts/](scripts/) builds the corpora and runs the experiments, [data/](data/) holds the demo corpus and the 3,000
+claims, [results/](results/) every experiment as JSON and Markdown, and [docs/](docs/) the reference pages
+([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [analysis/](analysis/) is the earlier FEVEROUS analysis
+that chose the benchmark, and [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
 917 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
