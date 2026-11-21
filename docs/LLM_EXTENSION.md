@@ -9,6 +9,14 @@ Does a small model, Claude Haiku 5.5, get better at fact-checking with RAG, the 
 one SQL statement? And does RAG help more than letting the model search the web, as a person
 would? Retrieval quality itself is covered by the database part ([EVALUATION.md](EVALUATION.md)).
 
+- **RAG helps a lot, almost as much as the gold evidence.** It lifts Haiku from 45.2% to 70.9% of
+  the 3,000 claims right; with the annotators' own evidence Haiku gets 72.9% (section 3).
+- **RAG is ahead of web search: clearly on all claims, narrowly on the supported and refuted
+  ones,** by 9.6 and 1.7 points (sections 3 and 5).
+- **NOT ENOUGH INFO is the hardest label, partly because the label is weak.** With passages Haiku
+  often picks a side on these claims, and on 16 of 40 audited RAG cases the label itself looked
+  doubtful (section 4).
+
 ## 2. The setup
 
 The same 3,000 claims ([data/scaled/claims_3000.jsonl](../data/scaled/claims_3000.jsonl): 1,000
@@ -50,15 +58,11 @@ flowchart LR
   The user turn is `EVIDENCE:` followed by the numbered passages, then `CLAIM:` and the claim;
   without passages it reads `EVIDENCE: (none given)`. The web prompt,
   [`fact_check_web_v1/system.txt`](../wikilense/llm/prompts/fact_check_web_v1/system.txt), replaces
-  the second paragraph with "You can search the web and open pages. Use them to check the claim
-  where your own knowledge falls short; a claim may need several facts checked." and ends the
-  justification rule with "the sources used, such as a page title"; its user turn is the claim
-  alone.
-- **Three facts about the prompt.** It lets the model add its own knowledge where the passages
-  fall short, because real retrieval will not always find the answer. It asks for the state as of
-  December 2020, the date of FEVEROUS's Wikipedia, so later events do not count. And it is the same
-  for gold: "gold" means the annotators' evidence plus the model's own knowledge, so it is a
-  reference point, not a ceiling.
+  the second paragraph with one that lets the model search the web and open pages; its user turn
+  is the claim alone.
+- **Gold is a reference point, not a ceiling.** The prompt lets the model add its own knowledge
+  where the passages fall short, because real retrieval will not always find the answer, and gold
+  gets the same prompt: "gold" means the annotators' evidence plus the model's own knowledge.
 - **The passages** of RAG come from the `inline` statement (the joined statement that
   `wikilense query` runs) on S1, 132,359 chunks, with k = 5 and `mhnsw_ef_search` 100, each chunk
   headed by its page title and section path. Retrieval was cached once per claim, so every run
@@ -75,8 +79,10 @@ flowchart LR
 
 ## 3. Three-class results
 
-Accuracy is the share of claims whose answer equals the FEVEROUS label; the intervals are 95%
-Wilson intervals, the macro F1 interval is a paired bootstrap (10,000 resamples, seed 20261120).
+Accuracy is the share of claims whose answer equals the FEVEROUS label. A label's recall is the
+share of its 1,000 claims answered with that label; macro F1 is the mean of the three labels' F1,
+a score that combines recall with precision, the share of the answers with that label that were
+right. The ranges are 95% intervals (Wilson for accuracy, a bootstrap for macro F1).
 
 | condition | accuracy (3,000 claims) | macro F1 | recall SUPPORTS / REFUTES / NOT ENOUGH INFO | NOT ENOUGH INFO answers, right |
 |---|---|---|---|---|
@@ -85,11 +91,17 @@ Wilson intervals, the macro F1 interval is a paired bootstrap (10,000 resamples,
 | RAG | 70.9% (69.2 to 72.5) | 69.6 (68.0 to 71.2) | 85.0 / 82.2 / 45.5 | 606, 75.1% right |
 | gold | 72.9% (71.2 to 74.4) | 72.1 (70.5 to 73.7) | 85.7 / 80.0 / 52.9 | 755, 70.1% right |
 
-Claim by claim (McNemar's exact test; the interval of a paired difference is
-(b − c)/n ± 1.96 · √(b + c − (b − c)²/n) / n, with b and c the claims only one of the two got
-right), RAG is ahead of web search by 9.6 points (95% interval 8.0 to 11.2) and gold is ahead of
-RAG by 2.0 points (0.7 to 3.3). Over no passages, RAG gains 771 right claims and gold 830, so RAG
-recovers 92.9% of what the gold evidence adds.
+**How the comparisons are worded.** Two conditions are "level" where the 95% interval of their
+paired difference, compared claim by claim, includes zero; otherwise one is "ahead by X points",
+with the interval in the text or in [LLM_RESULTS.md](../results/llm/LLM_RESULTS.md).
+
+**RAG is clearly ahead of web search and close to gold: it recovers 92.9% of what the gold
+evidence adds over no passages** (771 more right claims for RAG, 830 for gold).
+
+| pair | difference, points | 95% interval |
+|---|---|---|
+| RAG ahead of web search | 9.6 | 8.0 to 11.2 |
+| gold ahead of RAG | 2.0 | 0.7 to 3.3 |
 
 Confusion matrices (rows: the FEVEROUS label; each cell: answered SUPPORTS / REFUTES / NOT ENOUGH
 INFO, of 1,000 claims):
@@ -111,26 +123,32 @@ The six groups (accuracy):
 | NOT ENOUGH INFO, one article | 700 | 67.6% | 20.3% | 47.4% | 55.3% |
 | NOT ENOUGH INFO, two or more | 300 | 59.3% | 19.7% | 41.0% | 47.3% |
 
-**Reweighted to FEVEROUS's own mix.** A third of our claims are NOT ENOUGH INFO, against 3.5% of
-FEVEROUS's. With the weights of the database part
-([results/scaled/breakdown/breakdown.json](../results/scaled/breakdown/breakdown.json); the sum
-over the six groups of weight × the group's accuracy, intervals by paired bootstrap):
+What it means:
 
-| weights | no passages | web search | RAG | gold |
+- **Without passages Haiku hedges.** It answers NOT ENOUGH INFO on 1,765 of the 3,000 claims and is
+  right on 36.9% of them, close to the 33.3% that chance gives on this balanced set, so NOT ENOUGH INFO
+  is the label it recalls best there. This is an interpretation; the cause was not tested.
+- **With passages or the web it picks a side, and NOT ENOUGH INFO becomes its worst label.** On
+  the NOT ENOUGH INFO claims it picks a side 79.9% of the time with web search, 54.5% with RAG and
+  47.1% even with gold; section 4 asks how many of those answers are really wrong.
+- **Most of web search's gap to RAG is on these claims.** Web search gets 201 of the 1,000 right,
+  RAG 455.
+- **Refuted claims that need two or more articles are the hardest supported or refuted group:**
+  web search, RAG and gold all stop at 73.0% to 73.7% (section 8).
+
+**On FEVEROUS's own mix, where NOT ENOUGH INFO is rare, web search comes close to RAG, and RAG and
+gold are level.** A third of our claims are NOT ENOUGH INFO, against 3.5% of FEVEROUS's. Weighting
+each of the six groups by its share of all FEVEROUS train and dev claims, as the database part
+does for recall ([EVALUATION.md](EVALUATION.md#reweighted-to-feverouss-mix),
+[breakdown.json](../results/scaled/breakdown/breakdown.json)), gives:
+
+| | no passages | web search | RAG | gold |
 |---|---|---|---|---|
-| every FEVEROUS train + dev claim | 34.9% (32.8 to 37.0) | 80.9% (79.2 to 82.6) | 83.8% (82.2 to 85.4) | 83.2% (81.5 to 84.8) |
-| claims with a text-only evidence set | 35.4% (33.3 to 37.6) | 81.0% (79.3 to 82.6) | 83.7% (82.0 to 85.2) | 82.9% (81.2 to 84.5) |
+| accuracy, FEVEROUS's mix | 34.9% | 80.9% | 83.8% | 83.2% |
 
-With the first weights RAG is ahead of web search by 2.9 points (1.3 to 4.5), and RAG and gold
-are level (0.6, −0.7 to 2.0).
-
-**NOT ENOUGH INFO answers.** This is an interpretation; the cause was not tested. Without passages
-Haiku answers NOT ENOUGH INFO most often (1,765 times), and those answers are right 36.9% of the
-time, close to the 33.3% that chance gives on this balanced set. That fits a model that is unsure
-and hedges, and it makes NOT ENOUGH INFO the label it recalls best there. With web search it gives
-this answer least often and picks a side on 79.9% of the NOT ENOUGH INFO claims. In every
-condition except no passages, NOT ENOUGH INFO is the label with the lowest recall. Even with the
-gold evidence, Haiku picks a side on 47.1% of the NOT ENOUGH INFO claims.
+RAG is ahead of web search by 2.9 points (1.3 to 4.5), and RAG and gold are level (0.6, −0.7 to
+2.0). Weights from only the claims with a text-only evidence set give nearly the same figures
+([LLM_RESULTS.md](../results/llm/LLM_RESULTS.md)).
 
 ## 4. Why NOT ENOUGH INFO is a weak label here
 
@@ -151,15 +169,21 @@ So the label means "the annotator did not settle it from Wikipedia under these r
 answer does not exist". A model that is allowed outside knowledge can be marked wrong for a
 correct verdict, when it finds the answer outside Wikipedia or finds what the annotator missed.
 
-**The audit.** On some claims labelled NOT ENOUGH INFO, Haiku answered SUPPORTS or REFUTES, and
-those answers count as wrong. Claude Opus 5.5 agents reviewed 100 of them (40 gold, 40 RAG, 20 no
-passages, drawn at random with a fixed seed) and named the main reason for each. In 16 of the 40
-gold cases and 16 of the 40 RAG cases, that reason was a doubtful label: the text Haiku saw does
-settle the claim, the way Haiku answered. In those cases Haiku may have been right and the label
-wrong. (For the no-passage cases the agents judged from the annotators' evidence: 4 of 20.) Two agents rated each case without seeing each other's ratings
-and agreed on the main reason in 94 of 100. A third agent settled those 6 cases and 3 more where
-they disagreed on another rating. This is a sample, not a count over all claims, and no person
-has checked the ratings.
+**The audit: about 4 in 10 of the reviewed gold and RAG "errors" may be right answers under a
+doubtful label.** On some claims labelled NOT ENOUGH INFO, Haiku answered SUPPORTS or REFUTES,
+which counts as wrong. Claude Opus 5.5 agents reviewed 100 such answers, drawn at random with a
+fixed seed, and named the main reason for each. A doubtful label means that the text Haiku saw
+does settle the claim, the way Haiku answered.
+
+| condition | cases reviewed | main reason a doubtful label |
+|---|---|---|
+| gold | 40 | 16 |
+| RAG | 40 | 16 |
+| no passages | 20 | 4, judged from the annotators' evidence |
+
+Two agents rated each case without seeing each other's ratings and agreed on the main reason in
+94 of 100; a third settled those 6 and 3 more where the two disagreed on whether the text settles
+the claim. This is a sample, not a count over all claims, and no person has checked the ratings.
 
 ## 5. The supported and refuted claims
 
@@ -170,6 +194,9 @@ dropped because of the model's answer. This choice was made after seeing the res
 cautious one for RAG: its lead over web search shrinks from 9.6 points on three classes to 1.7
 points here.
 
+**Here web search, RAG and gold are within 1.7 points of each other, and all three are 46.7 to
+48.4 points above no passages.**
+
 | condition | accuracy (2,000 claims) | picked a side | right when it picked a side |
 |---|---|---|---|
 | no passages | 35.3% (33.2 to 37.4) | 44.3% (886) | 79.6% (76.8 to 82.1) |
@@ -177,30 +204,27 @@ points here.
 | RAG | 83.6% (81.9 to 85.2) | 92.5% (1,849) | 90.4% (89.0 to 91.7) |
 | gold | 82.9% (81.1 to 84.4) | 88.7% (1,774) | 93.4% (92.2 to 94.5) |
 
-Of the three conditions with passages or search, web search picks a side most often and is the
-least accurate when it does; gold picks a side least often and is the most accurate. Grading only
-the claims where a condition picked a side would reward hedging: no passages would then score
-79.6%.
+- **Of web search, RAG and gold, the one that picks a side most often is right least often when it
+  does.** Web search picks a side on 94.7% and is right on 86.5% of those; gold 88.7% and 93.4%.
+- **Grading only the answers that pick a side would reward hedging:** no passages would score
+  79.6%.
 
-Claim by claim, on the same 2,000 claims (b and c as in section 3; p-values are not corrected for
-the six comparisons):
+Claim by claim, on the same 2,000 claims (the intervals are not corrected for six comparisons):
 
-| pair | only the first right (b) | only the second right (c) | difference, points | 95% interval | McNemar p |
-|---|---|---|---|---|---|
-| RAG vs web search | 145 | 111 | 1.7 | 0.1 to 3.3 | 0.039 |
-| RAG vs gold | 102 | 87 | 0.8 | −0.6 to 2.1 | 0.31 |
-| gold vs web search | 161 | 142 | 1.0 | −0.8 to 2.7 | 0.30 |
-| RAG vs no passages | 998 | 31 | 48.4 | 46.0 to 50.7 | 6.7e-251 |
-| gold vs no passages | 989 | 37 | 47.6 | 45.3 to 49.9 | 2.8e-241 |
-| web search vs no passages | 976 | 43 | 46.7 | 44.3 to 49.0 | 5.6e-231 |
+| pair | only the first right | only the second right | difference, points | 95% interval |
+|---|---|---|---|---|
+| RAG vs web search | 145 | 111 | 1.7 | 0.1 to 3.3 |
+| RAG vs gold | 102 | 87 | 0.8 | −0.6 to 2.1 |
+| gold vs web search | 161 | 142 | 1.0 | −0.8 to 2.7 |
+| RAG vs no passages | 998 | 31 | 48.4 | 46.0 to 50.7 |
+| gold vs no passages | 989 | 37 | 47.6 | 45.3 to 49.9 |
+| web search vs no passages | 976 | 43 | 46.7 | 44.3 to 49.0 |
+
+- **Of web search, RAG and gold, only RAG against web search is larger than chance, and only
+  just:** 1.7 points, a little above two rerun standard deviations of a difference (1.3, the
+  spread between reruns of the same claims; section 7). RAG and gold are level.
 
 ![Accuracy of the four conditions on three classes and on the supported/refuted claims](img/llm_accuracy.svg)
-
-**How the comparisons are worded.** Two conditions are "level" only where the 95% interval of
-their paired difference includes zero; otherwise one is "ahead by X points", with the interval in
-the text or, where the text leaves it out, in [LLM_RESULTS.md](../results/llm/LLM_RESULTS.md).
-The text also says when a gap is smaller than about two rerun standard deviations, the spread
-between reruns of the same claims (section 7).
 
 ## 6. F1 per label
 
@@ -324,12 +348,9 @@ interval.
 
 ## 8. Where it fails
 
-- **Multi-hop claims (two or more articles).** RAG is right on 72.8% of the one-article claims and
-  66.6% of the others (85.4% against 79.3% on the supported/refuted ones). Gold drops too (74.4%
-  against 69.3%), clearly so on the refuted claims, and RAG stays level with gold in both groups,
-  so the second article is hard for the model as well as for retrieval
-  ([Multi-hop claims and RAG](#multi-hop-claims-and-rag) below). On refuted claims that need two
-  or more articles all three of web search, RAG and gold reach only 73.0% to 73.7%.
+- **Claims that need two or more articles are harder, for the model as well as for the search.**
+  On the refuted ones RAG drops 13.1 points and gold, which is handed the evidence, 9.0
+  ([Multi-hop claims and RAG](#multi-hop-claims-and-rag) below).
 
 **When the search misses the right article.** This is rare: 57 of the 3,000 claims got no passage
 from an article that holds their evidence. How often RAG is right with and without such a passage:
@@ -406,29 +427,28 @@ claims here, too few for conclusions.
 
 ## 9. The web condition
 
-- **How it used its tools.** 3,965 searches and 4,265 page fetches over the 3,000 claims, a median
-  of 4 turns per call; 3,744 of the fetches opened en.wikipedia.org. 228 claims were answered
-  without any tool call, and the deny list stopped 4 fetches.
+- **Web search mostly read Wikipedia itself:** 3,744 of its 4,265 page fetches opened
+  en.wikipedia.org. Over the 3,000 claims it also ran 3,965 searches, answered 228 claims without
+  any tool call, and had 4 fetches stopped by the deny list.
 - **Flagged claims.** An audit of every call's searches, URLs and tool results flagged 35 claims
   that mention FEVEROUS, a host where its data is published, or a label next to the word
   "Verdict"; they are kept in the results.
 - **Today's web against December 2020.** On 255 supported/refuted claims web search gave the
   opposite label (148 supported claims answered REFUTES, 107 refuted ones SUPPORTS). Some may be
-  facts that changed after 2020, where web search answered for today instead of for December 2020
-  as the prompt asks, some may be wrong FEVEROUS labels, and the rest are the model's own errors.
-  None was checked against the December 2020 page versions, so the size of each group is not
-  known. All 255 count as wrong answers in the results above.
+  facts that changed after 2020 (web search answering for today, not for December 2020 as the
+  prompt asks), some wrong FEVEROUS labels, and the rest the model's own errors. None was checked
+  against the December 2020 page versions, so the size of each group is not known. All 255 count
+  as wrong answers in the results above.
 
 ## 10. Cost and time
 
-- **Retrieval's share of a RAG call.** The `inline` statement on S1 takes 27.301 ms at the median
-  and the claim embedding 6.07 ms, against 2.3 s for the median RAG call, so the database part is
-  1.4% of the time
-  ([separate_index.json](../results/scaled/run1/s1/separate_index.json),
-  [s1_full_run1.json](../results/scaled/eval/s1_full_run1.json)). Both database times were
-  measured with the CPU capped at 50% and the GPU at 2,100 MHz; the embedding time is from the
-  GPU, while the RAG run embedded its claims on the CPU.
-- **RAG also makes the model faster and cheaper.**
+- **The database search is a tiny part of a RAG call: 1.4% of its time.** The `inline` statement
+  on S1 takes 27.301 ms at the median and the claim embedding 6.07 ms, against 2.3 s for the median
+  RAG call ([separate_index.json](../results/scaled/run1/s1/separate_index.json),
+  [s1_full_run1.json](../results/scaled/eval/s1_full_run1.json)), both timed with the CPU capped
+  at 50% and the GPU at 2,100 MHz. The 1.4% is for an embedding on the GPU; the RAG run embedded
+  its claims on the CPU, which was not timed.
+- **RAG also makes the model faster and cheaper: with the passages Haiku thinks less.**
 
   | condition | median seconds per claim | × RAG | median thinking tokens | prompt tokens, all claims |
   |---|---|---|---|---|
@@ -436,38 +456,34 @@ claims here, too few for conclusions.
   | web search | 18.2 | 7.8 | 2,405 | 165,580,936 |
   | RAG | 2.3 | 1.0 | 227 | 9,766,910 |
   | gold | 2.6 | 1.1 | 276 | 5,532,364 |
-
-  With the passages Haiku decides with less thinking (227 thinking tokens at the median against
-  636 without).
-- **The usage window.** By the subscription's own readings, the no-passage and gold run (6,000
-  calls) used 0.11 of a five-hour window, RAG 0.05 and web search 0.60, spread over three
-  windows. The readings cover the whole account.
+- **Web search used by far the most of the subscription.** A subscription allows a set amount of
+  use per five-hour window. By its own readings, which cover the whole account, web search used
+  0.60 of a window (summed over the three windows its run spanned), RAG 0.05, and the no-passage
+  and gold run together (6,000 calls) 0.11.
 - **These are observed medians, not a controlled timing.** The calls went through the
   subscription to Anthropic's servers, five at a time, so their times depend on server load and
   the network. Only the database times are controlled measurements.
 
 ## 11. Contamination
 
+**Contamination limits how far these numbers carry over to new claims, but it is not a measured
+effect.** A direct memorization probe, such as asking the model to complete claims from their first
+half, is further work.
+
 - **Why it matters here.** FEVEROUS was published in 2021, and its claims, labels and Wikipedia
-  pages are public, so they may be in Haiku's training data; Anthropic gives Haiku 5.5 a training
-  data cutoff of June 2026
+  pages are public, so they may be in Haiku's training data, which is not published; Anthropic
+  gives Haiku 5.5 a training data cutoff of June 2026
   ([models overview](https://platform.claude.com/docs/en/about-claude/models/overview)). This
   applies to all four conditions, because the same model judges in each.
 - **Two things to keep apart.** Having seen the benchmark's claim and label pairs is
   contamination. Knowing the Wikipedia facts is world knowledge, which the prompt allows.
-- **What is not known.** Haiku's training data is not published, so we make no claim about what
-  it contains.
-- **What the runs show.** With no passages, Haiku scores 45.2% (35.3% on the supported/refuted
-  claims). It answers NOT ENOUGH INFO on 1,765 of the 3,000 claims, and 1,763 of those
-  justifications contain the words "no evidence". That is hard to square with memorized labels,
-  but it does not rule out some memorization. When it does pick a side without passages, it is
-  right 79.6% of the time; that could be world knowledge or memory, and the runs cannot tell the
-  two apart.
+- **The runs give little sign of memorized labels, but cannot rule them out.** Without passages
+  Haiku gets only 45.2% right (35.3% on the supported/refuted claims), and 1,763 of its 1,765 NOT
+  ENOUGH INFO justifications contain the words "no evidence". When it does pick a side without
+  passages it is right 79.6% of the time, which could be world knowledge or memory; the runs cannot
+  tell the two apart.
 - **The web condition** has the most direct risk, copies of FEVEROUS online. Those hosts were
   blocked, and the 35 flagged claims (section 9) are kept.
-- So contamination limits how far these numbers carry over to new claims; it is not a measured
-  effect. A direct memorization probe, such as asking the model to complete claims from their first
-  half, is further work.
 
 ## 12. Limitations
 
@@ -541,8 +557,8 @@ prompt set's hash differs from the recorded one, the fact-check stays off and sa
 is one model call, with no retry and no web search.
 
 What it shows:
-- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy". The prompt
-  asks for that date, so a statement about later events is judged as of 2020.
+- Haiku's verdict, next to "judged as of December 2020, the date of this Wikipedia copy", the date
+  the prompt asks for.
 - Haiku's reason, in full. Each passage number it cites, such as [2], links to that hit and
   highlights it. If it cites none, the page says "no passage cited: from the model's own
   knowledge". The reason is the model's own wording and can be wrong even when the verdict is
@@ -578,11 +594,8 @@ Three ways to run the fact-check on what the page retrieved:
 
 The copied text is the request above with one change. A chat window has no system field, so the
 system prompt comes first, then a blank line, then the user turn exactly as the runner renders it.
-The system prompt's last sentence asks for a tool call that a chat window does not have:
-
-> Answer with one StructuredOutput call: "result" holds "label" (exactly one of the three) and "justification" (one sentence, at most 30 words: the deciding fact and the passages or sources used, such as [2]). No other text.
-
-In the copy it reads:
+The system prompt's last sentence (section 2) asks for a StructuredOutput call that a chat window
+does not have; in the copy it reads:
 
 > Answer with the label (exactly one of SUPPORTS, REFUTES or NOT ENOUGH INFO) and one sentence of justification, at most 30 words: the deciding fact and the passages or sources used, such as [2]. No other text.
 
@@ -591,6 +604,5 @@ otherwise; the prompt set itself is never edited. With a picked claim, the claim
 follows `CLAIM:`, and the box says that the answer key is on the page, so the chatbot's label can
 be compared with it.
 
-The box shows no reliability figures. The figures above were measured with Haiku, through the
-experiment's settings and its tool call, so they do not cover another chatbot's answer to the
-pasted text.
+The box shows no reliability figures: they were measured with Haiku, through the experiment's
+settings and its tool call, and do not cover another chatbot's answer to the pasted text.
