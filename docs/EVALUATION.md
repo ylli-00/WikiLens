@@ -224,8 +224,8 @@ chunks in rank order ([results/scaled/page_coverage/](../results/scaled/page_cov
 | S1, SUPPORTS + REFUTES | 0.814 | 0.911 | 0.937 | 0.954 | 0.965 |
 | [FEVEROUS paper](https://arxiv.org/abs/2106.05707), Table 4: dev set, its own retriever, 5.4 million pages | 0.39 | 0.49 | 0.58 | 0.69 | - |
 
-- **The first two pages hold most gold pages:** on average 0.923 of a claim's gold pages on S0 and
-  0.895 on S1; ten pages raise that only to 0.967 and 0.955.
+- **Two pages already hold nearly all the gold pages that ten find:** on average 0.923 of a
+  claim's gold pages on S0 and 0.895 on S1, against 0.967 and 0.955 at ten pages.
 - **The paper's row is not comparable.** Our corpus is nearly three orders of magnitude smaller
   (7,686 pages for S1), and our claims are the text-only ones, so even the FEVEROUS-style score
   is easier here than in the paper.
@@ -287,8 +287,8 @@ SQL time does not depend on it.
 
 What it means:
 
-- **Every statement finds the same pages.** The one claim whose gold page never appears, 87976, is
-  missed by the exact ranking too.
+- **Every statement finds the same pages,** except the oracle, which is given them. The one claim
+  whose gold page never appears, 87976, is missed by the exact ranking too.
 - **The index matches the exact ranking's recall at a fraction of its time:** 0.51 against
   2.24 ms. At ef_search 20 its hit lists are exact for only 65 of 75 claims.
 - **The RRF hybrid costs eighteen times more and adds nothing on these claims:** 9.11 against
