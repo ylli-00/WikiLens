@@ -7,10 +7,8 @@ the same statement. FEVEROUS claims are the queries, and their gold evidence is 
 for recall.
 
 This file is the contract between modules and the record of each design decision, with its reason
-and its evidence. The settings were chosen on the 75-claim development set and the 100-page corpus
-("Chosen defaults and their evidence"), and the scaled run keeps them fixed. The numbers are
-those of the current result files: `results/SUMMARY.md` for the demo corpus and
-`results/scaled/` for the scaled run.
+and its evidence. The numbers are those of the current result files: `results/SUMMARY.md` for
+the demo corpus and `results/scaled/` for the scaled run.
 
 ## Repository layout
 
@@ -258,21 +256,22 @@ The API (`Hit`, `Filters`, `search()`, `explain_search()`, `hit_sentences()`) is
   median we measured for the statement `wikilense query` runs is far below it. The slowest is
   1,387.73 ms, on S1 when 66 chunks pass a category filter (`results/scaled/run1/s1/join_order.md`).
   The evaluation, the LLM retrieval and the
-  measurement scripts pass no limit: the three statements of the guard would run inside their
-  timed part, and their results must stay those of the statement alone. The `hard_cap` part of
+  measurement scripts pass no limit: the three short statements that read, set and restore
+  `max_statement_time` would run inside their timed part, and their results must stay those of
+  the statement alone. The `hard_cap` part of
   `scripts/measure_index_behaviour.py` sets its own limit, because there a stopped statement is
   the result. The page's and the command's SQL time include those three short statements.
 
 Statement shapes and their reasons (`docs/VECTOR_INDEX.md`, "The statements"):
 
-- **The inline statement uses `STRAIGHT_JOIN` with `chunk` first.** With a plain `JOIN` on stale
-  statistics the optimizer started from `page` and lost the vector index. Left free, the optimizer
-  starts from the filter's own table under 17 of 18 filters on S1 and sorts the chunks that pass:
-  0.86 to 3.13 ms instead of 129.95 to 1,387.73 ms when 662 or fewer chunks pass, but 1,566.76 and
-  1,689.04 ms instead of 26.68 and 26.40 ms when half of them pass
-  (`results/scaled/run1/s1/join_order.md`, 200 claims; on the demo corpus `results/join_order.md`).
-  The fixed order keeps the cost of the joined index search under a loose filter and is slow under
-  a very selective one. A rule for when to leave the optimizer free would need a count of the passing
+- **The inline statement uses `STRAIGHT_JOIN` with `chunk` first, a trade-off we keep: it is
+  predictable under a loose filter and slow under a very selective one.** With a plain `JOIN` on
+  stale statistics the optimizer started from `page` and lost the vector index. Left free, it
+  starts from the filter's own table under 17 of the 18 filters on S1 and sorts the chunks that
+  pass: far faster than the fixed order when few chunks pass, but over a second when half of them
+  pass, where the fixed order stays at the cost of the unfiltered search
+  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-join-order-we-fix-and-the-plan-the-optimizer-would-pick)
+  has the times). A rule for when to leave the optimizer free would need a count of the passing
   chunks before the search; we did not build or measure one, because the settings are fixed.
 - **The link and category filters join a `SELECT DISTINCT` derived table.** The `IN (subquery)`
   form becomes a semi-join that starts from `link` and loses the vector index. The `DISTINCT` keeps
@@ -290,17 +289,18 @@ table.
   (S1) at k=5 and ef_search 100 (`results/scaled/eval/`). `mhnsw_ef_search` sets its accuracy.
 - **A join makes the ranking exact, while the graph fits in `mhnsw_max_cache_size`.** With another
   table in the statement (strategy `inline`), `EXPLAIN` still reports `type index, key embedding`,
-  but the server ranks exactly over the index, at a cost that grows with the table: 2.24 ms on the
-  4,598 chunks of the demo corpus (`results/final_inline.md`), 15.74 ms on S0 and 25.81 ms on S1
-  (`results/scaled/timing/`). The joined hit list equals NumPy's exact ranking, in order, for 75 of
-  75 claims on the demo corpus (`results/separate_index.md`) and for 3,000 of 3,000 on S0 and S1
-  (`results/scaled/run1/`). Under a filter it is close but not always exact. On the demo corpus the
-  statement returned the scan's chunks with two near-equal neighbours swapped in 2 of 75 lists
-  under the four filters (`results/join_order.md`), so `search()` sorts the rows it gets by the
-  reported distance and the chunk id. The lists under a filter on S1 are in
+  but the server ranks exactly over the index, at a cost that grows with the table: 15.74 ms on
+  S0's 43,134 chunks and 25.81 ms on S1's 132,359 (`results/scaled/timing/`), and 2.24 ms, at k=10
+  without the CPU cap, on the demo corpus's 4,598 (`results/final_inline.md`). The joined hit list equals
+  NumPy's exact ranking, in order, for 75 of 75 claims on the demo corpus
+  (`results/separate_index.md`) and for 3,000 of 3,000 on S0 and S1 (`results/scaled/run1/`).
+  Under a filter it is close but not always exact: on the demo corpus 2 of 75 lists under the four
+  filters held the exact ranking's chunks with two near-equal neighbours swapped
+  (`results/join_order.md`), so `search()` sorts the rows it gets by the reported distance and the
+  chunk id. The lists under a filter on S1 are in
   [VECTOR_INDEX.md](VECTOR_INDEX.md#the-joined-statement-against-a-brute-force-ranking-and-a-copy-of-the-vectors).
 
-`scripts/measure_index_behaviour.py` has five parts:
+`scripts/measure_index_behaviour.py` has five parts besides `hard_cap`:
 
 - **`forms` (`results/statement_forms.md`).** A predicate on `chunk` itself (`n_words`, no index)
   never comes back short, but it is approximate: it gave the exact filtered top 10 for only 51 of
@@ -321,17 +321,15 @@ table.
   commits writes to the corpus, nothing in WikiLense searches while an ingest runs, and no
   measured number depends on it. An application that writes while it searches must not search the
   index inside a REPEATABLE READ transaction whose snapshot predates another connection's commit.
-- **`builds` (`results/scaled/run1/s1/build_variance.md`).** On S1, twenty fresh builds at `M=16`
-  and `ef_search` 100 found a gold page for 2,922 to 2,937 of 3,000 claims, and twenty builds with
-  the server defaults found 2,218 to 2,433
-  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-same-vectors-built-several-times)). Which build a reader
-  gets moves the headline recall inside the first range, and far more at the defaults.
-- **`cache` (`results/scaled/run1/s1/cache_size.md`).** On S1, whose graph file is 156.0 MB, every
-  count at 192 and 256 MB equals the one at 512 MB. At 160 MB, just above the file, the joined
-  statement is exact for 2,725 to 2,734 of 3,000 claims and takes 351.45 ms instead of 27.53
-  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-index-cache-below-and-above-the-graph)). The 16 MB default
-  holds neither scaled graph (56.0 and 156.0 MB), which is why `docker-compose.yml` sets 512 MB,
-  more than three times S1's graph.
+- **`builds` (`results/scaled/run1/s1/build_variance.md`).** On S1, twenty fresh builds of the
+  graph show that the build barely moves recall at the chosen settings (`M=16`, `ef_search` 100)
+  and decides hundreds of the 3,000 claims at the server defaults (`M=6`, `ef_search` 20)
+  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-same-vectors-built-several-times)).
+- **`cache` (`results/scaled/run1/s1/cache_size.md`).** The graph must fit in
+  `mhnsw_max_cache_size` with room to spare: a cache just above S1's 156.0 MB graph already makes
+  the joined search much slower and no longer exact, and the 16 MB default, which holds neither
+  scaled graph, finds a gold page for fewer claims
+  ([VECTOR_INDEX.md](VECTOR_INDEX.md#the-index-cache-below-and-above-the-graph)).
 
 The experiment protocol measures the following:
 
@@ -339,9 +337,17 @@ The experiment protocol measures the following:
   that filled it finds fewer true neighbours than after COMMIT (overlap with the exact top 10:
   0.973 before, 1.000 after, at ef 100). The cause is not known. The practical rule is to write
   and search in separate transactions, or to commit before searching, as `tests/test_db.py` does.
-- **Scale with random distractor pages** (`results/scale.md`). From 4,598 to 89,650 chunks the
-  exact joined statement grows 7.6 times (2.52 to 19.17 ms p50) and the bare HNSW search 1.5
-  times (0.83 to 1.23 ms). Article recall@10 is 74 / 74 / 71 of 75 at the three sizes.
+- **Scale with random distractor pages** (`results/scale.md`: the demo corpus plus random pages,
+  k = 10). **The index is what keeps the search cheap as the table grows:** from the smallest to
+  the largest corpus the exact joined statement takes 7.6 times as long, the HNSW search 1.5 times.
+
+  | chunks | exact joined statement, p50 | HNSW search, p50 | article recall@10, of 75 |
+  |---|---|---|---|
+  | 4,598 | 2.52 ms | 0.83 ms | 74 |
+  | 26,700 | 10.27 ms | 1.05 ms | 74 |
+  | 89,650 | 19.17 ms | 1.23 ms | 71 |
+
+  The exact ranking also finds 71 there, so the distractors, not the index, cost those claims.
 - **Vector arithmetic** and the tests' bound on the HNSW overlap are in
   [VECTOR_INDEX.md](VECTOR_INDEX.md#what-we-measured).
 
@@ -388,22 +394,21 @@ The defaults are in the code (`sql/schema.sql`, `wikilense/config.py`, `.env.exa
 chosen on the 100-page development set and kept for the scaled run. The sweeps are sections 1 to
 7 of `results/SUMMARY.md`, and [EVALUATION.md](EVALUATION.md#parameters-and-why) has the table.
 
-- **Index `M` = 16.** On the same vectors at ef_search 20, article recall@10 is 67, 74 and 73 of 75
-  for M 6, 16 and 32, and evidence recall@20 54, 64 and 62 of 66, against 74 and 63 for the exact
-  ranking. Section 3, `results/index_m_rebuild.md`.
+- **Index `M` = 16: of M 6, 16 and 32 it is the only one that reaches the exact ranking's recall
+  at ef_search 20.** M=32 makes a few more hit lists exact at ef_search 100 but takes longer to
+  build. On the 120-word chunks, the index rebuilt for each `M` (section 3,
+  `results/index_m_rebuild.md`).
 - **`mhnsw_ef_search` = 100 as the application default** (the server default of 20 is left as it
-  is). On the final ingest the hit lists equal the exact ranking for 74 of 75 claims, against 65
-  at 20, for 0.51 ms instead of 0.45 ms at k=10. Section 7, `results/final_ef_100.md`,
+  is): on the final ingest it makes the hit lists equal the exact ranking for 74 of 75 claims
+  instead of 65, for 0.51 instead of 0.45 ms at k=10. Section 7, `results/final_ef_100.md`,
   `results/final_ef_20.md`.
-- **`chunk_max_words` = 240, overlap 1.** At equal retrieved text (chunk size x k) the 60-, 120-
-  and 240-word chunkings are close: article recall 74, 74 and 74 of 75 and evidence recall 54, 57
-  and 55 of 66 at 1,200 words. The 240-word chunks store 4,598 vectors instead of 8,658 or 19,065.
-  Section 4,
-  `results/chunk60_ef_100.md`, `results/chunk120_ef_100.md`, `results/chunk240_ef_100.md`.
-- **Embedding prefix kept** (`"title > section path: "`). The exact ranking, which does not depend
-  on a graph, decides it: the prefix raises evidence recall@20 from 61 to 63 of 66 and leaves
-  article recall@10 at 74 of 75 (section 5, `results/prefix_on_inline.md`,
-  `results/prefix_off_inline.md`).
+- **`chunk_max_words` = 240, overlap 1: at equal retrieved text (chunk size x k) the 60-, 120- and
+  240-word chunks give the same article recall and about the same evidence recall, and 240 words
+  needs the fewest vectors and the smallest graph.** Section 4, `results/chunk60_ef_100.md`,
+  `results/chunk120_ef_100.md`, `results/chunk240_ef_100.md`.
+- **Embedding prefix kept** (`"title > section path: "`): on the exact ranking, which does not
+  depend on a graph, it raises evidence recall and leaves article recall unchanged (section 5,
+  `results/prefix_on_inline.md`, `results/prefix_off_inline.md`).
 - **Filtered queries: strategy `inline`**, `overfetch` as the low-latency option. Inline always
   fills `k`; overfetch filters after the index search and comes back short under a selective
   filter. Under `heading LIKE '%History%'` on the demo corpus (117 of 4,598 chunks pass) inline
@@ -548,9 +553,10 @@ before the category box and the "last edited" footer.
   (`scripts/fetch_page_meta.py`, committed as `data/corpus/page_meta.jsonl` and `PAGE_META.md`).
   FEVEROUS scraped Wikipedia in December 2020 and did not release its per-page date stamp (paper,
   Sec 7.7). Today's "last edited" date or categories would pair 2026 metadata with 2020 text. The
-  chosen revision is the one whose wikitext holds the most FEVEROUS sentence probes: 94.5% of the
-  probes occur in the chosen revisions, and today's "Albert Einstein" page holds 260 of 484,
-  against 466 in the December 2020 revision. Its `[[Category:...]]` links are the categories.
+  chosen revision is the one whose wikitext holds the most FEVEROUS sentence probes (the first six
+  words of each FEVEROUS sentence of the page): 94.5% of the probes occur in the chosen
+  revisions, and today's "Albert Einstein" page holds 260 of 484, against 466 in the December
+  2020 revision. Its `[[Category:...]]` links are the categories.
   Categories that templates add when the page is rendered are not in the wikitext, so the category
   filter does not see them; most of those are hidden maintenance categories.
   `docs/DATA.md` has the details.
@@ -576,9 +582,10 @@ before the category box and the "last edited" footer.
 - **The README has a section "Where this approach loses"**, so the case for searching inside the
   database is weighed against its cost. `scripts/compare_separate_index.py` runs MariaDB against a
   copy of the chunk vectors in the application's memory: under the History filter and the four
-  metadata filters MariaDB's joined form costs 3.20 / 3.56 and 3.46 / 3.45 ms in two runs and the
-  copy 0.78 / 1.04 and 0.71 / 0.73 ms, with equally complete results (`results/separate_index.md`,
-  `results/separate_index_repeat.md`). No dedicated vector store was measured.
+  metadata filters an exact scan of the copy is faster than MariaDB's joined statement, on S1
+  and in both runs on the demo corpus (`results/separate_index.md`,
+  `results/separate_index_repeat.md`; [VECTOR_INDEX.md](VECTOR_INDEX.md#the-joined-statement-against-a-brute-force-ranking-and-a-copy-of-the-vectors)
+  has the S1 times). No dedicated vector store was measured.
 - **`make setup` generates the `.env` passwords** with `scripts/make_env.py`, which writes two
   random 128-bit hex strings with mode 0600, never prints them and never touches an existing
   file. The setup is one command. When a new `.env` meets a data volume created with other passwords, the run ends with one line that names
@@ -644,8 +651,7 @@ pages were picked, [docs/EVALUATION.md](EVALUATION.md) has every table, and
   article, picked by "rule D": each gold article's most-linked page (its "favourite link"). Random
   pages were not used because they barely distract (see docs/DATA.md).
 - **Settings not re-chosen.** 240-word chunks, overlap 1, bge-small-en-v1.5 with the title prefix,
-  M=16, `mhnsw_ef_search` 100 and strategy `inline` were chosen on the 75-claim development set
-  (the 100-page corpus) and stay fixed for the scaled run.
+  M=16, `mhnsw_ef_search` 100 and strategy `inline` stay fixed for the scaled run.
 - **Headline k = 5**, matching FEVEROUS's own k = 5 and the 5 chunks an LLM fact-checker reads.
   The full table at k = 1, 3, 5, 10, 20 is still given, and the 100-page results keep their
   k = 10.
