@@ -125,9 +125,10 @@ The six groups (accuracy):
 
 What it means:
 
-- **Without passages Haiku hedges.** It answers NOT ENOUGH INFO on 1,765 of the 3,000 claims and is
-  right on 36.9% of them, close to the 33.3% that chance gives on this balanced set, so NOT ENOUGH INFO
-  is the label it recalls best there. This is an interpretation; the cause was not tested.
+- **Without passages Haiku hedges.** It answers NOT ENOUGH INFO on 1,765 of the 3,000 claims,
+  which makes it the label it recalls best there, and those answers are right 36.9% of the time,
+  close to the 33.3% that chance gives on this balanced set. This is an interpretation; the cause
+  was not tested.
 - **With passages or the web it picks a side, and NOT ENOUGH INFO becomes its worst label.** On
   the NOT ENOUGH INFO claims it picks a side 79.9% of the time with web search, 54.5% with RAG and
   47.1% even with gold; section 4 asks how many of those answers are really wrong.
@@ -169,7 +170,7 @@ So the label means "the annotator did not settle it from Wikipedia under these r
 answer does not exist". A model that is allowed outside knowledge can be marked wrong for a
 correct verdict, when it finds the answer outside Wikipedia or finds what the annotator missed.
 
-**The audit: about 4 in 10 of the reviewed gold and RAG "errors" may be right answers under a
+**The audit: 4 in 10 of the reviewed gold and RAG "errors" may be right answers under a
 doubtful label.** On some claims labelled NOT ENOUGH INFO, Haiku answered SUPPORTS or REFUTES,
 which counts as wrong. Claude Opus 5.5 agents reviewed 100 such answers, drawn at random with a
 fixed seed, and named the main reason for each. A doubtful label means that the text Haiku saw
