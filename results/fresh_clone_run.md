@@ -3,10 +3,17 @@
 Run on 2026-11-11 on the author's laptop (i9-13900H, Ubuntu 26.04.1, Docker 29.1.3, Docker Compose
 2.40.3, the system's Python 3.14.4; the GPU was not used). The repository was cloned from GitHub
 into an empty directory, at commit 832d51e of the branch `fable-review-2026-11-11`, which `main`
-was fast-forwarded to afterwards. The commits after it change no code that the commands below
-run: they add this record, wording in the README and in `docs/`, a comment in
-`docker-compose.yml`, and one more measurement (`results/cache_size.md`, a part of
-`scripts/measure_index_behaviour.py` and two tests, which is why the suite has 406 tests now):
+was fast-forwarded to afterwards. The branch is deleted now; the commit is in `main`'s history.
+
+The run has not been repeated from a fresh clone since, and later commits changed code that these
+commands run: the search got a time limit (`17bb45a`), the ingest and the evaluation got new
+functions (`c5a689c`), the web page grew (`ea6ae74`, `704adc2`, `17bb45a`), and the Makefile got the
+S1 targets (`187b8a5`). The suite has grown too; the README states the current count. On 2026-11-21
+the suite, `make eval`, the query, `make examples` and `make serve` were run again at commit 5b76c16,
+in the author's working copy. The suite passed, `make eval` printed the same recall and
+unit-coverage columns, the query printed the same nine lines above its timing line, `make examples`
+printed 14 result tables again, and `make serve` returned the same chunk (Aare, chunk 1, distance
+0.3091). The clone command of the recorded run:
 
 ```
 git clone --branch fable-review-2026-11-11 https://github.com/ylli-00/WikiLens.git WikiLens
