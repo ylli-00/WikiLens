@@ -3,13 +3,12 @@
 The [README](../README.md) has the headline numbers. This page has the method in full and every
 table behind them, for two sets of measurements:
 
-- **The scaled run** is the reported result: 3,000 FEVEROUS claims searched on two corpora of
-  43,134 and 132,359 chunks. Its files are in [results/scaled/](../results/scaled/), and
+- **The scaled run** is the reported result: 3,000 FEVEROUS claims searched on two corpora. Its
+  files are in [results/scaled/](../results/scaled/), and
   [results/scaled/SUMMARY.md](../results/scaled/SUMMARY.md) has every table in one place.
 - **The demo corpus** is the 100 committed pages and their 75 claims. It is what `make setup` loads
-  and `make eval` measures, so a reader can check an install against it, and it is the development
-  set on which the settings were chosen. Its files are in [results/](../results/), with
-  [results/SUMMARY.md](../results/SUMMARY.md) as the overview.
+  and `make eval` measures, and the development set on which the settings were chosen. Its files
+  are in [results/](../results/), with [results/SUMMARY.md](../results/SUMMARY.md) as the overview.
 
 Every number below is read from one of those files.
 
@@ -57,9 +56,9 @@ From [results/scaled/eval/](../results/scaled/eval/) (`s0_full_run1` and `s1_ful
 
 The query embedding took 6.09 / 6.15 ms (S0) and 6.07 / 6.07 ms (S1) at the median, on the GPU.
 
-What the distractor pages cost: going from S0 to S1 triples the chunk table, adding for each gold
-article the page it links to most. Article recall@5 falls from 0.984 to 0.978, evidence recall@5 from
-0.780 to 0.751, and the index search takes 1.43 instead of 1.11 ms.
+What the distractor pages cost: going from S0 to S1 triples the chunk table. Article recall@5 falls
+from 0.984 to 0.978, evidence recall@5 from 0.780 to 0.751, and the index search takes 1.43 instead
+of 1.11 ms.
 
 ### Fast and slow statements
 
@@ -78,14 +77,12 @@ article the page it links to most. Article recall@5 falls from 0.984 to 0.978, e
 Run 1 is shown; run 2 is within 1.5% (p50 and p95, both files are in the folder).
 
 - The exact search costs about 11 times the index search on S0 and 15 times on S1, and its cost
-  grows with the table. The `inline` History filter costs as much as the exact search.
-- `overfetch 10` is as fast as the index search, but returns fewer than 5 rows for 2,472 of 3,000
-  claims on S0 and 2,425 on S1.
+  grows with the table. The `inline` History filter costs as much as the exact search, while
+  `overfetch 10` is as fast as the index search but often comes back short.
 - The HNSW top 5 equals the exact top 5 for 2,962 (run 2: 2,963) of 3,000 claims on S0 and 2,911
   on S1 (both runs). In this run a gold page is in the top 5 for 2,956 (HNSW) against 2,962 (exact)
   claims on S0, and 2,933 against 2,943 on S1 (the main harness: 2,951 and 2,933; the JSON
-  field is named `article_hits_at_10`, but k was 5). The lists differed for a few claims between separate sessions
-  on the same graph (2,962 against 2,963); we did not look into why.
+  field is named `article_hits_at_10`, but k was 5).
 
 ### The six claim groups
 
@@ -124,13 +121,10 @@ the tag; recall per tag at k = 5 (same file):
 | Combining Tables and Text (32) | 1.000 | 0.969 | 0.812 | 1.000 | 0.969 | 0.812 |
 
 The search does worse on some labels than on others, for all three metrics on both databases
-([the label check](../results/scaled/breakdown/breakdown.md#label-check-and-equal-weight-figures)).
-Comparing the labels among claims with the same page count (700 or 300 claims per label), NOT
-ENOUGH INFO claims on one page are found less often (article@5 on S1 0.936 against 0.994 and
-0.986), and on two or more pages supported claims get their whole evidence far more often than the
-others (evidence@5 on S1 0.553 against 0.287 and 0.303). So a tag's figure also depends on its
-label mix. The next table gives each tag's equal-weight figure, the mean of its three per-label
-rates (intervals in the same file):
+(the six groups above;
+[the label check](../results/scaled/breakdown/breakdown.md#label-check-and-equal-weight-figures)),
+so a tag's figure also depends on its label mix. The next table gives each tag's equal-weight
+figure, the mean of its three per-label rates (intervals in the same file):
 
 | challenge tag (S / R / NEI), equal weight | S0 article@5 | S0 evidence@5 | S0 FEVEROUS-style | S1 article@5 | S1 evidence@5 | S1 FEVEROUS-style |
 |---|---|---|---|---|---|---|
@@ -152,9 +146,8 @@ Reasoning (71) and Combining Tables and Text (32) are too small for conclusions.
 
 ### Reweighted to FEVEROUS's mix
 
-Our pick is balanced by label and by the number of pages; FEVEROUS is not. A third of our claims
-are NOT ENOUGH INFO, against 3.5% of FEVEROUS train + dev, and 30% of our REFUTES claims need two
-pages. An overall number is therefore given both as measured and reweighted.
+Our pick is balanced by label and by the number of pages; FEVEROUS is not ([DATA.md](DATA.md)
+compares the two mixes). An overall number is therefore given both as measured and reweighted.
 
 - **Weights.** From [analysis/feverous/feverous_claims.csv](../analysis/feverous/feverous_claims.csv),
   one row per FEVEROUS train and dev claim (79,181). A claim is in group (label, one article) when
@@ -201,9 +194,7 @@ the claims with a complete sentence-only gold set among them
 | S0 | 0.853 (2,558) | **0.546 (1,637)** | 0.413 (1,239) |
 | S1 | 0.825 (2,476) | **0.529 (1,588)** | 0.397 (1,190) |
 
-Each unit is embedded once with the same model as the chunks. Ranking the units by embedding
-finds a complete set for 1,588 claims on S1, against 1,190 when the first units of the top chunks
-are kept in order.
+Each unit is embedded once with the same model as the chunks.
 
 Page coverage as in the FEVEROUS paper's Table 4 uses the definition of the FEVEROUS baseline
 code (`page_coverage` in `src/feverous/baseline/retriever/eval_doc_retriever.py`; the paper gives
@@ -230,9 +221,8 @@ several hours. [SETUP.md](SETUP.md#reproduce-the-scaled-run) has the commands in
 
 ## The demo corpus: 100 pages, 75 claims
 
-These are the measurements on the committed corpus. The settings were chosen on them, and
-`make eval` reproduces the headline table, so an install can be checked against it. They ran
-without the CPU and GPU caps.
+`make eval` reproduces the headline table, so an install can be checked against it. These
+measurements ran without the CPU and GPU caps.
 
 **Method.** Each of the 75 claims is embedded once and searched once per `k` with `LIMIT k`, as
 above. All 75 claims cite one page. Evidence recall is counted over the 66 claims whose gold set is
@@ -285,8 +275,7 @@ SQL time does not depend on it.
 
 The one claim whose gold page never appears is claim 87976, a NOT ENOUGH INFO claim about a
 by-election; its gold page is "Lincoln, England", and the exact ranking misses it too. On these
-claims the hybrid does not beat the vector ranking and costs eighteen times more. With the page
-known, 42 of 66 gold sets are already in the first chunk.
+claims the hybrid does not beat the vector ranking and costs eighteen times more.
 
 **Reproduce.**
 - After `wikilense ingest`, `wikilense eval --name mine` writes `results/mine.json` and `.md` with
