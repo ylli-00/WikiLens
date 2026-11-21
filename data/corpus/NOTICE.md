@@ -2,11 +2,9 @@
 
 The code of this repository is under the MIT licence ([LICENSE](../../LICENSE)). The data files in
 this directory are not ours to license: they are Wikipedia text and FEVEROUS annotations, and they
-are redistributed here under their own terms. The same terms, and this notice, cover two kinds of
-tracked file outside `data/` that carry FEVEROUS material: the per-claim result files in
-`results/` and `results/scaled/`, which copy the claim text, and
-`analysis/feverous/feverous_claims.csv`, which holds per-claim labels and challenge tags taken from
-the FEVEROUS annotations.
+are redistributed here under their own terms. The same terms, and this notice, cover the tracked
+files outside `data/` that carry FEVEROUS material: the per-claim result files in `results/` and
+`results/scaled/`, which copy the claim text.
 
 | File | What it is | Where it comes from | Licence |
 |---|---|---|---|

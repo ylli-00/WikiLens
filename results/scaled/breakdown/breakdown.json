@@ -1,8 +1,8 @@
 {
- "created_at": "2026-11-20T16:01:51+00:00",
+ "created_at": "2026-11-21T16:57:05+00:00",
  "inputs": {
   "claims": "data/scaled/claims_3000.jsonl",
-  "FEVEROUS table": "analysis/feverous/feverous_claims.csv",
+  "FEVEROUS table": "data/scaled/feverous_claims.csv",
   "eval S0": "results/scaled/eval/s0_full_run1.json",
   "eval S1": "results/scaled/eval/s1_full_run1.json",
   "sentences S0": "results/scaled/sentence_score/s0/claims.jsonl",

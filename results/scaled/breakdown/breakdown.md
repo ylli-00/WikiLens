@@ -1,12 +1,12 @@
 # Scaled run: recall by claim group and challenge tag, and reweighted to FEVEROUS
 
-Written 2026-11-20T16:01:51+00:00 by `scripts/scaled_breakdown.py` from the per-claim files of the runs named below (no database). A claim counts at k when its rank in the run's LIMIT 20 search is at most k; that reproduces the run's own counts per k. "Complete set in top 10 chunks" and "FEVEROUS-style" are the two evidence scores of `scripts/scaled_sentence_score.py`.
+Written 2026-11-21T16:57:05+00:00 by `scripts/scaled_breakdown.py` from the per-claim files of the runs named below (no database). A claim counts at k when its rank in the run's LIMIT 20 search is at most k; that reproduces the run's own counts per k. "Complete set in top 10 chunks" and "FEVEROUS-style" are the two evidence scores of `scripts/scaled_sentence_score.py`.
 
-Inputs: claims: `data/scaled/claims_3000.jsonl`; FEVEROUS table: `analysis/feverous/feverous_claims.csv`; eval S0: `results/scaled/eval/s0_full_run1.json`; eval S1: `results/scaled/eval/s1_full_run1.json`; sentences S0: `results/scaled/sentence_score/s0/claims.jsonl`; sentences S1: `results/scaled/sentence_score/s1/claims.jsonl`.
+Inputs: claims: `data/scaled/claims_3000.jsonl`; FEVEROUS table: `data/scaled/feverous_claims.csv`; eval S0: `results/scaled/eval/s0_full_run1.json`; eval S1: `results/scaled/eval/s1_full_run1.json`; sentences S0: `results/scaled/sentence_score/s0/claims.jsonl`; sentences S1: `results/scaled/sentence_score/s1/claims.jsonl`.
 
 ## Weights: FEVEROUS's mix of the six groups
 
-From `analysis/feverous/feverous_claims.csv` (79,181 train + dev claims). A claim is in (label, one article) when every evidence set lies on one page (`max_pages` = 1), in (label, two or more) when every set spans two or more pages (`min_pages` >= 2); claims with sets of both kinds are in no group. `all` counts every such claim; `text` only those with an evidence set of sentences only or list items only. Reweighted = sum over the groups of weight x the group's measured rate.
+From `data/scaled/feverous_claims.csv` (79,181 train + dev claims). A claim is in (label, one article) when every evidence set lies on one page (`max_pages` = 1), in (label, two or more) when every set spans two or more pages (`min_pages` >= 2); claims with sets of both kinds are in no group. `all` counts every such claim; `text` only those with an evidence set of sentences only or list items only. Reweighted = sum over the groups of weight x the group's measured rate.
 
 | Group | Claims here | FEVEROUS, all | weight | FEVEROUS, text | weight |
 |---|---|---|---|---|---|

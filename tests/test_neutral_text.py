@@ -17,7 +17,7 @@ from pathlib import Path
 from wikilense.config import REPO_ROOT
 
 #: Folders scanned: every file below them with a suffix in :data:`SUFFIXES`.
-ROOTS = ("analysis", "scripts", "sql", "tests", "wikilense", ".github")
+ROOTS = ("scripts", "sql", "tests", "wikilense", ".github")
 #: Files at the top of the repository that are scanned too.
 TOP_FILES = ("Makefile", "pyproject.toml", "docker-compose.yml", ".env.example")
 SUFFIXES = frozenset({".py", ".sql", ".sh", ".yml", ".yaml", ".toml"})

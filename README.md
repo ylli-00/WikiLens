@@ -337,14 +337,13 @@ To learn the feature, five files are enough: [sql/schema.sql](sql/schema.sql) (t
 [wikilense/](wikilense/) is the package (its `llm/` folder and `factcheck.py` are the LLM extension),
 [scripts/](scripts/) builds the corpora and runs the experiments, [data/](data/) holds the demo corpus and the 3,000
 claims, [results/](results/) every experiment as JSON and Markdown, and [docs/](docs/) the reference pages
-([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [analysis/](analysis/) is the earlier FEVEROUS analysis
-that chose the benchmark. [tests/](tests/) holds
+([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [tests/](tests/) holds
 933 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 
 Ylli Rada, Constructor University, Databases and Web Services course. Code, experiments and
 documentation were produced with Claude Code (Anthropic), directed by the author. The code is under
-the MIT licence ([LICENSE](LICENSE)). The Wikipedia text and FEVEROUS material in `data/corpus/`, `data/scaled/`, the per-claim
-files of `results/` and `analysis/feverous/feverous_claims.csv` keep their own licence, CC BY-SA 3.0
+the MIT licence ([LICENSE](LICENSE)). The Wikipedia text and FEVEROUS material in `data/corpus/`, `data/scaled/` and the per-claim
+files of `results/` keep their own licence, CC BY-SA 3.0
 ([data/corpus/NOTICE.md](data/corpus/NOTICE.md)); FEVEROUS is Aly et al., 2021 (https://arxiv.org/abs/2106.05707).

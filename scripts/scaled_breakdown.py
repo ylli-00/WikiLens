@@ -10,7 +10,7 @@ Reads, without a database:
 - optionally, per database, the per-claim file of ``scripts/scaled_sentence_score.py``
   (``in_top_chunks``: a complete sentence-only gold set in the top 10 chunks;
   ``found_embed``: the FEVEROUS-style score, best 5 sentences + 25 list items by embedding);
-- the FEVEROUS annotation table ``analysis/feverous/feverous_claims.csv`` (one row per train
+- the FEVEROUS annotation table ``data/scaled/feverous_claims.csv`` (one row per train
   and dev claim), for the weights.
 
 and writes one JSON and one Markdown file with:
@@ -65,7 +65,7 @@ from typing import Any
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CSV = REPO_ROOT / "analysis" / "feverous" / "feverous_claims.csv"
+DEFAULT_CSV = REPO_ROOT / "data" / "scaled" / "feverous_claims.csv"
 LABELS: tuple[str, ...] = ("SUPPORTS", "REFUTES", "NOT ENOUGH INFO")
 KINDS: tuple[str, ...] = ("single", "needs2")
 KIND_LABEL = {"single": "one article", "needs2": "two or more"}
@@ -320,7 +320,7 @@ def to_markdown(report: dict[str, Any]) -> str:
         "",
         "## Weights: FEVEROUS's mix of the six groups",
         "",
-        (f"From `analysis/feverous/feverous_claims.csv` ({w['n_rows']:,} train + dev claims). A "
+        (f"From `data/scaled/feverous_claims.csv` ({w['n_rows']:,} train + dev claims). A "
          "claim is in (label, one article) when every evidence set lies on one page "
          "(`max_pages` = 1), in (label, two or more) when every set spans two or more pages "
          "(`min_pages` >= 2); claims with sets of both kinds are in no group. `all` counts every "

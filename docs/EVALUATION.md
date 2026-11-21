@@ -149,7 +149,7 @@ Reasoning (71) and Combining Tables and Text (32) are too small for conclusions.
 Our pick is balanced by label and by the number of pages; FEVEROUS is not ([DATA.md](DATA.md)
 compares the two mixes). An overall number is therefore given both as measured and reweighted.
 
-- **Weights.** From [analysis/feverous/feverous_claims.csv](../analysis/feverous/feverous_claims.csv),
+- **Weights.** From [data/scaled/feverous_claims.csv](../data/scaled/feverous_claims.csv),
   one row per FEVEROUS train and dev claim (79,181). A claim is in group (label, one article) when
   every evidence set lies on one page (`max_pages` = 1), and in (label, two or more) when every set
   spans two or more pages (`min_pages` >= 2); a claim with sets of both kinds is in no group.

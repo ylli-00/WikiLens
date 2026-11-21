@@ -91,6 +91,17 @@ pages the evidence sets cite; `evidence_sets`, per FEVEROUS set its `elements` (
 `text_only` and `findable`; `gold_set`, the index of the first findable set; and `gold_evidence`,
 that set's elements with their `element`, `page` and December 2020 `text`. Titles are Unicode NFC.
 
+`data/scaled/feverous_claims.csv` describes every FEVEROUS train and dev claim (79,181 rows, no
+claim text), for the reweighting in [EVALUATION.md](EVALUATION.md). Columns: `id`, `split`,
+`label`, `challenge`; `n_sets`, the number of evidence sets; `min_pages` and `max_pages`, the
+fewest and most distinct pages among the `content` ids of one set; `set_pages` and
+`modality_summary`, per set its page count and its element types (`sentence-only`, `table-only`
+for cells, header cells and captions, `list-only` for items, otherwise `mixed`), `|`-separated;
+and the flags `has_sentence_only_set`, `strict_multi_article` (`min_pages` >= 2),
+`lenient_multi_article` (`max_pages` >= 2) and `has_sentence_only_multi_page_set`. A page is the
+part of an element id before its first `_`, the FEVEROUS rule; on the train and dev files it
+agrees with the full id pattern for every id.
+
 ### The distractor pages: rule D
 
 Each gold article adds its favourite link: the page it links to most often (links counted with

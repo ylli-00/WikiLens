@@ -25,5 +25,9 @@ data/scaled/wikilense_s1.partial/
 data/scaled/wikilense_s1.tar.gz
 data/scaled/wikilense_s1.tar.gz.part
 
+# A local analysis of the FEVEROUS annotation files; the per-claim table it wrote, which
+# scripts/scaled_breakdown.py reads, is committed as data/scaled/feverous_claims.csv
+analysis/
+
 # The partial file of `make demo-dump`, renamed to data/corpus/wikilense_demo.sql.gz when complete
 data/corpus/wikilense_demo.sql.gz.part
