@@ -13,13 +13,15 @@ claims) are in [results/](../results/).
 
 **How these were measured.** One measurement at a time, with the laptop's CPU capped at 50% and the
 GPU at 2,100 MHz, so compare times only within this page. Each claim gives one timed run per
-statement after one untimed run, which is 3,000 timings per median. The join-order measurement
-runs 18 filters, two forms each, plus a scan of every passing chunk per claim. A pilot on 20 claims
+statement after one untimed run, which is 3,000 timings per median. p50 is the median time, p95
+the time 95% of searches stay under; a gold page holds the claim's FEVEROUS evidence, and article
+recall@5 counts the claims with one among the top 5 chunks. The join-order measurement runs 18
+filters, two forms each, plus a scan of every passing chunk per claim. A pilot on 20 claims
 took 2,426 s ([results/scaled/pilot/](../results/scaled/pilot/)), which puts all 3,000 claims at
 about 100 hours, so that measurement uses a fixed random sample of 200 claims
-(`random.Random(20261119)`, the same claims on S0 and S1). Each measurement here ran once so far;
-a rerun goes into `results/scaled/run2/`, and `scripts/scaled_summary.py` adds it to
-[SUMMARY.md](../results/scaled/SUMMARY.md) as a second column.
+(`random.Random(20261119)`, the same claims on S0 and S1). Each measurement here ran once; a rerun
+goes into `results/scaled/run2/` and becomes a second column of
+[SUMMARY.md](../results/scaled/SUMMARY.md).
 
 ## The statements
 
@@ -110,15 +112,19 @@ wrong-dimension vector.
   NumPy's `1 - cos` for every row, within 1e-5, and a scan that ignores the index
   (`IGNORE INDEX (embedding)`) returns NumPy's exact top 10 in order. The test requires the HNSW
   index to find at least 95% of them on average.
-- Query cost falls into two regimes:
-  - The bare query (`none`, `overfetch`) is the HNSW search: 1.11 ms at the median on S0 and
-    1.43 ms on S1 in the main harness (`results/scaled/eval/`). It reads exactly `LIMIT` rows,
-    and `mhnsw_ef_search` sets its accuracy.
-  - With a join in the statement (`inline`), `EXPLAIN` still says `type: index, key: embedding`,
-    but the server ranks exactly over the index: 15.74 ms on S0 and 25.81 ms on S1, against
-    1.43 and 1.68 ms for the bare query in the same run (`results/scaled/timing/`). The cost grows
-    with the table; "The joined statement against a brute-force ranking" below checks the lists.
-    It then walks until `k` rows pass the predicates.
+- **Query cost falls into two regimes: a join in the statement makes the server rank exactly, at
+  about 11 times the cost of the bare HNSW search on S0 and 15 times on S1.** Medians of one run
+  ([results/scaled/timing/](../results/scaled/timing/)):
+
+  | Statement | S0 p50 | S1 p50 |
+  |---|---|---|
+  | the bare query (`none`, `overfetch`) | 1.43 ms | 1.68 ms |
+  | with a join (`inline`) | 15.74 ms | 25.81 ms |
+
+  The bare query reads exactly `LIMIT` rows, and `mhnsw_ef_search` sets its accuracy. With the
+  join, `EXPLAIN` still says `type: index, key: embedding`, but the list is the exact ranking ("The
+  joined statement against a brute-force ranking" below checks it), its cost grows with the table,
+  and under predicates the server walks the index until `k` rows pass them.
 - Under a filter, the bounded form `overfetch` stays near the bare cost but returns fewer than `k`
   rows when the filter is selective; the inline form is complete. Under
   `heading LIKE '%History%'`, at k = 5, on the 3,000 claims:
@@ -128,26 +134,30 @@ wrong-dimension vector.
   | `overfetch 10` | 2,472 | 1.63 ms | 2,425 | 1.87 ms |
   | `inline` | 0 | 16.49 ms | 0 | 26.59 ms |
 
-- A search whose `WHERE` few rows pass is not capped at `LIMIT` on 11.8.9, and it can run away. The
-  `hard_cap` part of `scripts/measure_index_behaviour.py` ran 30 claims at k = 10 in a throwaway copy
-  of S1, with a 2 GB memory cap and a 10 s `max_statement_time`
-  ([results/scaled/run1/s1/hard_cap.md](../results/scaled/run1/s1/hard_cap.md)).
-  - **A distance threshold inside the statement.**
-    - 30 chunks meet it: all 60 executions returned 10 rows (p50 1.08 ms).
-    - Exactly 10 meet it: 54 returned them (p50 1.18 ms), 6 ran to the time limit.
-    - Only 3 meet it: 57 of 60 executions ran to the time limit.
-  - **A predicate on `chunk` itself.**
-    - 694 chunks passing (0.52%): p50 1,357.45 ms, p95 5,260.05 ms, stopped in 4 of 60.
-    - 133 chunks passing (0.10%): p50 2,389.48 ms, stopped in 32 of 60.
-    - The same predicates joined to `page` were never stopped (p50 31.57 and 654.14 ms).
-    - No answer that came back was short.
-  - **The documentation's subquery form.** It read exactly its inner `LIMIT` rows, in about 1 ms,
-    and came back short in 0 to 6 of 60 executions, where the index missed a qualifying chunk.
-  - **Under a 60 s time limit**, such a statement grew `mariadbd` until it ran out of memory: to
-    the 2 GB cap in 20 to 22 s in a throwaway container. Earlier the kernel's OOM killer had
-    stopped the development machine's server at 7.2 GiB; which statement ran then was not logged.
-  - **The guard.** A short `max_statement_time` stops the search ("A search that runs away"
-    below). The web page and `wikilense query` set it to 5 s; their filters are joins.
+- **On 11.8.9 a search whose `WHERE` fewer rows pass than its `LIMIT` does not stop at `LIMIT`, and
+  it can run away.** The `hard_cap` part of `scripts/measure_index_behaviour.py` ran 30 claims, twice
+  each, at k = 10 in a throwaway copy of S1, with a 2 GiB memory cap and a 10 s
+  `max_statement_time` ([results/scaled/run1/s1/hard_cap.md](../results/scaled/run1/s1/hard_cap.md)).
+  Executions, of 60 per row:
+
+  | Statement | Chunks that qualify | Complete | Stopped at 10 s | Short | p50 ms |
+  |---|---|---|---|---|---|
+  | a distance threshold inside the statement | 30 | 60 | 0 | 0 | 1.08 |
+  | the same | 10 | 54 | 6 | 0 | 1.18 |
+  | the same | 3 | 3 | 57 | 0 | - |
+  | `WHERE chunk.n_words < 4` | 694 (0.52%) | 56 | 4 | 0 | 1,357.45 |
+  | `WHERE chunk.n_words < 2` | 133 (0.10%) | 28 | 32 | 0 | 2,389.48 |
+  | `WHERE chunk.n_words < 4`, joined to `page` | 694 | 60 | 0 | 0 | 31.57 |
+  | `WHERE chunk.n_words < 2`, joined to `page` | 133 | 60 | 0 | 0 | 654.14 |
+  | the documentation's subquery form (threshold outside) | 3, 10 or 30 | 54 to 60 | 0 | 0 to 6 | 0.90 to 1.32 |
+
+  - **The fewer rows qualify, the more searches never finish**, up to 57 of 60 under the
+    threshold that 3 chunks meet.
+  - **A join was never stopped, and only the documentation's subquery form came back short**: it is
+    fast, but it reads exactly its inner `LIMIT` rows, so a qualifying chunk the index missed is
+    missing from the answer.
+  - **The guard is a short `max_statement_time`** ("A search that runs away" below): the web page
+    and `wikilense query` set 5 s, and their filters are joins.
 - The optimizer chooses per filter whether to keep the index, from its estimate of how many rows
   pass; "The join order we fix" below has the plans under 18 filter levels.
 - Join order matters:
@@ -157,18 +167,24 @@ wrong-dimension vector.
   - An `IN (subquery)` filter becomes a semi-join and loses the index too (a test pins this).
   - The same filter as a joined derived table keeps the index (a test pins that plan). Why the
     derived tables are `SELECT DISTINCT` is under "The join order we fix" below.
-- Rows a transaction has not committed are found less well. `scripts/scaled_uncommitted.py` fills
-  a scratch table in the test database with S0's 43,134 chunk vectors inside one transaction, with
-  the chunk table's vector column and index, and searches it with the 3,000 claims before and after
-  `COMMIT`, in three fresh builds, against NumPy's exact top 5
+- **Before `COMMIT` the search misses more of the true neighbours, and raising `ef_search` does not
+  help; after `COMMIT` it misses almost none.** `scripts/scaled_uncommitted.py` fills a scratch
+  table in the test database (the chunk table's vector column and index) with S0's 43,134 chunk
+  vectors inside one transaction and searches it with the 3,000 claims before and after `COMMIT`,
+  in three fresh builds
   ([results/scaled/run1/s0/uncommitted_recall.md](../results/scaled/run1/s0/uncommitted_recall.md)).
-  Before `COMMIT` the search finds 0.872 to 0.881 of the exact top 5, at `mhnsw_ef_search` 20, 100
-  and 400 alike, and at every value some query finds none of its 5 neighbours. After `COMMIT` it
-  finds 0.973 to 0.983 at 20, 0.993 to 0.996 at 100 and 0.998 to 0.999 at 400. Before `COMMIT`
-  the statement is also faster (0.32 against 0.83 ms p50 at 100). We did not look into how the
-  server searches rows that are not committed. On 1,000 random vectors the overlap is 0.611 to
-  0.655 before and 0.802 to 0.997 after. On the 100-page corpus it was 0.972 to 0.973 before and
-  0.990 to 1.000 after (k = 10, `results/uncommitted_recall.md`). Write and search in separate
+  Each cell is the share of NumPy's exact top 5 found, the mean over the builds:
+
+  | `mhnsw_ef_search` | S0, before `COMMIT` | S0, after | 1,000 random vectors, before | after |
+  |---|---|---|---|---|
+  | 20 | 0.876 | 0.978 | 0.618 | 0.809 |
+  | 100 | 0.877 | 0.994 | 0.652 | 0.992 |
+  | 400 | 0.877 | 0.998 | 0.652 | 0.996 |
+
+  Before `COMMIT`, at every value, some query found none of its 5 neighbours, and the statement
+  was faster (0.32 against 0.83 ms p50 at 100); we did not look into how the server searches rows
+  that are not committed. On the 100-page corpus the gap was small: 0.972 to 0.973 before and 0.990
+  to 1.000 after (k = 10, `results/uncommitted_recall.md`). Write and search in separate
   transactions, or commit first.
 - `mhnsw_ef_search` is a session variable, set per query and restored after. Values outside its
   range are clamped with a warning, not an error. The graph lives in a hidden InnoDB table
@@ -195,6 +211,11 @@ wrong-dimension vector.
 
 ## Three regimes of one statement
 
+Copying a filter column onto the vector table, without an index of its own, did not buy an exact
+filtered search, and under the more selective predicate not a fast one either. With a join in the
+statement MariaDB ranked exactly, or nearly so, at a cost that grows with the table (about 27 ms on
+S1) but not with the filter.
+
 "What we measured" names two regimes: the bare statement, and the statement with a join. A third
 is a predicate on the indexed table itself, which WikiLense's own statements never use because
 every filter of theirs sits on a joined table. `scripts/measure_index_behaviour.py forms`
@@ -219,42 +240,60 @@ that pass ([results/scaled/run1/s1/statement_forms.md](../results/scaled/run1/s1
 | WHERE chunk.n_words < 30 | 12,341 | 100 | 33.30 | 248.78 | 2,514/3,000 | 0 | 118 |
 | WHERE chunk.n_words < 30, joined to page | 12,341 | 100 | 27.30 | 43.50 | 2,984/3,000 | 0 | 114 |
 
-- **Bare.** The HNSW search. It reads `LIMIT` rows, and its top 5 is the exact one for 2,776
-  claims at `ef_search` 20 and 2,917 at 100.
-- **A predicate on `chunk` itself** (`n_words`, a column without an index). The server does not
-  stop at `LIMIT`: it keeps taking rows from the index until `k` of them pass (35 and 120 rows read
-  at the median at `ef_search` 20). None of the 12,000 answers came back short, unlike a filter
-  applied after the search. But the index hands the rows over in its approximate order, so the
-  result is often not the exact filtered top 5: 2,389 and 2,209 of 3,000 claims at `ef_search` 20,
-  2,707 and 2,514 at 100. Each continuation also costs time: with 26,935 passing chunks the
-  statement is still faster than the joined form (9.40 against 26.75 ms at `ef_search` 100), but
-  with 12,341 it is slower (33.30 against 27.30 ms), with a p95 of 248.78 ms.
-- **The same predicate with a join in the statement.** It takes about 27 ms in every shape,
-  whatever passes, and gives the exact top 5 for 3,000 of 3,000 claims without the predicate and
-  for 2,995 and 2,984 of 3,000 with it, at both `ef_search` values. On the demo corpus the joined
-  form was exact for 75 of 75 claims in every shape (`results/statement_forms.md`). We did not
-  look into the 5 and 16 lists that differ here.
+What it means:
 
-So copying a filter column onto the vector table, without an index of its own, did not buy an
-exact filtered search, and under the more selective predicate not a fast one either. With a join
-in the statement MariaDB ranked exactly, or nearly so, at a cost that grows with the table (about
-27 ms on S1) but not with the filter.
+- **The bare search reads only `LIMIT` rows and is approximate**: its top 5 is the exact one for
+  2,776 claims at `ef_search` 20 and 2,917 at 100.
+- **A predicate on `chunk` itself (`n_words`, a column without an index) is never short, but often
+  not the exact top 5.** The server keeps taking rows from the index until `k` of them pass (35 and
+  120 rows read at the median at `ef_search` 20), so none of the 12,000 answers came back short,
+  unlike a filter applied after the search. But the rows come in the index's approximate order, so
+  only 2,209 to 2,707 of 3,000 lists equal the exact filtered top 5.
+- **When few rows pass, it is slower than the join**: 33.30 against 27.30 ms at `ef_search` 100
+  with 12,341 chunks passing, with a p95 of 248.78 ms. With 26,935 passing it is still faster
+  (9.40 against 26.75 ms).
+- **With a join, exact or nearly so**: 3,000 of 3,000 claims without the predicate and 2,995 and
+  2,984 with it, at both `ef_search` values; on the demo corpus 75 of 75 in every shape
+  (`results/statement_forms.md`). We did not look into the 5 and 16 lists that differ here.
 
 ## The join order we fix, and the plan the optimizer would pick
 
+**`STRAIGHT_JOIN` trades the best plan under a selective filter for a predictable one under a loose
+filter, and on S1 each order has a worst case of over a second.**
+
 The filtered statement names its tables with `STRAIGHT_JOIN`, `chunk` first (the reason is under
 "Join order matters" above). `scripts/measure_index_behaviour.py join_order` runs every filter in
-two forms, as written and with every `STRAIGHT_JOIN` replaced by `JOIN` ("free"), and compares
-both with the same statement under `IGNORE INDEX (embedding)`, which reads and sorts every chunk.
-The 200 claims of the fixed sample are the queries, at k = 5 and `ef_search` 100; each form was
-timed alone, one untimed pass and one timed pass per claim.
+two forms, as written ("fixed order") and with every `STRAIGHT_JOIN` replaced by `JOIN` ("free"),
+and compares both with the same statement under `IGNORE INDEX (embedding)`, which reads and sorts
+every chunk. The 200 claims of the fixed sample are the queries, at k = 5 and `ef_search` 100; each
+form was timed alone, one untimed pass and one timed pass per claim. Median times in ms, by how many
+chunks pass (each filter is in the two tables further down):
+
+| Filters | S1, fixed order | S1, free | S0, fixed order | S0, free |
+|---|---|---|---|---|
+| the 0.5% and 0.05% levels (662 or fewer chunks pass on S1, 256 or fewer on S0) | 129.95 to 1,387.73 | 0.86 to 3.13 | 24.97 to 307.35 | 0.72 to 1.51 |
+| the 5% levels, and the loosest category and link levels | 34.41 to 40.27 | 25.84 to 36.12 | 16.94 to 19.34 | 6.57 to 19.83 |
+| the 50% length and date levels | 26.40 and 26.68 | 1,566.76 and 1,689.04 | 16.33 and 16.50 | 91.69 and 98.72 |
+| the four filters together | 54.47 | 12.69 | 21.45 | 3.94 |
+
+What it means:
+
+- **Each order is slow where the other is fast.** The free plan wins when few chunks pass and
+  under the four filters, the fixed order when half pass; between them, on S1, the two stay within
+  a factor of 1.5.
+- **At S1's size the fixed order has its own worst case of over a second**: 1,387.73 ms when 66
+  chunks pass the category filter, where the free plan takes 0.99 ms. On the demo corpus (4,598
+  chunks, k = 10) the worst medians were 4.76 ms fixed and 10.24 ms free
+  (`results/join_order.md`), so there the fixed order cost little.
+- **Counting the passing chunks first would help at the selective end, but it is not built.**
+  Such a statement would leave the order free when few pass; the count and the threshold would
+  need their own measurement.
 
 The filter values follow one rule per database (`scripts/scaled_filters.py`,
 [results/scaled/filters/](../results/scaled/filters/)): for page length, edit date, category and
 linking page, the value whose passing chunks come nearest, on a log scale, to 50%, 5%, 0.5% and
 0.05% of the chunk table. The four filters together take the 50% length and date values and the
-category and linking page whose pair keeps the most chunks with them. The edit date is cut to the
-second: on S1 the 5%, 0.5% and 0.05% levels all fall on 31 December 2020. No category or linking
+category and linking page whose pair keeps the most chunks with them. No category or linking
 page reaches 50%, so their loosest level is the largest there is (7.0% and 6.2% on S1, 11.8% and
 3.8% on S0). On S0 that linking page is also the one nearest to 5%, so S0 has 17 cases and S1 18.
 
@@ -306,57 +345,38 @@ On S0 ([results/scaled/run1/s0/join_order.md](../results/scaled/run1/s0/join_ord
 | linked 0.05% | 22 | vector index | 13,358 | 164.88 | 200 / 200 | derived table first | 22 | 0.91 |
 | four filters | 824 | vector index | 446 | 21.45 | 199 / 198 | derived table first | 824 | 3.94 |
 
-- **As written**, the server walks the vector index under 15 of the 18 filters on S1 (14 of 17 on
-  S0), and reads more `chunk` rows the fewer pass, up to 19,656 on S1 under both 0.05% levels that
-  keep the index (we did not look into why the two medians are equal). The time follows, up to
-  1,386 to 1,388 ms when 66 chunks pass through the category or the link filter. Under the three
-  most selective length and date filters the plan reads all 132,359 chunks and sorts them instead
-  (`chunk` has type `ALL`), in 335 to 360 ms. No list came back short, in either form, on either
-  database.
-- **Free**, the optimizer starts from another table under 17 of the 18 filters (16 of 17 on S0):
-  `page`, or the derived table of the link or category filter. It reads `chunk` by
-  `uq_chunk_page_ordinal`, exactly the chunks that pass, sorts them, and the vector index is not in
-  the plan. Its cost follows the number that pass.
-- **Each order is slow where the other is fast.** When 662 or fewer chunks pass, the free plan
-  takes 0.86 to 3.13 ms and the fixed order 129.95 to 1,387.73 ms. When half the chunks pass, the
-  free plan takes 1,566.76 and 1,689.04 ms and the fixed order 26.40 and 26.68 ms. Between them, at
-  the 5% levels and the loosest category and link levels, the two stay within a factor of 1.5
-  (25.84 to 36.12 against 34.41 to 40.27 ms). Under the four filters the free plan is faster,
-  12.69 against 54.47 ms. On S0 the pattern is the same at a smaller scale: 0.72 to 1.51 ms free
-  against 24.97 to 307.35 ms as written when 256 or fewer pass, and 91.69 and 98.72 ms free against
-  16.33 and 16.50 ms when half pass.
+- **With the order fixed, the search gets slower the fewer chunks pass**: from 26.77 ms with no
+  filter to 1,387.73 ms when 66 pass (S1), as it reads more `chunk` rows from the vector index to
+  find 5 that pass (up to 19,656). It walks the index under 15 of the 18 filters on S1 (14 of 17
+  on S0); under the three most selective length and date filters the plan reads all 132,359 chunks
+  and sorts them instead (`chunk` has type `ALL`), in 335 to 360 ms. No list came back short, in
+  either form, on either database.
+- **Left free, the optimizer drops the vector index under 17 of the 18 filters** (16 of 17 on S0):
+  it starts from `page` or the derived table of the link or category filter, reads `chunk` by
+  `uq_chunk_page_ordinal`, exactly the chunks that pass, and sorts them.
 - **The fixed order is not always exact under a filter.** As written, it holds the scan's chunks
-  for 175 to 200 of 200 claims on S1, fewest under the 0.5% category filter (175, and 169 in the
-  scan's order), and for 192 to 200 on S0. Under the four
-  filters on all 3,000 claims it is the exact top 5 for 2,962 ("The joined statement against a
-  brute-force ranking" below). We did not look into which rows the walk misses.
-- **Order.** As written, some lists hold the scan's chunks in another order (at most 6 of 200
-  claims, under the 0.5% category filter on S1), and up to 7 lists per filter have rows that are
-  not in ascending order of the distance the statement itself reports. Where such a list and the
-  scan's name different chunks at a position, the two reported distances differ by at most 4.5e-06
-  under 4 of the 7 filters where it happens on S1 and 2 of the 3 on S0. That fits the index ranking
-  by its 16-bit copies of the vectors (its author's description, linked below) while the select
-  list computes the distance from the stored 32-bit vector. Under the others (the 0.5% and 0.05%
-  category filters and the 0.05% link filter on S1, the 0.5% category filter on S0) the gap is up
-  to 2.6e-02 on S1 and 9.2e-03 on S0, which that explanation does not cover; we did not look into
-  it. `wikilense` sorts the returned rows by the reported distance and the chunk id, so its order
-  is the distance order.
+  for 175 to 200 of 200 claims on S1, fewest under the 0.5% category filter, and for 192 to 200 on
+  S0. Under the four filters on all 3,000 claims it is the exact top 5 for 2,962 ("The joined
+  statement against a brute-force ranking" below). We did not look into which rows the walk misses.
+- **Rows can come back slightly out of distance order; `wikilense` sorts them again by the
+  reported distance and the chunk id, so its output is in distance order.** As written, up to 7
+  lists per filter have rows that are not in ascending order of the distance the statement itself
+  reports. Where such a list and the scan's name different chunks at a position:
+  - under 4 of the 7 filters where it happens on S1 and 2 of the 3 on S0, the two reported
+    distances differ by at most 4.5e-06. That fits the index ranking by its 16-bit copies of the
+    vectors (its author's description, linked below) while the select list computes the distance
+    from the stored 32-bit vector;
+  - under the others, selective category and link filters (the 0.5% and 0.05% category filters
+    and the 0.05% link filter on S1, the 0.5% category filter on S0), the gap is up to
+    2.6e-02 on S1 and 9.2e-03 on S0. That explanation does not cover it, and we did not look into
+    it.
 - **The derived tables need their `DISTINCT` for the result, not for the index.** With every
   `SELECT DISTINCT` turned into `SELECT`, MariaDB merges the derived table into the join (no
   `<derived>` row in `EXPLAIN`) and still walks the vector index, for all 200 claims under every
   link, category and four-filter case, on both databases. But a page can link to another page
-  several times, and the merged join then returns a chunk once per link row: on S1, 24, 135 and
-  138 of 200 lists name a chunk twice under the 6.2%, 5% and 0.5% link filters, 147 under the four
-  filters and none under the 0.05% link filter; on S0, 200 of 200 under the 0.05% link filter and
-  none under the others. No category filter repeats a chunk.
-
-`STRAIGHT_JOIN` therefore trades the best plan under a selective filter for a predictable one
-under a loose filter. On the demo corpus the free plan's worst case was 10.24 ms against 2.11
-(`results/join_order.md`). At 132,359 chunks it is 1,689.04 ms against 26.40, and the fixed
-order's own worst case, 1,387.73 ms against 0.99, is now of the same size. A statement that counts
-the passing chunks first and leaves the order free when few pass would be faster at that end. We
-did not build it: the settings are fixed since the evaluation, and the count and the threshold
-would need their own measurement.
+  several times, and the merged join then returns a chunk once per link row: up to 147 of 200
+  lists on S1 (under the four filters) and all 200 on S0 (under the 0.05% link filter) named a
+  chunk twice. No category filter repeats a chunk; the results files have every filter.
 
 ## The same vectors, built several times
 
@@ -379,29 +399,27 @@ inserts and the commit:
 NumPy's exact ranking of the same vectors finds a gold page for 2,943 claims.
 
 - **At the chosen settings (`M=16`, `ef_search` 100) recall moves little with the build, the hit
-  lists more.** The twenty builds found a gold page for 2,922 to 2,937 of 3,000 claims, and none
-  reached the exact ranking's 2,943. Their top-5 lists equalled the exact ones for 2,862 to 2,918
-  claims, and two builds gave the same list for 2,838 to 2,907. The graph in the database is one
-  more build: its bare search finds a gold page for 2,933
-  ([results/scaled/eval/s1_full_run1.md](../results/scaled/eval/s1_full_run1.md)), inside that
+  lists more** (the table's first row), and no build reached the exact ranking's 2,943. The graph
+  in the database is one more build: its bare search finds a gold page for 2,933
+  ([results/scaled/eval/s1_full_run1.md](../results/scaled/eval/s1_full_run1.md)), inside the
   range. On the demo corpus all twenty builds found 74 of 75 gold pages, the exact ranking's
   number (`results/build_variance.md`, `results/build_variance_run1.md`).
-- **At `ef_search` 20 the same graphs differ more** (the table's second row). The larger
-  `ef_search` also makes a result repeatable across builds.
-- **With the server defaults (`M=6`, `ef_search` 20) the build decides hundreds of claims**: 2,218
-  to 2,433 gold pages, 1,553 to 1,794 lists equal to the exact ones, and two builds agree on 1,404
-  to 1,676 of 3,000 lists. At `ef_search` 100, `M=6` still finds fewer gold pages (2,709 to 2,786)
-  than every `M=16` build at 20.
-- **A build takes 86.5 to 102.3 s at `M=16` and 24.5 to 29.4 s at `M=6`**, for 132,359 inserts
-  into an empty table, against 1.4 to 2.3 s and 0.4 to 0.6 s for the 4,598 vectors of the demo
-  corpus (the same two files).
+- **At `ef_search` 20 the same graphs differ more** (the second row). The larger `ef_search` also
+  makes a result repeatable across builds.
+- **With the server defaults (`M=6`, `ef_search` 20) the build decides hundreds of claims** (the
+  last row). At `ef_search` 100, `M=6` still finds fewer gold pages than every `M=16` build at 20.
+- **At `M=16` a build takes about 3.5 times as long as at `M=6` on S1, and the build time grows
+  faster than the table**: 86.5 to 102.3 s against 24.5 to 29.4 s for S1's 132,359 inserts into an
+  empty table, and 1.4 to 2.3 s against 0.4 to 0.6 s for the demo corpus's 4,598 vectors (the same
+  two files).
 - We did not test whether the way a table is filled (batch size, commits between batches)
   changes the graph's quality.
 
 ## The index cache below and above the graph
 
 `mhnsw_max_cache_size` bounds the memory the server keeps for a vector index's graph. Its default is
-16 MB, and the Docker configuration sets 512 MB. The S1 graph is a file of 163,577,856 bytes
+16 MB, too small for either scaled graph (S0's is 56.0 MB), and the Docker configuration sets
+512 MB. The S1 graph is a file of 163,577,856 bytes
 (156.0 MB; the hidden tablespace `chunk#i#04` in `information_schema.innodb_sys_tablespaces`).
 `scripts/measure_index_behaviour.py cache` searched the 3,000 claims on S1 in two passes per cache
 size, with the bare and the joined statement, k = 5 and `ef_search` 100, and compared each hit list
@@ -495,16 +513,21 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
 | control: A's statement in step 1 is the scan, not the index search | 0 of 5 | [5, 5, 5, 5, 5] |
 | control: A commits but stays connected | 5 of 5 | [0, 0, 0, 0, 0] |
 
-- **What it takes.** In every trial that went stale, a REPEATABLE READ transaction had searched
-  the index before B's commit and again after it. None of the controls that lacked one of the two
-  went stale. That holds for this table only. In a plain-SQL repro with 8-dimensional vectors on
-  11.8.9 and 13.0.2, a transaction whose first statement was
-  `COUNT(*)`, a scan or `START TRANSACTION WITH CONSISTENT SNAPSHOT`, and that searched the index
-  once after B's commit, left it stale in 3 of 3 trials. A 384-dimensional rerun of that repro
-  stayed correct for `COUNT(*)` and the scan (0 of 5 stale) but went stale in 2 of 5 trials for
-  `CONSISTENT SNAPSHOT`. (In 1 control trial the index found 4 of the 5 rows: an approximate
-  search, not this state.) The last control shows that A's disconnect is not needed: the index was
-  stale when A committed and stayed connected.
+- **On this table it took an index search before B's commit and another after it, in one
+  REPEATABLE READ transaction; in an 8-dimensional repro one search after the commit was enough,
+  so the safe rule is the broader one below.** No control that lacked one of the two searches went
+  stale (the one 4 is the approximate search missing a row), including the two whose step 1 is
+  `COUNT(*)` or the scan. A plain-SQL repro, where A's first statement is not a search and A
+  searches the index once, after B's commit:
+
+  | Repro | A's first statement | Stale |
+  |---|---|---|
+  | 8-dimensional vectors, 11.8.9 and 13.0.2 | `COUNT(*)`, the scan or `START TRANSACTION WITH CONSISTENT SNAPSHOT` | 3 of 3 |
+  | 384-dimensional vectors | `COUNT(*)` or the scan | 0 of 5 |
+  | 384-dimensional vectors | `CONSISTENT SNAPSHOT` | 2 of 5 |
+
+  The last control shows that A's disconnect is not needed: the index was stale when A committed
+  and stayed connected.
 - **Who gets the wrong answer.** Everyone we tried: on 5 stale tables, new connections at REPEATABLE
   READ, READ COMMITTED and READ UNCOMMITTED and in autocommit mode each found 0 of the 5 rows
   through the index, so the isolation level of the connection that asks does not protect it.
@@ -520,22 +543,27 @@ The sequence, which we repeated 10 times on fresh tables, with six controls of 5
   insert (3 of 3 tables) or `FLUSH TABLES` (once) brought the 10 rows back, and the control
   without A's second search returned 10 rows in 5 of 5.
 
-What to do when other connections write to the table: no index search in a REPEATABLE READ
-transaction whose snapshot predates another connection's commit. Searching at READ COMMITTED or
+**The rule when other connections write to the table: no index search in a REPEATABLE READ
+transaction whose snapshot predates another connection's commit.** Searching at READ COMMITTED or
 in autocommit mode did not cause the state. PyMySQL opens connections with autocommit off, so a
 connection that has run one `SELECT` is in a REPEATABLE READ transaction until it commits, rolls
-back or closes. That is how WikiLense's own connections work. A web request runs one search and
-closes; with "repeat" it rolls back between the runs, so each search has a transaction of its own. `wikilense query` runs a `COUNT(*)`, loads the model, runs one search and closes, which is
-the shape of the `COUNT(*)` control. That shape stayed correct on this table but not in the
-8-dimensional repro. `wikilense query` stays safe because no other connection commits a write to
-the corpus while it runs. `wikilense eval` and the experiment scripts run many searches in one
-transaction, so a committed write to the corpus by another connection during such a run would
-start the sequence. Nothing here does that: only an ingest (`wikilense ingest`, or the one inside
-an experiment group) commits writes to the corpus, and it recreates the tables; `sql/examples.sql`
-updates one row and rolls back. The measurements are not affected. The experiment was run three
-times with the same outcome in every row of the sequence table that the runs share
-([results/isolation_run1.md](../results/isolation_run1.md) is the first run, made before three of
-the controls were added). The behaviour is MariaDB issue
+back or closes, and WikiLense's connections work that way.
+
+**WikiLense's measurements are not affected: nothing commits a write to the corpus while a run is
+going on.** Only an ingest (`wikilense ingest`, or the one inside an experiment group) commits
+writes to the corpus, and it recreates the tables; `sql/examples.sql` updates one row and rolls
+back. Per command:
+
+- **The web page** runs one search per request and closes; with "repeat" it rolls back between the
+  runs, so each search has a transaction of its own.
+- **`wikilense query`** runs a `COUNT(*)`, loads the model, runs one search and closes: the shape of
+  the `COUNT(*)` control, which stayed correct on this table but not in the 8-dimensional repro.
+- **`wikilense eval` and the experiment scripts** run many searches in one transaction, so a
+  committed write to the corpus by another connection during such a run would start the sequence.
+
+The experiment ran three times with the same outcome in every row of the sequence table that the
+runs share ([results/isolation_run1.md](../results/isolation_run1.md), the first run, has three
+controls fewer). The behaviour is MariaDB issue
 [MDEV-41321](https://jira.mariadb.org/browse/MDEV-41321). The tables above were measured on 11.8.9
 only, on this one table.
 
@@ -565,62 +593,53 @@ claims, k = 5, the methods taking turns query by query, one timed pass):
   2,962 under the four metadata filters, where the mean overlap with the exact top 5 is 0.998. On
   S0 they are 2,998 and 2,993 (1,588 and 824 chunks pass). On the demo corpus they were exact for
   75 of 75 claims under both (`results/separate_index.md`). We did not look into the 38 lists.
-- **The copy.** 132,359 vectors are 203,303,424 bytes of float32; reading them out of MariaDB with
-  the columns the filters need took 2.42 s, and the client process grew by 701,804,544 bytes. The
-  hnswlib graph is 222,955,496 bytes saved and took 5.87 s to build on all cores. A copy is stale
-  after the next write and outside every transaction.
-- **Speed.** Without a filter, MariaDB's index search (2.87 ms) is faster than an exact scan of the
-  copy (10.19 ms); an in-process HNSW graph is faster still (0.36 ms) but finds less of the exact
-  top 5 (0.961 against 0.993). Under the four filters the copy is far faster: 2.44 ms with the row
-  fetch against 58.69 ms for MariaDB's joined statement (p95 189.01 ms). The copy's filtered times
-  include evaluating the filter in Python inside every query (for the History heading, a match over
-  the 132,359 headings), so they are an upper bound for a separate index with its own filter index.
+- **A copy costs memory, and it is stale after the next write.** The 132,359 vectors are 193.9 MB
+  of float32; reading them out of MariaDB with the columns the filters need took 2.42 s, and the
+  client process grew by 669.3 MB, about 3.5 times the vectors. The hnswlib graph is 212.6 MB saved
+  and took 5.87 s to build on all cores. A copy is outside every transaction.
+- **Without a filter MariaDB's index search is fast; under the four filters the copy is far
+  faster.** The index search (2.87 ms) beats an exact scan of the copy (10.19 ms); an in-process
+  HNSW graph is faster still (0.36 ms) but gives the exact top 5 for fewer claims (2,544 against
+  2,917). Under the four filters the copy takes 2.44 ms with the row fetch against 58.69 ms for
+  MariaDB's joined statement (p95 189.01 ms). The copy's filtered times include evaluating the
+  filter in Python inside every query (for the History heading, a match over the 132,359
+  headings), so they are an upper bound for a separate index with its own filter index.
 
 ## A search that runs away
 
-**The setup.** The statements of the bullet above ran once more in throwaway containers of the
-official images, each with a 2 GB memory cap
+**On 11.8.9 a search that fewer rows pass than its `LIMIT` can grow the server until the kernel
+kills it; 12.3.3 and 13.0.2 stayed at 552 MiB or less, but every version can return fewer rows
+than pass.** The statements of the `hard_cap` bullet under "What we measured" ran again in
+throwaway containers of the official images with a 2 GiB memory cap, on a table of the 132,359 S1
+vectors, with one claim's query vector and `LIMIT` 10
 ([results/scaled/version_probe/version_probe.md](../results/scaled/version_probe/version_probe.md),
-with its script and logs):
-- a table of the 132,359 S1 vectors;
-- one claim's query vector;
-- `LIMIT` 10.
+with its script and logs). A reproduction in SQL only, on vectors generated in SQL and on the first
+80,000 S1 vectors, read the statement's own memory from `Max_memory_used`, in millions of bytes
+([results/scaled/runaway_repro/runaway_repro.md](../results/scaled/runaway_repro/runaway_repro.md)):
 
-**On 11.8.9.**
-- **As the first search after a server start it was fast.** A distance threshold that 3 rows
-  meet returned them in 1.51 and 1.71 s; after four other searches it took 10.25 s and 842 MiB.
-- **The next run was killed.** Under a 60 s `max_statement_time` it grew `mariadbd` to the 2 GB
-  cap in 20 to 22 s, and the kernel killed the server. The logs record this for that threshold,
-  on the same connection and on a fresh one, and once for `WHERE w < x` with 6 rows passing.
-- **With random vectors** five such statements took 3.29 to 16.55 s (the longest with 30 rows
-  under the threshold) and up to 1,311 MiB; four came back short, and the memory was given back.
-- **With `max_statement_time` = 10** the threshold statement was stopped at 10.0 s (error 1969),
-  at 1.3 and 1.5 GiB, and the server stayed up.
+| Version | The container | The statement's own memory | Threshold that 3 rows meet | Of the 5 rows that pass `w < 5`, returned |
+|---|---|---|---|---|
+| 11.8.9 | killed at the cap after 20 to 22 s, under a 60 s `max_statement_time` | 709 on 80,000 generated, 984 on 80,000 S1 vectors | 1.51 and 1.71 s as the first search after a start, then killed | 0 to 3 |
+| 12.3.3 | at most 552 MiB | 58 to 150 | 6.85 s on the first run, then 0.81 to 1.69 s | 0 to 2 |
+| 13.0.2 | at most 552 MiB | 42 | 5.47 s on the first run, then 0.63 to 1.16 s | none |
 
-**On 12.3.3 and 13.0.2.**
-- Nothing ran away: memory peaked at 552 MiB or less.
-- The threshold statement returned its 3 rows every time: 6.85 and 5.47 s on the first run, then
-  0.63 to 1.69 s.
-- `WHERE w < x` returned 0 or 1 of the 6 rows that pass. That is the short answer the
+What it means:
+
+- **The memory is the statement's own**, and it is given back when the statement ends; a plain
+  search took 0.13 million bytes.
+- **No data file is needed for a kill.** On 160,000 generated vectors the second execution got
+  `mariadbd` killed at the cap in 2 of 2 runs, as on the 132,359 S1 vectors; the version probe
+  also lost 11.8.9 once under `w < x`.
+- **A 10 s time limit stops it.** With `max_statement_time` = 10 the threshold statement was
+  stopped at 10.0 s (error 1969), at 1,307 and 1,545 MiB, and the server stayed up. Earlier the
+  kernel's OOM killer had stopped the development machine's server at 7.2 GiB; which statement ran
+  then was not logged.
+- **On 12.3.3 and 13.0.2 a very selective filter comes back short**, the answer the
   documentation describes.
 
-**In SQL only, a day later.** The same statements on vectors generated in SQL and on the first
-80,000 S1 vectors, with the connection's own memory read from `Max_memory_used`
-([results/scaled/runaway_repro/runaway_repro.md](../results/scaled/runaway_repro/runaway_repro.md)):
-- **The memory is the statement's.** On 11.8.9 the threshold statement took 709 MB on 80,000
-  generated vectors and 984 MB on 80,000 S1 vectors, where a plain search took 0.13 MB. It was
-  given back when the statement ended.
-- **No data file is needed for a kill.** On 160,000 generated vectors the second execution got
-  `mariadbd` killed at the 2 GB cap in 2 of 2 runs, as on the 132,359 S1 vectors.
-- **12.3.3 and 13.0.2 are not flat.** They took 42 to 150 MB for these statements; nothing was
-  killed.
-- **Short answers on every version.** Of 5 passing rows 11.8.9 returned 0 to 3, 12.3.3 0 to 2
-  and 13.0.2 none.
-
 **Status.** It is MariaDB issue [MDEV-42358](https://jira.mariadb.org/browse/MDEV-42358),
-reported on 2026-11-21 with the reproduction in SQL only; a search of JIRA the day before had
-found no ticket for it. A Percona-Lab
-benchmark met the same symptom on 11.8.8
+reported on 2026-11-21 with the reproduction in SQL only. A Percona-Lab benchmark met the same
+symptom on 11.8.8
 ([pull request](https://github.com/Percona-Lab/vector-bench/pull/14)). 11.8.10 and 12.3.4 were
 released on 2026-11-16 and are not tested here. Its nearest
 relatives are [MDEV-40916](https://jira.mariadb.org/browse/MDEV-40916) (in review for 13.2: the
@@ -674,7 +693,7 @@ and each statement tried on the 11.8.9 container:
 | `M` from 3 to 200, default 6; `mhnsw_ef_search` from 1 to 10000, default 20; `mhnsw_max_cache_size` default 16 MB | the same values in `information_schema.SYSTEM_VARIABLES` (a test reads them) |
 | `INFORMATION_SCHEMA.VECTOR_INDEXES` exists from MariaDB 13.1 | the table does not exist in 11.8.9, which is why the graph size was read from the tablespace file |
 | "Concurrent reads/writes and all transaction isolation levels are supported" | we measured two things it does not mention: the lower recall over a transaction's own uncommitted rows, and the index left stale by a REPEATABLE READ reader ("Isolation levels" above) |
-| "The `LIMIT` is a hard cap on how many rows the index returns *before* the threshold is applied", and "(Adding the `WHERE` directly to an `ORDER BY ... LIMIT` query also uses the index, but with the same hard cap.)" (read on 2026-11-20) | holds for the subquery form, which reads exactly its inner `LIMIT` rows. Not on 11.8.9 for a `WHERE` inside the statement: the search goes on past `LIMIT`, and when fewer rows qualify it can run until it is stopped or the server is out of memory ("A search that runs away" above); other runs ended by themselves, some with a short answer. On 12.3.3 and 13.0.2 nothing was killed, and a very selective filter came back short |
+| "The `LIMIT` is a hard cap on how many rows the index returns *before* the threshold is applied", and "(Adding the `WHERE` directly to an `ORDER BY ... LIMIT` query also uses the index, but with the same hard cap.)" (read on 2026-11-20) | holds for the subquery form, which reads exactly its inner `LIMIT` rows. Not on 11.8.9 for a `WHERE` inside the statement: the search goes on past `LIMIT`, and when fewer rows qualify it can run until it is stopped or the server is out of memory ("A search that runs away" above). On 12.3.3 and 13.0.2 nothing was killed, and a very selective filter came back short |
 
 Not in the reference, and measured here: the second `ORDER BY` key and the `IN (subquery)` that
 lose the index; the exact ranking of the joined statement without a filter, and its nearly exact
