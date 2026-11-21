@@ -2,7 +2,9 @@
 # Every recipe is echoed before it runs, so the commands can be copied into a shell.
 #
 #   make setup        .env (written on the first run, with generated passwords), MariaDB via
-#                     Docker Compose, the .venv, the package, and the ingest of data/corpus/
+#                     Docker Compose, the .venv, the package, and the ingest of data/corpus/;
+#                     on Linux with PyTorch's CPU-only build
+#   make setup GPU=1  the same with PyPI's PyTorch, which on Linux is the CUDA build
 #   make setup CPU=1  the same with the pinned CPU-only packages (requirements-cpu.lock)
 #   make test         run the test suite (db tests need the container, slow tests the model)
 #   make lint         ruff
@@ -22,6 +24,8 @@ PYTHON  ?= python3
 VENV    ?= .venv
 COMPOSE ?= docker compose
 # What `make setup` installs. The default is the version ranges of requirements-dev.txt.
+#   make setup GPU=1                   the same ranges with PyTorch from PyPI, which on Linux is
+#                                      the CUDA build (for an NVIDIA GPU)
 #   make setup CPU=1                   the pinned CPU-only build (no CUDA wheels, about 2 GB
 #                                      smaller); Linux, Windows, and macOS 14+ on Apple Silicon
 #   make setup REQS=requirements.lock  the pinned GPU build that results/ was measured with
@@ -29,6 +33,19 @@ COMPOSE ?= docker compose
 REQS    ?= requirements-dev.txt
 ifeq ($(CPU),1)
 REQS    := requirements-cpu.lock
+endif
+# On Linux, PyPI's PyTorch is the CUDA build, so the ranges also look in PyTorch's CPU index. pip
+# takes the newest version from either index, and a "+cpu" build sorts above PyPI's build of the
+# same release. macOS wheels have no CUDA and get no extra index. A lock file pins its own build:
+# "==2.14.0" would also match "2.14.0+cpu".
+UNAME   ?= $(shell uname -s)
+TORCH_INDEX :=
+ifeq ($(UNAME),Linux)
+ifneq ($(GPU),1)
+ifeq ($(filter %.lock,$(REQS)),)
+TORCH_INDEX := --extra-index-url https://download.pytorch.org/whl/cpu
+endif
+endif
 endif
 # The oldest Python that can install $(REQS): the package needs 3.10, the lock files pin
 # versions that need 3.12 (numpy 2.5.3).
@@ -59,7 +76,7 @@ endif
 
 setup: check-python .env check-env venv
 	$(COMPOSE) up -d --wait
-	$(VENV)/bin/pip install -r $(REQS) -e .
+	$(VENV)/bin/pip install -r $(REQS) -e . $(TORCH_INDEX)
 	$(VENV)/bin/wikilense ingest
 
 # Stop early, with the reason, when $(PYTHON) is too old: on a Mac without Homebrew, python3 is
