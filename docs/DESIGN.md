@@ -476,8 +476,8 @@ the statement and its first 5 passages to Haiku ([LLM_EXTENSION.md](LLM_EXTENSIO
 - It sends the experiment's prompt with the experiment's settings. The page shows how often each
   verdict was right in the experiment, and those figures describe one request: `fact_check_v1`,
   Haiku at effort high, the top 5 passages. A different prompt would get different answers, and
-  the figures would no longer apply. So the page reads every part of the request from the
-  experiment's files: the settings
+  the figures would no longer apply. That includes a longer reason, or dropping "as of December
+  2020". So the page reads every part of the request from the experiment's files: the settings
   from the RAG run's record in `results/llm/runs.json` and the prompt set from its folder. A hash
   that differs from the recorded one keeps the fact-check off. `Runner.request` builds the
   request, and the backend's own code parses the answer. The server runs the search again and
