@@ -1,8 +1,6 @@
 # Setup: what `make setup` does, on which platforms, and what to do when it fails
 
-The [README](../README.md) has the short version: `make setup`, then a query. This page has every
-step, the three sets of packages, what was checked on which platform and how, and the known
-failures.
+The [README](../README.md) has the short version: `make setup`, then a query.
 
 ## What you need
 
@@ -245,11 +243,15 @@ make load-s1      # load it into the database wikilense_s1 and check every count
 5. `scripts/scaled_stage3.py load` and `verify` write the categories and edit dates and check them
    against `page_meta_S1.jsonl`.
 
-The vectors are the ones the reported results were measured with, but the HNSW graph is built anew
-by each load, and graph builds differ a little. Twenty builds of these vectors found a gold page in
-the top 5 for 2,922 to 2,937 of the 3,000 claims ([build_variance.md](../results/scaled/run1/s1/build_variance.md));
-the reported run found 2,933. A test load from the release file found 2,934, and evidence recall@5
-was 2,256 of 3,000 against the reported 2,253 ([the test load](../results/scaled/release_check/README.md)).
+Your load will come close to the reported numbers but need not equal them: the vectors are the
+ones they were measured with, but each load builds the HNSW graph anew, and graph builds differ a
+little. Claims of the 3,000 found at k = 5:
+
+| Graph | Gold page in the top 5 | Evidence recall@5 |
+|---|---|---|
+| twenty builds ([build_variance.md](../results/scaled/run1/s1/build_variance.md)) | 2,922 to 2,937 | not measured |
+| the reported run | 2,933 | 2,253 |
+| a test load from the release file ([the test load](../results/scaled/release_check/README.md)) | 2,934 | 2,256 |
 
 The web page needs no setting: once S1 is loaded, `make serve` offers it in the page's database
 selector, next to the demo database. To query S1 from the command line, name it in
