@@ -193,7 +193,7 @@ table and the method; the measurements are on S1 unless a line says otherwise.
 - **One statement.** "Chunks about X, in a category, longer than N words, edited since D, linked
   from Y" is a single statement that the optimizer plans, and `EXPLAIN` shows the plan. The link
   graph and the categories are joined, not copied next to each vector.
-- **One transaction, one backup, one set of foreign keys.** Vectors roll back with their
+- **One transaction, one set of foreign keys.** Vectors roll back with their
   transaction and disappear with their page; there is no synchronisation job between two stores.
 - **The ground truth in the same database.** `claim_evidence` resolves every gold element to a
   `sentence_id`, so the evaluation matches ids, not text; the `FULLTEXT` index sits on the same
