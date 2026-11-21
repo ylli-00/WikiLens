@@ -338,7 +338,7 @@ To learn the feature, five files are enough: [sql/schema.sql](sql/schema.sql) (t
 [scripts/](scripts/) builds the corpora and runs the experiments, [data/](data/) holds the demo corpus and the 3,000
 claims, [results/](results/) every experiment as JSON and Markdown, and [docs/](docs/) the reference pages
 ([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [analysis/](analysis/) is the earlier FEVEROUS analysis
-that chose the benchmark, and [CLAUDE.md](CLAUDE.md) the working notes for the coding assistant. [tests/](tests/) holds
+that chose the benchmark. [tests/](tests/) holds
 921 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team

@@ -1,6 +1,6 @@
 """Comments, docstrings and messages in the code stay neutral and hold no personal details.
 
-The rule is in ``CLAUDE.md``, section "Comments, docstrings and personal details". These tests
+The rule is in ``docs/DESIGN.md``, section "Repository layout". These tests
 scan the code, SQL and configuration files for what that rule excludes: notes on who decided
 something, references to chat sessions, review findings and decision lists, paths into a home or
 user folder, email addresses, and IP addresses other than the allowed ones. Data, results, docs
@@ -114,6 +114,6 @@ def test_the_patterns_catch_the_excluded_forms_and_let_the_allowed_ones_pass() -
 def test_the_code_text_is_neutral_and_holds_no_personal_details() -> None:
     found = findings()
     assert not found, (
-        'excluded by CLAUDE.md, section "Comments, docstrings and personal details":\n'
+        'excluded by the rule in docs/DESIGN.md, section "Repository layout":\n'
         + "\n".join(found)
     )

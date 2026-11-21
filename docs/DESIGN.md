@@ -24,6 +24,14 @@ that say what a function returns, no SQL built by string formatting (parameters 
 identifiers only from fixed literals in the code), no credentials in code, and no debug flags left
 on. Tests live in `tests/` and are real tests.
 
+Comments, docstrings, the messages the code prints and the docs say what the code does and why,
+in terms that stay true as long as the code does. They do not record who decided or asked for
+something, when, or how the code reached its present form; that belongs in commit messages.
+Tracked files hold no personal details: the author's name appears only in the README's Team
+section and in `LICENSE`, the GitHub account only in the repository URL, and there are no email
+addresses, no paths into a home or user folder, and no IP addresses other than `127.0.0.1` and
+`0.0.0.0`. `tests/test_neutral_text.py` scans the code, SQL and configuration files for this.
+
 ## Data contracts
 
 **Page record** (`data/corpus/pages.jsonl`): the unmodified FEVEROUS page object, one per line.

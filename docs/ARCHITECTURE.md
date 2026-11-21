@@ -162,7 +162,6 @@ personal details; `test_docs.py` checks the README, every link and anchor, and t
 | `data/scaled/` | `claims_3000.jsonl`, the scaled run's claims with their evidence sets, gold pages and gold evidence text, and `NOTICE.md`, its licence. `make fetch-s1` unpacks S1's release file into `wikilense_s1/` here, which git ignores. |
 | `results/`, `results/scaled/` | The result files (JSON and Markdown) of the demo corpus and of the scaled run, each folder with its `SUMMARY.md`. |
 | `README.md` | One question and its answer on the first screen, then how it works, the findings, the data model, how MariaDB uses the index, what the approach gave and where it loses, setup and the method. |
-| `CLAUDE.md` | The project's rules for Claude Code sessions: the task, the benchmark facts, the environment, the rules for comments. |
 | `Makefile` | `make setup` ([SETUP.md](SETUP.md) has its steps; `CPU=1` for the pinned CPU-only set), `test`, `lint`, `eval`, `serve`, `examples`, `experiments`, `fetch-s1` and `load-s1` (the scaled database S1 from its release file), `down`; `make -n <target>` prints the commands. |
 | `docker-compose.yml`, `.env.example` | MariaDB 11.8 as `wikilense-mariadb` on `127.0.0.1:3306`, with a 512 MB HNSW cache and a health check; the template for the ignored `.env`. |
 | `pyproject.toml`, `requirements*` | The package, the `wikilense` command, pytest markers, ruff; version ranges, and exact versions in `requirements.lock` (the GPU build behind `results/`) and `requirements-cpu.lock` (CPU only, per-platform PyTorch lines). |
