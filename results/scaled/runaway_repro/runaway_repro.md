@@ -5,7 +5,7 @@
 - On 12.3.3 and 13.0.2 the same statements took 42 to 150 MB, and nothing was killed.
 - On all three versions such a search can come back with fewer rows than pass.
 
-This repeats [the version probe](../version_probe/version_probe.md) with a script that needs no data file, so that it can go with a bug report to MariaDB. Measured on 2026-11-21.
+This repeats [the version probe](../version_probe/version_probe.md) with a script that needs no data file. It is the reproduction attached to MariaDB issue [MDEV-42358](https://jira.mariadb.org/browse/MDEV-42358). Measured on 2026-11-21.
 
 ## Setup
 

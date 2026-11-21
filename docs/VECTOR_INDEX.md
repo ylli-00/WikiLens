@@ -617,7 +617,9 @@ with its script and logs):
 - **Short answers on every version.** Of 5 passing rows 11.8.9 returned 0 to 3, 12.3.3 0 to 2
   and 13.0.2 none.
 
-**Status.** We found no MariaDB ticket for this; we searched JIRA on 2026-11-20. A Percona-Lab
+**Status.** It is MariaDB issue [MDEV-42358](https://jira.mariadb.org/browse/MDEV-42358),
+reported on 2026-11-21 with the reproduction in SQL only; a search of JIRA the day before had
+found no ticket for it. A Percona-Lab
 benchmark met the same symptom on 11.8.8
 ([pull request](https://github.com/Percona-Lab/vector-bench/pull/14)). 11.8.10 and 12.3.4 were
 released on 2026-11-16 and are not tested here. Its nearest
