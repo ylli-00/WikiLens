@@ -195,7 +195,8 @@ make load-s1      # load it into the database wikilense_s1 and check every count
 1. `scripts/scaled_release.py check-empty` stops when `wikilense_s1` already holds tables, because
    the ingest drops every table of its database. `make load-s1 REPLACE=1` replaces them.
 2. `scripts/scaled_stage2.py create-dbs` creates `wikilense_s0` and `wikilense_s1` and grants them
-   to the application user. `wikilense_s0` stays empty; only the full build below fills it.
+   to the user `wikilense`, the default of `.env`; with another `WIKILENSE_DB_USER`, grant them by
+   hand. `wikilense_s0` stays empty; only the full build below fills it.
 3. `scaled_stage2.py ingest` loads the folder with the saved vectors and builds the vector index.
 4. `scaled_stage2.py verify` compares the counts with `corpora.json`: 7,686 pages, 132,359 chunks,
    19,149,694 chunk words, 3,000 claims and 8,408 evidence ids (8,408 with a page, 7,877 with a
