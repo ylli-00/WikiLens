@@ -46,9 +46,14 @@ SONNET = {"sonnet": "claude-sonnet-5-5"}
 
 @pytest.fixture
 def api(tmp_path, monkeypatch):
-    """A fake API, a .env holding the test key, and no ANTHROPIC* variable in the shell."""
+    """A fake API, a .env holding the test key, and no ANTHROPIC* variable in the shell.
+
+    The database password is set in the environment, so the runner's settings load in a checkout
+    that has no ``.env`` of its own.
+    """
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("WIKILENSE_DB_PASSWORD", "x")
     env_file = tmp_path / ".env"
     env_file.write_text(f"WIKILENSE_DB_PASSWORD=x\nANTHROPIC_API_KEY={KEY}\n")
     fake = FakeAPI()
