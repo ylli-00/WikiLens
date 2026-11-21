@@ -13,6 +13,7 @@ the FEVEROUS annotations.
 | `pages.jsonl` | the text of 100 English Wikipedia articles as it stood in December 2020, in the FEVEROUS page format | Wikipedia contributors; the lines are copied unchanged from the FEVEROUS Wikipedia shard `wiki_000.jsonl` | Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0) |
 | `claims.jsonl` | 75 FEVEROUS claims with their evidence annotations, plus a `split` field | the FEVEROUS train and dev files, https://fever.ai/dataset/feverous.html | the FEVEROUS licence terms quoted below |
 | `page_meta.jsonl`, `PAGE_META.md` | each page's Wikipedia revision id, its timestamp and its category names | the MediaWiki API of en.wikipedia.org, fetched by `scripts/fetch_page_meta.py` | the category names are part of the article text: CC BY-SA 3.0 |
+| `wikilense_demo.sql.gz` | the demo database: the three files above as the ingest loads them, with each chunk's vector | written by `make demo-dump` from the ingested files | the terms of the files it holds: CC BY-SA 3.0 and the FEVEROUS terms |
 | `MANIFEST.md` | counts, checksums and the page list | written by `scripts/build_corpus.py` | MIT, like the code |
 
 ## Wikipedia text

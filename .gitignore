@@ -24,3 +24,6 @@ data/scaled/wikilense_s1/
 data/scaled/wikilense_s1.partial/
 data/scaled/wikilense_s1.tar.gz
 data/scaled/wikilense_s1.tar.gz.part
+
+# The partial file of `make demo-dump`, renamed to data/corpus/wikilense_demo.sql.gz when complete
+data/corpus/wikilense_demo.sql.gz.part

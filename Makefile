@@ -11,6 +11,9 @@
 #   make eval         recall and latency of the ingested corpus -> results/
 #   make serve        the web query page on http://127.0.0.1:8000
 #   make examples     the ten examples of sql/examples.sql through the mariadb client (no Python)
+#   make load-demo    the demo database from its dump, data/corpus/wikilense_demo.sql.gz, through
+#                     the same client: with .env and MariaDB up, make examples needs no Python
+#   make demo-dump    write that dump again from the ingested demo database
 #   make experiments  the whole experiment protocol (scripts/run_experiments.py all)
 #   make fetch-s1     download the scaled database's release file, check its SHA-256, unpack it
 #                     into data/scaled/wikilense_s1/ (docs/SETUP.md, "Get the scaled database")
@@ -68,9 +71,18 @@ ifeq ($(S1_CHECK),1)
 S1_DB     := wikilense_s1_check
 S1_FLAGS  := --allow-check-database
 endif
+# The demo database as a dump. `make load-demo` loads it into the database the container was
+# created with (MARIADB_DATABASE, from WIKILENSE_DB_NAME), the one `make examples` reads; the
+# container's shell expands the name. `make load-demo DEMO_CHECK=1` loads into the scratch database
+# wikilense_demo_check instead, to test the load without touching the demo database.
+DEMO_DUMP := data/corpus/wikilense_demo.sql.gz
+DEMO_DB   := $$MARIADB_DATABASE
+ifeq ($(DEMO_CHECK),1)
+DEMO_DB   := wikilense_demo_check
+endif
 
-.PHONY: setup check-python check-env venv test lint eval serve examples experiments fetch-s1 \
-	load-s1 down
+.PHONY: setup check-python check-env venv test lint eval serve examples load-demo demo-dump \
+	experiments fetch-s1 load-s1 down
 
 # --- setup -----------------------------------------------------------------------------------
 
@@ -130,6 +142,31 @@ serve:
 # environment; the password reaches the client as MYSQL_PWD there and is on no command line.
 examples:
 	$(COMPOSE) exec -T mariadb sh -c 'MYSQL_PWD="$$MARIADB_PASSWORD" exec mariadb --table -u"$$MARIADB_USER" "$$MARIADB_DATABASE"' < sql/examples.sql
+
+# The dump through the container's own gzip and mariadb client, as the application user: no
+# Python, no model. The dump drops and re-creates the eleven tables, so the load first stops when
+# the database already holds tables; REPLACE=1 skips that check. `gzip -t` refuses a damaged file
+# before any table is touched, and the last statement prints counts to compare with the ingest's.
+# DEMO_CHECK=1 first creates the scratch database as root and grants it to the user wikilense,
+# the default of .env (the statements are fixed text, like those of scripts/scaled_stage2.py).
+load-demo:
+	$(COMPOSE) exec -T mariadb gzip -t < $(DEMO_DUMP)
+ifeq ($(DEMO_CHECK),1)
+	printf '%s\n' 'CREATE DATABASE IF NOT EXISTS wikilense_demo_check;' "GRANT ALL PRIVILEGES ON wikilense_demo_check.* TO 'wikilense'@'%';" | $(COMPOSE) exec -T mariadb sh -c 'MYSQL_PWD="$$MARIADB_ROOT_PASSWORD" exec mariadb -uroot'
+endif
+ifneq ($(REPLACE),1)
+	$(COMPOSE) exec -T mariadb sh -c 'n=$$(MYSQL_PWD="$$MARIADB_PASSWORD" mariadb -u"$$MARIADB_USER" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()" "$(DEMO_DB)") || exit 1; if [ "$$n" != 0 ]; then echo "$(DEMO_DB) already holds $$n tables, and the load would drop and replace them. To replace them, run the load again with REPLACE=1."; exit 1; fi'
+endif
+	$(COMPOSE) exec -T mariadb sh -c 'gzip -dc | MYSQL_PWD="$$MARIADB_PASSWORD" exec mariadb -u"$$MARIADB_USER" "$(DEMO_DB)"' < $(DEMO_DUMP)
+	$(COMPOSE) exec -T mariadb sh -c 'MYSQL_PWD="$$MARIADB_PASSWORD" exec mariadb --table -u"$$MARIADB_USER" -e "SELECT (SELECT COUNT(*) FROM page) AS pages, (SELECT COUNT(*) FROM chunk) AS chunks, (SELECT COUNT(*) FROM claim) AS claims" "$(DEMO_DB)"'
+
+# Write the dump again from the ingested demo database (after `make setup`), with the container's
+# mariadb-dump and gzip. The same database gives the same bytes: no dump date, and gzip -n stores
+# no file name or time. The file is replaced only when the dump succeeded.
+# tests/test_demo_dump.py pins its SHA-256 and checks its ingest record against data/corpus/.
+demo-dump:
+	$(COMPOSE) exec -T mariadb sh -c 'MYSQL_PWD="$$MARIADB_PASSWORD" mariadb-dump -u"$$MARIADB_USER" --single-transaction --hex-blob --skip-dump-date "$$MARIADB_DATABASE" > /tmp/demo.sql && gzip -9n < /tmp/demo.sql; status=$$?; rm -f /tmp/demo.sql; exit $$status' > $(DEMO_DUMP).part
+	mv $(DEMO_DUMP).part $(DEMO_DUMP)
 
 experiments:
 	$(VENV)/bin/python scripts/run_experiments.py all
