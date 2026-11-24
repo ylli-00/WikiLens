@@ -273,7 +273,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (933 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (936 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), apart from differences between HNSW builds. The scaled run needs the 53.5 GB FEVEROUS
@@ -339,7 +339,7 @@ To learn the feature, five files are enough: [sql/schema.sql](sql/schema.sql) (t
 [scripts/](scripts/) builds the corpora and runs the experiments, [data/](data/) holds the demo corpus and the 3,000
 claims, [results/](results/) every experiment as JSON and Markdown, and [docs/](docs/) the reference pages
 ([ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every file). [tests/](tests/) holds
-933 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
+936 tests, and [CI](.github/workflows/ci.yml) runs ruff and the whole suite against a `mariadb:11.8.9` service on every push to `main` and pull request.
 
 ## Team
 
