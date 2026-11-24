@@ -12,6 +12,7 @@ The [README](../README.md) has the short version: `make setup`, then a query.
   `wsl --install` in a terminal run as administrator (without one it fails with a message that
   does not say so), then in Ubuntu
   `sudo apt install make docker.io docker-compose-v2 python3-venv` and `sudo usermod -aG docker $USER`.
+  Then open a new Ubuntu terminal: the `docker` group applies only to sessions started after it.
   Clone inside Ubuntu's own file system (`~`), not under `/mnt/c`: with every package in pip's
   cache, `make setup` took 4 min 49 s there against 25 min 10 s under `/mnt/c`, and loading the
   model 3 s against 56 s.
