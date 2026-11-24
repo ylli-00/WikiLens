@@ -33,7 +33,7 @@ make setup
   MariaDB 11.8 in a container, builds a virtual environment with PyTorch's CPU build (`GPU=1` for
   CUDA) and loads the 100 Wikipedia pages committed here ([the list](data/corpus/MANIFEST.md)). Nothing has to be edited.
 - The output is from a fresh clone with `make setup CPU=1` (the pinned versions), which took 4 minutes
-  45 seconds ([the record](results/fresh_clone_run.md); [setup and platforms](#setup-and-platforms), also for a Mac).
+  45 seconds with the packages from pip's local cache and the model from `~/.cache/huggingface` ([the record](results/fresh_clone_run.md); [setup and platforms](#setup-and-platforms), also for a Mac).
 - Put your own question between the quotes. The first number is the cosine distance. `--k 5`
   returns more passages, `--category`, `--min-words`, `--edited-since` and `--linked-from` filter
   them, `--explain` prints the SQL statement and MariaDB's plan, and `make serve` opens the same
@@ -261,9 +261,9 @@ without that, its "Copy the prompt" box gives that prompt, with one sentence cha
 
 ## Setup and platforms
 
-`make setup` does four things, each of which you can run by hand ([docs/SETUP.md](docs/SETUP.md)):
-it writes `.env` with two generated passwords, starts MariaDB 11.8 with `docker compose up -d --wait`
-(bound to `127.0.0.1:3306`), creates `.venv` and installs the package, and runs `wikilense ingest`.
+`make setup` does five things, each of which you can run by hand ([docs/SETUP.md](docs/SETUP.md)):
+it writes `.env` with two generated passwords, creates `.venv`, starts MariaDB 11.8 with `docker compose up -d --wait`
+(bound to `127.0.0.1:3306`), installs the package, and runs `wikilense ingest`.
 The ingest loads the 100-page demo corpus and ends with a report to compare against this one:
 
 ```
@@ -273,7 +273,7 @@ The ingest loads the 100-page demo corpus and ends with a report to compare agai
   page metadata 100 of 100 pages, categories 1005 (page_category 1123)
 ```
 
-Then `make test` (936 tests), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
+Then `make test` (936 tests; after `make setup` 32 skip, as they need the optional Anthropic SDK of `requirements-llm.txt`), `make eval`, `make serve`, `make examples` (the ten examples of `sql/examples.sql`,
 no Python needed), `make experiments` (the protocol on the 100 pages, with a GPU) and `make down`. `make eval` checks
 an install: on the 100 pages it finds the gold page among the top 5 chunks for 74 of 75 claims and the complete evidence
 in the top 10 for 60 of 66 (`results/final_ef_100.md`), apart from differences between HNSW builds. The scaled run needs the 53.5 GB FEVEROUS
