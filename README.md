@@ -285,9 +285,9 @@ laptop's CPU against 21 s on its GPU, and a query embedding takes 18 ms against 
 do not change. So `make setup` installs PyTorch's CPU build (1.5 GB against 5.8 GB for the GPU build); `CPU=1` pins CPU-only versions (1.4 GB; Python 3.12 or newer).
 
 **Platforms.** On Linux x86_64 all three were run: the default's install and the tests, `GPU=1` on the author's laptop,
-`CPU=1` from a fresh clone; CI installs that lock file on every push. On macOS 14 or newer with Apple
+`CPU=1` from a fresh clone; CI installs that lock file on every push. On Windows the default ran from fresh clones in WSL 2 ([the record](results/fresh_clone_run.md#windows-with-wsl-2)); native Windows was not tested. On macOS 14 or newer with Apple
 Silicon both resolve: pip's and uv's resolvers find every package for that platform, but it was not run
-there, because we have no Mac and no Windows machine. [The platform table](docs/SETUP.md#platforms) has
+there, because we have no Mac. [The platform table](docs/SETUP.md#platforms) has
 macOS 13, Intel Macs and Windows, and the commands behind each cell.
 
 ## Method
