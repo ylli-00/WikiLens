@@ -5,12 +5,19 @@ The [README](../README.md) has the short version: `make setup`, then a query.
 ## What you need
 
 - Docker with the Compose plugin (`docker compose`).
-- Python 3.10 or newer with the `venv` module. The two lock files need 3.12 or newer.
+- Python 3.10 or newer with the `venv` module (on Debian and Ubuntu, the package `python3-venv`).
+  The two lock files need 3.12 or newer.
 - GNU `make` and `git`.
+- On Windows, WSL 2 with Ubuntu: `wsl --install` in a terminal run as administrator (without one it
+  fails with a message that does not say so), then in Ubuntu
+  `sudo apt install make docker.io docker-compose-v2 python3-venv` and `sudo usermod -aG docker $USER`.
 - Disk: the Python environment is 1.5 GB with `make setup`'s CPU build, 1.4 GB with the pinned
   CPU-only packages and 5.8 GB with the GPU build (`du -sh`, measured on the author's laptop). The
   embedding model is another 134 MB in `~/.cache/huggingface`.
-- A network connection for the first run (the MariaDB image, the packages, the model).
+- Memory: the demo path, `make setup` to `make load-demo`, ran in a WSL 2 VM limited to 4 GB of
+  memory and 4 GB of swap.
+- A network connection for the first run (the MariaDB image, the packages, the model; the model's
+  download warns that no `HF_TOKEN` is set, which it does not need).
 
 ## What `make setup` runs
 
@@ -21,21 +28,21 @@ Every recipe is echoed, and `make -n setup` prints the commands without running 
    you only. To choose the passwords yourself, copy `.env.example` to `.env` and edit it before the
    first `make setup`. MariaDB's image sets the passwords once, when it creates the data volume, so
    a later change in `.env` does not change them.
-2. `docker compose up -d --wait`: MariaDB 11.8 with `--mhnsw-max-cache-size=536870912` (512 MB),
+2. `python3 -m venv --clear .venv`, when there is no `.venv` or the one in place does not work, for
+   example after a system upgrade removed the Python it was made with.
+3. `docker compose up -d --wait`: MariaDB 11.8 with `--mhnsw-max-cache-size=536870912` (512 MB),
    bound to `127.0.0.1:3306`, with the databases `wikilense` (the corpus) and `wikilense_test` (the
    test suite). The healthcheck waits until InnoDB is ready.
-3. `python3 -m venv .venv` and `.venv/bin/pip install -r requirements-dev.txt -e .`, on Linux with
+4. `.venv/bin/pip install -r requirements-dev.txt -e .`, on Linux with
    `--extra-index-url https://download.pytorch.org/whl/cpu`, so that PyTorch is its CPU build
    (`make setup GPU=1` leaves the flag out and gets PyPI's CUDA build). The package reads
    `sql/schema.sql` and `data/corpus/` from the checkout, so the editable install is required.
-4. `.venv/bin/wikilense ingest`: creates the tables, parses the 100 committed pages, loads their
+5. `.venv/bin/wikilense ingest`: creates the tables, parses the 100 committed pages, loads their
    categories and edit dates, embeds the chunks and loads everything. It took 21 s on the laptop's
    RTX 4060 (17 s of it embedding) and 230.0 s on its CPU (226.0 s embedding;
    [results/fresh_clone_run.md](../results/fresh_clone_run.md)).
 
 Before step 1 `make setup` checks the Python version and stops with one line when it is too old.
-Before step 3 it rebuilds `.venv` when the one in place does not work, for example after a system
-upgrade removed the Python it was made with.
 
 ## Three sets of packages
 
@@ -69,7 +76,7 @@ that platform; nobody ran it there. We have no Mac and no Windows machine.
 | macOS 13, Apple Silicon | resolves, with PyTorch 2.11.0 | does not resolve |
 | Intel Mac | resolves only with PyTorch 2.2.2 and Python up to 3.12; we treat it as not supported | does not resolve |
 | Windows, WSL 2 | a Linux system: as Linux, not run | as Linux, not run |
-| Windows, native | the Makefile needs a POSIX shell; run the four steps above by hand; PyPI's Windows PyTorch is already the CPU build | the lock file resolves; not run |
+| Windows, native | the Makefile needs a POSIX shell; run the five steps above by hand; PyPI's Windows PyTorch is already the CPU build | the lock file resolves; not run |
 
 The sources for the table, looked up on 2026-11-11 and, for the `make setup` column, again on
 2026-11-21:
@@ -126,13 +133,14 @@ uv also gets `--index-strategy unsafe-best-match`, pip's rule of the newest vers
 | `The container name "/wikilense-mariadb" is already in use` | a second checkout of this repository has its container up | `docker compose down` in the other checkout |
 | `permission denied while trying to connect to the Docker daemon socket` | your user is not in the `docker` group in this shell | `sg docker -c "make setup"`, or log in again |
 | `ensurepip is not available` | a stock Debian or Ubuntu without the venv package | install `python3-venv`; the next `make setup` rebuilds the half-made `.venv` |
+| `Access denied for user 'wikilense'@'%' to database 'wikilense_test'` (error 1044) in `make test` | the data volume has no test database: `sql/docker-init/01-test-database.sh` runs only when the volume is created, and that run failed | `docker compose down -v` (this deletes the database) and `make setup` again |
 
 ## Afterwards
 
 `make test` runs the suite, `make eval` writes the headline table to `results/baseline.md` (ignored
 by git), `make serve` starts the web page, `make examples` runs the ten examples of
-`sql/examples.sql` through the `mariadb` client inside the container (no Python), `make experiments`
-reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
+`sql/examples.sql` through the `mariadb` client inside the container (no Python) and prints 14
+result tables, `make experiments` reruns the protocol and `make down` stops MariaDB and keeps the data. `docker compose down -v`
 deletes the data volume.
 
 `wikilense query` and the web page stop a search after 5 s (`WIKILENSE_STATEMENT_SECONDS` in `.env`,
@@ -162,7 +170,9 @@ make examples
   laptop. `make load-demo DEMO_CHECK=1` loads into the scratch database `wikilense_demo_check` instead.
 - The tables and vectors come back byte for byte. The load builds the HNSW graph anew, as every
   ingest does, so index searches can return slightly different rows
-  ([build_variance.md](../results/build_variance.md)).
+  ([build_variance.md](../results/build_variance.md)). After an ingest on another machine the
+  distances can also differ from about the 6th significant digit, so rows with close or equal
+  scores can come back in another order.
 - `make demo-dump` writes the file again from an ingested database; the same database gives the same
   bytes. `tests/test_demo_dump.py` pins the file's SHA-256 and checks that its ingest record names
   the committed corpus files and the default settings.
