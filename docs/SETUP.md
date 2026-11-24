@@ -8,9 +8,13 @@ The [README](../README.md) has the short version: `make setup`, then a query.
 - Python 3.10 or newer with the `venv` module (on Debian and Ubuntu, the package `python3-venv`).
   The two lock files need 3.12 or newer.
 - GNU `make` and `git`.
-- On Windows, WSL 2 with Ubuntu: `wsl --install` in a terminal run as administrator (without one it
-  fails with a message that does not say so), then in Ubuntu
+- On Windows, WSL 2 with Ubuntu, the route that was run (native Windows was not tested):
+  `wsl --install` in a terminal run as administrator (without one it fails with a message that
+  does not say so), then in Ubuntu
   `sudo apt install make docker.io docker-compose-v2 python3-venv` and `sudo usermod -aG docker $USER`.
+  Clone inside Ubuntu's own file system (`~`), not under `/mnt/c`: with every package in pip's
+  cache, `make setup` took 4 min 49 s there against 25 min 10 s under `/mnt/c`, and loading the
+  model 3 s against 56 s.
 - Disk: the Python environment is 1.5 GB with `make setup`'s CPU build, 1.4 GB with the pinned
   CPU-only packages and 5.8 GB with the GPU build (`du -sh`, measured on the author's laptop). The
   embedding model is another 134 MB in `~/.cache/huggingface`.
@@ -66,7 +70,7 @@ the ingest above, and 18 ms for a query instead of 4.6 ms (`results/final_ef_100
 ## Platforms
 
 "Run" means we ran it. "Resolves" means a package installer finds a version of every package for
-that platform; nobody ran it there. We have no Mac and no Windows machine.
+that platform; nobody ran it there. We have no Mac; Windows was run only through WSL 2.
 
 | Platform | `make setup` (ranges) | `make setup CPU=1` (lock file) |
 |---|---|---|
@@ -75,8 +79,8 @@ that platform; nobody ran it there. We have no Mac and no Windows machine.
 | macOS 14 or newer, Apple Silicon | resolves for Python 3.10 to 3.14 | resolves for Python 3.12 to 3.14 |
 | macOS 13, Apple Silicon | resolves, with PyTorch 2.11.0 | does not resolve |
 | Intel Mac | resolves only with PyTorch 2.2.2 and Python up to 3.12; we treat it as not supported | does not resolve |
-| Windows, WSL 2 | a Linux system: as Linux, not run | as Linux, not run |
-| Windows, native | the Makefile needs a POSIX shell; run the five steps above by hand; PyPI's Windows PyTorch is already the CPU build | the lock file resolves; not run |
+| Windows, WSL 2 | run with Ubuntu 26.04 and Python 3.14 on 2026-11-22 and 2026-11-24 ([the record](../results/fresh_clone_run.md)) | as Linux, not run |
+| Windows, native | not tested: the Makefile needs a POSIX shell, so the five steps above would be run by hand; PyPI's Windows PyTorch is already the CPU build | the lock file resolves; not run |
 
 The sources for the table, looked up on 2026-11-11 and, for the `make setup` column, again on
 2026-11-21:

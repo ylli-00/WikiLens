@@ -5,15 +5,15 @@ Run on 2026-11-11 on the author's laptop (i9-13900H, Ubuntu 26.04.1, Docker 29.1
 into an empty directory, at commit 832d51e of the branch `fable-review-2026-11-11`, which `main`
 was fast-forwarded to afterwards. The branch is deleted now; the commit is in `main`'s history.
 
-The run has not been repeated from a fresh clone since, and later commits changed code that these
-commands run: the search got a time limit (`17bb45a`), the ingest and the evaluation got new
+Later commits changed code that these commands run: the search got a time limit (`17bb45a`), the ingest and the evaluation got new
 functions (`c5a689c`), the web page grew (`ea6ae74`, `704adc2`, `17bb45a`), and the Makefile got the
 S1 targets (`187b8a5`). The suite has grown too; the README states the current count. On 2026-11-21
 the suite, `make eval`, the query, `make examples` and `make serve` were run again at commit 5b76c16,
 in the author's working copy. The suite passed, `make eval` printed the same recall and
 unit-coverage columns, the query printed the same nine lines above its timing line, `make examples`
 printed 14 result tables again, and `make serve` returned the same chunk (Aare, chunk 1, distance
-0.3091). The clone command of the recorded run:
+0.3091). Plain `make setup` was run from fresh clones on the same laptop under Windows, with WSL 2
+(the last section). The clone command of the recorded run:
 
 ```
 git clone --branch fable-review-2026-11-11 https://github.com/ylli-00/WikiLens.git WikiLens
@@ -142,6 +142,25 @@ wikilense: database error: Access denied for user 'wikilense'@'<host>' (using pa
 ## Not run
 
 Plain `make setup` (the version ranges of `requirements-dev.txt`), the command on the README's
-first screen, was not run in this clone: on Linux it installs the CUDA build of PyTorch, several
-GB. Its recipe differs from the run above only in the requirements file it gives to pip. The
-ranges were checked by resolution only (`docs/SETUP.md`, "Platforms").
+first screen, was not run in this clone. Its recipe differs from the run above in the requirements
+file it gives to pip and, on Linux, in PyTorch's CPU index, so it installs the CPU build too. It
+was run from fresh clones on Windows (below).
+
+## Windows with WSL 2
+
+The same laptop under Windows 11 with WSL 2, Ubuntu 26.04, Docker Engine 29.1.3 and the system's
+Python 3.14.4, plain `make setup` (PyTorch 2.15.0+cpu):
+
+- 2026-11-22, a clone of `f176f2c` on the Windows drive (`/mnt/c`). `make setup` ended with exit
+  code 0, but there was no test database: on that drive every file looks executable, so the
+  entrypoint ran `sql/docker-init/01-test-database.sh` as a program, and it failed. `make test`
+  gave 11 failed and 102 errors, all error 1044; with the database made by hand, 901 passed and
+  32 skipped. The query printed the same nine lines (`model load 57296 ms`), `make eval` the same
+  recall and unit-coverage columns. With every package in pip's cache `make setup` took 25 min 10 s.
+- 2026-11-24, a clone of `7574b5e`, which makes the script work both ways, inside Ubuntu's own file
+  system. `make setup` took 4 min 49 s, every package from pip's cache. The query printed the same
+  nine lines (`model load 3010 ms`); `make test` gave 904 passed and 32 skipped, which need the
+  optional Anthropic SDK; `make eval` printed the same columns, `make serve` gave the answers
+  above, `make examples` 14 result tables, and `make load-demo REPLACE=1` 100 pages, 4598 chunks
+  and 75 claims. A clone on the Windows drive, started on a new volume, ran the script as a
+  program and made the test database.
